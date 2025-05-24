@@ -5,13 +5,14 @@
 <PageTitle>Configurações</PageTitle>
 
 <MudText Typo="Typo.h3" GutterBottom="true">Configurações</MudText>
-<MudText Typo="Typo.body1">Faça ajustes na plataforma e deixe de acordo com sua preferência</MudText>
+<MudText Typo="Typo.body1" GutterBottom="true">Faça ajustes na plataforma e deixe de acordo com sua preferência</MudText>
 
 <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-2" Outlined="true">
     <MudTabPanel Text="Perfil" Icon="@Icons.Material.Filled.Person"/>
     <MudTabPanel Text="Visual" Icon="@Icons.Material.Filled.Brightness6">
         <MudSwitch T="bool"
-                   @bind-Checked="ThemeService.IsDarkMode"
+                   @bind-Value="@ThemeService.IsDarkMode"
+                   ThumbIcon="@ThemeIcon"
                    Color="Color.Primary"
                    Label="@ThemeLabel"
                    ThumbIconChecked="@Icons.Material.Filled.DarkMode"
@@ -27,4 +28,6 @@
 @code {
     [Inject] ThemeService ThemeService { get; set; } = null!;
     private string ThemeLabel => ThemeService.IsDarkMode ? "Modo escuro" : "Modo claro";
+    private string ThemeIcon => ThemeService.IsDarkMode ? Icons.Material.Filled.DarkMode : Icons.Material.Filled.LightMode;
+
 }

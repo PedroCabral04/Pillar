@@ -1,9 +1,11 @@
+using MudBlazor.Interfaces;
+
+
 namespace erp.Services;
 
 public class ThemeService
 {
-    public bool IsDarkMode { get; set; } = false;
-
+    public bool IsDarkMode { get; set; } 
     public event Action? OnThemeChanged;
 
     public void SetDarkMode(bool value)
@@ -14,4 +16,5 @@ public class ThemeService
             OnThemeChanged?.Invoke();
         }
     }
+    
 }
