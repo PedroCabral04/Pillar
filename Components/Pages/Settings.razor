@@ -1,0 +1,30 @@
+@page "/ajustes"
+@using erp.Components.Layout
+@using erp.Services
+
+<PageTitle>Configurações</PageTitle>
+
+<MudText Typo="Typo.h3" GutterBottom="true">Configurações</MudText>
+<MudText Typo="Typo.body1">Faça ajustes na plataforma e deixe de acordo com sua preferência</MudText>
+
+<MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-2" Outlined="true">
+    <MudTabPanel Text="Perfil" Icon="@Icons.Material.Filled.Person"/>
+    <MudTabPanel Text="Visual" Icon="@Icons.Material.Filled.Brightness6">
+        <MudSwitch T="bool"
+                   @bind-Checked="ThemeService.IsDarkMode"
+                   Color="Color.Primary"
+                   Label="@ThemeLabel"
+                   ThumbIconChecked="@Icons.Material.Filled.DarkMode"
+                   ThumbIconUnchecked="@Icons.Material.Filled.LightMode"
+                   Class="mb-2">
+        </MudSwitch>
+    </MudTabPanel>
+    <MudTabPanel Text="Notificações" Icon="@Icons.Material.Filled.Notifications"/>
+    <MudTabPanel Text="Áudio" Icon="@Icons.Material.Filled.VolumeUp"/>
+
+</MudTabs>
+
+@code {
+    [Inject] ThemeService ThemeService { get; set; } = null!;
+    private string ThemeLabel => ThemeService.IsDarkMode ? "Modo escuro" : "Modo claro";
+}

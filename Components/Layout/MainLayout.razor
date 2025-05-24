@@ -1,0 +1,125 @@
+﻿@using erp.Services
+@inherits LayoutComponentBase
+@inject ThemeService ThemeService
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
+
+<MudThemeProvider @ref="@_mudThemeProvider" @bind-IsDarkMode="ThemeService.IsDarkMode" Theme="@_customTheme"/>
+<MudPopoverProvider/>
+<MudDialogProvider/>
+<MudSnackbarProvider/>
+<MudLayout>
+    <MudPaper Style="position: relative; height: 100vh; display: flex" >
+        @*<MudAppBar Elevation="1">
+            <MudStaticNavDrawerToggle DrawerId="nav-drawer" Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start"/>
+            <MudText Typo="Typo.h5" Class="ml-3">Application</MudText>
+            <MudSpacer/>
+            <MudIconButton Icon="@Icons.Material.Filled.MoreVert" Color="Color.Inherit" Edge="Edge.End"/>
+        </MudAppBar>*@
+        <MudDrawerContainer Class="mud-height-full">
+            <MudDrawer id="nav-drawer" 
+                       Fixed="false" 
+                       Variant="@DrawerVariant.Mini" 
+                       OpenMiniOnHover="true" 
+                       @bind-Open="_drawerOpen" 
+                       ClipMode="DrawerClipMode.Always" 
+                       Elevation="2"
+                       Width="170px">
+                    <NavMenu/>
+            </MudDrawer>
+        </MudDrawerContainer>
+        <MudMainContent 
+            Class="pt-16 pa-4 full-height-content" 
+            Style="@MainContentStyle()">
+                @Body
+            </MudMainContent>
+    </MudPaper>
+</MudLayout>
+
+
+@*<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+    <div/>*@
+
+@code {
+    private bool _drawerOpen = false;
+    private MudThemeProvider _mudThemeProvider = null!;
+    public bool IsDarkMode;
+
+    readonly MudTheme _customTheme = new MudTheme()
+    {
+        PaletteLight = new PaletteLight()
+        {
+            Primary = Colors.Blue.Default,
+            Secondary = Colors.Indigo.Default,
+            Success = Colors.Teal.Lighten1,
+            Info = Colors.LightBlue.Default,
+            Warning = Colors.Amber.Default,
+            Error = Colors.Red.Default,
+            Background = Colors.Gray.Lighten5,
+            Surface = Colors.Gray.Lighten5,
+            AppbarBackground = Colors.Blue.Darken2,
+            DrawerBackground = Colors.Gray.Lighten3,
+            Tertiary = Colors.Teal.Lighten1,
+            TextPrimary = Colors.Gray.Darken4,
+            TextSecondary = Colors.Gray.Darken3,
+        },
+
+        PaletteDark = new PaletteDark()
+        {
+            Primary = Colors.Blue.Lighten2,
+            Secondary = Colors.Indigo.Lighten3,
+            Success = Colors.Teal.Lighten3,
+            Info = Colors.Cyan.Lighten2,
+            Warning = Colors.Amber.Lighten2,
+            Error = Colors.Red.Lighten2,
+            Background = Colors.Gray.Darken4,
+            Surface = Colors.Gray.Darken3,
+            AppbarBackground = Colors.Blue.Darken2,
+            DrawerBackground = Colors.Gray.Darken3,
+            Tertiary = Colors.Teal.Darken2,
+            TextPrimary = Colors.Gray.Lighten5,
+            TextSecondary = Colors.Gray.Lighten2,
+        },
+
+        Typography = new Typography()
+        {
+            Default = new DefaultTypography()
+            {
+                FontFamily = new[] { "Poppins", "Roboto" },
+            },
+        },
+    };
+
+    string SetMarginForDrawer()
+    {
+        return _drawerOpen ? "margin-left: 170px;" : "margin-left: 56px;";
+    }
+
+    string MainContentStyle() => $"margin-top: -32px; {SetMarginForDrawer()} flex: 1 1 auto; min-height: 0; overflow-y: auto;";
+
+    protected override void OnInitialized()
+    {
+        ThemeService.OnThemeChanged += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        ThemeService.OnThemeChanged -= StateHasChanged;
+    }
+    
+    /*protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            isDarkMode = await _mudThemeProvider.GetSystemPreference();
+            StateHasChanged();
+        }
+    }*/
+    
+    
+}

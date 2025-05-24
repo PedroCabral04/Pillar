@@ -1,0 +1,3 @@
+[*.cs]
+dotnet_diagnostic.RMG020.severity = none
+dotnet_diagnostic.RMG012.severity = none
