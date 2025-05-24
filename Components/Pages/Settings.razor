@@ -11,7 +11,8 @@
     <MudTabPanel Text="Perfil" Icon="@Icons.Material.Filled.Person"/>
     <MudTabPanel Text="Visual" Icon="@Icons.Material.Filled.Brightness6">
         <MudSwitch T="bool"
-                   @bind-Checked="ThemeService.IsDarkMode"
+                   Checked="@ThemeService.IsDarkMode"
+                   CheckedChanged="@((bool newValue) => ThemeService.SetDarkMode(newValue))"
                    Color="Color.Primary"
                    Label="@ThemeLabel"
                    ThumbIconChecked="@Icons.Material.Filled.DarkMode"
