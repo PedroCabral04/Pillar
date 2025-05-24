@@ -5,6 +5,7 @@ using erp.DAOs;
 using erp.Data;
 using erp.Mappings;
 using erp.Services;
+using Blazored.LocalStorage;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +19,7 @@ builder.Services.AddSwaggerGen();
 
 // Adiciona serviços de terceiros.
 builder.Services.AddMudServices();
+builder.Services.AddBlazoredLocalStorage();
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection"); 
 builder.Services.AddDbContext<AppDbContext>(options =>

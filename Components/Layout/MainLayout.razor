@@ -1,6 +1,7 @@
 ﻿@using erp.Services
 @inherits LayoutComponentBase
 @inject ThemeService ThemeService
+@inject IJSRuntime JsRuntime
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -104,12 +105,46 @@
 
     protected override void OnInitialized()
     {
-        ThemeService.OnThemeChanged += StateHasChanged;
+        ThemeService.OnThemeChanged += HandleThemeChanged;
+    }
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            { 
+                await ThemeService.InitializeThemeAsync();
+            }
+            catch (Exception ex) // Captura mais genérica para logar qualquer problema na inicialização
+            {
+                Console.WriteLine($"Failed to initialize theme: {ex.Message}");
+                // A UI usará o valor padrão de IsDarkMode (false)
+            }
+            StateHasChanged();
+        }
+    }
+    
+    private void HandleThemeChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ToggleThemeInAppBar()
+    {
+        try
+        {
+            await ThemeService.SetDarkModeAsync(!ThemeService.IsDarkMode);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to set theme: {ex.Message}");
+        }
     }
 
     public void Dispose()
     {
-        ThemeService.OnThemeChanged -= StateHasChanged;
+        ThemeService.OnThemeChanged -= HandleThemeChanged;
     }
     
     /*protected override async Task OnAfterRenderAsync(bool firstRender)
