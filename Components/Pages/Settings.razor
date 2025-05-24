@@ -10,7 +10,8 @@
     <MudTabPanel Text="Perfil" Icon="@Icons.Material.Filled.Person"/>
     <MudTabPanel Text="Visual" Icon="@Icons.Material.Filled.Brightness6">
         <MudSwitch T="bool"
-                   @bind-Value="@ThemeService.IsDarkMode"
+                   Value="@ThemeService.IsDarkMode"
+                   ValueChanged="@OnThemeSwitchChanged"
                    ThumbIcon="@ThemeIcon"
                    Color="Color.Primary"
                    Label="@ThemeLabel"
@@ -29,4 +30,8 @@
     private string ThemeLabel => ThemeService.IsDarkMode ? "Modo escuro" : "Modo claro";
     private string ThemeIcon => ThemeService.IsDarkMode ? Icons.Material.Filled.DarkMode : Icons.Material.Filled.LightMode;
 
+    private async Task OnThemeSwitchChanged(bool newValue)
+    {
+        await ThemeService.SetDarkModeAsync(newValue);
+    }
 }
