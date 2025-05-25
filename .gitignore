@@ -4,3 +4,6 @@ obj/
 riderModule.iml
 /_ReSharper.Caches/
 .idea
+Migrations
+ERP_Development_Guide.md
+Pages/Template

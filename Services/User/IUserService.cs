@@ -2,13 +2,15 @@ using erp.DAOs;
 using erp.Models;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using erp.DTOs.User; // Adicionar este using
 
 namespace erp.Services
 {
     public interface IUserService
     {
         Task<User> GetByIdAsync(int id);
-        Task<IEnumerable<User>> GetAllAsync();
+        // Task<IEnumerable<User>> GetAllAsync(); // Linha Antiga
+        Task<IEnumerable<UserDto>> GetAllAsync(); // <<< MODIFICAR PARA RETORNAR UserDto
         Task<User> CreateAsync(User user, string password);
         Task UpdateAsync(User user, string password = null);
         Task DeleteAsync(int id);

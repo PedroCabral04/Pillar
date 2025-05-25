@@ -1,0 +1,48 @@
+@page "/login"
+@using System.ComponentModel.DataAnnotations
+@using erp.Models
+@using erp.DTOs.User
+@using erp.Services
+@using erp.Controllers
+
+<PageTitle>Log in</PageTitle>
+
+<MudText Typo="Typo.h3" GutterBottom="true">Login</MudText>
+
+<MudCard Elevation="8" Class="w-100">
+    <MudCardHeader Style="margin-bottom: -20px">
+        <CardHeaderContent>
+            <MudText Typo="Typo.h5" Color="Color.Default">Adicionar usuários</MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudIconButton Icon="@Icons.Material.Filled.Settings" Color="Color.Default"></MudIconButton>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudTextField T="string" Label="Nome" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      InputType="InputType.Text" Required="true" RequiredError="Nome é obrigatório"/>
+        <MudTextField T="string" Label="Email" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      InputType="InputType.Email" Required="true" RequiredError="Email é obrigatório"
+                      Validation="@(new EmailAddressAttribute() {ErrorMessage = "Email inválido!"})"/>
+        <MudTextField T="string" Label="Telefone" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      InputType="InputType.Telephone" Required="true" RequiredError="Telefone é obrigatório"
+                      Validation="@(new PhoneAttribute() {ErrorMessage = "Telefone inválido!"})"/>
+        <MudSelect T="string" @bind-Value="_role" Label="Função/Permissão" MultiSelection="true"
+                   Variant="Variant.Outlined" Margin="Margin.Dense" Required="true"
+                   RequiredError="Escolha pelo menos uma permissão" SelectAll="true" SelectAllText="Selecionar todos">
+            @foreach (string role in _roles)
+            {
+                <MudSelectItem T="string" Value="@role">@role</MudSelectItem>
+            }
+        </MudSelect>
+    </MudCardContent>
+</MudCard>
+
+
+@code {
+    private string _role = "";
+    private readonly string[] _roles = {"Administrador", "Gerente", "Vendedor"};
+    private User _user = new User();
+    private IEnumerable<User> _users = new List<User>();
+    
+}

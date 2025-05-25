@@ -1,0 +1,126 @@
+@page "/admin/users"
+@using System.ComponentModel.DataAnnotations
+@using System.Net.Http.Json
+@using erp.Models
+@using erp.DTOs.User
+
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject ILogger<Users> Logger
+
+<PageTitle>Gerenciar Usuários</PageTitle>
+
+<MudCard Elevation="8" Class="w-100">
+    <MudCardHeader Style="margin-bottom: -20px">
+        <CardHeaderContent>
+            <MudText Typo="Typo.h5" Color="Color.Default">Adicionar usuários</MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudIconButton Icon="@Icons.Material.Filled.Settings" Color="Color.Default"></MudIconButton>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudTextField T="string" Label="Nome" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      InputType="InputType.Text" Required="true" RequiredError="Nome é obrigatório"/>
+        <MudTextField T="string" Label="Email" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      InputType="InputType.Email" Required="true" RequiredError="Email é obrigatório"
+                      Validation="@(new EmailAddressAttribute() {ErrorMessage = "Email inválido!"})"/>
+        <MudTextField T="string" Label="Telefone" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      InputType="InputType.Telephone" Required="true" RequiredError="Telefone é obrigatório"
+                      Validation="@(new PhoneAttribute() {ErrorMessage = "Telefone inválido!"})"/>
+        <MudSelect T="string" @bind-Value="_role" Label="Função/Permissão" MultiSelection="true"
+                   Variant="Variant.Outlined" Margin="Margin.Dense" Required="true"
+                   RequiredError="Escolha pelo menos uma permissão" SelectAll="true" SelectAllText="Selecionar todos">
+            @foreach (string roleName in _roles)
+            {
+                <MudSelectItem T="string" Value="@roleName">@roleName</MudSelectItem>
+            }
+        </MudSelect>
+        <MudButton Color="Color.Primary" Variant="Variant.Outlined" EndIcon="@Icons.Material.Filled.Add"
+                   Class="w-100" Style="margin-top: 20px">
+            Adicionar
+        </MudButton>
+    </MudCardContent>
+</MudCard>
+
+<MudDivider Class="my-4"/>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Usuários Existentes</MudText>
+@if (_users == null && _loadError == null)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true"/>
+    <MudText>Carregando...</MudText>
+} 
+else if (_loadError != null)
+{
+    <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
+} 
+else if (_users != null && _users.Any())
+{
+    <MudTable Items="@_users" Dense="true" Hover="true"
+              Striped="true" Elevation="4">
+        <HeaderContent>
+            <MudTh>Nome</MudTh>
+            <MudTh>Email</MudTh>
+            <MudTh>Telefone</MudTh>
+            <MudTh>Função/Permissão</MudTh>
+            <MudTh>Ações</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Nome">@context.Username</MudTd>
+            <MudTd DataLabel="Email">@context.Email</MudTd>
+            <MudTd DataLabel="Telefone">@context.Phone</MudTd>
+            <MudTd DataLabel="Permissões">@context.RoleName</MudTd>
+            <MudTd DataLabel="Nome">
+                
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
+}
+else
+{
+    <MudText>Nenhum usuário encontrado</MudText>
+}
+
+
+@code {
+    private string _role = "";
+    private readonly string[] _roles = {"Admin", "User"};
+    private int _onInitializedCounter = 0;
+    
+// Api retorna IEnumerable<UserDto>
+    private IEnumerable<UserDto>? _users;
+    private string? _loadError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _onInitializedCounter+=1;
+        var executionContext = OperatingSystem.IsBrowser() ? "Client" : "Server";
+        Logger.LogInformation("Users.razor: OnInitializedAsync() called. Count: {Count}, Context: {Context}, ThreadId: {ThreadId}",
+        _onInitializedCounter, executionContext, Environment.CurrentManagedThreadId);
+        if (_users == null)
+        {
+            try
+            {
+                // A API está em "api/users" e o método GetAllUsers é um GET nesse endpoint.
+                // HttpClient.GetFromJsonAsync desserializa a resposta JSON.
+                _users = await Http.GetFromJsonAsync<IEnumerable<UserDto>>("api/users");
+                _loadError = null; // Limpa erros anteriores
+            }
+            catch (Exception ex)
+            {
+                // Logar o erro real no console do servidor/browser para debugging
+                Console.WriteLine($"Erro ao buscar usuários: {ex.Message}");
+                _loadError = "Não foi possível carregar os usuários. Tente novamente mais tarde.";
+                _users = Enumerable.Empty<UserDto>(); // Define como vazio para evitar null ref na UI
+            }
+        }
+        else
+        {
+            Logger.LogInformation("Users.razor: Data already loaded, skipping fetch. Count: {Count}, Context: {Context}", _onInitializedCounter, executionContext);
+        }
+    }
+}

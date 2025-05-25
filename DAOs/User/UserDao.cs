@@ -1,14 +1,20 @@
 using erp.Data;
 using erp.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using erp.DTOs.User; // Adicionar este using
 
 namespace erp.DAOs;
 
-public class UserDao(AppDbContext context) : IUserDao
+public class UserDao(ApplicationDbContext context) : IUserDao
 {
-    private readonly AppDbContext _context = context;
+    private readonly ApplicationDbContext _context = context;
 
     // Busca um usuário pelo ID. Retorna null se não encontrar.
+    // Para GetByIdAsync, ainda pode ser útil retornar a entidade completa
+    // ou um DTO mais detalhado, dependendo do uso.
     public async Task<User?> GetByIdAsync(int id)
     {
         return await _context.Users
@@ -17,11 +23,34 @@ public class UserDao(AppDbContext context) : IUserDao
                 .FirstOrDefaultAsync(u => u.Id == id);
     }
 
-    // Retorna todos os usuários como uma lista.
+    // Modificado para retornar IEnumerable<UserDto> e selecionar apenas os campos necessários.
+    public async Task<IEnumerable<UserDto>> GetAllAsyncProjected() // Renomeado para clareza ou poderia substituir o original
+    {
+        return await _context.Users
+            .Include(u => u.Role) // O Include ainda é necessário para acessar u.Role.Name
+            .AsNoTracking()
+            .Select(u => new UserDto
+            {
+                Id = u.Id, // <<< DESCOMENTE ESTA LINHA
+                Username = u.Username,
+                Email = u.Email,
+                Phone = u.Phone,
+                RoleName = u.Role != null ? u.Role.Name : null // Garante que Role não é null
+                // IsActive e RoleId do UserDto não estão sendo preenchidos aqui.
+                // Se forem necessários para a listagem, adicione-os à projeção.
+            })
+            .ToListAsync();
+    }
+
+    // Mantenha a assinatura original de GetAllAsync se outras partes do sistema esperam a entidade User completa.
+    // Caso contrário, você pode adaptar a interface IUserDao e o restante do sistema.
+    // Por agora, estou adicionando um novo método GetAllAsyncProjected.
+    // Se você quiser substituir o GetAllAsync original, você precisará atualizar IUserDao e UserService.
     public async Task<IEnumerable<User>> GetAllAsync()
     {
         return await _context.Users.Include(u => u.Role).AsNoTracking().ToListAsync();
     }
+
 
     // Adiciona o novo usuário ao contexto.
     public async Task<User> CreateAsync(User user)
@@ -64,6 +93,7 @@ public class UserDao(AppDbContext context) : IUserDao
     {
         // Busca o primeiro usuário que corresponde ao email fornecido.
         // Retorna null se nenhum usuário com esse email for encontrado.
-        return await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+        // Se você só precisar de alguns campos aqui também, pode projetar.
+        return await _context.Users.Include(u => u.Role).FirstOrDefaultAsync(u => u.Email == email);
     }
 }

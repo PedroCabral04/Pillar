@@ -7,7 +7,7 @@ namespace erp.Models;
 
 /// <summary>
 /// Modelo que representa um usuário no sistema
-/// </summadoty>
+/// </summary>
 [Index(nameof(Email), IsUnique = true)]
 public class User
 {
@@ -23,6 +23,11 @@ public class User
     [EmailAddress(ErrorMessage = "Formato de e-mail inválido")]
     [StringLength(100, ErrorMessage = "E-mail não pode exceder 100 caracteres")]
     public string Email { get; set; }
+    
+    [Required]
+    [Phone]
+    [StringLength(11, ErrorMessage = "Telefone inválido")]
+    public string Phone { get; set; }
     
     [Required]
     [JsonIgnore] 
@@ -69,11 +74,12 @@ public class User
     public DateTime? LastLoginAt { get; set; }
     
     
-    public User(int id, string username, string email, string passwordHash, int roleId, bool isActive)
+    public User(int id, string username, string email, string phone, string passwordHash, int roleId, bool isActive)
     {
         Id = id;
         Username = username;
         Email = email;
+        Phone = phone;
         PasswordHash = passwordHash;
         RoleId = roleId;
         IsActive = isActive;

@@ -1,30 +1,22 @@
 using erp.DAOs;
 using erp.Models;
 using BCrypt.Net;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+using erp.DTOs.User; // Adicionar este using
 
 namespace erp.Services
 {
-    public class UserService : IUserService
-    {
-        private readonly IUserDao _userDao;
+    public class UserService(IUserDao userDao) : IUserService {
         private const int WorkFactor = 12;
-        
-        public UserService(IUserDao userDao)
-        {
-            _userDao = userDao;
-        }
-        
+
         public async Task<User> GetByIdAsync(int id)
         {
-            return await _userDao.GetByIdAsync(id);
+            return await userDao.GetByIdAsync(id);
         }
         
-        public async Task<IEnumerable<User>> GetAllAsync()
+        // MODIFICADO para chamar GetAllAsyncProjected e retornar IEnumerable<UserDto>
+        public async Task<IEnumerable<UserDto>> GetAllAsync()
         {
-            return await _userDao.GetAllAsync();
+            return await userDao.GetAllAsyncProjected();
         }
         
         public async Task<User> CreateAsync(User user, string password)
@@ -36,15 +28,14 @@ namespace erp.Services
             ValidatePasswordStrength(password);
             
             user.PasswordHash = HashPassword(password);
-            user.CreatedAt = DateTime.UtcNow;
             user.PasswordChangedAt = DateTime.UtcNow;
             
-            return await _userDao.CreateAsync(user);
+            return await userDao.CreateAsync(user);
         }
         
-        public async Task UpdateAsync(User user, string password = null)
+        public async Task UpdateAsync(User user, string password = null!)
         {
-            var existingUser = await _userDao.GetByIdAsync(user.Id);
+            var existingUser = await userDao.GetByIdAsync(user.Id);
             
             if (existingUser == null)
                 throw new Exception("Usuário não encontrado");
@@ -62,28 +53,24 @@ namespace erp.Services
                 user.PasswordChangedAt = existingUser.PasswordChangedAt;
             }
             
-            user.LastUpdatedAt = DateTime.UtcNow;
-            await _userDao.UpdateAsync(user);
+            await userDao.UpdateAsync(user);
         }
         
         public async Task DeleteAsync(int id)
         {
-            await _userDao.DeleteAsync(id);
+            await userDao.DeleteAsync(id);
         }
         
         public async Task<User> AuthenticateAsync(string email, string password)
         {
-            var user = await _userDao.GetByEmailAsync(email);
+            var user = await userDao.GetByEmailAsync(email);
             
-            if (user == null)
-                return null;
-                
-            if (!user.IsActive)
-                return null;
-                
+            if (user == null! || !user.IsActive)
+                return null!;
+
             // Verifica se a conta está bloqueada
             if (user.IsLocked)
-                return null;
+                return null!;
                 
             // Verifica a senha
             if (!VerifyPassword(password, user.PasswordHash))
@@ -97,8 +84,8 @@ namespace erp.Services
                     user.LockedUntil = DateTime.UtcNow.AddMinutes(30);
                 }
                 
-                await _userDao.UpdateAsync(user);
-                return null;
+                await userDao.UpdateAsync(user);
+                return null!;
             }
             
             // Autenticação bem-sucedida, reseta contadores
@@ -106,11 +93,11 @@ namespace erp.Services
             user.LockedUntil = null;
             user.LastLoginAt = DateTime.UtcNow;
             
-            await _userDao.UpdateAsync(user);
+            await userDao.UpdateAsync(user);
             return user;
         }
         
-        private void ValidatePasswordStrength(string password)
+        private static void ValidatePasswordStrength(string password)
         {
             if (string.IsNullOrEmpty(password))
                 throw new ArgumentException("Senha não pode ser vazia");
@@ -151,9 +138,9 @@ namespace erp.Services
                     
                 return BCrypt.Net.BCrypt.Verify(password, passwordHash);
             }
-            catch
+            catch (Exception e)
             {
-                // Em caso de qualquer erro (formato inválido, etc), considera falha na verificação
+                Console.WriteLine("Erro ao verificar senha: " + e.Message);
                 return false;
             }
         }
@@ -165,7 +152,7 @@ namespace erp.Services
                 
             ValidatePasswordStrength(newPassword);
             
-            var user = await _userDao.GetByIdAsync(userId);
+            var user = await userDao.GetByIdAsync(userId);
             if (user == null)
                 throw new Exception("Usuário não encontrado");
                 
@@ -174,12 +161,12 @@ namespace erp.Services
             user.FailedLoginAttempts = 0;
             user.LockedUntil = null;
             
-            await _userDao.UpdateAsync(user);
+            await userDao.UpdateAsync(user);
         }
         
         public async Task<bool> ChangePasswordAsync(int userId, string currentPassword, string newPassword)
         {
-            var user = await _userDao.GetByIdAsync(userId);
+            var user = await userDao.GetByIdAsync(userId);
             if (user == null)
                 throw new Exception("Usuário não encontrado");
                 
@@ -192,20 +179,20 @@ namespace erp.Services
             user.PasswordHash = HashPassword(newPassword);
             user.PasswordChangedAt = DateTime.UtcNow;
             
-            await _userDao.UpdateAsync(user);
+            await userDao.UpdateAsync(user);
             return true;
         }
         
         public async Task UnlockUserAsync(int userId)
         {
-            var user = await _userDao.GetByIdAsync(userId);
+            var user = await userDao.GetByIdAsync(userId);
             if (user == null)
                 throw new Exception("Usuário não encontrado");
                 
             user.FailedLoginAttempts = 0;
             user.LockedUntil = null;
             
-            await _userDao.UpdateAsync(user);
+            await userDao.UpdateAsync(user);
         }
         
         public Task<bool> IsPasswordValidAsync(string password)

@@ -6,6 +6,8 @@ using erp.Data;
 using erp.Mappings;
 using erp.Services;
 using Blazored.LocalStorage;
+using erp.DAOs;
+using Microsoft.AspNetCore.Components;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,13 +18,20 @@ builder.Services.AddRazorComponents()
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddScoped(sp => {
+    var navigationManager = sp.GetRequiredService<NavigationManager>();
+    return new HttpClient
+    {
+        BaseAddress = new Uri(navigationManager.BaseUri)
+    };
+});
 
 // Adiciona serviços de terceiros.
 builder.Services.AddMudServices();
 builder.Services.AddBlazoredLocalStorage();
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection"); 
-builder.Services.AddDbContext<AppDbContext>(options =>
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
                                                 options.UseNpgsql(connectionString ?? "Host=localhost;Database=erp;Username=postgres;Password=123"));
 
 // Registra DAOs e Serviços

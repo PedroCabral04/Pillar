@@ -9,24 +9,26 @@ using erp.Mappings;
 namespace erp.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/users")]
     public class UsersController : ControllerBase
     {
         private readonly IUserService _userService;
-        private readonly UserMapper _mapper; // Agora usando UserMapper de Mapperly
+        private readonly UserMapper _mapper; // Mapper ainda é usado em outros métodos
 
         public UsersController(IUserService userService, UserMapper mapper)
         {
             _userService = userService;
-            _mapper = mapper;
+            _mapper = mapper; // Mantenha o mapper se outros métodos o utilizam
         }
 
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
         public async Task<ActionResult<IEnumerable<UserDto>>> GetAllUsers()
         {
-            var users = await _userService.GetAllAsync();
-            var userDtos = _mapper.UsersToUserDtos(users);
+            // Agora _userService.GetAllAsync() retorna IEnumerable<UserDto>
+            var userDtos = await _userService.GetAllAsync(); 
+            // A linha abaixo não é mais necessária e deve ser removida:
+            // var userDtos = _mapper.UsersToUserDtos(users); 
             return Ok(userDtos);
         }
 
@@ -35,11 +37,12 @@ namespace erp.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<ActionResult<UserDto>> GetUserById(int id)
         {
-            var user = await _userService.GetByIdAsync(id);
+            var user = await _userService.GetByIdAsync(id); // Retorna User (entidade)
             if (user == null)
                 return NotFound($"Usuário com ID {id} não encontrado.");
 
-            var userDto = _mapper.UserToUserDto(user);
+            // Mapeamento ainda necessário aqui se GetByIdAsync retorna a entidade completa
+            var userDto = _mapper.UserToUserDto(user); 
             return Ok(userDto);
         }
 

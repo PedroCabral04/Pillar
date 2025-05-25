@@ -1,13 +1,15 @@
-using erp.Models;
+using erp.DTOs.User;
 
 namespace erp.DAOs;
 
 public interface IUserDao
 {
-    Task<User> GetByIdAsync(int id);
-    Task<IEnumerable<User>> GetAllAsync();
-    Task<User> CreateAsync(User user);
-    Task UpdateAsync(User user);
+    Task<Models.User> GetByIdAsync(int id);
+    Task<IEnumerable<Models.User>> GetAllAsync();
+    Task<IEnumerable<UserDto>> GetAllAsyncProjected();
+    
+    Task<Models.User> CreateAsync(Models.User user);
+    Task UpdateAsync(Models.User user);
     Task DeleteAsync(int id);
-    Task<User> GetByEmailAsync(string email);
+    Task<Models.User> GetByEmailAsync(string email);
 }
