@@ -1,12 +1,44 @@
+using System.Text;
 using erp.DAOs;
 using erp.Models;
 using BCrypt.Net;
-using erp.DTOs.User; // Adicionar este using
+using erp.DTOs.User;
+using Microsoft.AspNetCore;
+
 
 namespace erp.Services
 {
     public class UserService(IUserDao userDao) : IUserService {
         private const int WorkFactor = 12;
+
+        private string GenerateRandomPassword(int length = 12)
+        {
+            const string validChars = "ABCDEFGHJKLMNOPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz0123456789!@#$%^&*?_-";
+            const string uppercase = "ABCDEFGHJKLMNOPQRSTUVWXYZ";
+            const string lowercase = "abcdefghijkmnopqrstuvwxyz";
+            const string digits = "0123456789";
+            const string specialChars = "!@#$%^&*?_-";
+
+            var random = new Random();
+            var password = new char[length];
+            var charSetBuilder = new StringBuilder();
+
+            // Garantir pelo menos um de cada tipo
+            password[0] = uppercase[random.Next(uppercase.Length)];
+            password[1] = lowercase[random.Next(lowercase.Length)];
+            password[2] = digits[random.Next(digits.Length)];
+            password[3] = specialChars[random.Next(specialChars.Length)];
+
+            // Preencher o restante da senha com caracteres aleatórios de todos os conjuntos
+            for (int i = 4; i < length; i++)
+            {
+                password[i] = validChars[random.Next(validChars.Length)];
+            }
+
+            // Embaralhar os caracteres da senha para maior aleatoriedade
+            return new string(password.OrderBy(x => random.Next()).ToArray());
+        }
+
 
         public async Task<User> GetByIdAsync(int id)
         {
@@ -19,15 +51,14 @@ namespace erp.Services
             return await userDao.GetAllAsyncProjected();
         }
         
-        public async Task<User> CreateAsync(User user, string password)
+        public async Task<User> CreateAsync(User user)
         {
-            // Valida input
-            if (string.IsNullOrEmpty(password))
-                throw new ArgumentException("Senha é obrigatória");
+            // Gera senha temporária ao criar usuário
+            string temporaryPassword = GenerateRandomPassword();
                 
-            ValidatePasswordStrength(password);
+            ValidatePasswordStrength(temporaryPassword);
             
-            user.PasswordHash = HashPassword(password);
+            user.PasswordHash = HashPassword(temporaryPassword);
             user.PasswordChangedAt = DateTime.UtcNow;
             
             return await userDao.CreateAsync(user);

@@ -11,7 +11,7 @@ namespace erp.Services
         Task<User> GetByIdAsync(int id);
         // Task<IEnumerable<User>> GetAllAsync(); // Linha Antiga
         Task<IEnumerable<UserDto>> GetAllAsync(); // <<< MODIFICAR PARA RETORNAR UserDto
-        Task<User> CreateAsync(User user, string password);
+        Task<User> CreateAsync(User user);
         Task UpdateAsync(User user, string password = null);
         Task DeleteAsync(int id);
         Task<User> AuthenticateAsync(string email, string password);
