@@ -34,7 +34,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         foreach (var entityEntry in entries )
         {
             var userEntity = (User)entityEntry.Entity;
-            userEntity.LastUpdatedAt = DateTime.UtcNow;
+            if (entityEntry.State == EntityState.Modified)
+            {
+                userEntity.LastUpdatedAt = DateTime.UtcNow;
+            }
             
             if (entityEntry.State == EntityState.Added)
             {

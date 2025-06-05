@@ -55,7 +55,7 @@ namespace erp.Controllers
 
             try
             {
-                var createdUser = await _userService.CreateAsync(userToCreate, createUserDto.Password);
+                var createdUser = await _userService.CreateAsync(userToCreate);
                 var createdUserDto = _mapper.UserToUserDto(createdUser);
                 return CreatedAtAction(nameof(GetUserById), new { id = createdUserDto.Id }, createdUserDto);
             }
