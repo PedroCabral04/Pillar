@@ -15,7 +15,7 @@
 <PageTitle>Gerenciar Usuários</PageTitle>
 
 <MudSnackbarProvider/>
-<MudCard Elevation="8" Class="w-100">
+<MudCard Elevation="4" Class="w-100">
     <MudCardHeader Style="margin-bottom: -20px">
         <CardHeaderContent>
             <MudText Typo="Typo.h5" Color="Color.Default">Adicionar usuários</MudText>
@@ -213,6 +213,9 @@
 
     private async Task LoadRolesAsync()
     {
+        if (_rolesList.Any())
+            return;
+            
         try
         {
             var roles = await Http.GetFromJsonAsync<List<RoleDto>>("api/roles");
