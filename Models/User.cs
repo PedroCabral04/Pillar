@@ -57,11 +57,10 @@ public class User
         PasswordChangedAt.HasValue && (DateTime.UtcNow - PasswordChangedAt.Value).TotalDays > 90;
     
     [Required]
-    [ForeignKey("Role")]
-    public int RoleId { get; set; }
+    public List<int> RoleIds { get; set; } = new();
     
-    [ForeignKey("RoleId")]
-    public virtual Role Role { get; set; }
+    [NotMapped]
+    public virtual ICollection<Role> Roles { get; set; } = new List<Role>();
     
     public bool IsActive { get; set; } = true;
     
@@ -74,14 +73,14 @@ public class User
     public DateTime? LastLoginAt { get; set; }
     
     
-    public User(int id, string username, string email, string phone, string passwordHash, int roleId, bool isActive)
+    public User(int id, string username, string email, string phone, string passwordHash, List<int> roleIds, bool isActive)
     {
         Id = id;
         Username = username;
         Email = email;
         Phone = phone;
         PasswordHash = passwordHash;
-        RoleId = roleId;
+        RoleIds = roleIds;
         IsActive = isActive;
         CreatedAt = DateTime.UtcNow;
     }

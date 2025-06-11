@@ -2,16 +2,17 @@ using System.Text;
 using erp.DAOs;
 using erp.Models;
 using BCrypt.Net;
+using erp.Data;
 using erp.DTOs.User;
 using Microsoft.AspNetCore;
-
 
 namespace erp.Services
 {
     public class UserService(IUserDao userDao) : IUserService {
         private const int WorkFactor = 12;
+        private readonly ApplicationDbContext _context;
 
-        private string GenerateRandomPassword(int length = 12)
+        private static string GenerateRandomPassword(int length = 12)
         {
             const string validChars = "ABCDEFGHJKLMNOPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz0123456789!@#$%^&*?_-";
             const string uppercase = "ABCDEFGHJKLMNOPQRSTUVWXYZ";
@@ -21,7 +22,6 @@ namespace erp.Services
 
             var random = new Random();
             var password = new char[length];
-            var charSetBuilder = new StringBuilder();
 
             // Garantir pelo menos um de cada tipo
             password[0] = uppercase[random.Next(uppercase.Length)];
@@ -39,13 +39,16 @@ namespace erp.Services
             return new string(password.OrderBy(x => random.Next()).ToArray());
         }
 
+        private string sanitizePhoneNumber(string phoneNumber)
+        {
+            return phoneNumber.Replace("(", "").Replace(")", "").Replace("-", "").Replace(" ", "");
+        }
 
         public async Task<User> GetByIdAsync(int id)
         {
             return await userDao.GetByIdAsync(id);
         }
         
-        // MODIFICADO para chamar GetAllAsyncProjected e retornar IEnumerable<UserDto>
         public async Task<IEnumerable<UserDto>> GetAllAsync()
         {
             return await userDao.GetAllAsyncProjected();
@@ -55,13 +58,22 @@ namespace erp.Services
         {
             // Gera senha temporária ao criar usuário
             string temporaryPassword = GenerateRandomPassword();
-                
-            ValidatePasswordStrength(temporaryPassword);
-            
             user.PasswordHash = HashPassword(temporaryPassword);
             user.PasswordChangedAt = DateTime.UtcNow;
             
-            return await userDao.CreateAsync(user);
+            // Definir propriedades padrão para novo usuário
+            user.IsActive = true;
+            user.FailedLoginAttempts = 0;
+            user.LockedUntil = null;
+            user.LastLoginAt = null;
+            user.Phone = sanitizePhoneNumber(user.Phone);
+            
+            var createdUser = await userDao.CreateAsync(user);
+            
+            // Log da senha temporária (em produção, envie por email ou outro meio seguro)
+            Console.WriteLine($"Senha temporária para {user.Email}: {temporaryPassword}");
+            
+            return createdUser;
         }
         
         public async Task UpdateAsync(User user, string password = null!)
@@ -83,6 +95,7 @@ namespace erp.Services
                 user.PasswordHash = existingUser.PasswordHash;
                 user.PasswordChangedAt = existingUser.PasswordChangedAt;
             }
+            
             
             await userDao.UpdateAsync(user);
         }
@@ -155,7 +168,6 @@ namespace erp.Services
         
         private string HashPassword(string password)
         {
-            // Usa o BCrypt.Net com salt e fator de trabalho adequados
             return BCrypt.Net.BCrypt.HashPassword(password, workFactor: WorkFactor);
         }
         
@@ -163,7 +175,6 @@ namespace erp.Services
         {
             try
             {
-                // Verifica se o hash está em um formato válido antes de tentar verificar
                 if (string.IsNullOrEmpty(passwordHash) || !passwordHash.StartsWith("$2"))
                     return false;
                     

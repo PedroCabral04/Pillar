@@ -5,6 +5,7 @@
 @using erp.Models
 @using erp.DTOs.User
 @using erp.DTOs.Role
+@using erp.Services
 
 @inject HttpClient Http
 @inject NavigationManager NavigationManager
@@ -36,12 +37,12 @@
                       Validation="@(new PhoneAttribute() {ErrorMessage = "Telefone inválido!"})" 
                       Placeholder="(00) 00000-0000" Mask="@(new PatternMask("(00) 00000-0000"))"
                       @bind-Value="_newUser.Phone"/>
-        <MudSelect T="int" @bind-Value="_newUser.RoleId" Label="Função/Permissão" MultiSelection="true"
+        <MudSelect T="@RoleDto" @bind-SelectedValues="_selectedRoles" Label="Função/Permissão" MultiSelection="true"
                    Variant="Variant.Outlined" Margin="Margin.Dense" Required="true"
                    RequiredError="Escolha pelo menos uma permissão" SelectAll="true" SelectAllText="Selecionar todos">
             @foreach (var roleOption in _rolesList)
             {
-                <MudSelectItem T="int" Value="@roleOption.Id">@roleOption.Name</MudSelectItem>
+                <MudSelectItem T="@RoleDto" Value="@roleOption">@roleOption.Name</MudSelectItem>
             }
         </MudSelect>
         <MudButton Color="Color.Primary" Variant="Variant.Outlined" EndIcon="@Icons.Material.Filled.Add"
@@ -74,14 +75,15 @@ else if (_users != null && _users.Any())
             <MudTh>Email</MudTh>
             <MudTh>Telefone</MudTh>
             <MudTh>Função/Permissão</MudTh>
+            <MudTh>Ativo</MudTh>
             <MudTh>Ações</MudTh>
         </HeaderContent>
         <RowTemplate>
             <MudTd DataLabel="Nome">@context.Username</MudTd>
             <MudTd DataLabel="Email">@context.Email</MudTd>
             <MudTd DataLabel="Telefone">@context.Phone</MudTd>
-            <MudTd DataLabel="Permissões">@context.RoleName</MudTd>
-            <MudTd DataLabel="Nome"/>
+            <MudTd DataLabel="Permissões">@string.Join(", ", context.RoleNames)</MudTd>
+            <MudTd DataLabel="Ativo">@context.IsActive</MudTd>
             <MudTd DataLabel="Ações"/>    
         </RowTemplate>
         <PagerContent>
@@ -96,8 +98,12 @@ else
 
 
 @code {
-    private CreateUserDto _newUser = new CreateUserDto();
+    private CreateUserDto _newUser = new()
+    {
+        RoleIds = new List<int>()
+    };
 
+    private IEnumerable<RoleDto> _selectedRoles = new List<RoleDto>();
     private List<RoleDto> _rolesList = new List<RoleDto>();
     
     // Api retorna IEnumerable<UserDto>
@@ -131,16 +137,14 @@ else
     {
         try
         {
+            _newUser.RoleIds = _selectedRoles.Select(r => r.Id).ToList();
             var response = await Http.PostAsJsonAsync("api/users", _newUser);
             if (response.IsSuccessStatusCode)
             {
                 Logger.LogInformation("Usuário adicionado com sucesso.");
-                _newUser = new CreateUserDto(); // Limpa o formulário
-                if (_rolesList.Any())
-                {
-                    // Resetar RoleId para um valor padrão ou o primeiro da lista se desejar
-                    // _newUser.RoleId = _roleOptions.First().Id; 
-                }
+                _newUser = new CreateUserDto { RoleIds = new List<int>() };
+                _selectedRoles = new List<RoleDto>();
+
                 _users = await Http.GetFromJsonAsync<IEnumerable<UserDto>>("api/users"); // Recarrega a lista de usuários
                 Snackbar.Add("Usuário adicionado com sucesso!", Severity.Success);
             }
@@ -163,24 +167,13 @@ else
         try
         {
             var roles = await Http.GetFromJsonAsync<List<RoleDto>>("api/roles");
-            if (roles != null)
-            {
-                _rolesList = roles;
-                // Optionally, set a default role if needed and none is selected
-                if (_newUser.RoleId == 0 && _rolesList.Any())
-                {
-                    // _newUserToCreate.RoleId = _rolesList.First().Id; // Uncomment to pre-select the first role
-                }
-            }
-            else
-            {
-                _rolesList = new List<RoleDto>(); // Ensure it's not null
-            }
+            _rolesList = roles ?? new List<RoleDto>();
         }
         catch (Exception ex)
         {
             Logger.LogError($"Erro ao buscar funções: {ex.Message}");
             _rolesList = new List<RoleDto>(); // Ensure it's not null on error
+            Snackbar.Add("Erro ao buscar funções: " + ex.Message, Severity.Error);
         }
         StateHasChanged();
 

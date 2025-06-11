@@ -51,10 +51,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         base.OnModelCreating(modelBuilder);
 
         modelBuilder.Entity<User>()
-            .HasOne(u => u.Role)
+            .HasMany(u => u.Roles)
             .WithMany(r => r.Users)
-            .HasForeignKey(u => u.RoleId)
-            .OnDelete(DeleteBehavior.Restrict); // Evita a exclusão em cascata de usuários ao excluir um papel
+            .UsingEntity(j => j.ToTable("UserRoles"));
 
     }
 }

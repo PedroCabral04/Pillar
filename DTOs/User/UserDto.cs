@@ -8,10 +8,9 @@ public class UserDto
     public string Username { get; set; }
     public string Email { get; set; }
     public string Phone { get; set; }
-    public int RoleId { get; set; }
     
     [NotMapped]
-    public string RoleName { get; set; }
+    public List<string> RoleNames { get; set; } = new();
     
     public bool IsActive { get; set; }
 }

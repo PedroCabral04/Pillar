@@ -18,26 +18,25 @@ public class UserDao(ApplicationDbContext context) : IUserDao
     public async Task<User?> GetByIdAsync(int id)
     {
         return await _context.Users
-                .Include(u => u.Role)
+                .Include(u => u.Roles)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(u => u.Id == id);
     }
 
     // Modificado para retornar IEnumerable<UserDto> e selecionar apenas os campos necessários.
-    public async Task<IEnumerable<UserDto>> GetAllAsyncProjected() // Renomeado para clareza ou poderia substituir o original
+    public async Task<IEnumerable<UserDto>> GetAllAsyncProjected()
     {
         return await _context.Users
-            .Include(u => u.Role) // O Include ainda é necessário para acessar u.Role.Name
+            .Include(u => u.Roles)
             .AsNoTracking()
             .Select(u => new UserDto
             {
-                Id = u.Id, // <<< DESCOMENTE ESTA LINHA
+                Id = u.Id,
                 Username = u.Username,
                 Email = u.Email,
                 Phone = u.Phone,
-                RoleName = u.Role != null ? u.Role.Name : null // Garante que Role não é null
-                // IsActive e RoleId do UserDto não estão sendo preenchidos aqui.
-                // Se forem necessários para a listagem, adicione-os à projeção.
+                RoleNames = u.Roles.Select(r => r.Name).ToList(),
+                IsActive = u.IsActive
             })
             .ToListAsync();
     }
@@ -48,7 +47,10 @@ public class UserDao(ApplicationDbContext context) : IUserDao
     // Se você quiser substituir o GetAllAsync original, você precisará atualizar IUserDao e UserService.
     public async Task<IEnumerable<User>> GetAllAsync()
     {
-        return await _context.Users.Include(u => u.Role).AsNoTracking().ToListAsync();
+        return await _context.Users
+            .Include(u => u.Roles)
+            .AsNoTracking()
+            .ToListAsync();
     }
 
 
@@ -91,9 +93,8 @@ public class UserDao(ApplicationDbContext context) : IUserDao
 
     public async Task<User> GetByEmailAsync(string email)
     {
-        // Busca o primeiro usuário que corresponde ao email fornecido.
-        // Retorna null se nenhum usuário com esse email for encontrado.
-        // Se você só precisar de alguns campos aqui também, pode projetar.
-        return await _context.Users.Include(u => u.Role).FirstOrDefaultAsync(u => u.Email == email);
+        return await _context.Users
+            .Include(u => u.Roles)
+            .FirstOrDefaultAsync(u => u.Email == email);
     }
 }
