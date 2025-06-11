@@ -56,7 +56,6 @@
 
 <MudDivider Class="my-4"/>
 
-<MudText Typo="Typo.h4" GutterBottom="true">Usuários Existentes</MudText>
 @if (_users == null && _loadError == null)
 {
     <MudProgressCircular Color="Color.Primary" Indeterminate="true"/>
@@ -68,14 +67,22 @@ else if (_loadError != null)
 } 
 else if (_users != null && _users.Any())
 {
-    <MudTable Items="@_users" Dense="true" Hover="true"
-              Striped="true" Elevation="4">
+    <MudTable Items="@_users" Dense="false" Hover="true"
+              Elevation="4" RowClass="cursor-pointer" Striped='true'>
+        <ToolBarContent>
+            <MudText Typo="Typo.h5">Usuários Cadastrados</MudText>
+            <MudSpacer/>
+            <MudSpacer/>
+            <MudSpacer/>
+            <MudTextField T="string" @bind-Value="_search" Placeholder="Procurar" Variant="Variant.Outlined" Margin="Margin.Dense"
+            Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true"/>
+        </ToolBarContent>
         <HeaderContent>
-            <MudTh>Nome</MudTh>
-            <MudTh>Email</MudTh>
-            <MudTh>Telefone</MudTh>
-            <MudTh>Função/Permissão</MudTh>
-            <MudTh>Ativo</MudTh>
+            <MudTh><MudTableSortLabel SortBy="new Func<User, object>(e => e.Username)">Nome</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel SortBy="new Func<User, object>(e => e.Email)">Email</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel SortBy="new Func<User, object>(e => e.Phone)">Telefone</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel SortBy="new Func<Role, object>(e => e.Name)">Função/Permissão</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel SortBy="new Func<User, object>(e => e.IsActive)">Ativo</MudTableSortLabel></MudTh>
             <MudTh>Ações</MudTh>
         </HeaderContent>
         <RowTemplate>
@@ -98,6 +105,9 @@ else
 
 
 @code {
+
+    private string _search = String.Empty;
+
     private CreateUserDto _newUser = new()
     {
         RoleIds = new List<int>()
