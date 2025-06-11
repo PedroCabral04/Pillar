@@ -3,6 +3,7 @@ namespace erp.DTOs.Role;
 public class RoleDto {
     public int Id { get; set; }
     public string Name { get; set; }
+    public string Abbreviation { get; set; }
 
     public override bool Equals(object? obj)
     {
@@ -17,6 +18,6 @@ public class RoleDto {
 
     public override string ToString()
     {
-        return Name;
+        return Abbreviation;
     }
 }

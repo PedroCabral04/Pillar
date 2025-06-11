@@ -22,7 +22,6 @@ namespace erp.Mappings
         [MapperIgnoreTarget(nameof(User.LockedUntil))]
         [MapperIgnoreTarget(nameof(User.LastLoginAt))]
         [MapperIgnoreTarget(nameof(User.CreatedAt))]
-        [MapperIgnoreTarget(nameof(User.RoleIds))]
         [MapperIgnoreTarget(nameof(User.Roles))]
         [MapperIgnoreTarget(nameof(User.Id))]
         

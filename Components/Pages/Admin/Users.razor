@@ -192,7 +192,7 @@
             if (response.IsSuccessStatusCode)
             {
                 Logger.LogInformation("Usuário adicionado com sucesso.");
-                _newUser = new CreateUserDto { RoleIds = new List<int>() };
+                _newUser = new CreateUserDto() { RoleIds = new List<int>() };
                 _selectedRoles = new List<RoleDto>();
 
                 await _table.ReloadServerData();

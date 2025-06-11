@@ -18,7 +18,7 @@ namespace erp.Controllers
         {
             var roles = await context.Roles
                                       .AsNoTracking() // Good practice for read-only queries
-                                      .Select(r => new RoleDto { Id = r.Id, Name = r.Name })
+                                      .Select(r => new RoleDto { Id = r.Id, Name = r.Name, Abbreviation = r.Abbreviation })
                                       .ToListAsync();
             return Ok(roles);
         }
