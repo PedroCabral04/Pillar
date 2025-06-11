@@ -18,7 +18,8 @@ public class UserDao(ApplicationDbContext context) : IUserDao
     public async Task<User?> GetByIdAsync(int id)
     {
         return await _context.Users
-                .Include(u => u.Roles)
+                .Include(u => u.UserRoles)
+                .ThenInclude(ur => ur.Role)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(u => u.Id == id);
     }
@@ -27,7 +28,8 @@ public class UserDao(ApplicationDbContext context) : IUserDao
     public async Task<IEnumerable<UserDto>> GetAllAsyncProjected()
     {
         return await _context.Users
-            .Include(u => u.Roles)
+            .Include(u => u.UserRoles)
+            .ThenInclude(ur => ur.Role)
             .AsNoTracking()
             .Select(u => new UserDto
             {
@@ -35,7 +37,8 @@ public class UserDao(ApplicationDbContext context) : IUserDao
                 Username = u.Username,
                 Email = u.Email,
                 Phone = u.Phone,
-                RoleNames = u.Roles.Select(r => r.Name).ToList(),
+                RoleNames = u.UserRoles.Select(ur => ur.Role.Name).ToList(),
+                RoleAbbreviations = u.UserRoles.Select(ur => ur.Role.Abbreviation).ToList(),
                 IsActive = u.IsActive
             })
             .ToListAsync();
@@ -48,7 +51,8 @@ public class UserDao(ApplicationDbContext context) : IUserDao
     public async Task<IEnumerable<User>> GetAllAsync()
     {
         return await _context.Users
-            .Include(u => u.Roles)
+            .Include(u => u.UserRoles)
+            .ThenInclude(ur => ur.Role)
             .AsNoTracking()
             .ToListAsync();
     }
@@ -58,9 +62,9 @@ public class UserDao(ApplicationDbContext context) : IUserDao
     public async Task<User> CreateAsync(User user)
     {
         await _context.Users.AddAsync(user);
-        // Salva as mudanças no banco de dados.
-        await _context.SaveChangesAsync();
-        // Retorna o usuário criado
+        // A chamada para SaveChangesAsync foi removida.
+        // A responsabilidade de salvar será da camada de serviço (Unit of Work).
+        // await _context.SaveChangesAsync();
         return user;
     }
 
@@ -94,7 +98,8 @@ public class UserDao(ApplicationDbContext context) : IUserDao
     public async Task<User> GetByEmailAsync(string email)
     {
         return await _context.Users
-            .Include(u => u.Roles)
+            .Include(u => u.UserRoles)
+            .ThenInclude(ur => ur.Role)
             .FirstOrDefaultAsync(u => u.Email == email);
     }
 }

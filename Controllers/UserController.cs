@@ -5,6 +5,7 @@ using erp.Models;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using erp.Mappings;
+using System.Linq;
 
 namespace erp.Controllers
 {
@@ -55,8 +56,16 @@ namespace erp.Controllers
 
             try
             {
-                var createdUser = await _userService.CreateAsync(userToCreate);
+                var createdUser = await _userService.CreateAsync(userToCreate, createUserDto.RoleIds);
                 var createdUserDto = _mapper.UserToUserDto(createdUser);
+
+                // É importante mapear as RoleNames para o DTO de retorno
+                var roles = await _userService.GetByIdAsync(createdUser.Id);
+                if (roles != null)
+                {
+                    createdUserDto.RoleNames = roles.UserRoles.Select(ur => ur.Role.Name).ToList();
+                }
+                
                 return CreatedAtAction(nameof(GetUserById), new { id = createdUserDto.Id }, createdUserDto);
             }
             catch (Exception ex)

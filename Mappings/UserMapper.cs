@@ -22,7 +22,7 @@ namespace erp.Mappings
         [MapperIgnoreTarget(nameof(User.LockedUntil))]
         [MapperIgnoreTarget(nameof(User.LastLoginAt))]
         [MapperIgnoreTarget(nameof(User.CreatedAt))]
-        [MapperIgnoreTarget(nameof(User.Roles))]
+        [MapperIgnoreTarget(nameof(User.UserRoles))]
         [MapperIgnoreTarget(nameof(User.Id))]
         
         public partial User CreateUserDtoToUser(CreateUserDto dto);

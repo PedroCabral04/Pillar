@@ -12,8 +12,8 @@ public class Role {
     public required string Name { get; set; }
 
     [Required(ErrorMessage = "Abreviação é obrigatória")]
-    [StringLength(10, MinimumLength = 2, ErrorMessage = "A abreviação deve ter entre 2 e 10 caracteres")]
+    [StringLength(20, MinimumLength = 2, ErrorMessage = "A abreviação deve ter entre 2 e 10 caracteres")]
     public required string Abbreviation { get; set; } = string.Empty;
 
-    public virtual required ICollection<User> Users { get; set; }
+    public virtual ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
 }

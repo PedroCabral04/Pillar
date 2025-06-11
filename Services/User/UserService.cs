@@ -5,12 +5,12 @@ using BCrypt.Net;
 using erp.Data;
 using erp.DTOs.User;
 using Microsoft.AspNetCore;
+using Microsoft.EntityFrameworkCore;
 
 namespace erp.Services
 {
-    public class UserService(IUserDao userDao) : IUserService {
+    public class UserService(IUserDao userDao, ApplicationDbContext context) : IUserService {
         private const int WorkFactor = 12;
-        private readonly ApplicationDbContext _context;
 
         private static string GenerateRandomPassword(int length = 12)
         {
@@ -54,7 +54,7 @@ namespace erp.Services
             return await userDao.GetAllAsyncProjected();
         }
         
-        public async Task<User> CreateAsync(User user)
+        public async Task<User> CreateAsync(User user, List<int> roleIds)
         {
             // Gera senha temporária ao criar usuário
             string temporaryPassword = GenerateRandomPassword();
@@ -68,12 +68,34 @@ namespace erp.Services
             user.LastLoginAt = null;
             user.Phone = sanitizePhoneNumber(user.Phone);
             
-            var createdUser = await userDao.CreateAsync(user);
-            
-            // Log da senha temporária (em produção, envie por email ou outro meio seguro)
-            Console.WriteLine($"Senha temporária para {user.Email}: {temporaryPassword}");
-            
-            return createdUser;
+            try
+            {
+                // 1. Delega a preparação da criação do usuário para o DAO
+                await userDao.CreateAsync(user);
+
+                // 2. Associa os papéis (roles) ao usuário através da propriedade de navegação
+                if (roleIds is { Count: > 0 })
+                {
+                    foreach (var roleId in roleIds)
+                    {
+                        user.UserRoles.Add(new UserRole { RoleId = roleId });
+                    }
+                }
+
+                // 3. Salva todas as mudanças (User e UserRoles) em uma única transação atômica.
+                await context.SaveChangesAsync();
+                
+                // Log da senha temporária (em produção, envie por email ou outro meio seguro)
+                Console.WriteLine($"Senha temporária para {user.Email}: {temporaryPassword}");
+
+                return user;
+            }
+            catch (Exception ex)
+            {
+                // Log do erro
+                Console.WriteLine($"Erro ao criar usuário: {ex.Message}");
+                throw;
+            }
         }
         
         public async Task UpdateAsync(User user, string password = null!)

@@ -12,5 +12,8 @@ public class UserDto
     [NotMapped]
     public List<string> RoleNames { get; set; } = new();
     
+    [NotMapped]
+    public List<string> RoleAbbreviations { get; set; } = new();
+    
     public bool IsActive { get; set; }
 }

@@ -56,12 +56,6 @@ public class User
     public bool PasswordRequiresReset => 
         PasswordChangedAt.HasValue && (DateTime.UtcNow - PasswordChangedAt.Value).TotalDays > 90;
     
-    [Required]
-    public List<int> RoleIds { get; set; } = new();
-    
-    [NotMapped]
-    public virtual ICollection<Role> Roles { get; set; } = new List<Role>();
-    
     public bool IsActive { get; set; } = true;
     
     // Campos adicionais para auditoria e segurança
@@ -72,15 +66,15 @@ public class User
     [JsonIgnore]
     public DateTime? LastLoginAt { get; set; }
     
+    public virtual ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
     
-    public User(int id, string username, string email, string phone, string passwordHash, List<int> roleIds, bool isActive)
+    public User(int id, string username, string email, string phone, string passwordHash, bool isActive)
     {
         Id = id;
         Username = username;
         Email = email;
         Phone = phone;
         PasswordHash = passwordHash;
-        RoleIds = roleIds;
         IsActive = isActive;
         CreatedAt = DateTime.UtcNow;
     }
