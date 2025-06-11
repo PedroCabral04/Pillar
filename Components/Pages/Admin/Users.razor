@@ -83,7 +83,14 @@
         <MudTd DataLabel="Email">@context.Email</MudTd>
         <MudTd DataLabel="Telefone">@context.Phone</MudTd>
         <MudTd DataLabel="Permissões">@string.Join(", ", context.RoleNames)</MudTd>
-        <MudTd DataLabel="Ativo">@context.IsActive</MudTd>
+        @if (context.IsActive)
+        {
+        <MudTd DataLabel="Ativo">Sim</MudTd>
+        }
+        else
+        {
+        <MudTd DataLabel="Ativo">Não</MudTd>
+        }
         <MudTd DataLabel="Ações"/>    
     </RowTemplate>
     <NoRecordsContent>
