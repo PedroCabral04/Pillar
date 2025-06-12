@@ -237,7 +237,7 @@
     {
         var options = new DialogOptions { CloseOnEscapeKey = true, CloseButton = true, BackgroundClass = "dialog-blur"};
 
-        return DialogService.ShowAsync<UserUpdateDialog>(Test, options);
+        return DialogService.ShowAsync<UserUpdateDialog>("Test", options);
     }
     
     public void Dispose()
