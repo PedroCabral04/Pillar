@@ -1,0 +1,29 @@
+@inject ISnackbar Snackbar;
+
+<MudDialog>
+    <DialogContent>
+        Test
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Error" Variant="Variant.Text" OnClick="@Cancel">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Text" OnClick="@Update">Atualizar usuário</MudButton>       
+    </DialogActions>
+</MudDialog>
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+    
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Update()
+    {
+        try
+        {
+            Snackbar.Add("Usuário atualizado com sucesso!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+}

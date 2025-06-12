@@ -1,16 +1,16 @@
 @page "/admin/users"
 @using System.ComponentModel.DataAnnotations
-@using System.Net.Http.Json
-@using System.Reflection.Metadata
-@using erp.Models
+@using erp.Components.Shared.Dialogs
 @using erp.DTOs.User
 @using erp.DTOs.Role
-@using erp.Services
+
 
 @inject HttpClient Http
-@inject NavigationManager NavigationManager
 @inject ILogger<Users> Logger
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@implements IDisposable;
+
 
 <PageTitle>Gerenciar Usuários</PageTitle>
 
@@ -56,14 +56,19 @@
 
 <MudDivider Class="my-4"/>
 
+<style>
+    .dialog-blur {
+        backdrop-filter: blur(5px);
+    }
+</style>
+
 @if (_loadError != null)
 {
     <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
 }
 
 <MudTable T="UserDto" ServerData="new Func<TableState, CancellationToken, Task<TableData<UserDto>>>(ServerReload)" 
-          Dense="false" Hover="true" Elevation="4" @ref="_table"
-          RowClass="cursor-pointer" Striped='true'>
+          Dense="false" Hover="true" Elevation="4" @ref="_table" Striped='true'>
     <ToolBarContent>
         <MudText Typo="Typo.h5">Usuários Cadastrados</MudText>
         <MudSpacer/>
@@ -84,7 +89,7 @@
         <MudTd DataLabel="Telefone">@context.Phone</MudTd>
         <MudTd DataLabel="Permissões">@string.Join(", ", context.RoleAbbreviations)</MudTd>
         <MudTd DataLabel="Ativo">@(context.IsActive ? "Sim" : "Não")</MudTd>
-        <MudTd DataLabel="Ações"/>    
+        <MudTd><MudButton Variant="Variant.Outlined"  Color="Color.Info" Size="Size.Small" OnClick="@(() => ShowUserUpdateDialog(context.Id))">Editar</MudButton></MudTd>    
     </RowTemplate>
     <NoRecordsContent>
         <MudText>Nenhum usuário encontrado.</MudText>
@@ -98,7 +103,6 @@
 </MudTable>
 
 @code {
-    @implements IDisposable
 
     private MudTable<UserDto>? _table;
     private IEnumerable<UserDto>? _users;
@@ -106,7 +110,7 @@
     private string _searchString = "";
 
     private System.Timers.Timer? _debounceTimer;
-    private const int DEBOUNCE_DELAY_MS = 600;
+    private const int DebounceDelayMs = 600;
 
     private CreateUserDto _newUser = new()
     {
@@ -122,7 +126,7 @@
     {
         await LoadRolesAsync();
         
-        _debounceTimer = new System.Timers.Timer(DEBOUNCE_DELAY_MS);
+        _debounceTimer = new System.Timers.Timer(DebounceDelayMs);
         _debounceTimer.Elapsed += OnDebounceTimerElapsed;
         _debounceTimer.AutoReset = false;
     }
@@ -131,7 +135,7 @@
     {
         try
         {
-            IEnumerable<UserDto> data = await Http.GetFromJsonAsync<IEnumerable<UserDto>>("api/users", token);
+            IEnumerable<UserDto> data = await Http.GetFromJsonAsync<IEnumerable<UserDto>>("api/users", token) ?? throw new InvalidOperationException();
             _loadError = null;
 
             data = data.Where(user =>
@@ -227,6 +231,13 @@
             _rolesList = new List<RoleDto>(); // Ensure it's not null on error
             Snackbar.Add("Erro ao buscar funções: " + ex.Message, Severity.Error);
         }
+    }
+
+    private Task ShowUserUpdateDialog(int userId)
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true, CloseButton = true, BackgroundClass = "dialog-blur"};
+
+        return DialogService.ShowAsync<UserUpdateDialog>(Test, options);
     }
     
     public void Dispose()
