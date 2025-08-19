@@ -104,7 +104,6 @@
         <MudTd DataLabel="Permissões">@string.Join(", ", context.RoleAbbreviations)</MudTd>
         <MudTd DataLabel="Ativo">@(context.IsActive ? "Sim" : "Não")</MudTd>
         <MudTd><MudButton Variant="Variant.Outlined"  Color="Color.Info" Size="Size.Small" OnClick="@(() => ShowUserUpdateDialog(context.Id))">Editar</MudButton></MudTd>    
-        <MudTd><MudButton Variant="Variant.Outlined"  Color="Color.Info" Size="Size.Small" OnClick="@(() => ShowUserUpdateDialog(context.Id))">Editar</MudButton></MudTd>    
     </RowTemplate>
     <NoRecordsContent>
         <MudText>Nenhum usuário encontrado.</MudText>
