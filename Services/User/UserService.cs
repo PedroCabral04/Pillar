@@ -56,6 +56,8 @@ namespace erp.Services
         
         public async Task<User> CreateAsync(User user, List<int> roleIds)
         {
+            if (roleIds == null || roleIds.Count == 0)
+                throw new ArgumentException("Pelo menos uma função/permissão deve ser informada.");
             // Gera senha temporária ao criar usuário
             string temporaryPassword = GenerateRandomPassword();
             user.PasswordHash = HashPassword(temporaryPassword);

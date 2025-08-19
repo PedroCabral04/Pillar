@@ -6,6 +6,7 @@
 @using erp.DTOs.User
 @using erp.DTOs.Role
 @using erp.Services
+@attribute [Authorize]
 
 @inject HttpClient Http
 @inject NavigationManager NavigationManager
@@ -25,33 +26,41 @@
         </CardHeaderActions>
     </MudCardHeader>
     <MudCardContent>
-        <MudTextField T="string" Label="Nome" Variant="Variant.Outlined" Margin="Margin.Dense"
-                      InputType="InputType.Text" Required="true" RequiredError="Nome é obrigatório"
-                      @bind-Value="_newUser.Username"/>
-        <MudTextField T="string" Label="Email" Variant="Variant.Outlined" Margin="Margin.Dense"
-                      InputType="InputType.Email" Required="true" RequiredError="Email é obrigatório"
-                      Validation="@(new EmailAddressAttribute() {ErrorMessage = "Email inválido!"})"
-                      @bind-Value="_newUser.Email"/>
-        <MudTextField T="string" Label="Telefone" Variant="Variant.Outlined" Margin="Margin.Dense"
-                      InputType="InputType.Telephone" Required="true" RequiredError="Telefone é obrigatório"
-                      Validation="@(new PhoneAttribute() {ErrorMessage = "Telefone inválido!"})" 
-                      Placeholder="(00) 00000-0000" Mask="@(new PatternMask("(00) 00000-0000"))"
-                      @bind-Value="_newUser.Phone"/>
-        <MudSelect T="@RoleDto" @bind-SelectedValues="_selectedRoles" Label="Função/Permissão" MultiSelection="true"
-                   Variant="Variant.Outlined" Margin="Margin.Dense" Required="true"
-                   RequiredError="Escolha pelo menos uma permissão" SelectAll="true" SelectAllText="Selecionar todos">
-            @foreach (var roleOption in _rolesList)
-            {
-                <MudSelectItem T="@RoleDto" Value="@roleOption">@roleOption.Name</MudSelectItem>
-            }
-        </MudSelect>
-        <MudButton Color="Color.Primary" Variant="Variant.Outlined" EndIcon="@Icons.Material.Filled.Add"
-                   ButtonType="ButtonType.Submit"
-                   OnClick="@HandleAddUser"
-                   Class="w-100" Style="margin-top: 20px">
-            Adicionar
-        </MudButton>
-    </MudCardContent>
+            <MudForm @ref="_form">
+                <MudTextField T="string" Label="Nome" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              InputType="InputType.Text"
+                              @bind-Value="_newUser.Username"
+                              Validation="@(_usernameRules)"/>
+
+                <MudTextField T="string" Label="Email" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              InputType="InputType.Email"
+                              @bind-Value="_newUser.Email"
+                              Validation="@(_emailRules)"/>
+
+                <MudTextField T="string" Label="Telefone" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              InputType="InputType.Telephone"
+                              Placeholder="(00) 00000-0000" Mask="@(new PatternMask("(00) 00000-0000"))"
+                              @bind-Value="_newUser.Phone"
+                              Validation="@(_phoneRules)"/>
+
+                <MudSelect T="@RoleDto" @bind-SelectedValues="_selectedRoles" Label="Função/Permissão" MultiSelection="true"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" Required="true"
+                           RequiredError="Escolha pelo menos uma permissão" SelectAll="true" SelectAllText="Selecionar todos">
+                    @foreach (var roleOption in _rolesList)
+                    {
+                        <MudSelectItem T="@RoleDto" Value="@roleOption">@roleOption.Name</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudButton Color="Color.Primary" Variant="Variant.Outlined" EndIcon="@Icons.Material.Filled.Add"
+                           ButtonType="ButtonType.Submit"
+                           Disabled="@(_submitting || !(_selectedRoles?.Any() ?? false))"
+                           OnClick="@HandleAddUser"
+                           Class="w-100" Style="margin-top: 20px">
+                    Adicionar
+                </MudButton>
+            </MudForm>
+        </MudCardContent>
 </MudCard>
 
 <MudDivider Class="my-4"/>
@@ -117,6 +126,36 @@
     private List<RoleDto> _rolesList = new List<RoleDto>();
     
     private string? _loadError;
+    private MudForm? _form;
+    private bool _submitting = false;
+
+    // Regras de validação do formulário (client-side)
+    private Func<string, string?> _required(string fieldName) =>
+        v => string.IsNullOrWhiteSpace(v) ? $"{fieldName} é obrigatório" : null;
+
+    private IEnumerable<Func<string, string?>> _usernameRules => new List<Func<string, string?>>
+    {
+        _required("Nome"),
+        v => v?.Trim().Length < 3 ? "Nome deve ter pelo menos 3 caracteres" : null,
+        v => v?.Trim().Length > 50 ? "Nome não pode exceder 50 caracteres" : null
+    };
+
+    private IEnumerable<Func<string, string?>> _emailRules => new List<Func<string, string?>>
+    {
+        _required("Email"),
+        v => new EmailAddressAttribute().IsValid(v) ? null : "Email inválido"
+    };
+
+    private static string OnlyDigits(string? s) => new string((s ?? string.Empty).Where(char.IsDigit).ToArray());
+    private IEnumerable<Func<string, string?>> _phoneRules => new List<Func<string, string?>>
+    {
+        _required("Telefone"),
+        v =>
+        {
+            var digits = OnlyDigits(v);
+            return (digits.Length is < 10 or > 11) ? "Telefone deve conter DDD + número (10 ou 11 dígitos)" : null;
+        }
+    };
 
     protected override async Task OnInitializedAsync()
     {
@@ -131,7 +170,8 @@
     {
         try
         {
-            IEnumerable<UserDto> data = await Http.GetFromJsonAsync<IEnumerable<UserDto>>("api/users", token);
+            IEnumerable<UserDto> data = await Http.GetFromJsonAsync<IEnumerable<UserDto>>("api/users", token) 
+                                            ?? Enumerable.Empty<UserDto>();
             _loadError = null;
 
             data = data.Where(user =>
@@ -180,13 +220,36 @@
     
     private void OnDebounceTimerElapsed(object? sender, System.Timers.ElapsedEventArgs e)
     {
-        InvokeAsync(() => _table?.ReloadServerData());
+        InvokeAsync(async () => { if (_table != null) await _table.ReloadServerData(); });
     }
     
     private async Task HandleAddUser()
     {
         try
         {
+            // 1) Validação client-side
+            await (_form?.Validate() ?? Task.CompletedTask);
+            if (!(_form?.IsValid ?? false))
+            {
+                Snackbar.Add("Verifique os campos destacados e tente novamente.", Severity.Warning);
+                return;
+            }
+
+            if (_selectedRoles == null || !_selectedRoles.Any())
+            {
+                Snackbar.Add("Escolha pelo menos uma permissão.", Severity.Warning);
+                return;
+            }
+
+            // Sanitiza telefone para enviar apenas dígitos
+            _newUser.Phone = OnlyDigits(_newUser.Phone);
+            if (_newUser.Phone.Length is < 10 or > 11)
+            {
+                Snackbar.Add("Telefone inválido. Informe DDD + número (10 ou 11 dígitos).", Severity.Warning);
+                return;
+            }
+
+            _submitting = true;
             _newUser.RoleIds = _selectedRoles.Select(r => r.Id).ToList();
             var response = await Http.PostAsJsonAsync("api/users", _newUser);
             if (response.IsSuccessStatusCode)
@@ -195,7 +258,8 @@
                 _newUser = new CreateUserDto() { RoleIds = new List<int>() };
                 _selectedRoles = new List<RoleDto>();
 
-                await _table.ReloadServerData();
+                if (_table != null)
+                    await _table.ReloadServerData();
                 Snackbar.Add("Usuário adicionado com sucesso!", Severity.Success);
             }
             else
@@ -208,6 +272,11 @@
         catch (Exception ex)
         {
             Logger.LogError($"Erro ao adicionar usuário: {ex.Message}");
+            Snackbar.Add("Erro inesperado ao adicionar usuário.", Severity.Error);
+        }
+        finally
+        {
+            _submitting = false;
         }
     }
 

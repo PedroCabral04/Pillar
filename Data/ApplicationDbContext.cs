@@ -1,14 +1,18 @@
 using erp.Models;
+using erp.Models.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 namespace erp.Data;
 
-public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
+public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+    : IdentityDbContext<ApplicationUser, ApplicationRole, int>(options)
 {
-    public DbSet<User> Users { get; set; } = null!;
-    public DbSet<Role> Roles { get; set; } = null!;
-    public DbSet<UserRole> UserRoles { get; set; } = null!;
+    // Mantemos os DbSets existentes se ainda forem usados em outras partes (tabelas próprias do app)
+    public new DbSet<User> Users { get; set; } = null!;
+    public new DbSet<Role> Roles { get; set; } = null!;
+    public new DbSet<UserRole> UserRoles { get; set; } = null!;
 
     protected override void OnConfiguring(DbContextOptionsBuilder options)
         => options.UseNpgsql("Host=localhost;Database=erp;Username=postgres;Password=123");
@@ -51,6 +55,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     {
         base.OnModelCreating(modelBuilder);
 
+    // As entidades de Identity usam tabelas padrão: AspNetUsers, AspNetRoles, etc.
+    // As entidades do app usam suas próprias tabelas: Users, Roles, UserRoles.
         modelBuilder.Entity<UserRole>(entity =>
         {
             entity.HasKey(ur => new { ur.UserId, ur.RoleId });
@@ -64,6 +70,6 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
                 .WithMany(r => r.UserRoles)
                 .HasForeignKey(ur => ur.RoleId)
                 .IsRequired();
-        });
+    });
     }
 }

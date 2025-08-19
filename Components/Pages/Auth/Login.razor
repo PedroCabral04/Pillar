@@ -1,48 +1,99 @@
 @page "/login"
+@attribute [AllowAnonymous]
 @using System.ComponentModel.DataAnnotations
-@using erp.Models
-@using erp.DTOs.User
-@using erp.Services
-@using erp.Controllers
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JS
+@code {
+    [Parameter] [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
+}
 
-<PageTitle>Log in</PageTitle>
+<PageTitle>Login</PageTitle>
 
-<MudText Typo="Typo.h3" GutterBottom="true">Login</MudText>
-
-<MudCard Elevation="8" Class="w-100">
-    <MudCardHeader Style="margin-bottom: -20px">
-        <CardHeaderContent>
-            <MudText Typo="Typo.h5" Color="Color.Default">Adicionar usuários</MudText>
-        </CardHeaderContent>
-        <CardHeaderActions>
-            <MudIconButton Icon="@Icons.Material.Filled.Settings" Color="Color.Default"></MudIconButton>
-        </CardHeaderActions>
-    </MudCardHeader>
-    <MudCardContent>
-        <MudTextField T="string" Label="Nome" Variant="Variant.Outlined" Margin="Margin.Dense"
-                      InputType="InputType.Text" Required="true" RequiredError="Nome é obrigatório"/>
-        <MudTextField T="string" Label="Email" Variant="Variant.Outlined" Margin="Margin.Dense"
-                      InputType="InputType.Email" Required="true" RequiredError="Email é obrigatório"
-                      Validation="@(new EmailAddressAttribute() {ErrorMessage = "Email inválido!"})"/>
-        <MudTextField T="string" Label="Telefone" Variant="Variant.Outlined" Margin="Margin.Dense"
-                      InputType="InputType.Telephone" Required="true" RequiredError="Telefone é obrigatório"
-                      Validation="@(new PhoneAttribute() {ErrorMessage = "Telefone inválido!"})"/>
-        <MudSelect T="string" @bind-Value="_role" Label="Função/Permissão" MultiSelection="true"
-                   Variant="Variant.Outlined" Margin="Margin.Dense" Required="true"
-                   RequiredError="Escolha pelo menos uma permissão" SelectAll="true" SelectAllText="Selecionar todos">
-            @foreach (string role in _roles)
-            {
-                <MudSelectItem T="string" Value="@role">@role</MudSelectItem>
-            }
-        </MudSelect>
-    </MudCardContent>
-</MudCard>
-
+<MudPaper Class="d-flex justify-center align-center" Style="min-height: 70vh;">
+    <MudCard Style="width: 400px;">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h5">Entrar</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <EditForm Model="model" OnValidSubmit="HandleLoginAsync">
+                <DataAnnotationsValidator />
+                <MudTextField @bind-Value="model.Email" Label="E-mail" Variant="Variant.Outlined" Required="true" For="() => model.Email" InputType="InputType.Email"/>
+                <MudTextField @bind-Value="model.Password" Label="Senha" Variant="Variant.Outlined" Required="true" For="() => model.Password" InputType="InputType.Password"/>
+                <MudCheckBox T="bool" @bind-Checked="model.RememberMe" Label="Lembrar" Class="mt-2" />
+                <MudAlert Severity="Severity.Error" Dense="true" Style="@ErrorDisplayStyle" Class="mt-2">@error</MudAlert>
+                <MudButton Disabled="busy" Loading="busy" Color="Color.Primary" Variant="Variant.Filled" Class="mt-4" FullWidth="true" ButtonType="ButtonType.Submit">
+                    Entrar
+                </MudButton>
+            </EditForm>
+        </MudCardContent>
+    </MudCard>
+    
+</MudPaper>
 
 @code {
-    private string _role = "";
-    private readonly string[] _roles = {"Administrador", "Gerente", "Vendedor"};
-    private User _user = new User();
-    private IEnumerable<User> _users = new List<User>();
-    
+    private LoginModel model = new();
+    private string? error;
+    private bool busy;
+    private string ErrorDisplayStyle => string.IsNullOrEmpty(error) ? "display:none;" : "display:block;";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthStateProvider.GetAuthenticationStateAsync();
+        if (state.User.Identity?.IsAuthenticated == true)
+        {
+            var target = string.IsNullOrWhiteSpace(ReturnUrl) ? "/" : ReturnUrl;
+            Nav.NavigateTo(target!, replace: true);
+        }
+    }
+
+    private async Task HandleLoginAsync()
+    {
+        busy = true;
+        error = null;
+        try
+        {
+            // Use JS fetch with credentials to ensure cookie is set in browser
+            var result = await JS.InvokeAsync<LoginResult>("erpAuth.login", model);
+            if (result.ok)
+            {
+                var target = string.IsNullOrWhiteSpace(ReturnUrl) ? "/" : ReturnUrl;
+                Nav.NavigateTo(target!, forceLoad: true);
+            }
+            else
+            {
+                error = string.IsNullOrWhiteSpace(result.text) ? "Falha ao autenticar" : result.text;
+            }
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    public class LoginModel
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        public string Password { get; set; } = string.Empty;
+
+        public bool RememberMe { get; set; } = true;
+    }
+
+    public class LoginResult
+    {
+        public bool ok { get; set; }
+        public int status { get; set; }
+        public string? text { get; set; }
+    }
 }

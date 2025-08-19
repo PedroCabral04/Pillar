@@ -3,7 +3,7 @@
 @inject NavigationManager NavigationManager
 
 <MudNavMenu Rounded="true" Class="mud-nav-menu-dark">
-    <MudText GutterBottom="true" Typo="Typo.h6" Class="px-4">Gestify</MudText>
+    <MudText GutterBottom="true" Typo="Typo.h6" Class="px-4">Pillar</MudText>
     <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
     <MudDivider/>
     @*<MudNavLink Href="counter" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Add">Counter</MudNavLink>
@@ -14,7 +14,12 @@
     <MudDivider/>
     <MudNavLink Href="ajustes" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Settings">Configurações</MudNavLink>
     <MudDivider/>
-    <MudNavLink Href="login" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Login">Admin</MudNavLink>
+    <MudNavLink OnClick="LogoutAsync" Icon="@Icons.Material.Filled.Logout">Sair</MudNavLink>
+    <AuthorizeView>
+        <NotAuthorized>
+            <MudNavLink Href="login" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Login">Entrar</MudNavLink>
+        </NotAuthorized>
+    </AuthorizeView>
 
     @*<MudNavLink Href="auth" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Lock">Auth Required</MudNavLink>
     <AuthorizeView>
@@ -37,6 +42,7 @@
 
 
 @code {
+    [Inject] HttpClient Http { get; set; } = null!;
     private string? currentUrl;
 
     protected override void OnInitialized()
@@ -54,5 +60,20 @@
     public void Dispose()
     {
         NavigationManager.LocationChanged -= OnLocationChanged;
+    }
+
+    [Inject] IJSRuntime JS { get; set; } = null!;
+
+    private async Task LogoutAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("erpAuth.logout");
+            NavigationManager.NavigateTo("/login", forceLoad: true);
+        }
+        catch
+        {
+            NavigationManager.NavigateTo("/login", forceLoad: true);
+        }
     }
 }

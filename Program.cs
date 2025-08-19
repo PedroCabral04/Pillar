@@ -6,8 +6,12 @@ using erp.Data;
 using erp.Mappings;
 using erp.Services;
 using Blazored.LocalStorage;
-using erp.DAOs;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Http;
+using erp.Security;
+using erp.Models.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +19,41 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddAuthorization();
+
+// Identity com chaves int
+builder.Services
+    .AddIdentityCore<ApplicationUser>(options =>
+    {
+        options.Password.RequireDigit = true;
+        options.Password.RequireLowercase = true;
+        options.Password.RequireUppercase = true;
+        options.Password.RequireNonAlphanumeric = true;
+        options.Password.RequiredLength = 8;
+        options.Lockout.MaxFailedAccessAttempts = 5;
+        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(30);
+        options.User.RequireUniqueEmail = true;
+    })
+    .AddRoles<ApplicationRole>()
+    .AddEntityFrameworkStores<ApplicationDbContext>()
+    .AddSignInManager();
+
+builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
+    .AddCookie(IdentityConstants.ApplicationScheme, options =>
+    {
+        options.LoginPath = "/login";
+        options.LogoutPath = "/api/auth/logout";
+        options.Cookie.Name = "erp.auth";
+        options.ExpireTimeSpan = TimeSpan.FromDays(7);
+        options.SlidingExpiration = true;
+    // Harden cookie
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = SameSiteMode.Lax; // prevents CSRF on cross-site navigations, still works for same-site
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // only over HTTPS in prod
+    options.Cookie.Path = "/";
+    options.Cookie.IsEssential = true; // ensure cookie not blocked by consent if used
+    });
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -29,6 +68,16 @@ builder.Services.AddScoped(sp => {
 // Adiciona serviços de terceiros.
 builder.Services.AddMudServices();
 builder.Services.AddBlazoredLocalStorage();
+
+// Antiforgery hardening (used by UseAntiforgery)
+builder.Services.AddAntiforgery(o =>
+{
+    o.Cookie.HttpOnly = true;
+    o.Cookie.SameSite = SameSiteMode.Lax;
+    o.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    o.Cookie.Name = "erp.csrf";
+    // HeaderName can be customized if you post forms via JS: o.HeaderName = "X-CSRF-TOKEN";
+});
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection"); 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -64,6 +113,13 @@ app.UseHttpsRedirection(); // Redireciona HTTP para HTTPS
 
 app.UseStaticFiles(); // Permite servir arquivos estáticos como CSS, JS, imagens
 
+// Enforce secure cookie behaviors globally
+app.UseCookiePolicy(new CookiePolicyOptions
+{
+    MinimumSameSitePolicy = SameSiteMode.Lax,
+    Secure = CookieSecurePolicy.Always
+});
+
 app.UseAntiforgery(); // Adiciona proteção contra CSRF
 
 // Adiciona middlewares de autenticação e autorização (se aplicável)
@@ -71,11 +127,60 @@ app.UseAntiforgery(); // Adiciona proteção contra CSRF
 app.UseAuthentication();
 app.UseAuthorization();
 
+// API Key enforcement placeholder: only activates if Security:ApiKey is configured
+app.UseMiddleware<ApiKeyMiddleware>();
+
 // Mapeia os endpoints
 app.MapControllers(); // Mapeia rotas para os Controllers de API
 app.MapRazorComponents<App>() // Mapeia os componentes Blazor
     .AddInteractiveServerRenderMode();
 // Mapeie outros endpoints (Minimal APIs, etc.) aqui, se necessário
+
+// Seed inicial de Identity (ambiente de dev)
+using (var scope = app.Services.CreateScope())
+{
+    try
+    {
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        db.Database.Migrate();
+
+        var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+
+        async Task EnsureRole(string name)
+        {
+            if (!await roleManager.RoleExistsAsync(name))
+            {
+                await roleManager.CreateAsync(new ApplicationRole { Name = name, NormalizedName = name.ToUpperInvariant() });
+            }
+        }
+
+        await EnsureRole("Administrador");
+        await EnsureRole("Gerente");
+        await EnsureRole("Vendedor");
+
+        var adminEmail = "admin@erp.local";
+        var admin = await userManager.FindByEmailAsync(adminEmail);
+        if (admin is null)
+        {
+            admin = new ApplicationUser
+            {
+                UserName = "admin",
+                Email = adminEmail,
+                EmailConfirmed = true
+            };
+            var created = await userManager.CreateAsync(admin, "Admin@123!");
+            if (created.Succeeded)
+            {
+                await userManager.AddToRoleAsync(admin, "Administrador");
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Identity seed error: {ex.Message}");
+    }
+}
 
 // --- Executa a aplicação ---
 app.Run(); // Inicia o servidor e começa a ouvir requisições

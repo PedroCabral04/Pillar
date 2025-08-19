@@ -14,9 +14,12 @@
 </head>
 
 <body>
-<Routes @rendermode="InteractiveServer"/>
+<CascadingAuthenticationState>
+    <Routes @rendermode="InteractiveServer"/>
+</CascadingAuthenticationState>
 <script src="_framework/blazor.web.js"></script>
 <script src=@Assets["_content/MudBlazor/MudBlazor.min.js"]></script>
+<script src="js/auth.js"></script>
 </body>
 
 </html>
