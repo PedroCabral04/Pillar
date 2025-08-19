@@ -1,29 +1,272 @@
 @inject ISnackbar Snackbar;
+@inject IApiService ApiService;
+@inject ILogger<UserUpdateDialog> Logger;
+@using System.ComponentModel.DataAnnotations
+@using erp.DTOs.User
+@using erp.DTOs.Role
+@using erp.Services
 
 <MudDialog>
     <DialogContent>
-        Alterar usuário
+        @if (_loading)
+        {
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+            <MudText>Carregando dados do usuário...</MudText>
+        }
+        else if (_loadError != null)
+        {
+            <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
+        }
+        else
+        {
+            <MudForm @ref="_form">
+                <MudTextField T="string" Label="Nome" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              InputType="InputType.Text"
+                              @bind-Value="_updateUser.Username"
+                              Validation="@(_usernameRules)"/>
+
+                <MudTextField T="string" Label="Email" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              InputType="InputType.Email"
+                              @bind-Value="_updateUser.Email"
+                              Validation="@(_emailRules)"/>
+
+                <MudTextField T="string" Label="Telefone" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              InputType="InputType.Telephone"
+                              Placeholder="(00) 00000-0000" Mask="@(new PatternMask("(00) 00000-0000"))"
+                              @bind-Value="_updateUser.Phone"
+                              Validation="@(_phoneRules)"/>
+
+                <MudTextField T="string" Label="Nova Senha (opcional)" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              InputType="InputType.Password"
+                              @bind-Value="_updateUser.Password"
+                              HelperText="Deixe em branco para manter a senha atual"/>
+
+                <MudSelect T="@RoleDto" @bind-SelectedValues="_selectedRoles" Label="Função/Permissão" MultiSelection="true"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" Required="true"
+                           RequiredError="Escolha pelo menos uma permissão" SelectAll="true" SelectAllText="Selecionar todos">
+                    @foreach (var roleOption in _rolesList)
+                    {
+                        <MudSelectItem T="@RoleDto" Value="@roleOption">@roleOption.Name</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudSwitch @bind-Value="_updateUser.IsActive" Label="Usuário Ativo" Color="Color.Primary" />
+            </MudForm>
+        }
     </DialogContent>
     <DialogActions>
         <MudButton Color="Color.Error" Variant="Variant.Text" OnClick="@Cancel">Cancelar</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Text" OnClick="@Update">Atualizar usuário</MudButton>       
+        <MudButton Color="Color.Primary" Variant="Variant.Text" OnClick="@Update" 
+                   Disabled="@(_loading || _submitting || _loadError != null)">
+            @if (_submitting)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true"/>
+                <MudText Class="ms-2">Atualizando...</MudText>
+            }
+            else
+            {
+                <MudText>Atualizar usuário</MudText>
+            }
+        </MudButton>       
     </DialogActions>
 </MudDialog>
 @code {
     [CascadingParameter]
-    private IMudDialogInstance MudDialog { get; set; }
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+    
+    [Parameter]
+    public int UserId { get; set; }
+
+    private UpdateUserDto _updateUser = new();
+    private IEnumerable<RoleDto> _selectedRoles = new List<RoleDto>();
+    private List<RoleDto> _rolesList = new List<RoleDto>();
+    
+    private bool _loading = true;
+    private bool _submitting = false;
+    private string? _loadError;
+    private MudForm? _form;
+
+    // Regras de validação do formulário (client-side)
+    private Func<string, string?> _required(string fieldName) =>
+        v => string.IsNullOrWhiteSpace(v) ? $"{fieldName} é obrigatório" : null;
+
+    private IEnumerable<Func<string, string?>> _usernameRules => new List<Func<string, string?>>
+    {
+        _required("Nome"),
+        v => v?.Trim().Length < 3 ? "Nome deve ter pelo menos 3 caracteres" : null,
+        v => v?.Trim().Length > 50 ? "Nome não pode exceder 50 caracteres" : null
+    };
+
+    private IEnumerable<Func<string, string?>> _emailRules => new List<Func<string, string?>>
+    {
+        _required("Email"),
+        v => new EmailAddressAttribute().IsValid(v) ? null : "Email inválido"
+    };
+
+    private static string OnlyDigits(string? s) => new string((s ?? string.Empty).Where(char.IsDigit).ToArray());
+    private IEnumerable<Func<string, string?>> _phoneRules => new List<Func<string, string?>>
+    {
+        _required("Telefone"),
+        v =>
+        {
+            var digits = OnlyDigits(v);
+            return (digits.Length is < 10 or > 11) ? "Telefone deve conter DDD + número (10 ou 11 dígitos)" : null;
+        }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUserData();
+        await LoadRolesAsync();
+        _loading = false;
+    }
     
     private void Cancel() => MudDialog.Cancel();
 
-    private void Update()
+    private async Task LoadUserData()
     {
         try
         {
-            Snackbar.Add("Usuário atualizado com sucesso!", Severity.Success);
+            var response = await ApiService.GetAsync($"api/users/{UserId}");
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                _loadError = "Usuário não encontrado.";
+                return;
+            }
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                _loadError = "Você precisa estar autenticado para acessar este usuário.";
+                return;
+            }
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                _loadError = "Você não tem permissão para editar este usuário.";
+                return;
+            }
+            
+            response.EnsureSuccessStatusCode();
+            var user = await response.Content.ReadFromJsonAsync<UserDto>();
+            
+            if (user != null)
+            {
+                _updateUser = new UpdateUserDto
+                {
+                    Username = user.Username,
+                    Email = user.Email,
+                    Phone = user.Phone,
+                    IsActive = user.IsActive,
+                    RoleIds = new List<int>()
+                };
+
+                // Set current roles as selected after roles are loaded
+                StateHasChanged();
+            }
         }
         catch (Exception ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Logger.LogError($"Erro ao carregar dados do usuário: {ex.Message}");
+            _loadError = "Erro ao carregar dados do usuário.";
+        }
+    }
+
+    private async Task LoadRolesAsync()
+    {
+        try
+        {
+            var response = await ApiService.GetAsync("api/roles");
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                Logger.LogError("Não autorizado para buscar funções.");
+                return;
+            }
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                Logger.LogError("Acesso negado para buscar funções.");
+                return;
+            }
+            
+            response.EnsureSuccessStatusCode();
+            
+            var roles = await response.Content.ReadFromJsonAsync<List<RoleDto>>();
+            _rolesList = roles ?? new List<RoleDto>();
+
+            // Now load user data again to get current user roles and match them
+            var userResponse = await ApiService.GetAsync($"api/users/{UserId}");
+            if (userResponse.IsSuccessStatusCode)
+            {
+                var user = await userResponse.Content.ReadFromJsonAsync<UserDto>();
+                if (user != null && user.RoleNames.Any())
+                {
+                    // Match role names to role DTOs
+                    var currentUserRoles = _rolesList.Where(r => user.RoleNames.Contains(r.Name)).ToList();
+                    _selectedRoles = currentUserRoles;
+                    _updateUser.RoleIds = currentUserRoles.Select(r => r.Id).ToList();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Erro ao buscar funções: {ex.Message}");
+            _rolesList = new List<RoleDto>();
+        }
+    }
+
+    private async Task Update()
+    {
+        try
+        {
+            // 1) Validação client-side
+            await (_form?.Validate() ?? Task.CompletedTask);
+            if (!(_form?.IsValid ?? false))
+            {
+                Snackbar.Add("Verifique os campos destacados e tente novamente.", Severity.Warning);
+                return;
+            }
+
+            if (_selectedRoles == null || !_selectedRoles.Any())
+            {
+                Snackbar.Add("Escolha pelo menos uma permissão.", Severity.Warning);
+                return;
+            }
+
+            // Sanitiza telefone para enviar apenas dígitos
+            _updateUser.Phone = OnlyDigits(_updateUser.Phone);
+            if (_updateUser.Phone.Length is < 10 or > 11)
+            {
+                Snackbar.Add("Telefone inválido. Informe DDD + número (10 ou 11 dígitos).", Severity.Warning);
+                return;
+            }
+
+            _submitting = true;
+            _updateUser.RoleIds = _selectedRoles.Select(r => r.Id).ToList();
+            
+            var response = await ApiService.PutAsJsonAsync($"api/users/{UserId}", _updateUser);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Usuário atualizado com sucesso!", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Logger.LogError($"Erro ao atualizar usuário: {response.StatusCode} - {errorContent}");
+                Snackbar.Add($"Erro ao atualizar usuário: {errorContent}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Erro ao atualizar usuário: {ex.Message}");
+            Snackbar.Add("Erro inesperado ao atualizar usuário.", Severity.Error);
+        }
+        finally
+        {
+            _submitting = false;
         }
     }
 }

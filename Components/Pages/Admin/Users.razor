@@ -346,11 +346,19 @@
         }
     }
 
-    private Task ShowUserUpdateDialog(int userId)
+    private async Task ShowUserUpdateDialog(int userId)
     {
-        var options = new DialogOptions { CloseOnEscapeKey = true, CloseButton = true, BackgroundClass = "dialog-blur"};
+        var options = new DialogOptions { CloseOnEscapeKey = true, CloseButton = true, BackgroundClass = "dialog-blur" };
+        var parameters = new DialogParameters<UserUpdateDialog> { { x => x.UserId, userId } };
 
-        return DialogService.ShowAsync<UserUpdateDialog>("Test", options);
+        var userName = _users?.FirstOrDefault(u => u.Id == userId)?.Username ?? "usuário";
+        var dialog = await DialogService.ShowAsync<UserUpdateDialog>($"Alterar {userName}", parameters, options);
+        var result = await dialog.Result;
+        
+        if (result is { Canceled: false } && _table != null)
+        {
+            await _table.ReloadServerData();
+        }
     }
     public void Dispose()
     {
