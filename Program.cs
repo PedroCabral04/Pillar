@@ -8,6 +8,8 @@ using erp.Services;
 using Blazored.LocalStorage;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Identity;
+using erp.Models.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,8 +19,26 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddAuthorization();
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-    .AddCookie(options =>
+
+// Identity com chaves int
+builder.Services
+    .AddIdentityCore<ApplicationUser>(options =>
+    {
+        options.Password.RequireDigit = true;
+        options.Password.RequireLowercase = true;
+        options.Password.RequireUppercase = true;
+        options.Password.RequireNonAlphanumeric = true;
+        options.Password.RequiredLength = 8;
+        options.Lockout.MaxFailedAccessAttempts = 5;
+        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(30);
+        options.User.RequireUniqueEmail = true;
+    })
+    .AddRoles<ApplicationRole>()
+    .AddEntityFrameworkStores<ApplicationDbContext>()
+    .AddSignInManager();
+
+builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
+    .AddCookie(IdentityConstants.ApplicationScheme, options =>
     {
         options.LoginPath = "/login";
         options.LogoutPath = "/api/auth/logout";
@@ -88,7 +108,7 @@ app.MapRazorComponents<App>() // Mapeia os componentes Blazor
     .AddInteractiveServerRenderMode();
 // Mapeie outros endpoints (Minimal APIs, etc.) aqui, se necessário
 
-// Seed inicial (ambiente de dev)
+// Seed inicial de Identity (ambiente de dev)
 using (var scope = app.Services.CreateScope())
 {
     try
@@ -96,38 +116,41 @@ using (var scope = app.Services.CreateScope())
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         db.Database.Migrate();
 
-        if (!db.Roles.Any())
+        var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+
+        async Task EnsureRole(string name)
         {
-            db.Roles.AddRange(
-                new erp.Models.Role { Name = "Administrador", Abbreviation = "ADM" },
-                new erp.Models.Role { Name = "Gerente", Abbreviation = "GER" },
-                new erp.Models.Role { Name = "Vendedor", Abbreviation = "VEN" }
-            );
-            db.SaveChanges();
+            if (!await roleManager.RoleExistsAsync(name))
+            {
+                await roleManager.CreateAsync(new ApplicationRole { Name = name, NormalizedName = name.ToUpperInvariant() });
+            }
         }
 
-        if (!db.Users.Any())
-        {
-            var admin = new erp.Models.User
-            {
-                Username = "admin",
-                Email = "admin@erp.local",
-                Phone = "11999999999",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123!", workFactor: 12),
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow
-            };
-            db.Users.Add(admin);
-            db.SaveChanges();
+        await EnsureRole("Administrador");
+        await EnsureRole("Gerente");
+        await EnsureRole("Vendedor");
 
-            var adminRoleId = db.Roles.First(r => r.Abbreviation == "ADM").Id;
-            db.UserRoles.Add(new erp.Models.UserRole { UserId = admin.Id, RoleId = adminRoleId });
-            db.SaveChanges();
+        var adminEmail = "admin@erp.local";
+        var admin = await userManager.FindByEmailAsync(adminEmail);
+        if (admin is null)
+        {
+            admin = new ApplicationUser
+            {
+                UserName = "admin",
+                Email = adminEmail,
+                EmailConfirmed = true
+            };
+            var created = await userManager.CreateAsync(admin, "Admin@123!");
+            if (created.Succeeded)
+            {
+                await userManager.AddToRoleAsync(admin, "Administrador");
+            }
         }
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Seed error: {ex.Message}");
+        Console.WriteLine($"Identity seed error: {ex.Message}");
     }
 }
 
