@@ -6,7 +6,7 @@
 @using erp.Services
 @attribute [Authorize]
 
-@inject HttpClient Http
+@inject IApiService ApiService
 @inject ILogger<Users> Logger
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
@@ -181,7 +181,25 @@
     {
         try
         {
-            IEnumerable<UserDto> data = await Http.GetFromJsonAsync<IEnumerable<UserDto>>("api/users", token) 
+            var response = await ApiService.GetAsync("api/users", token);
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                _loadError = "Você precisa estar autenticado para acessar esta página.";
+                Snackbar.Add(_loadError, Severity.Error);
+                return new TableData<UserDto>() { TotalItems = 0, Items = Enumerable.Empty<UserDto>() };
+            }
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                _loadError = "Você não tem permissão para acessar esta página.";
+                Snackbar.Add(_loadError, Severity.Error);
+                return new TableData<UserDto>() { TotalItems = 0, Items = Enumerable.Empty<UserDto>() };
+            }
+            
+            response.EnsureSuccessStatusCode();
+            
+            IEnumerable<UserDto> data = await response.Content.ReadFromJsonAsync<IEnumerable<UserDto>>(cancellationToken: token) 
                                             ?? Enumerable.Empty<UserDto>();
             _loadError = null;
 
@@ -262,7 +280,7 @@
 
             _submitting = true;
             _newUser.RoleIds = _selectedRoles.Select(r => r.Id).ToList();
-            var response = await Http.PostAsJsonAsync("api/users", _newUser);
+            var response = await ApiService.PostAsJsonAsync("api/users", _newUser);
             if (response.IsSuccessStatusCode)
             {
                 Logger.LogInformation("Usuário adicionado com sucesso.");
@@ -298,7 +316,27 @@
             
         try
         {
-            var roles = await Http.GetFromJsonAsync<List<RoleDto>>("api/roles");
+            var response = await ApiService.GetAsync("api/roles");
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                Logger.LogError("Não autorizado para buscar funções.");
+                Snackbar.Add("Você precisa estar autenticado para acessar as funções.", Severity.Error);
+                _rolesList = new List<RoleDto>();
+                return;
+            }
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                Logger.LogError("Acesso negado para buscar funções.");
+                Snackbar.Add("Você não tem permissão para acessar as funções.", Severity.Error);
+                _rolesList = new List<RoleDto>();
+                return;
+            }
+            
+            response.EnsureSuccessStatusCode();
+            
+            var roles = await response.Content.ReadFromJsonAsync<List<RoleDto>>();
             _rolesList = roles ?? new List<RoleDto>();
         }
         catch (Exception ex)

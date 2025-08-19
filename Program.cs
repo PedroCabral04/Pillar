@@ -56,10 +56,38 @@ builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
         : CookieSecurePolicy.Always; // only over HTTPS in prod
     options.Cookie.Path = "/";
     options.Cookie.IsEssential = true; // ensure cookie not blocked by consent if used
+    
+    // Configure API-specific events to return JSON instead of redirecting
+    options.Events.OnRedirectToLogin = context =>
+    {
+        // If it's an API request, return 401 instead of redirecting
+        if (context.Request.Path.StartsWithSegments("/api"))
+        {
+            context.Response.StatusCode = 401;
+            context.Response.ContentType = "application/json";
+            return context.Response.WriteAsync("{\"error\":\"Unauthorized\",\"message\":\"Authentication required\"}");
+        }
+        context.Response.Redirect(context.RedirectUri);
+        return Task.CompletedTask;
+    };
+    
+    options.Events.OnRedirectToAccessDenied = context =>
+    {
+        // If it's an API request, return 403 instead of redirecting
+        if (context.Request.Path.StartsWithSegments("/api"))
+        {
+            context.Response.StatusCode = 403;
+            context.Response.ContentType = "application/json";
+            return context.Response.WriteAsync("{\"error\":\"Forbidden\",\"message\":\"Access denied\"}");
+        }
+        context.Response.Redirect(context.RedirectUri);
+        return Task.CompletedTask;
+    };
     });
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped(sp => {
     var navigationManager = sp.GetRequiredService<NavigationManager>();
     return new HttpClient
@@ -92,6 +120,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddScoped<IUserDao, UserDao>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<ThemeService>();
+builder.Services.AddScoped<IApiService, ApiService>();
 
 // ------- REGISTRO DO MAPPERLY -------
 builder.Services.AddScoped<UserMapper, UserMapper>();
