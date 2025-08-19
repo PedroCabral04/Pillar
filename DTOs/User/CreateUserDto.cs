@@ -20,5 +20,6 @@ public class CreateUserDto
     public string Phone { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Role é obrigatória")]
+    [MinLength(1, ErrorMessage = "Escolha pelo menos uma função/permissão")]
     public required List<int> RoleIds { get; set; } = new List<int>();
 }

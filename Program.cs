@@ -6,8 +6,8 @@ using erp.Data;
 using erp.Mappings;
 using erp.Services;
 using Blazored.LocalStorage;
-using erp.DAOs;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Authentication.Cookies;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +15,17 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddAuthorization();
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/login";
+        options.LogoutPath = "/api/auth/logout";
+        options.Cookie.Name = "erp.auth";
+        options.ExpireTimeSpan = TimeSpan.FromDays(7);
+        options.SlidingExpiration = true;
+    });
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -76,6 +87,49 @@ app.MapControllers(); // Mapeia rotas para os Controllers de API
 app.MapRazorComponents<App>() // Mapeia os componentes Blazor
     .AddInteractiveServerRenderMode();
 // Mapeie outros endpoints (Minimal APIs, etc.) aqui, se necessário
+
+// Seed inicial (ambiente de dev)
+using (var scope = app.Services.CreateScope())
+{
+    try
+    {
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        db.Database.Migrate();
+
+        if (!db.Roles.Any())
+        {
+            db.Roles.AddRange(
+                new erp.Models.Role { Name = "Administrador", Abbreviation = "ADM" },
+                new erp.Models.Role { Name = "Gerente", Abbreviation = "GER" },
+                new erp.Models.Role { Name = "Vendedor", Abbreviation = "VEN" }
+            );
+            db.SaveChanges();
+        }
+
+        if (!db.Users.Any())
+        {
+            var admin = new erp.Models.User
+            {
+                Username = "admin",
+                Email = "admin@erp.local",
+                Phone = "11999999999",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123!", workFactor: 12),
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            };
+            db.Users.Add(admin);
+            db.SaveChanges();
+
+            var adminRoleId = db.Roles.First(r => r.Abbreviation == "ADM").Id;
+            db.UserRoles.Add(new erp.Models.UserRole { UserId = admin.Id, RoleId = adminRoleId });
+            db.SaveChanges();
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Seed error: {ex.Message}");
+    }
+}
 
 // --- Executa a aplicação ---
 app.Run(); // Inicia o servidor e começa a ouvir requisições

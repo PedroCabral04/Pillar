@@ -6,11 +6,13 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using erp.Mappings;
 using System.Linq;
+using Microsoft.AspNetCore.Authorization;
 
 namespace erp.Controllers
 {
     [ApiController]
     [Route("api/users")]
+    [Authorize]
     public class UsersController : ControllerBase
     {
         private readonly IUserService _userService;
@@ -52,6 +54,10 @@ namespace erp.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<ActionResult<UserDto>> CreateUser([FromBody] CreateUserDto createUserDto)
         {
+            if (createUserDto.RoleIds == null || createUserDto.RoleIds.Count == 0)
+            {
+                return BadRequest("Escolha pelo menos uma função/permissão.");
+            }
             var userToCreate = _mapper.CreateUserDtoToUser(createUserDto);
 
             try
