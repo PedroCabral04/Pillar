@@ -1,7 +1,6 @@
 @page "/admin/users"
 @using System.ComponentModel.DataAnnotations
 @using erp.Components.Shared.Dialogs
-@using erp.Components.Shared.Dialogs
 @using erp.DTOs.User
 @using erp.DTOs.Role
 @using erp.Services
@@ -14,7 +13,6 @@
 @implements IDisposable;
 
 @inject IDialogService DialogService
-@implements IDisposable;
 
 
 <PageTitle>Gerenciar Usuários</PageTitle>
@@ -88,7 +86,6 @@
 
 <MudTable T="UserDto" ServerData="new Func<TableState, CancellationToken, Task<TableData<UserDto>>>(ServerReload)" 
           Dense="false" Hover="true" Elevation="4" @ref="_table" Striped='true'>
-          Dense="false" Hover="true" Elevation="4" @ref="_table" Striped='true'>
     <ToolBarContent>
         <MudText Typo="Typo.h5">Usuários Cadastrados</MudText>
         <MudSpacer/>
@@ -131,7 +128,6 @@
     private string _searchString = "";
 
     private System.Timers.Timer? _debounceTimer;
-    private const int DebounceDelayMs = 600;
     private const int DebounceDelayMs = 600;
 
     private CreateUserDto _newUser = new()
@@ -322,14 +318,6 @@
 
         return DialogService.ShowAsync<UserUpdateDialog>("Test", options);
     }
-
-    private Task ShowUserUpdateDialog(int userId)
-    {
-        var options = new DialogOptions { CloseOnEscapeKey = true, CloseButton = true, BackgroundClass = "dialog-blur"};
-
-        return DialogService.ShowAsync<UserUpdateDialog>("Test", options);
-    }
-    
     public void Dispose()
     {
         _debounceTimer?.Dispose();
