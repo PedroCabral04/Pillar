@@ -1,7 +1,10 @@
 @page "/login"
+@attribute [AllowAnonymous]
 @using System.ComponentModel.DataAnnotations
 @inject HttpClient Http
 @inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JS
 @code {
     [Parameter] [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
 }
@@ -37,22 +40,32 @@
     private bool busy;
     private string ErrorDisplayStyle => string.IsNullOrEmpty(error) ? "display:none;" : "display:block;";
 
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthStateProvider.GetAuthenticationStateAsync();
+        if (state.User.Identity?.IsAuthenticated == true)
+        {
+            var target = string.IsNullOrWhiteSpace(ReturnUrl) ? "/" : ReturnUrl;
+            Nav.NavigateTo(target!, replace: true);
+        }
+    }
+
     private async Task HandleLoginAsync()
     {
         busy = true;
         error = null;
         try
         {
-            var response = await Http.PostAsJsonAsync("api/auth/login", model);
-            if (response.IsSuccessStatusCode)
+            // Use JS fetch with credentials to ensure cookie is set in browser
+            var result = await JS.InvokeAsync<LoginResult>("erpAuth.login", model);
+            if (result.ok)
             {
                 var target = string.IsNullOrWhiteSpace(ReturnUrl) ? "/" : ReturnUrl;
                 Nav.NavigateTo(target!, forceLoad: true);
             }
             else
             {
-                var msg = await response.Content.ReadAsStringAsync();
-                error = string.IsNullOrWhiteSpace(msg) ? "Falha ao autenticar" : msg;
+                error = string.IsNullOrWhiteSpace(result.text) ? "Falha ao autenticar" : result.text;
             }
         }
         catch (Exception ex)
@@ -75,5 +88,12 @@
         public string Password { get; set; } = string.Empty;
 
         public bool RememberMe { get; set; } = true;
+    }
+
+    public class LoginResult
+    {
+        public bool ok { get; set; }
+        public int status { get; set; }
+        public string? text { get; set; }
     }
 }

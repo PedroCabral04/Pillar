@@ -9,6 +9,8 @@ using Blazored.LocalStorage;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Http;
+using erp.Security;
 using erp.Models.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -45,6 +47,12 @@ builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
         options.Cookie.Name = "erp.auth";
         options.ExpireTimeSpan = TimeSpan.FromDays(7);
         options.SlidingExpiration = true;
+    // Harden cookie
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = SameSiteMode.Lax; // prevents CSRF on cross-site navigations, still works for same-site
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // only over HTTPS in prod
+    options.Cookie.Path = "/";
+    options.Cookie.IsEssential = true; // ensure cookie not blocked by consent if used
     });
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -60,6 +68,16 @@ builder.Services.AddScoped(sp => {
 // Adiciona serviços de terceiros.
 builder.Services.AddMudServices();
 builder.Services.AddBlazoredLocalStorage();
+
+// Antiforgery hardening (used by UseAntiforgery)
+builder.Services.AddAntiforgery(o =>
+{
+    o.Cookie.HttpOnly = true;
+    o.Cookie.SameSite = SameSiteMode.Lax;
+    o.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    o.Cookie.Name = "erp.csrf";
+    // HeaderName can be customized if you post forms via JS: o.HeaderName = "X-CSRF-TOKEN";
+});
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection"); 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -95,12 +113,22 @@ app.UseHttpsRedirection(); // Redireciona HTTP para HTTPS
 
 app.UseStaticFiles(); // Permite servir arquivos estáticos como CSS, JS, imagens
 
+// Enforce secure cookie behaviors globally
+app.UseCookiePolicy(new CookiePolicyOptions
+{
+    MinimumSameSitePolicy = SameSiteMode.Lax,
+    Secure = CookieSecurePolicy.Always
+});
+
 app.UseAntiforgery(); // Adiciona proteção contra CSRF
 
 // Adiciona middlewares de autenticação e autorização (se aplicável)
 // A ordem é importante: UseAuthentication antes de UseAuthorization
 app.UseAuthentication();
 app.UseAuthorization();
+
+// API Key enforcement placeholder: only activates if Security:ApiKey is configured
+app.UseMiddleware<ApiKeyMiddleware>();
 
 // Mapeia os endpoints
 app.MapControllers(); // Mapeia rotas para os Controllers de API

@@ -1,26 +1,28 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using erp.Data;
 using erp.DTOs.Role; 
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Identity;
+using erp.Models.Identity;
 
 namespace erp.Controllers
 {
     [ApiController]
     [Route("api/roles")]
-    public class RoleController(ApplicationDbContext context) : ControllerBase {
+    public class RoleController(RoleManager<ApplicationRole> roleManager) : ControllerBase {
 
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
         public async Task<ActionResult<IEnumerable<RoleDto>>> GetAllRoles()
         {
-            var roles = await context.Roles
-                                      .AsNoTracking() // Good practice for read-only queries
-                                      .Select(r => new RoleDto { Id = r.Id, Name = r.Name, Abbreviation = r.Abbreviation })
-                                      .ToListAsync();
-            return Ok(roles);
+            var roles = roleManager.Roles.Select(r => new RoleDto
+            {
+                Id = r.Id,
+                Name = r.Name!,
+                Abbreviation = r.Abbreviation ?? r.Name!
+            }).ToList();
+            return Ok(await Task.FromResult(roles));
         }
     }
 }

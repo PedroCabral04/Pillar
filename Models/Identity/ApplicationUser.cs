@@ -4,5 +4,5 @@ namespace erp.Models.Identity;
 
 public class ApplicationUser : IdentityUser<int>
 {
-    // Campos extras (se/quando precisar)
+    public bool IsActive { get; set; } = true;
 }
