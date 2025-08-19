@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.HttpOverrides;
 using erp.Security;
 using erp.Models.Identity;
 
@@ -50,7 +51,9 @@ builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
     // Harden cookie
     options.Cookie.HttpOnly = true;
     options.Cookie.SameSite = SameSiteMode.Lax; // prevents CSRF on cross-site navigations, still works for same-site
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // only over HTTPS in prod
+    options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+        ? CookieSecurePolicy.SameAsRequest // allow HTTP in dev to avoid antiforgery/cookie issues
+        : CookieSecurePolicy.Always; // only over HTTPS in prod
     options.Cookie.Path = "/";
     options.Cookie.IsEssential = true; // ensure cookie not blocked by consent if used
     });
@@ -74,7 +77,9 @@ builder.Services.AddAntiforgery(o =>
 {
     o.Cookie.HttpOnly = true;
     o.Cookie.SameSite = SameSiteMode.Lax;
-    o.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    o.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+        ? CookieSecurePolicy.SameAsRequest
+        : CookieSecurePolicy.Always;
     o.Cookie.Name = "erp.csrf";
     // HeaderName can be customized if you post forms via JS: o.HeaderName = "X-CSRF-TOKEN";
 });
@@ -89,10 +94,16 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<ThemeService>();
 
 // ------- REGISTRO DO MAPPERLY -------
-builder.Services.AddScoped<UserMapper, UserMapper>(); 
+builder.Services.AddScoped<UserMapper, UserMapper>();
 
 // --- Constrói a aplicação ---
 var app = builder.Build();
+
+// Enable forwarded headers so HTTPS scheme is honored behind reverse proxies
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedFor
+});
 
 // --- Configura o pipeline de requisições HTTP ---
 if (app.Environment.IsDevelopment())
@@ -117,7 +128,9 @@ app.UseStaticFiles(); // Permite servir arquivos estáticos como CSS, JS, imagen
 app.UseCookiePolicy(new CookiePolicyOptions
 {
     MinimumSameSitePolicy = SameSiteMode.Lax,
-    Secure = CookieSecurePolicy.Always
+    Secure = builder.Environment.IsDevelopment()
+        ? CookieSecurePolicy.SameAsRequest
+        : CookieSecurePolicy.Always
 });
 
 app.UseAntiforgery(); // Adiciona proteção contra CSRF
