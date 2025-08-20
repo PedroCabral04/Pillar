@@ -7,6 +7,7 @@ using System.Linq;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using erp.Models.Identity;
+using Microsoft.EntityFrameworkCore;
 
 namespace erp.Controllers
 {
@@ -25,10 +26,13 @@ namespace erp.Controllers
         }
 
         [HttpGet]
+        [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
         [ProducesResponseType(StatusCodes.Status200OK)]
         public async Task<ActionResult<IEnumerable<UserDto>>> GetAllUsers()
         {
-            var allUsers = _users.Users.ToList();
+            
+            // Força uma nova consulta ao banco usando ToListAsync para garantir dados atualizados
+            var allUsers = await _users.Users.AsNoTracking().ToListAsync();
             var userDtos = new List<UserDto>(allUsers.Count);
             foreach (var u in allUsers)
             {

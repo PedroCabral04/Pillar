@@ -59,6 +59,12 @@ public class ApiService : IApiService
     public async Task<HttpResponseMessage> GetAsync(string endpoint, CancellationToken cancellationToken = default)
     {
         var request = CreateRequestWithCookies(HttpMethod.Get, endpoint);
+        request.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue
+        {
+            NoCache = true,
+            NoStore = true,
+            MustRevalidate = true
+        };
         return await _httpClient.SendAsync(request, cancellationToken);
     }
 

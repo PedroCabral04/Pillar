@@ -283,11 +283,18 @@
             if (response.IsSuccessStatusCode)
             {
                 Logger.LogInformation("Usuário adicionado com sucesso.");
+                
+                // Limpa o formulário
                 _newUser = new CreateUserDto() { RoleIds = new List<int>() };
                 _selectedRoles = new List<RoleDto>();
-
+                _searchString = string.Empty;
+                await (_form?.ResetAsync() ?? Task.CompletedTask);
+                
                 if (_table != null)
+                {
                     await _table.ReloadServerData();
+                }
+                
                 Snackbar.Add("Usuário adicionado com sucesso!", Severity.Success);
             }
             else
@@ -357,7 +364,14 @@
         
         if (result is { Canceled: false } && _table != null)
         {
+            // Aguarda um momento para garantir que as alterações foram salvas
+            await Task.Delay(200);
+            
+            // Limpa o estado da tabela e força reload
+            _users = null;
+            _totalItems = 0;
             await _table.ReloadServerData();
+            await InvokeAsync(StateHasChanged);
         }
     }
     public void Dispose()
