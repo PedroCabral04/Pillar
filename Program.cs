@@ -119,6 +119,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // Registra DAOs e Serviços
 builder.Services.AddScoped<IUserDao, UserDao>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<PreferenceService>();
 builder.Services.AddScoped<ThemeService>();
 builder.Services.AddScoped<IApiService, ApiService>();
 

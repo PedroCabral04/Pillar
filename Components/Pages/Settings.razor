@@ -29,6 +29,7 @@
 
 @code {
     [Inject] ThemeService ThemeService { get; set; } = null!;
+    [Inject] PreferenceService PreferenceService { get; set; } = null!;
     private string ThemeLabel => ThemeService.IsDarkMode ? "Modo escuro" : "Modo claro";
     private string ThemeIcon => ThemeService.IsDarkMode ? Icons.Material.Filled.DarkMode : Icons.Material.Filled.LightMode;
 
