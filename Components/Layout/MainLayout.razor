@@ -61,8 +61,19 @@
         {
             await PreferenceService.InitializeAsync();
             ThemeService.InitializeTheme();
+            PreferenceService.OnPreferenceChanged += OnPreferenceChanged;
             StateHasChanged();
         }
+    }
+
+    private void OnPreferenceChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        PreferenceService.OnPreferenceChanged -= OnPreferenceChanged;
     }
 
     readonly MudTheme _customTheme = new MudTheme()
@@ -110,48 +121,22 @@
         },
     };
 
-    string SetMarginForDrawer()
+        string SetMarginForDrawer()
     {
         return _drawerOpen ? "margin-left: 170px;" : "margin-left: 56px;";
     }
 
-    string MainContentStyle() => $"margin-top: -32px; {SetMarginForDrawer()} flex: 1 1 auto; min-height: 0; overflow-y: auto;";
-
-    protected override void OnInitialized()
+    private string MainContentStyle()
     {
-        ThemeService.OnThemeChanged += HandleThemeChanged;
-    }
-    
-    private void HandleThemeChanged()
-    {
-        InvokeAsync(StateHasChanged);
-    }
-
-    private async Task ToggleThemeInAppBar()
-    {
-        try
+        var style = $"margin-top: -32px; {SetMarginForDrawer()} flex: 1 1 auto; min-height: 0; overflow-y: auto;";
+        if (PreferenceService.CurrentPreferences?.Ui?.FontSize == "small")
         {
-            await ThemeService.SetDarkModeAsync(!ThemeService.IsDarkMode);
+            style += "font-size: 0.9rem;";
         }
-        catch (Exception ex)
+        else if (PreferenceService.CurrentPreferences?.Ui?.FontSize == "large")
         {
-            Console.WriteLine($"Failed to set theme: {ex.Message}");
+            style += "font-size: 1.1rem;";
         }
+        return style;
     }
-
-    public void Dispose()
-    {
-        ThemeService.OnThemeChanged -= HandleThemeChanged;
-    }
-    
-    /*protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            isDarkMode = await _mudThemeProvider.GetSystemPreference();
-            StateHasChanged();
-        }
-    }*/
-    
-    
 }

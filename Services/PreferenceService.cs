@@ -11,6 +11,7 @@ namespace erp.Services
         private readonly HttpClient _httpClient;
         private readonly ILocalStorageService _localStorage;
         public UserPreferences CurrentPreferences { get; private set; } = new();
+        public event Action? OnPreferenceChanged;
 
         public PreferenceService(HttpClient httpClient, ILocalStorageService localStorage)
         {
@@ -39,6 +40,7 @@ namespace erp.Services
             {
                 // API might be unavailable or user not logged in, proceed with local preferences
             }
+            OnPreferenceChanged?.Invoke();
         }
 
         public async Task SaveAsync()
@@ -52,6 +54,7 @@ namespace erp.Services
             {
                 // Handle case where user is offline
             }
+            OnPreferenceChanged?.Invoke();
         }
     }
 }
