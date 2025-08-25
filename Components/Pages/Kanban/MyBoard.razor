@@ -184,4 +184,17 @@
 
 .mud-paper.kanban-column .mud-divider { opacity: .5; }
 .mud-paper.kanban-column .mud-button { margin-top: 8px; }
+
+/* Hover suave nos cards */
+.kanban-item,
+.kanban-card {
+  transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease, background-color 120ms ease;
+}
+
+.kanban-item:hover,
+.kanban-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--mud-elevation-8);
+  filter: brightness(1.03);
+}
 </style>
