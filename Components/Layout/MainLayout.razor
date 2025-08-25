@@ -14,12 +14,6 @@
 <MudSnackbarProvider/>
 <MudLayout>
     <MudPaper Style="position: relative; height: 100vh; display: flex" >
-        @*<MudAppBar Elevation="1">
-            <MudStaticNavDrawerToggle DrawerId="nav-drawer" Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start"/>
-            <MudText Typo="Typo.h5" Class="ml-3">Application</MudText>
-            <MudSpacer/>
-            <MudIconButton Icon="@Icons.Material.Filled.MoreVert" Color="Color.Inherit" Edge="Edge.End"/>
-        </MudAppBar>*@
         <MudDrawerContainer Class="mud-height-full">
             <MudDrawer id="nav-drawer" 
                        Fixed="false" 
@@ -33,7 +27,7 @@
             </MudDrawer>
         </MudDrawerContainer>
         <MudMainContent 
-            Class="pt-16 pa-4 full-height-content" 
+            Class="pa-4 full-height-content" 
             Style="@MainContentStyle()">
             @Body
         </MudMainContent>
@@ -124,8 +118,11 @@
         {
             Default = new DefaultTypography()
             {
-                FontFamily = new[] { "Poppins", "Roboto" },
+                FontFamily = new[] { "Poppins", "Roboto", "Segoe UI", "Arial", "sans-serif" },
             },
+            H5 = new H5Typography(){ FontWeight = "600", LetterSpacing = "0.2px" },
+            Button = new ButtonTypography(){ TextTransform = "none", FontWeight = "600" },
+            Subtitle2 = new Subtitle2Typography(){ FontWeight = "600" }
         },
     };
 
@@ -136,7 +133,7 @@
 
     private string MainContentStyle()
     {
-        var style = $"margin-top: -32px; {SetMarginForDrawer()} flex: 1 1 auto; min-height: 0; overflow-y: auto;";
+        var style = $"{SetMarginForDrawer()} flex: 1 1 auto; min-height: 0; overflow-y: auto;";
         if (PreferenceService.CurrentPreferences?.Ui?.FontSize == "small")
         {
             style += "font-size: 0.9rem;";
