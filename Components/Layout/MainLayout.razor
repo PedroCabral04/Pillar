@@ -78,36 +78,44 @@
 
     readonly MudTheme _customTheme = new MudTheme()
     {
+        // Light: vibrant and friendly with warm neutrals
         PaletteLight = new PaletteLight()
         {
-            Primary = Colors.Blue.Default,
-            Secondary = Colors.Indigo.Default,
-            Success = Colors.Teal.Lighten1,
-            Info = Colors.LightBlue.Default,
-            Warning = Colors.Amber.Default,
-            Error = Colors.Red.Default,
-            Background = Colors.Gray.Lighten5,
+            Primary = Colors.DeepPurple.Darken1,
+            Secondary = Colors.Cyan.Darken1,
+            Tertiary = Colors.Amber.Default,
+
+            Success = Colors.Green.Darken2,
+            Info = Colors.LightBlue.Darken1,
+            Warning = Colors.Orange.Darken1,
+            Error = Colors.Red.Darken1,
+
+            Background = Colors.BlueGray.Lighten5,
             Surface = Colors.Gray.Lighten5,
-            AppbarBackground = Colors.Blue.Darken2,
-            DrawerBackground = Colors.Gray.Lighten3,
-            Tertiary = Colors.Teal.Lighten1,
-            TextPrimary = Colors.Gray.Darken4,
-            TextSecondary = Colors.Gray.Darken3,
+            AppbarBackground = Colors.DeepPurple.Darken2,
+            DrawerBackground = Colors.BlueGray.Lighten4,
+
+            TextPrimary = Colors.BlueGray.Darken3,
+            TextSecondary = Colors.BlueGray.Default,
         },
 
+        // Dark: saturated accents on deep blue-Gray surfaces for contrast
         PaletteDark = new PaletteDark()
         {
-            Primary = Colors.Blue.Lighten2,
-            Secondary = Colors.Indigo.Lighten3,
-            Success = Colors.Teal.Lighten3,
-            Info = Colors.Cyan.Lighten2,
-            Warning = Colors.Amber.Lighten2,
+            Primary = Colors.DeepPurple.Lighten2,
+            Secondary = Colors.Cyan.Lighten2,
+            Tertiary = Colors.Amber.Lighten1,
+
+            Success = Colors.Green.Lighten2,
+            Info = Colors.LightBlue.Lighten2,
+            Warning = Colors.Orange.Lighten2,
             Error = Colors.Red.Lighten2,
-            Background = Colors.Gray.Darken4,
-            Surface = Colors.Gray.Darken3,
-            AppbarBackground = Colors.Blue.Darken2,
-            DrawerBackground = Colors.Gray.Darken3,
-            Tertiary = Colors.Teal.Darken2,
+
+            Background = Colors.BlueGray.Darken4,
+            Surface = Colors.BlueGray.Darken3,
+            AppbarBackground = Colors.DeepPurple.Darken3,
+            DrawerBackground = Colors.BlueGray.Darken3,
+
             TextPrimary = Colors.Gray.Lighten5,
             TextSecondary = Colors.Gray.Lighten2,
         },
