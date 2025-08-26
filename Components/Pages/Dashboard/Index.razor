@@ -1,0 +1,49 @@
+@page "/dashboard"
+@using erp.Services.Dashboard
+@using MudBlazor
+
+@inject IDashboardService Dashboard
+
+<MudStack Spacing="2">
+    <MudText Typo="Typo.h5">Dashboard</MudText>
+
+    <MudPaper Class="pa-3">
+        <MudGrid>
+            <MudItem xs="12" sm="6" md="3">
+                <MudDateRangePicker @bind-DateRange="_range" Label="Período" Dense="true" />
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudGrid Class="mt-2" GutterSize="GutterSize.Small">
+        @if (_widgets is null)
+        {
+            @for (var i = 0; i < 4; i++)
+            {
+                <MudItem xs="12" md="6" lg="4">
+                    <MudSkeleton Height="320px" Width="100%" />
+                </MudItem>
+            }
+        }
+        else
+        {
+            @foreach (var w in _widgets)
+            {
+                <MudItem xs="12" md="6" lg="4">
+                    <erp.Components.Shared.Charts.WidgetHost Definition="w" />
+                </MudItem>
+            }
+        }
+    </MudGrid>
+</MudStack>
+
+@code {
+    private List<DashboardWidgetDefinition>? _widgets;
+    private DateRange _range = new(DateTime.Today.AddMonths(-1), DateTime.Today);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var list = await Dashboard.GetWidgetsAsync();
+        _widgets = list.ToList();
+    }
+}

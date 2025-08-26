@@ -1,0 +1,95 @@
+@using erp.DTOs.Dashboard
+@using ApexCharts
+@using MudBlazor
+
+<MudPaper Class="pa-4" Elevation="1">
+    <div class="d-flex align-center justify-space-between mb-2">
+        <div class="d-flex align-center gap-2">
+            @if (!string.IsNullOrWhiteSpace(Definition.Icon))
+            {
+                <MudIcon Icon="@Definition.Icon" Size="@MudBlazor.Size.Medium" Class="text-secondary" />
+            }
+            <MudText Typo="Typo.h6">@Definition.Title</MudText>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(Data?.Subtitle))
+        {
+            <MudText Typo="Typo.caption" Class="text-secondary">@Data.Subtitle</MudText>
+        }
+    </div>
+
+    @if (Data is null)
+    {
+        <MudSkeleton Width="100%" Height="240px" Animation="Animation.Pulse" />
+    }
+    else
+    {
+        @switch (Definition.ChartType)
+        {
+            case DashboardChartType.Bar:
+                <ApexChart TItem="DataPoint" Height="280">
+                    @foreach (var s in _seriesData)
+                    {
+                        <ApexPointSeries TItem="DataPoint" Items="@s.Items" Name="@s.Name" SeriesType="SeriesType.Bar" XValue="e => e.Category" YValue="e => e.Value" />
+                    }
+                </ApexChart>
+                break;
+            case DashboardChartType.Line:
+                <ApexChart TItem="DataPoint" Height="280">
+                    @foreach (var s in _seriesData)
+                    {
+                        <ApexPointSeries TItem="DataPoint" Items="@s.Items" Name="@s.Name" SeriesType="SeriesType.Line" XValue="e => e.Category" YValue="e => e.Value" />
+                    }
+                </ApexChart>
+                break;
+            case DashboardChartType.Area:
+                <ApexChart TItem="DataPoint" Height="280">
+                    @foreach (var s in _seriesData)
+                    {
+                        <ApexPointSeries TItem="DataPoint" Items="@s.Items" Name="@s.Name" SeriesType="SeriesType.Area" XValue="e => e.Category" YValue="e => e.Value" />
+                    }
+                </ApexChart>
+                break;
+            case DashboardChartType.Donut:
+            case DashboardChartType.Pie:
+                <ApexChart TItem="DataPoint" Height="280">
+                    @foreach (var s in _seriesData)
+                    {
+                        <ApexPointSeries TItem="DataPoint" Items="@s.Items" Name="@s.Name" SeriesType="SeriesType.Bar" XValue="e => e.Category" YValue="e => e.Value" />
+                    }
+                </ApexChart>
+                break;
+        }
+    }
+</MudPaper>
+
+@code {
+    [Parameter] public required DashboardWidgetDefinition Definition { get; set; }
+    [Parameter] public ChartDataResponse? Data { get; set; }
+
+    private List<SeriesItems> _seriesData = new();
+
+    protected override void OnParametersSet()
+    {
+        _seriesData.Clear();
+        if (Data?.Series is null || Data.Series.Count == 0) return;
+        var categories = Data.Categories ?? Enumerable.Range(1, Data.Series.Max(s => s.Data.Count)).Select(i => i.ToString()).ToList();
+        foreach (var s in Data.Series)
+        {
+            var items = new List<DataPoint>();
+            for (int i = 0; i < s.Data.Count; i++)
+            {
+                var cat = i < categories.Count ? categories[i] : i.ToString();
+                items.Add(new DataPoint { Category = cat, Value = s.Data[i] });
+            }
+            _seriesData.Add(new SeriesItems(s.Name, items));
+        }
+    }
+
+    public class DataPoint
+    {
+        public string Category { get; set; } = string.Empty;
+        public decimal Value { get; set; }
+    }
+
+    public record SeriesItems(string Name, List<DataPoint> Items);
+}

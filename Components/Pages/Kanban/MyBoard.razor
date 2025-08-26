@@ -11,7 +11,7 @@
         <MudStack Row Spacing="2">
             <MudText Typo="Typo.h5">Meu Kanban</MudText>
             <MudSpacer />
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="NewColumn">Nova Coluna</MudButton>
+            <MudButton Color="MudBlazor.Color.Primary" Variant="Variant.Filled" OnClick="NewColumn">Nova Coluna</MudButton>
         </MudStack>
         <MudDivider Class="my-2"/>
     </div>
@@ -19,7 +19,7 @@
     <div class="kanban-scroll">
         @if (_columns is null)
         {
-            <MudProgressCircular Color="Color.Primary" Indeterminate="true"/>
+            <MudProgressCircular Color="MudBlazor.Color.Primary" Indeterminate="true"/>
         }
         else
         {
@@ -36,11 +36,11 @@
                             <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
                                 <MudText Typo="Typo.subtitle1">@col.Title</MudText>
                                 <MudSpacer/>
-                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="() => RenameColumn(col)"/>
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="MudBlazor.Size.Small" OnClick="() => RenameColumn(col)"/>
                             </MudStack>
                             <MudDivider Class="my-1"/>
                             <MudDropZone T="KanbanCardDto" Identifier="@col.Id.ToString()" Class="kanban-cards mud-height-full" />
-                            <MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add" OnClick="() => NewCard(col)">Adicionar</MudButton>
+                            <MudButton Size="MudBlazor.Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add" OnClick="() => NewCard(col)">Adicionar</MudButton>
                         </MudPaper>
                     }
                 </ChildContent>

@@ -13,6 +13,10 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
 using erp.Security;
 using erp.Models.Identity;
+using erp.Services.Dashboard;
+using erp.Services.Dashboard.Providers.Sales;
+using erp.Services.Dashboard.Providers.Finance;
+using ApexCharts;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -106,6 +110,7 @@ builder.Services.AddMudServices(config =>
     config.SnackbarConfiguration.ShowTransitionDuration = 200;
     config.SnackbarConfiguration.SnackbarVariant = MudBlazor.Variant.Filled;
 });
+builder.Services.AddApexCharts();
 builder.Services.AddBlazoredLocalStorage();
 
 // Antiforgery hardening (used by UseAntiforgery)
@@ -130,6 +135,11 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<PreferenceService>();
 builder.Services.AddScoped<ThemeService>();
 builder.Services.AddScoped<IApiService, ApiService>();
+// Dashboard services
+builder.Services.AddScoped<IDashboardRegistry, DashboardRegistry>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<IDashboardWidgetProvider, SalesDashboardProvider>();
+builder.Services.AddScoped<IDashboardWidgetProvider, FinanceDashboardProvider>();
 
 // ------- REGISTRO DO MAPPERLY -------
 builder.Services.AddScoped<UserMapper, UserMapper>();

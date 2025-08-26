@@ -18,10 +18,10 @@
 <MudCard Elevation="4" Class="w-100">
     <MudCardHeader Style="margin-bottom: -20px">
         <CardHeaderContent>
-            <MudText Typo="Typo.h5" Color="Color.Default">Adicionar usuários</MudText>
+            <MudText Typo="Typo.h5" Color="MudBlazor.Color.Default">Adicionar usuários</MudText>
         </CardHeaderContent>
         <CardHeaderActions>
-            <MudIconButton Icon="@Icons.Material.Filled.Settings" Color="Color.Default"></MudIconButton>
+            <MudIconButton Icon="@Icons.Material.Filled.Settings" Color="MudBlazor.Color.Default"></MudIconButton>
         </CardHeaderActions>
     </MudCardHeader>
     <MudCardContent>
@@ -51,7 +51,7 @@
                     }
                 </MudSelect>
 
-                <MudButton Color="Color.Primary" Variant="Variant.Outlined" EndIcon="@Icons.Material.Filled.Add"
+                <MudButton Color="MudBlazor.Color.Primary" Variant="Variant.Outlined" EndIcon="@Icons.Material.Filled.Add"
                            ButtonType="ButtonType.Submit"
                            Disabled="@(_submitting || !IsFormValid())"
                            OnClick="@HandleAddUser"
@@ -103,7 +103,7 @@
         <MudTd DataLabel="Telefone">@context.Phone</MudTd>
         <MudTd DataLabel="Permissões">@string.Join(", ", context.RoleAbbreviations)</MudTd>
         <MudTd DataLabel="Ativo">@(context.IsActive ? "Sim" : "Não")</MudTd>
-        <MudTd><MudButton Variant="Variant.Outlined"  Color="Color.Info" Size="Size.Small" OnClick="@(() => ShowUserUpdateDialog(context.Id))">Editar</MudButton></MudTd>    
+        <MudTd><MudButton Variant="Variant.Outlined"  Color="MudBlazor.Color.Info" Size="MudBlazor.Size.Small" OnClick="@(() => ShowUserUpdateDialog(context.Id))">Editar</MudButton></MudTd>    
     </RowTemplate>
     <NoRecordsContent>
         <MudText>Nenhum usuário encontrado.</MudText>
