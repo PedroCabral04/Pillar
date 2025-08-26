@@ -10,7 +10,7 @@
     <DialogContent>
         @if (_loading)
         {
-            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+            <MudProgressCircular Color="MudBlazor.Color.Primary" Indeterminate="true" />
             <MudText>Carregando dados do usuário...</MudText>
         }
         else if (_loadError != null)
@@ -50,17 +50,17 @@
                     }
                 </MudSelect>
 
-                <MudSwitch @bind-Value="_updateUser.IsActive" Label="Usuário Ativo" Color="Color.Primary" />
+                <MudSwitch @bind-Value="_updateUser.IsActive" Label="Usuário Ativo" Color="MudBlazor.Color.Primary" />
             </MudForm>
         }
     </DialogContent>
     <DialogActions>
-        <MudButton Color="Color.Error" Variant="Variant.Text" OnClick="@Cancel">Cancelar</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Text" OnClick="@Update" 
+        <MudButton Color="MudBlazor.Color.Error" Variant="Variant.Text" OnClick="@Cancel">Cancelar</MudButton>
+        <MudButton Color="MudBlazor.Color.Primary" Variant="Variant.Text" OnClick="@Update" 
                    Disabled="@(_loading || _submitting || _loadError != null)">
             @if (_submitting)
             {
-                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true"/>
+                <MudProgressCircular Class="ms-n1" Size="MudBlazor.Size.Small" Indeterminate="true"/>
                 <MudText Class="ms-2">Atualizando...</MudText>
             }
             else

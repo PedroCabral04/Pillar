@@ -1,0 +1,20 @@
+@using erp.Services.Dashboard
+@using erp.DTOs.Dashboard
+@using erp.Components.Shared.Charts
+
+@inject IDashboardService Dashboard
+
+<ChartWidget Definition="Definition" Data="_data" />
+
+@code {
+    [Parameter] public required DashboardWidgetDefinition Definition { get; set; }
+    [Parameter] public DashboardQuery? Query { get; set; }
+    private ChartDataResponse? _data;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // naive: load on parameter set. Improve with memoization by (provider, widget, query)
+        var q = Query ?? new DashboardQuery { From = DateTime.UtcNow.AddMonths(-6), To = DateTime.UtcNow };
+        _data = await Dashboard.QueryAsync(Definition, q);
+    }
+}
