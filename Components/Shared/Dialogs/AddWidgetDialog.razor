@@ -75,7 +75,7 @@
 
 @code {
     [CascadingParameter]
-    MudDialogInstance? MudDialog { get; set; }
+    private IMudDialogInstance MudDialog { get; set; } = null!;
 
     private bool _loading = true;
     private string _searchTerm = string.Empty;
