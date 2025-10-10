@@ -141,8 +141,7 @@ builder.Services.AddScoped<IDashboardRegistry, DashboardRegistry>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IDashboardWidgetProvider, SalesDashboardProvider>();
 builder.Services.AddScoped<IDashboardWidgetProvider, FinanceDashboardProvider>();
-// Onboarding service
-builder.Services.AddScoped<erp.Services.Onboarding.IOnboardingService, erp.Services.Onboarding.OnboardingService>();
+builder.Services.AddScoped<erp.Services.DashboardCustomization.IDashboardLayoutService, erp.Services.DashboardCustomization.DashboardLayoutService>();
 
 // ------- REGISTRO DO MAPPERLY -------
 builder.Services.AddScoped<UserMapper, UserMapper>();
