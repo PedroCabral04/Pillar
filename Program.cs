@@ -136,6 +136,7 @@ builder.Services.AddScoped<PreferenceService>();
 builder.Services.AddScoped<ThemeService>();
 builder.Services.AddScoped<IApiService, ApiService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<erp.Services.Notifications.IAdvancedNotificationService, erp.Services.Notifications.AdvancedNotificationService>();
 // Dashboard services
 builder.Services.AddScoped<IDashboardRegistry, DashboardRegistry>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
