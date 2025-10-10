@@ -1,6 +1,7 @@
 @page "/login"
 @attribute [AllowAnonymous]
 @using System.ComponentModel.DataAnnotations
+@using erp.Services
 @inject HttpClient Http
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthStateProvider
@@ -25,7 +26,7 @@
                 <MudTextField @bind-Value="model.Password" Label="Senha" Variant="Variant.Outlined" Required="true" For="() => model.Password" InputType="InputType.Password"/>
                 <MudCheckBox T="bool" @bind-Checked="model.RememberMe" Label="Lembrar" Class="mt-2" />
                 <MudAlert Severity="Severity.Error" Dense="true" Style="@ErrorDisplayStyle" Class="mt-2">@error</MudAlert>
-                <MudButton Disabled="busy" Loading="busy" Color="Color.Primary" Variant="Variant.Filled" Class="mt-4" FullWidth="true" ButtonType="ButtonType.Submit">
+                <MudButton Disabled="busy" Loading="busy" Color="MudBlazor.Color.Primary" Variant="Variant.Filled" Class="mt-4" FullWidth="true" ButtonType="ButtonType.Submit">
                     Entrar
                 </MudButton>
             </EditForm>
@@ -65,12 +66,23 @@
             }
             else
             {
-                error = string.IsNullOrWhiteSpace(result.text) ? "Falha ao autenticar" : result.text;
+                // Mensagem de erro mais contextual baseada no status HTTP
+                if (result.status > 0)
+                {
+                    var statusCode = (System.Net.HttpStatusCode)result.status;
+                    error = ErrorMessageHelper.GetLoginErrorMessage(statusCode);
+                }
+                else
+                {
+                    error = string.IsNullOrWhiteSpace(result.text) 
+                        ? "E-mail ou senha incorretos. Verifique seus dados e tente novamente." 
+                        : result.text;
+                }
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            error = ex.Message;
+            error = "Erro ao conectar com o servidor. Verifique sua conexão e tente novamente.";
         }
         finally
         {

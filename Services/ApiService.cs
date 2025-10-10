@@ -58,7 +58,13 @@ public class ApiService : IApiService
 
     public async Task<HttpResponseMessage> GetAsync(string endpoint, CancellationToken cancellationToken = default)
     {
-        var request = CreateRequestWithCookies(HttpMethod.Get, endpoint);
+        var fullUri = new Uri(_httpClient.BaseAddress!, endpoint);
+        var uriBuilder = new UriBuilder(fullUri);
+        var query = System.Web.HttpUtility.ParseQueryString(uriBuilder.Query);
+        query["_"] = DateTime.UtcNow.Ticks.ToString();
+        uriBuilder.Query = query.ToString();
+
+        var request = CreateRequestWithCookies(HttpMethod.Get, uriBuilder.Uri.PathAndQuery);
         return await _httpClient.SendAsync(request, cancellationToken);
     }
 

@@ -14,6 +14,11 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public new DbSet<Role> Roles { get; set; } = null!;
     public new DbSet<UserRole> UserRoles { get; set; } = null!;
 
+    // Kanban
+    public DbSet<Models.Kanban.KanbanBoard> KanbanBoards { get; set; } = null!;
+    public DbSet<Models.Kanban.KanbanColumn> KanbanColumns { get; set; } = null!;
+    public DbSet<Models.Kanban.KanbanCard> KanbanCards { get; set; } = null!;
+
     protected override void OnConfiguring(DbContextOptionsBuilder options)
         => options.UseNpgsql("Host=localhost;Database=erp;Username=postgres;Password=123");
 
@@ -71,5 +76,45 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
                 .HasForeignKey(ur => ur.RoleId)
                 .IsRequired();
     });
+
+        // Kanban model configuration
+        modelBuilder.Entity<Models.Kanban.KanbanBoard>(b =>
+        {
+            b.ToTable("KanbanBoards");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            b.HasOne<ApplicationUser>()
+                .WithMany()
+                .HasForeignKey(x => x.OwnerId)
+                .OnDelete(DeleteBehavior.Cascade);
+            b.HasIndex(x => new { x.OwnerId, x.Name });
+        });
+
+        modelBuilder.Entity<Models.Kanban.KanbanColumn>(c =>
+        {
+            c.ToTable("KanbanColumns");
+            c.HasKey(x => x.Id);
+            c.Property(x => x.Title).HasMaxLength(200).IsRequired();
+            c.Property(x => x.Position).IsRequired();
+            c.HasOne(x => x.Board)
+                .WithMany(x => x.Columns)
+                .HasForeignKey(x => x.BoardId)
+                .OnDelete(DeleteBehavior.Cascade);
+            c.HasIndex(x => new { x.BoardId, x.Position });
+        });
+
+        modelBuilder.Entity<Models.Kanban.KanbanCard>(t =>
+        {
+            t.ToTable("KanbanCards");
+            t.HasKey(x => x.Id);
+            t.Property(x => x.Title).HasMaxLength(300).IsRequired();
+            t.Property(x => x.Description).HasMaxLength(4000);
+            t.Property(x => x.Position).IsRequired();
+            t.HasOne(x => x.Column)
+                .WithMany(x => x.Cards)
+                .HasForeignKey(x => x.ColumnId)
+                .OnDelete(DeleteBehavior.Cascade);
+            t.HasIndex(x => new { x.ColumnId, x.Position });
+        });
     }
 }

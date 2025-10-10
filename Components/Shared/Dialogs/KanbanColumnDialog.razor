@@ -1,0 +1,48 @@
+@using System.ComponentModel.DataAnnotations
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="_title" 
+                      Label="Título da Coluna" 
+                      Required="true"
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense"
+                      HelperText="Digite o nome da coluna do Kanban"
+                      Immediate="true" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="MudBlazor.Color.Primary" 
+                   Variant="Variant.Filled"
+                   OnClick="Submit"
+                   Disabled="@(string.IsNullOrWhiteSpace(_title))">
+            @(IsEdit ? "Salvar" : "Criar")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] 
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+    
+    [Parameter] public string? InitialTitle { get; set; }
+    [Parameter] public bool IsEdit { get; set; } = false;
+
+    private string _title = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        _title = InitialTitle ?? string.Empty;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+    
+    private void Submit()
+    {
+        if (!string.IsNullOrWhiteSpace(_title))
+        {
+            MudDialog.Close(DialogResult.Ok(_title));
+        }
+    }
+}

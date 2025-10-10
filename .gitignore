@@ -8,3 +8,8 @@ Migrations
 ERP_Development_Guide.md
 Pages/Template
 wwwroot/download.png
+docs/
+/packages
+*.nupkg
+*.nuspec
+*.props

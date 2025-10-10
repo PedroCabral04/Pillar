@@ -1,0 +1,324 @@
+@using erp.DTOs.Notifications
+@using erp.Services.Notifications
+@using Microsoft.AspNetCore.Components.Authorization
+@using MudBlazor
+@inject IAdvancedNotificationService NotificationService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+<MudMenu Icon="@Icons.Material.Filled.Notifications" 
+         Color="MudBlazor.Color.Inherit"
+         AnchorOrigin="Origin.BottomLeft"
+         TransformOrigin="Origin.TopLeft"
+         Class="notification-icon">
+    <ActivatorContent>
+        <MudBadge Content="@_unreadCount" 
+                  Visible="@(_unreadCount > 0)" 
+                  Color="MudBlazor.Color.Error" 
+                  Overlap="true">
+            <MudIconButton Icon="@Icons.Material.Filled.Notifications" 
+                          Color="MudBlazor.Color.Inherit" />
+        </MudBadge>
+    </ActivatorContent>
+    <ChildContent>
+        <div class="notification-panel">
+            <div class="notification-panel-header">
+                <MudText Typo="Typo.h6">Notificações</MudText>
+                @if (_unreadCount > 0)
+                {
+                    <MudButton Size="MudBlazor.Size.Small" 
+                              Variant="Variant.Text" 
+                              Color="MudBlazor.Color.Primary"
+                              OnClick="MarkAllAsRead">
+                        Marcar todas como lidas
+                    </MudButton>
+                }
+            </div>
+
+            @if (_loading)
+            {
+                <div class="notification-panel-loading">
+                    <MudProgressCircular Indeterminate="true" Size="MudBlazor.Size.Small" />
+                </div>
+            }
+            else if (!_notifications.Any())
+            {
+                <div class="notification-panel-empty">
+                    <MudIcon Icon="@Icons.Material.Outlined.Notifications" Size="MudBlazor.Size.Large" Color="MudBlazor.Color.Secondary" />
+                    <MudText Typo="Typo.body2" Color="MudBlazor.Color.Secondary">
+                        Nenhuma notificação
+                    </MudText>
+                </div>
+            }
+            else
+            {
+                <div class="notification-panel-list">
+                    @foreach (var notification in _notifications)
+                    {
+                        <div class="notification-item @(!notification.IsRead ? "unread" : "")"
+                             @onclick="() => HandleNotificationClick(notification)">
+                            <div class="notification-item-icon">
+                                <MudIcon Icon="@GetNotificationIcon(notification.Type)" 
+                                        Color="@GetNotificationColor(notification.Type)" />
+                            </div>
+                            <div class="notification-item-content">
+                                <MudText Typo="Typo.subtitle2">@notification.Title</MudText>
+                                <MudText Typo="Typo.body2" Color="MudBlazor.Color.Secondary">
+                                    @notification.Message
+                                </MudText>
+                                <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">
+                                    @FormatTimeAgo(notification.CreatedAt)
+                                </MudText>
+                            </div>
+                            <div class="notification-item-actions">
+                                @if (!notification.IsRead)
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.Circle" 
+                                                  Size="MudBlazor.Size.Small" 
+                                                  Color="MudBlazor.Color.Primary" />
+                                }
+                                <div @onclick="@(() => DeleteNotification(notification.Id))" @onclick:stopPropagation="true">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Close" 
+                                                  Size="MudBlazor.Size.Small" />
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+
+            <div class="notification-panel-footer">
+                <MudButton Variant="Variant.Text" 
+                          FullWidth="true" 
+                          OnClick="ViewAllNotifications">
+                    Ver todas as notificações
+                </MudButton>
+            </div>
+        </div>
+    </ChildContent>
+</MudMenu>
+
+@code {
+    private bool _loading = true;
+    private int _unreadCount = 0;
+    private List<Notification> _notifications = new();
+    private string? _userId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            _userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            await LoadNotifications();
+        }
+
+        _loading = false;
+
+        // Subscribe to real-time events
+        NotificationService.OnNotificationCreated += OnNotificationCreated;
+        NotificationService.OnNotificationRead += OnNotificationRead;
+        NotificationService.OnNotificationDeleted += OnNotificationDeleted;
+    }
+
+    private async Task LoadNotifications()
+    {
+        if (string.IsNullOrEmpty(_userId)) return;
+
+        var filter = new NotificationFilter
+        {
+            Take = 10,
+            Skip = 0
+        };
+
+        _notifications = await NotificationService.GetUserNotificationsAsync(_userId, filter);
+        
+        var summary = await NotificationService.GetSummaryAsync(_userId);
+        _unreadCount = summary.UnreadCount;
+    }
+
+    private async Task MarkAllAsRead()
+    {
+        if (string.IsNullOrEmpty(_userId)) return;
+
+        await NotificationService.MarkAllAsReadAsync(_userId);
+        await LoadNotifications();
+    }
+
+    private async Task HandleNotificationClick(Notification notification)
+    {
+        if (string.IsNullOrEmpty(_userId)) return;
+
+        if (!notification.IsRead)
+        {
+            await NotificationService.MarkAsReadAsync(_userId, notification.Id);
+        }
+
+        if (!string.IsNullOrEmpty(notification.ActionUrl))
+        {
+            NavigationManager.NavigateTo(notification.ActionUrl);
+        }
+
+        await LoadNotifications();
+    }
+
+    private async Task DeleteNotification(string notificationId)
+    {
+        if (string.IsNullOrEmpty(_userId)) return;
+
+        await NotificationService.DeleteNotificationAsync(_userId, notificationId);
+        await LoadNotifications();
+    }
+
+    private void ViewAllNotifications()
+    {
+        NavigationManager.NavigateTo("/notifications");
+    }
+
+    private string GetNotificationIcon(NotificationType type)
+    {
+        return type switch
+        {
+            NotificationType.Success => Icons.Material.Filled.CheckCircle,
+            NotificationType.Warning => Icons.Material.Filled.Warning,
+            NotificationType.Error => Icons.Material.Filled.Error,
+            NotificationType.System => Icons.Material.Filled.Settings,
+            _ => Icons.Material.Filled.Info
+        };
+    }
+
+    private MudBlazor.Color GetNotificationColor(NotificationType type)
+    {
+        return type switch
+        {
+            NotificationType.Success => MudBlazor.Color.Success,
+            NotificationType.Warning => MudBlazor.Color.Warning,
+            NotificationType.Error => MudBlazor.Color.Error,
+            NotificationType.System => MudBlazor.Color.Secondary,
+            _ => MudBlazor.Color.Info
+        };
+    }
+
+    private string FormatTimeAgo(DateTime date)
+    {
+        var timeSpan = DateTime.UtcNow - date;
+
+        if (timeSpan.TotalSeconds < 60)
+            return "Agora mesmo";
+        if (timeSpan.TotalMinutes < 60)
+            return $"{(int)timeSpan.TotalMinutes}m atrás";
+        if (timeSpan.TotalHours < 24)
+            return $"{(int)timeSpan.TotalHours}h atrás";
+        if (timeSpan.TotalDays < 7)
+            return $"{(int)timeSpan.TotalDays}d atrás";
+        
+        return date.ToString("dd/MM/yyyy");
+    }
+
+    private void OnNotificationCreated(object? sender, Notification notification)
+    {
+        if (notification.UserId == _userId)
+        {
+            InvokeAsync(async () =>
+            {
+                await LoadNotifications();
+                StateHasChanged();
+            });
+        }
+    }
+
+    private void OnNotificationRead(object? sender, string notificationId)
+    {
+        InvokeAsync(async () =>
+        {
+            await LoadNotifications();
+            StateHasChanged();
+        });
+    }
+
+    private void OnNotificationDeleted(object? sender, string notificationId)
+    {
+        InvokeAsync(async () =>
+        {
+            await LoadNotifications();
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        NotificationService.OnNotificationCreated -= OnNotificationCreated;
+        NotificationService.OnNotificationRead -= OnNotificationRead;
+        NotificationService.OnNotificationDeleted -= OnNotificationDeleted;
+    }
+}
+
+<style>
+    .notification-panel {
+        width: 400px;
+        max-width: 90vw;
+    }
+
+    .notification-panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px;
+        border-bottom: 1px solid var(--mud-palette-divider);
+    }
+
+    .notification-panel-loading,
+    .notification-panel-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 16px;
+        gap: 16px;
+    }
+
+    .notification-panel-list {
+        max-height: 500px;
+        overflow-y: auto;
+    }
+
+    .notification-item {
+        display: flex;
+        gap: 12px;
+        padding: 16px;
+        border-bottom: 1px solid var(--mud-palette-divider);
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    .notification-item:hover {
+        background-color: var(--mud-palette-action-default-hover);
+    }
+
+    .notification-item.unread {
+        background-color: var(--mud-palette-action-selected);
+    }
+
+    .notification-item-icon {
+        flex-shrink: 0;
+    }
+
+    .notification-item-content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .notification-item-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        flex-shrink: 0;
+    }
+
+    .notification-panel-footer {
+        padding: 8px;
+        border-top: 1px solid var(--mud-palette-divider);
+    }
+</style>

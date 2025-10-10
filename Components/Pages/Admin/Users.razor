@@ -15,66 +15,16 @@
 <PageTitle>Gerenciar Usuários</PageTitle>
 
 <MudSnackbarProvider/>
-<MudCard Elevation="4" Class="w-100">
-    <MudCardHeader Style="margin-bottom: -20px">
-        <CardHeaderContent>
-            <MudText Typo="Typo.h5" Color="Color.Default">Adicionar usuários</MudText>
-        </CardHeaderContent>
-        <CardHeaderActions>
-            <MudIconButton Icon="@Icons.Material.Filled.Settings" Color="Color.Default"></MudIconButton>
-        </CardHeaderActions>
-    </MudCardHeader>
-    <MudCardContent>
-            <MudForm @ref="_form">
-                <MudTextField T="string" Label="Nome" Variant="Variant.Outlined" Margin="Margin.Dense"
-                              InputType="InputType.Text"
-                              @bind-Value="_newUser.Username"
-                              Validation="@(_usernameRules)"/>
 
-                <MudTextField T="string" Label="Email" Variant="Variant.Outlined" Margin="Margin.Dense"
-                              InputType="InputType.Email"
-                              @bind-Value="_newUser.Email"
-                              Validation="@(_emailRules)"/>
-
-                <MudTextField T="string" Label="Telefone" Variant="Variant.Outlined" Margin="Margin.Dense"
-                              InputType="InputType.Telephone"
-                              Placeholder="(00) 00000-0000" Mask="@(new PatternMask("(00) 00000-0000"))"
-                              @bind-Value="_newUser.Phone"
-                              Validation="@(_phoneRules)"/>
-
-                <MudSelect T="@RoleDto" @bind-SelectedValues="_selectedRoles" Label="Função/Permissão" MultiSelection="true"
-                           Variant="Variant.Outlined" Margin="Margin.Dense" Required="true"
-                           RequiredError="Escolha pelo menos uma permissão" SelectAll="true" SelectAllText="Selecionar todos">
-                    @foreach (var roleOption in _rolesList)
-                    {
-                        <MudSelectItem T="@RoleDto" Value="@roleOption">@roleOption.Name</MudSelectItem>
-                    }
-                </MudSelect>
-
-                <MudButton Color="Color.Primary" Variant="Variant.Outlined" EndIcon="@Icons.Material.Filled.Add"
-                           ButtonType="ButtonType.Submit"
-                           Disabled="@(_submitting || !(_selectedRoles?.Any() ?? false))"
-                           OnClick="@HandleAddUser"
-                           Class="w-100" Style="margin-top: 20px">
-                    Adicionar
-                </MudButton>
-            </MudForm>
-        </MudCardContent>
-</MudCard>
-
-<MudDivider Class="my-4"/>
-
-<style>
-    .dialog-blur {
-        backdrop-filter: blur(5px);
-    }
-</style>
-
-<style>
-    .dialog-blur {
-        backdrop-filter: blur(5px);
-    }
-</style>
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Gerenciar Usuários</MudText>
+    <MudButton Color="MudBlazor.Color.Primary" 
+               Variant="Variant.Filled" 
+               StartIcon="@Icons.Material.Filled.PersonAdd"
+               OnClick="@ShowUserCreateDialog">
+        Adicionar Usuário
+    </MudButton>
+</MudStack>
 
 @if (_loadError != null)
 {
@@ -86,8 +36,47 @@
     <ToolBarContent>
         <MudText Typo="Typo.h5">Usuários Cadastrados</MudText>
         <MudSpacer/>
-        <MudTextField T="string" ValueChanged="OnSearch" Immediate="true" Placeholder="Procurar" Variant="Variant.Outlined" Margin="Margin.Dense"
-                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true"/>
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudTextField T="string" ValueChanged="OnSearch" Immediate="true" Placeholder="Procurar" Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true" Style="min-width: 200px;"/>
+            <MudSelect T="string" 
+                       Value="_statusFilter" 
+                       ValueChanged="OnStatusFilterChanged"
+                       Label="Status" 
+                       Variant="Variant.Outlined" 
+                       Margin="Margin.Dense"
+                       Clearable="true"
+                       Style="min-width: 120px;">
+                <MudSelectItem T="string" Value="@("active")">Ativos</MudSelectItem>
+                <MudSelectItem T="string" Value="@("inactive")">Inativos</MudSelectItem>
+            </MudSelect>
+            <MudSelect T="string" 
+                       Value="_roleFilter" 
+                       ValueChanged="OnRoleFilterChanged"
+                       Label="Função" 
+                       Variant="Variant.Outlined" 
+                       Margin="Margin.Dense"
+                       Clearable="true"
+                       Style="min-width: 150px;">
+                @if (_availableRoles != null)
+                {
+                    @foreach (var role in _availableRoles)
+                    {
+                        <MudSelectItem T="string" Value="@role.Name">@role.Name</MudSelectItem>
+                    }
+                }
+            </MudSelect>
+            @if (HasActiveFilters())
+            {
+                <MudButton Variant="Variant.Text" 
+                           Color="MudBlazor.Color.Secondary" 
+                           StartIcon="@Icons.Material.Filled.FilterAltOff"
+                           OnClick="ClearFilters"
+                           Size="MudBlazor.Size.Small">
+                    Limpar Filtros
+                </MudButton>
+            }
+        </MudStack>
     </ToolBarContent>
     <HeaderContent>
         <MudTh><MudTableSortLabel SortLabel="username" T="UserDto">Nome</MudTableSortLabel></MudTh>
@@ -102,8 +91,22 @@
         <MudTd DataLabel="Email">@context.Email</MudTd>
         <MudTd DataLabel="Telefone">@context.Phone</MudTd>
         <MudTd DataLabel="Permissões">@string.Join(", ", context.RoleAbbreviations)</MudTd>
-        <MudTd DataLabel="Ativo">@(context.IsActive ? "Sim" : "Não")</MudTd>
-        <MudTd><MudButton Variant="Variant.Outlined"  Color="Color.Info" Size="Size.Small" OnClick="@(() => ShowUserUpdateDialog(context.Id))">Editar</MudButton></MudTd>    
+        <MudTd DataLabel="Ativo">
+            <MudChip T="string" Size="MudBlazor.Size.Small" Color="@(context.IsActive ? MudBlazor.Color.Success : MudBlazor.Color.Default)">
+                @(context.IsActive ? "Ativo" : "Inativo")
+            </MudChip>
+        </MudTd>
+        <MudTd>
+            <MudButtonGroup Variant="Variant.Outlined" Size="MudBlazor.Size.Small">
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="MudBlazor.Color.Info" 
+                               OnClick="@(() => ShowUserUpdateDialog(context.Id))" 
+                               Title="Editar usuário" />
+                <MudIconButton Icon="@(context.IsActive ? Icons.Material.Filled.PersonOff : Icons.Material.Filled.PersonAdd)" 
+                               Color="@(context.IsActive ? MudBlazor.Color.Warning : MudBlazor.Color.Success)" 
+                               OnClick="@(() => ToggleUserStatus(context))" 
+                               Title="@(context.IsActive ? "Desativar usuário" : "Ativar usuário")" />
+            </MudButtonGroup>
+        </MudTd>    
     </RowTemplate>
     <NoRecordsContent>
         <MudText>Nenhum usuário encontrado.</MudText>
@@ -122,58 +125,34 @@
     private IEnumerable<UserDto>? _users;
     private int _totalItems;
     private string _searchString = "";
+    private string _statusFilter = "";
+    private string _roleFilter = "";
+    private List<RoleDto>? _availableRoles;
 
     private System.Timers.Timer? _debounceTimer;
     private const int DebounceDelayMs = 600;
-
-    private CreateUserDto _newUser = new()
-    {
-        RoleIds = new List<int>()
-    };
-
-    private IEnumerable<RoleDto> _selectedRoles = new List<RoleDto>();
-    private List<RoleDto> _rolesList = new List<RoleDto>();
     
     private string? _loadError;
-    private MudForm? _form;
-    private bool _submitting = false;
-
-    // Regras de validação do formulário (client-side)
-    private Func<string, string?> _required(string fieldName) =>
-        v => string.IsNullOrWhiteSpace(v) ? $"{fieldName} é obrigatório" : null;
-
-    private IEnumerable<Func<string, string?>> _usernameRules => new List<Func<string, string?>>
-    {
-        _required("Nome"),
-        v => v?.Trim().Length < 3 ? "Nome deve ter pelo menos 3 caracteres" : null,
-        v => v?.Trim().Length > 50 ? "Nome não pode exceder 50 caracteres" : null
-    };
-
-    private IEnumerable<Func<string, string?>> _emailRules => new List<Func<string, string?>>
-    {
-        _required("Email"),
-        v => new EmailAddressAttribute().IsValid(v) ? null : "Email inválido"
-    };
-
-    private static string OnlyDigits(string? s) => new string((s ?? string.Empty).Where(char.IsDigit).ToArray());
-    private IEnumerable<Func<string, string?>> _phoneRules => new List<Func<string, string?>>
-    {
-        _required("Telefone"),
-        v =>
-        {
-            var digits = OnlyDigits(v);
-            return (digits.Length is < 10 or > 11) ? "Telefone deve conter DDD + número (10 ou 11 dígitos)" : null;
-        }
-    };
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadRolesAsync();
-        
-        _debounceTimer = new System.Timers.Timer(DebounceDelayMs);
         _debounceTimer = new System.Timers.Timer(DebounceDelayMs);
         _debounceTimer.Elapsed += OnDebounceTimerElapsed;
         _debounceTimer.AutoReset = false;
+        
+        // Load available roles for filter
+        try
+        {
+            var rolesResponse = await ApiService.GetAsync("api/roles");
+            if (rolesResponse.IsSuccessStatusCode)
+            {
+                _availableRoles = await rolesResponse.Content.ReadFromJsonAsync<List<RoleDto>>() ?? new List<RoleDto>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Erro ao carregar funções: {ex.Message}");
+        }
     }
 
     private async Task<TableData<UserDto>> ServerReload(TableState state, CancellationToken token)
@@ -204,15 +183,29 @@
 
             data = data.Where(user =>
             {
-                if (string.IsNullOrWhiteSpace(_searchString))
-                    return true;
-                if (user.Username.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
-                    return true;
-                if (user.Email.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
-                    return true;
-                if (user.Phone.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
-                    return true;
-                return user.RoleNames.Any(r => r.Contains(_searchString, StringComparison.OrdinalIgnoreCase));
+                // Search filter
+                if (!string.IsNullOrWhiteSpace(_searchString))
+                {
+                    if (!user.Username.Contains(_searchString, StringComparison.OrdinalIgnoreCase) &&
+                        !user.Email.Contains(_searchString, StringComparison.OrdinalIgnoreCase) &&
+                        !user.Phone.Contains(_searchString, StringComparison.OrdinalIgnoreCase) &&
+                        !user.RoleNames.Any(r => r.Contains(_searchString, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        return false;
+                    }
+                }
+                
+                // Status filter
+                if (_statusFilter == "active" && !user.IsActive)
+                    return false;
+                if (_statusFilter == "inactive" && user.IsActive)
+                    return false;
+                
+                // Role filter
+                if (!string.IsNullOrWhiteSpace(_roleFilter) && !user.RoleNames.Contains(_roleFilter, StringComparer.OrdinalIgnoreCase))
+                    return false;
+                
+                return true;
             });
 
             _totalItems = data.Count();
@@ -230,10 +223,17 @@
             _users = data.Skip(state.Page * state.PageSize).Take(state.PageSize).ToArray();
             return new TableData<UserDto>() { TotalItems = _totalItems, Items = _users };
         }
+        catch (HttpRequestException ex)
+        {
+            Console.WriteLine($"Erro ao buscar usuários: {ex.Message}");
+            _loadError = "Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.";
+            Snackbar.Add(_loadError, Severity.Error);
+            return new TableData<UserDto>() { TotalItems = 0, Items = Enumerable.Empty<UserDto>() };
+        }
         catch (Exception ex)
         {
             Console.WriteLine($"Erro ao buscar usuários: {ex.Message}");
-            _loadError = "Não foi possível carregar os usuários. Tente novamente mais tarde.";
+            _loadError = "Erro inesperado ao carregar os usuários. Tente novamente.";
             Snackbar.Add(_loadError, Severity.Error);
             return new TableData<UserDto>() { TotalItems = 0, Items = Enumerable.Empty<UserDto>() };
         }
@@ -250,108 +250,130 @@
     {
         InvokeAsync(async () => { if (_table != null) await _table.ReloadServerData(); });
     }
-    
-    private async Task HandleAddUser()
+
+    private async void OnStatusFilterChanged(string value)
     {
-        try
+        _statusFilter = value ?? "";
+        if (_table != null) await _table.ReloadServerData();
+    }
+
+    private async void OnRoleFilterChanged(string value)
+    {
+        _roleFilter = value ?? "";
+        if (_table != null) await _table.ReloadServerData();
+    }
+
+    private bool HasActiveFilters()
+    {
+        return !string.IsNullOrWhiteSpace(_searchString) || 
+               !string.IsNullOrWhiteSpace(_statusFilter) || 
+               !string.IsNullOrWhiteSpace(_roleFilter);
+    }
+
+    private async void ClearFilters()
+    {
+        _searchString = "";
+        _statusFilter = "";
+        _roleFilter = "";
+        if (_table != null) await _table.ReloadServerData();
+    }
+
+    private async Task ShowUserCreateDialog()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true, CloseButton = true, MaxWidth = MaxWidth.Medium };
+        var dialog = await DialogService.ShowAsync<UserCreateDialog>("Adicionar Novo Usuário", options);
+        var result = await dialog.Result;
+        
+        if (result is { Canceled: false } && _table != null)
         {
-            // 1) Validação client-side
-            await (_form?.Validate() ?? Task.CompletedTask);
-            if (!(_form?.IsValid ?? false))
-            {
-                Snackbar.Add("Verifique os campos destacados e tente novamente.", Severity.Warning);
-                return;
-            }
-
-            if (_selectedRoles == null || !_selectedRoles.Any())
-            {
-                Snackbar.Add("Escolha pelo menos uma permissão.", Severity.Warning);
-                return;
-            }
-
-            // Sanitiza telefone para enviar apenas dígitos
-            _newUser.Phone = OnlyDigits(_newUser.Phone);
-            if (_newUser.Phone.Length is < 10 or > 11)
-            {
-                Snackbar.Add("Telefone inválido. Informe DDD + número (10 ou 11 dígitos).", Severity.Warning);
-                return;
-            }
-
-            _submitting = true;
-            _newUser.RoleIds = _selectedRoles.Select(r => r.Id).ToList();
-            var response = await ApiService.PostAsJsonAsync("api/users", _newUser);
-            if (response.IsSuccessStatusCode)
-            {
-                Logger.LogInformation("Usuário adicionado com sucesso.");
-                _newUser = new CreateUserDto() { RoleIds = new List<int>() };
-                _selectedRoles = new List<RoleDto>();
-
-                if (_table != null)
-                    await _table.ReloadServerData();
-                Snackbar.Add("Usuário adicionado com sucesso!", Severity.Success);
-            }
-            else
-            {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                Logger.LogError($"Erro ao adicionar usuário: {response.StatusCode} - {errorContent}");
-                Snackbar.Add($"Erro ao adicionar usuário: {errorContent}", Severity.Error);
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError($"Erro ao adicionar usuário: {ex.Message}");
-            Snackbar.Add("Erro inesperado ao adicionar usuário.", Severity.Error);
-        }
-        finally
-        {
-            _submitting = false;
+            await Task.Delay(200);
+            _users = null;
+            _totalItems = 0;
+            await _table.ReloadServerData();
+            await InvokeAsync(StateHasChanged);
         }
     }
 
-    private async Task LoadRolesAsync()
+    private async Task ShowUserUpdateDialog(int userId)
     {
-        if (_rolesList.Any())
-            return;
-            
-        try
+        var options = new DialogOptions { CloseOnEscapeKey = true, CloseButton = true, MaxWidth = MaxWidth.Medium };
+        var parameters = new DialogParameters<UserUpdateDialog> { { x => x.UserId, userId } };
+
+        var userName = _users?.FirstOrDefault(u => u.Id == userId)?.Username ?? "usuário";
+        var dialog = await DialogService.ShowAsync<UserUpdateDialog>($"Alterar {userName}", parameters, options);
+        var result = await dialog.Result;
+        
+        if (result is { Canceled: false } && _table != null)
         {
-            var response = await ApiService.GetAsync("api/roles");
+            // Aguarda um momento para garantir que as alterações foram salvas
+            await Task.Delay(200);
             
-            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-            {
-                Logger.LogError("Não autorizado para buscar funções.");
-                Snackbar.Add("Você precisa estar autenticado para acessar as funções.", Severity.Error);
-                _rolesList = new List<RoleDto>();
-                return;
-            }
-            
-            if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
-            {
-                Logger.LogError("Acesso negado para buscar funções.");
-                Snackbar.Add("Você não tem permissão para acessar as funções.", Severity.Error);
-                _rolesList = new List<RoleDto>();
-                return;
-            }
-            
-            response.EnsureSuccessStatusCode();
-            
-            var roles = await response.Content.ReadFromJsonAsync<List<RoleDto>>();
-            _rolesList = roles ?? new List<RoleDto>();
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError($"Erro ao buscar funções: {ex.Message}");
-            _rolesList = new List<RoleDto>(); // Ensure it's not null on error
-            Snackbar.Add("Erro ao buscar funções: " + ex.Message, Severity.Error);
+            // Limpa o estado da tabela e força reload
+            _users = null;
+            _totalItems = 0;
+            await _table.ReloadServerData();
+            await InvokeAsync(StateHasChanged);
         }
     }
 
-    private Task ShowUserUpdateDialog(int userId)
+    private async Task ToggleUserStatus(UserDto user)
     {
-        var options = new DialogOptions { CloseOnEscapeKey = true, CloseButton = true, BackgroundClass = "dialog-blur"};
+        var action = user.IsActive ? "desativar" : "ativar";
+        var parameters = new DialogParameters
+        {
+            { "ContentText", $"Tem certeza que deseja {action} o usuário '{user.Username}'?" },
+            { "ButtonText", action.First().ToString().ToUpper() + action.Substring(1) },
+            { "Color", user.IsActive ? MudBlazor.Color.Warning : MudBlazor.Color.Success }
+        };
 
-        return DialogService.ShowAsync<UserUpdateDialog>("Test", options);
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.Small };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>($"Confirmar {action}", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            try
+            {
+                // Buscar dados completos do usuário para ter os RoleIds
+                var userResponse = await ApiService.GetAsync($"api/users/{user.Id}");
+                if (!userResponse.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("Erro ao carregar dados do usuário.", Severity.Error);
+                    return;
+                }
+                
+                var fullUser = await userResponse.Content.ReadFromJsonAsync<UpdateUserDto>();
+                if (fullUser == null)
+                {
+                    Snackbar.Add("Erro ao carregar dados do usuário.", Severity.Error);
+                    return;
+                }
+
+                fullUser.IsActive = !user.IsActive;
+
+                var response = await ApiService.PutAsJsonAsync($"api/users/{user.Id}", fullUser);
+                if (response.IsSuccessStatusCode)
+                {
+                    Snackbar.Add($"✓ Usuário {(user.IsActive ? "desativado" : "ativado")} com sucesso!", Severity.Success);
+                    if (_table != null)
+                    {
+                        await _table.ReloadServerData();
+                    }
+                }
+                else
+                {
+                    var errorMessage = ErrorMessageHelper.GetUserOperationErrorMessage(response.StatusCode, "update");
+                    Snackbar.Add(errorMessage, Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Erro ao {action} usuário: {ex.Message}");
+                Snackbar.Add($"Erro ao {action} usuário. Tente novamente.", Severity.Error);
+            }
+        }
     }
+
     public void Dispose()
     {
         _debounceTimer?.Dispose();

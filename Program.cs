@@ -13,6 +13,10 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
 using erp.Security;
 using erp.Models.Identity;
+using erp.Services.Dashboard;
+using erp.Services.Dashboard.Providers.Sales;
+using erp.Services.Dashboard.Providers.Finance;
+// using ApexCharts; // TODO: Instalar pacote ApexCharts se necessário
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -97,7 +101,16 @@ builder.Services.AddScoped(sp => {
 });
 
 // Adiciona serviços de terceiros.
-builder.Services.AddMudServices();
+builder.Services.AddMudServices(config =>
+{
+    config.SnackbarConfiguration.PositionClass = MudBlazor.Defaults.Classes.Position.BottomRight;
+    config.SnackbarConfiguration.ShowCloseIcon = true;
+    config.SnackbarConfiguration.VisibleStateDuration = 4000;
+    config.SnackbarConfiguration.HideTransitionDuration = 200;
+    config.SnackbarConfiguration.ShowTransitionDuration = 200;
+    config.SnackbarConfiguration.SnackbarVariant = MudBlazor.Variant.Filled;
+});
+// builder.Services.AddApexCharts(); // TODO: Instalar pacote ApexCharts se necessário
 builder.Services.AddBlazoredLocalStorage();
 
 // Antiforgery hardening (used by UseAntiforgery)
@@ -119,8 +132,17 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // Registra DAOs e Serviços
 builder.Services.AddScoped<IUserDao, UserDao>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<PreferenceService>();
 builder.Services.AddScoped<ThemeService>();
 builder.Services.AddScoped<IApiService, ApiService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<erp.Services.Notifications.IAdvancedNotificationService, erp.Services.Notifications.AdvancedNotificationService>();
+// Dashboard services
+builder.Services.AddScoped<IDashboardRegistry, DashboardRegistry>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<IDashboardWidgetProvider, SalesDashboardProvider>();
+builder.Services.AddScoped<IDashboardWidgetProvider, FinanceDashboardProvider>();
+builder.Services.AddScoped<erp.Services.DashboardCustomization.IDashboardLayoutService, erp.Services.DashboardCustomization.DashboardLayoutService>();
 
 // ------- REGISTRO DO MAPPERLY -------
 builder.Services.AddScoped<UserMapper, UserMapper>();

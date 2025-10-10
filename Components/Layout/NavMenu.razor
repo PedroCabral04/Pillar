@@ -1,4 +1,6 @@
-﻿@implements IDisposable
+﻿@using erp.Components.Shared.Dialogs
+@using MudBlazor
+@implements IDisposable
 
 @inject NavigationManager NavigationManager
 
@@ -6,11 +8,15 @@
     <MudText GutterBottom="true" Typo="Typo.h6" Class="px-4">Pillar</MudText>
     <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
     <MudDivider/>
+    <MudNavLink Href="dashboard" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
+    <MudDivider/>
     @*<MudNavLink Href="counter" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Add">Counter</MudNavLink>
     <MudDivider/>
     <MudNavLink Href="weather" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.List">Weather</MudNavLink>
     <MudDivider/>*@
     <MudNavLink Href="admin/users" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.People">Usuários</MudNavLink>
+    <MudDivider/>
+    <MudNavLink Href="kanban" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.ViewKanban">Meu Kanban</MudNavLink>
     <MudDivider/>
     <MudNavLink Href="ajustes" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Settings">Configurações</MudNavLink>
     <MudDivider/>
@@ -63,17 +69,32 @@
     }
 
     [Inject] IJSRuntime JS { get; set; } = null!;
+    [Inject] IDialogService DialogService { get; set; } = null!;
 
     private async Task LogoutAsync()
     {
-        try
+        var parameters = new DialogParameters
         {
-            await JS.InvokeVoidAsync("erpAuth.logout");
-            NavigationManager.NavigateTo("/login", forceLoad: true);
-        }
-        catch
+            { "ContentText", "Tem certeza que deseja sair do sistema?" },
+            { "ButtonText", "Sair" },
+            { "Color", MudBlazor.Color.Error }
+        };
+
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.Small };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirmar saída", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
         {
-            NavigationManager.NavigateTo("/login", forceLoad: true);
+            try
+            {
+                await JS.InvokeVoidAsync("erpAuth.logout");
+                NavigationManager.NavigateTo("/login", forceLoad: true);
+            }
+            catch
+            {
+                NavigationManager.NavigateTo("/login", forceLoad: true);
+            }
         }
     }
 }

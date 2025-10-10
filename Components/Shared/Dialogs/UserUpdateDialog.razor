@@ -1,29 +1,423 @@
+@using MudBlazor
 @inject ISnackbar Snackbar;
+@inject IApiService ApiService;
+@inject ILogger<UserUpdateDialog> Logger;
+@using System.ComponentModel.DataAnnotations
+@using erp.DTOs.User
+@using erp.DTOs.Role
+@using erp.Services
 
-<MudDialog>
+<MudDialog Class="user-dialog">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Edit" Color="MudBlazor.Color.Info" Size="MudBlazor.Size.Large" />
+            <MudText Typo="Typo.h6">Editar Usuário</MudText>
+        </MudStack>
+    </TitleContent>
     <DialogContent>
-        Test
+        @if (_loading)
+        {
+            <MudStack AlignItems="AlignItems.Center" Spacing="3" Class="pa-6">
+                <MudProgressCircular Color="MudBlazor.Color.Primary" Indeterminate="true" Size="MudBlazor.Size.Large" />
+                <MudText Typo="Typo.body1" Color="MudBlazor.Color.Secondary">Carregando dados do usuário...</MudText>
+            </MudStack>
+        }
+        else if (_loadError != null)
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Icon="@Icons.Material.Filled.Error">
+                @_loadError
+            </MudAlert>
+        }
+        else
+        {
+            <MudForm @ref="_form" Class="pa-2">
+                <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.Badge" Size="MudBlazor.Size.Small" Class="mr-1" />
+                    Informações Pessoais
+                </MudText>
+                
+                <MudGrid Spacing="3">
+                    <MudItem xs="12">
+                        <MudTextField T="string" 
+                                      Label="Nome completo" 
+                                      Variant="Variant.Outlined"
+                                      InputType="InputType.Text"
+                                      @bind-Value="_updateUser.Username"
+                                      Validation="@(_usernameRules)"
+                                      Immediate="true"
+                                      HelperText="Mínimo 3 caracteres"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Person"/>
+                    </MudItem>
+                    
+                    <MudItem xs="12" md="6">
+                        <MudTextField T="string" 
+                                      Label="E-mail" 
+                                      Variant="Variant.Outlined"
+                                      InputType="InputType.Email"
+                                      @bind-Value="_updateUser.Email"
+                                      Validation="@(_emailRules)"
+                                      Immediate="true"
+                                      HelperText="exemplo@empresa.com"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Email"/>
+                    </MudItem>
+                    
+                    <MudItem xs="12" md="6">
+                        <MudTextField T="string" 
+                                      Label="Telefone" 
+                                      Variant="Variant.Outlined"
+                                      InputType="InputType.Telephone"
+                                      Placeholder="(00) 00000-0000" 
+                                      Mask="@(new PatternMask("(00) 00000-0000"))"
+                                      @bind-Value="_updateUser.Phone"
+                                      Validation="@(_phoneRules)"
+                                      Immediate="true"
+                                      HelperText="Com DDD"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Phone"/>
+                    </MudItem>
+                </MudGrid>
+
+                <MudDivider Class="my-4" />
+
+                <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.Lock" Size="MudBlazor.Size.Small" Class="mr-1" />
+                    Segurança
+                </MudText>
+
+                <MudTextField T="string" 
+                              Label="Nova Senha (opcional)" 
+                              Variant="Variant.Outlined"
+                              InputType="InputType.Password"
+                              @bind-Value="_updateUser.Password"
+                              HelperText="Deixe em branco para manter a senha atual"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Key"
+                              Class="mb-3"/>
+
+                <MudDivider Class="my-4" />
+
+                <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.Security" Size="MudBlazor.Size.Small" Class="mr-1" />
+                    Permissões de Acesso
+                </MudText>
+
+                <MudSelect T="@RoleDto" 
+                           @bind-SelectedValues="_selectedRoles" 
+                           Label="Funções/Permissões" 
+                           MultiSelection="true"
+                           Variant="Variant.Outlined" 
+                           Required="true"
+                           RequiredError="Selecione pelo menos uma permissão" 
+                           SelectAll="true" 
+                           SelectAllText="Selecionar todas"
+                           Adornment="Adornment.Start"
+                           AdornmentIcon="@Icons.Material.Filled.AdminPanelSettings"
+                           HelperText="Selecione uma ou mais funções para o usuário"
+                           Immediate="true">
+                    @foreach (var roleOption in _rolesList)
+                    {
+                        <MudSelectItem T="@RoleDto" Value="@roleOption">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                <MudIcon Icon="@GetRoleIcon(roleOption.Name)" Size="MudBlazor.Size.Small" />
+                                <div>
+                                    <MudText Typo="Typo.body2">@roleOption.Name</MudText>
+                                    <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">@GetRoleDescription(roleOption.Name)</MudText>
+                                </div>
+                            </MudStack>
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+
+                @if (_selectedRoles.Any())
+                {
+                    <MudChipSet T="string" Class="mt-2">
+                        @foreach (var role in _selectedRoles)
+                        {
+                            <MudChip T="string" 
+                                     Text="@role.Name" 
+                                     Color="MudBlazor.Color.Primary" 
+                                     Variant="Variant.Filled"
+                                     Size="MudBlazor.Size.Small"
+                                     Icon="@GetRoleIcon(role.Name)" />
+                        }
+                    </MudChipSet>
+                }
+
+                <MudDivider Class="my-4" />
+
+                <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.ToggleOn" Size="MudBlazor.Size.Small" Class="mr-1" />
+                    Status
+                </MudText>
+
+                <MudSwitch @bind-Value="_updateUser.IsActive" 
+                           Color="MudBlazor.Color.Success" 
+                           UnCheckedColor="MudBlazor.Color.Default"
+                           ThumbIcon="@(_updateUser.IsActive ? Icons.Material.Filled.Check : Icons.Material.Filled.Close)"
+                           ThumbIconColor="@(_updateUser.IsActive ? MudBlazor.Color.Success : MudBlazor.Color.Default)">
+                    <MudText>
+                        Usuário @(_updateUser.IsActive ? "Ativo" : "Inativo")
+                    </MudText>
+                </MudSwitch>
+            </MudForm>
+        }
     </DialogContent>
     <DialogActions>
-        <MudButton Color="Color.Error" Variant="Variant.Text" OnClick="@Cancel">Cancelar</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Text" OnClick="@Update">Atualizar usuário</MudButton>       
+        <MudButton Color="MudBlazor.Color.Default" 
+                   Variant="Variant.Text" 
+                   OnClick="@Cancel"
+                   StartIcon="@Icons.Material.Filled.Close">
+            Cancelar
+        </MudButton>
+        <MudButton Color="MudBlazor.Color.Info" 
+                   Variant="Variant.Filled" 
+                   OnClick="@Update" 
+                   Disabled="@(_loading || _submitting || _loadError != null)"
+                   StartIcon="@(_submitting ? null : Icons.Material.Filled.Save)">
+            @if (_submitting)
+            {
+                <MudProgressCircular Class="mr-2" Size="MudBlazor.Size.Small" Indeterminate="true"/>
+                <span>Salvando alterações...</span>
+            }
+            else
+            {
+                <span>Salvar Alterações</span>
+            }
+        </MudButton>       
     </DialogActions>
 </MudDialog>
+
+<style>
+    .user-dialog .mud-dialog-content {
+        overflow-y: auto;
+        max-height: 70vh;
+    }
+    
+    .user-dialog .mud-input-adornment {
+        color: var(--mud-palette-primary);
+    }
+</style>
 @code {
     [CascadingParameter]
-    private IMudDialogInstance MudDialog { get; set; }
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+    
+    [Parameter]
+    public int UserId { get; set; }
+
+    private UpdateUserDto _updateUser = new();
+    private IEnumerable<RoleDto> _selectedRoles = new List<RoleDto>();
+    private List<RoleDto> _rolesList = new List<RoleDto>();
+    
+    private bool _loading = true;
+    private bool _submitting = false;
+    private string? _loadError;
+    private MudForm? _form;
+
+    // Regras de validação do formulário (client-side)
+    private Func<string, string?> _required(string fieldName) =>
+        v => string.IsNullOrWhiteSpace(v) ? $"{fieldName} é obrigatório" : null;
+
+    private IEnumerable<Func<string, string?>> _usernameRules => new List<Func<string, string?>>
+    {
+        _required("Nome"),
+        v => v?.Trim().Length < 3 ? "Nome deve ter pelo menos 3 caracteres" : null,
+        v => v?.Trim().Length > 50 ? "Nome não pode exceder 50 caracteres" : null
+    };
+
+    private IEnumerable<Func<string, string?>> _emailRules => new List<Func<string, string?>>
+    {
+        _required("Email"),
+        v => new EmailAddressAttribute().IsValid(v) ? null : "Email inválido"
+    };
+
+    private static string OnlyDigits(string? s) => new string((s ?? string.Empty).Where(char.IsDigit).ToArray());
+    private IEnumerable<Func<string, string?>> _phoneRules => new List<Func<string, string?>>
+    {
+        _required("Telefone"),
+        v =>
+        {
+            var digits = OnlyDigits(v);
+            return (digits.Length is < 10 or > 11) ? "Telefone deve conter DDD + número (10 ou 11 dígitos)" : null;
+        }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUserData();
+        await LoadRolesAsync();
+        _loading = false;
+    }
     
     private void Cancel() => MudDialog.Cancel();
 
-    private void Update()
+    private async Task LoadUserData()
     {
         try
         {
-            Snackbar.Add("Usuário atualizado com sucesso!", Severity.Success);
+            var response = await ApiService.GetAsync($"api/users/{UserId}");
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                _loadError = "Usuário não encontrado.";
+                return;
+            }
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                _loadError = "Você precisa estar autenticado para acessar este usuário.";
+                return;
+            }
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                _loadError = "Você não tem permissão para editar este usuário.";
+                return;
+            }
+            
+            response.EnsureSuccessStatusCode();
+            var user = await response.Content.ReadFromJsonAsync<UserDto>();
+            
+            if (user != null)
+            {
+                _updateUser = new UpdateUserDto
+                {
+                    Username = user.Username,
+                    Email = user.Email,
+                    Phone = user.Phone,
+                    IsActive = user.IsActive,
+                    RoleIds = new List<int>()
+                };
+
+                // Set current roles as selected after roles are loaded
+                StateHasChanged();
+            }
         }
         catch (Exception ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Logger.LogError($"Erro ao carregar dados do usuário: {ex.Message}");
+            _loadError = "Erro ao carregar dados do usuário.";
         }
+    }
+
+    private async Task LoadRolesAsync()
+    {
+        try
+        {
+            var response = await ApiService.GetAsync("api/roles");
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                Logger.LogError("Não autorizado para buscar funções.");
+                return;
+            }
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                Logger.LogError("Acesso negado para buscar funções.");
+                return;
+            }
+            
+            response.EnsureSuccessStatusCode();
+            
+            var roles = await response.Content.ReadFromJsonAsync<List<RoleDto>>();
+            _rolesList = roles ?? new List<RoleDto>();
+
+            // Now load user data again to get current user roles and match them
+            var userResponse = await ApiService.GetAsync($"api/users/{UserId}");
+            if (userResponse.IsSuccessStatusCode)
+            {
+                var user = await userResponse.Content.ReadFromJsonAsync<UserDto>();
+                if (user != null && user.RoleNames.Any())
+                {
+                    // Match role names to role DTOs
+                    var currentUserRoles = _rolesList.Where(r => user.RoleNames.Contains(r.Name)).ToList();
+                    _selectedRoles = currentUserRoles;
+                    _updateUser.RoleIds = currentUserRoles.Select(r => r.Id).ToList();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Erro ao buscar funções: {ex.Message}");
+            _rolesList = new List<RoleDto>();
+        }
+    }
+
+    private async Task Update()
+    {
+        try
+        {
+            // 1) Validação client-side
+            await (_form?.Validate() ?? Task.CompletedTask);
+            if (!(_form?.IsValid ?? false))
+            {
+                Snackbar.Add("Verifique os campos destacados e tente novamente.", Severity.Warning);
+                return;
+            }
+
+            if (_selectedRoles == null || !_selectedRoles.Any())
+            {
+                Snackbar.Add("Escolha pelo menos uma permissão.", Severity.Warning);
+                return;
+            }
+
+            // Sanitiza telefone para enviar apenas dígitos
+            _updateUser.Phone = OnlyDigits(_updateUser.Phone);
+            if (_updateUser.Phone.Length is < 10 or > 11)
+            {
+                Snackbar.Add("Telefone inválido. Informe DDD + número (10 ou 11 dígitos).", Severity.Warning);
+                return;
+            }
+
+            _submitting = true;
+            _updateUser.RoleIds = _selectedRoles.Select(r => r.Id).ToList();
+            
+            var response = await ApiService.PutAsJsonAsync($"api/users/{UserId}", _updateUser);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Usuário atualizado com sucesso!", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Logger.LogError($"Erro ao atualizar usuário: {response.StatusCode} - {errorContent}");
+                Snackbar.Add($"Erro ao atualizar usuário: {errorContent}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Erro ao atualizar usuário: {ex.Message}");
+            Snackbar.Add("Erro inesperado ao atualizar usuário.", Severity.Error);
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private string GetRoleIcon(string roleName)
+    {
+        return roleName.ToLower() switch
+        {
+            "administrador" => Icons.Material.Filled.AdminPanelSettings,
+            "gerente" => Icons.Material.Filled.ManageAccounts,
+            "vendedor" => Icons.Material.Filled.StoreMallDirectory,
+            _ => Icons.Material.Filled.Person
+        };
+    }
+
+    private string GetRoleDescription(string roleName)
+    {
+        return roleName.ToLower() switch
+        {
+            "administrador" => "Acesso total ao sistema",
+            "gerente" => "Gerenciar equipes e relatórios",
+            "vendedor" => "Registro de vendas e atendimento",
+            _ => "Usuário comum"
+        };
     }
 }

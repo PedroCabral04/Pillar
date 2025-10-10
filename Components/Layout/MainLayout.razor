@@ -1,6 +1,7 @@
 ﻿@using erp.Services
 @inherits LayoutComponentBase
 @inject ThemeService ThemeService
+@inject PreferenceService PreferenceService
 @inject IJSRuntime JsRuntime
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,12 +14,6 @@
 <MudSnackbarProvider/>
 <MudLayout>
     <MudPaper Style="position: relative; height: 100vh; display: flex" >
-        @*<MudAppBar Elevation="1">
-            <MudStaticNavDrawerToggle DrawerId="nav-drawer" Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start"/>
-            <MudText Typo="Typo.h5" Class="ml-3">Application</MudText>
-            <MudSpacer/>
-            <MudIconButton Icon="@Icons.Material.Filled.MoreVert" Color="Color.Inherit" Edge="Edge.End"/>
-        </MudAppBar>*@
         <MudDrawerContainer Class="mud-height-full">
             <MudDrawer id="nav-drawer" 
                        Fixed="false" 
@@ -32,12 +27,15 @@
             </MudDrawer>
         </MudDrawerContainer>
         <MudMainContent 
-            Class="pt-16 pa-4 full-height-content" 
+            Class="pa-4 full-height-content" 
             Style="@MainContentStyle()">
+            <div class="mb-4">
+                <erp.Components.Shared.Breadcrumbs />
+            </div>
             @Body
         </MudMainContent>
         <MudScrollToTop>
-            <MudFab Color="Color.Tertiary" StartIcon="@Icons.Material.Filled.ArrowCircleUp" />
+            <MudFab Color="MudBlazor.Color.Tertiary" StartIcon="@Icons.Material.Filled.ArrowCircleUp" />
         </MudScrollToTop>
     </MudPaper>
 </MudLayout>
@@ -54,38 +52,67 @@
     private MudThemeProvider _mudThemeProvider = null!;
     public bool IsDarkMode;
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await PreferenceService.InitializeAsync();
+            ThemeService.InitializeTheme();
+            PreferenceService.OnPreferenceChanged += OnPreferenceChanged;
+            StateHasChanged();
+        }
+    }
+
+    private void OnPreferenceChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        PreferenceService.OnPreferenceChanged -= OnPreferenceChanged;
+    }
+
     readonly MudTheme _customTheme = new MudTheme()
     {
+        // Light: vibrant and friendly with warm neutrals
         PaletteLight = new PaletteLight()
         {
-            Primary = Colors.Blue.Default,
-            Secondary = Colors.Indigo.Default,
-            Success = Colors.Teal.Lighten1,
-            Info = Colors.LightBlue.Default,
-            Warning = Colors.Amber.Default,
-            Error = Colors.Red.Default,
-            Background = Colors.Gray.Lighten5,
+            Primary = Colors.DeepPurple.Darken1,
+            Secondary = Colors.Cyan.Darken1,
+            Tertiary = Colors.Amber.Default,
+
+            Success = Colors.Green.Darken2,
+            Info = Colors.LightBlue.Darken1,
+            Warning = Colors.Orange.Darken1,
+            Error = Colors.Red.Darken1,
+
+            Background = Colors.BlueGray.Lighten5,
             Surface = Colors.Gray.Lighten5,
-            AppbarBackground = Colors.Blue.Darken2,
-            DrawerBackground = Colors.Gray.Lighten3,
-            Tertiary = Colors.Teal.Lighten1,
-            TextPrimary = Colors.Gray.Darken4,
-            TextSecondary = Colors.Gray.Darken3,
+            AppbarBackground = Colors.DeepPurple.Darken2,
+            DrawerBackground = Colors.BlueGray.Lighten4,
+
+            TextPrimary = Colors.BlueGray.Darken3,
+            TextSecondary = Colors.BlueGray.Default,
         },
 
+        // Dark: saturated accents on deep blue-Gray surfaces for contrast
         PaletteDark = new PaletteDark()
         {
-            Primary = Colors.Blue.Lighten2,
-            Secondary = Colors.Indigo.Lighten3,
-            Success = Colors.Teal.Lighten3,
-            Info = Colors.Cyan.Lighten2,
-            Warning = Colors.Amber.Lighten2,
+            Primary = Colors.DeepPurple.Lighten2,
+            Secondary = Colors.Cyan.Lighten2,
+            Tertiary = Colors.Amber.Lighten1,
+
+            Success = Colors.Green.Lighten2,
+            Info = Colors.LightBlue.Lighten2,
+            Warning = Colors.Orange.Lighten2,
             Error = Colors.Red.Lighten2,
-            Background = Colors.Gray.Darken4,
-            Surface = Colors.Gray.Darken3,
-            AppbarBackground = Colors.Blue.Darken2,
-            DrawerBackground = Colors.Gray.Darken3,
-            Tertiary = Colors.Teal.Darken2,
+
+            Background = Colors.BlueGray.Darken4,
+            Surface = Colors.BlueGray.Darken3,
+            AppbarBackground = Colors.DeepPurple.Darken3,
+            DrawerBackground = Colors.BlueGray.Darken3,
+
             TextPrimary = Colors.Gray.Lighten5,
             TextSecondary = Colors.Gray.Lighten2,
         },
@@ -94,70 +121,30 @@
         {
             Default = new DefaultTypography()
             {
-                FontFamily = new[] { "Poppins", "Roboto" },
+                FontFamily = new[] { "Poppins", "Roboto", "Segoe UI", "Arial", "sans-serif" },
             },
+            H5 = new H5Typography(){ FontWeight = "600", LetterSpacing = "0.2px" },
+            Button = new ButtonTypography(){ TextTransform = "none", FontWeight = "600" },
+            Subtitle2 = new Subtitle2Typography(){ FontWeight = "600" }
         },
     };
 
-    string SetMarginForDrawer()
+        string SetMarginForDrawer()
     {
         return _drawerOpen ? "margin-left: 170px;" : "margin-left: 56px;";
     }
 
-    string MainContentStyle() => $"margin-top: -32px; {SetMarginForDrawer()} flex: 1 1 auto; min-height: 0; overflow-y: auto;";
-
-    protected override void OnInitialized()
+    private string MainContentStyle()
     {
-        ThemeService.OnThemeChanged += HandleThemeChanged;
-    }
-    
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
+        var style = $"{SetMarginForDrawer()} flex: 1 1 auto; min-height: 0; overflow-y: auto;";
+        if (PreferenceService.CurrentPreferences?.Ui?.FontSize == "small")
         {
-            try
-            { 
-                await ThemeService.InitializeThemeAsync();
-            }
-            catch (Exception ex) // Captura mais genérica para logar qualquer problema na inicialização
-            {
-                Console.WriteLine($"Failed to initialize theme: {ex.Message}");
-                // A UI usará o valor padrão de IsDarkMode (false)
-            }
-            StateHasChanged();
+            style += "font-size: 0.9rem;";
         }
-    }
-    
-    private void HandleThemeChanged()
-    {
-        InvokeAsync(StateHasChanged);
-    }
-
-    private async Task ToggleThemeInAppBar()
-    {
-        try
+        else if (PreferenceService.CurrentPreferences?.Ui?.FontSize == "large")
         {
-            await ThemeService.SetDarkModeAsync(!ThemeService.IsDarkMode);
+            style += "font-size: 1.1rem;";
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Failed to set theme: {ex.Message}");
-        }
+        return style;
     }
-
-    public void Dispose()
-    {
-        ThemeService.OnThemeChanged -= HandleThemeChanged;
-    }
-    
-    /*protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            isDarkMode = await _mudThemeProvider.GetSystemPreference();
-            StateHasChanged();
-        }
-    }*/
-    
-    
 }

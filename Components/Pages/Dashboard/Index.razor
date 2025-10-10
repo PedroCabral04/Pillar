@@ -1,0 +1,143 @@
+@page "/dashboard"
+@using erp.Services.Dashboard
+@using MudBlazor
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+@using Color = MudBlazor.Color
+@using Size = MudBlazor.Size
+
+@inject IDashboardService Dashboard
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<MudStack Spacing="3">
+    <!-- Greeting Section -->
+    <MudPaper Class="pa-4" Elevation="2">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+            <MudStack Spacing="1">
+                <MudText Typo="Typo.h4">@_greeting, @_userName!</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">@DateTime.Now.ToString("dddd, dd 'de' MMMM 'de' yyyy")</MudText>
+            </MudStack>
+            <MudIcon Icon="@_greetingIcon" Size="Size.Large" Color="Color.Primary" />
+        </MudStack>
+    </MudPaper>
+
+    <!-- Date Range Filters -->
+    <MudPaper Class="pa-3">
+        <MudGrid>
+            <MudItem xs="12" sm="6" md="4">
+                <MudDateRangePicker @bind-DateRange="_range" 
+                                    Label="Período Personalizado" 
+                                    Dense="true"
+                                    Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="8">
+                <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Style="height: 100%;">
+                    <MudText Typo="Typo.body2" Style="white-space: nowrap;">Presets:</MudText>
+                    <MudChipSet T="string" @bind-SelectedChip="_selectedPreset" Filter="true" Mandatory="false">
+                        <MudChip T="string" Text="Hoje" Color="Color.Primary" Value="@("today")" OnClick="() => ApplyPreset(DatePreset.Today)" />
+                        <MudChip T="string" Text="Ontem" Color="Color.Primary" Value="@("yesterday")" OnClick="() => ApplyPreset(DatePreset.Yesterday)" />
+                        <MudChip T="string" Text="Últimos 7 dias" Color="Color.Primary" Value="@("week")" OnClick="() => ApplyPreset(DatePreset.Last7Days)" />
+                        <MudChip T="string" Text="Últimos 30 dias" Color="Color.Primary" Value="@("month")" OnClick="() => ApplyPreset(DatePreset.Last30Days)" />
+                        <MudChip T="string" Text="Este mês" Color="Color.Primary" Value="@("thisMonth")" OnClick="() => ApplyPreset(DatePreset.ThisMonth)" />
+                        <MudChip T="string" Text="Último mês" Color="Color.Primary" Value="@("lastMonth")" OnClick="() => ApplyPreset(DatePreset.LastMonth)" />
+                    </MudChipSet>
+                </MudStack>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudGrid Class="mt-2" GutterSize="GutterSize.Small">
+        @if (_widgets is null)
+        {
+            @for (var i = 0; i < 4; i++)
+            {
+                <MudItem xs="12" md="6" lg="4">
+                    <MudSkeleton Height="320px" Width="100%" />
+                </MudItem>
+            }
+        }
+        else
+        {
+            @foreach (var w in _widgets)
+            {
+                <MudItem xs="12" md="6" lg="4">
+                    <erp.Components.Shared.Charts.WidgetHost Definition="w" />
+                </MudItem>
+            }
+        }
+    </MudGrid>
+</MudStack>
+
+@code {
+    private List<DashboardWidgetDefinition>? _widgets;
+    private DateRange _range = new(DateTime.Today.AddMonths(-1), DateTime.Today);
+    private MudChip<string>? _selectedPreset;
+    
+    private string _greeting = "";
+    private string _greetingIcon = Icons.Material.Filled.WbSunny;
+    private string _userName = "Usuário";
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Set greeting based on time of day
+        var hour = DateTime.Now.Hour;
+        if (hour >= 5 && hour < 12)
+        {
+            _greeting = "Bom dia";
+            _greetingIcon = Icons.Material.Filled.WbSunny;
+        }
+        else if (hour >= 12 && hour < 18)
+        {
+            _greeting = "Boa tarde";
+            _greetingIcon = Icons.Material.Filled.WbTwilight;
+        }
+        else
+        {
+            _greeting = "Boa noite";
+            _greetingIcon = Icons.Material.Filled.DarkMode;
+        }
+
+        // Get user name
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            _userName = user.FindFirst(ClaimTypes.Name)?.Value 
+                        ?? user.FindFirst("sub")?.Value 
+                        ?? user.Identity.Name 
+                        ?? "Usuário";
+        }
+
+        var list = await Dashboard.GetWidgetsAsync();
+        _widgets = list.ToList();
+    }
+
+    private enum DatePreset
+    {
+        Today,
+        Yesterday,
+        Last7Days,
+        Last30Days,
+        ThisMonth,
+        LastMonth
+    }
+
+    private void ApplyPreset(DatePreset preset)
+    {
+        var today = DateTime.Today;
+        _range = preset switch
+        {
+            DatePreset.Today => new DateRange(today, today),
+            DatePreset.Yesterday => new DateRange(today.AddDays(-1), today.AddDays(-1)),
+            DatePreset.Last7Days => new DateRange(today.AddDays(-7), today),
+            DatePreset.Last30Days => new DateRange(today.AddDays(-30), today),
+            DatePreset.ThisMonth => new DateRange(new DateTime(today.Year, today.Month, 1), today),
+            DatePreset.LastMonth => new DateRange(
+                new DateTime(today.Year, today.Month, 1).AddMonths(-1),
+                new DateTime(today.Year, today.Month, 1).AddDays(-1)
+            ),
+            _ => _range
+        };
+        StateHasChanged();
+    }
+}

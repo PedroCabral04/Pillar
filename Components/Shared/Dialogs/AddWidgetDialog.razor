@@ -1,0 +1,166 @@
+@using erp.DTOs.Dashboard
+@using erp.Services.DashboardCustomization
+@using Microsoft.AspNetCore.Components.Authorization
+@using MudBlazor
+@inject IDashboardLayoutService LayoutService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-4">Adicionar Widget ao Dashboard</MudText>
+        
+        @if (_loading)
+        {
+            <MudProgressCircular Indeterminate="true" />
+        }
+        else
+        {
+            <MudTextField @bind-Value="_searchTerm" 
+                         Label="Buscar widgets" 
+                         Variant="Variant.Outlined"
+                         Adornment="Adornment.Start"
+                         AdornmentIcon="@Icons.Material.Filled.Search"
+                         Class="mb-4"
+                         Immediate="true"
+                         OnDebounceIntervalElapsed="FilterWidgets" 
+                         DebounceInterval="300" />
+
+            <MudChipSet @bind-SelectedChip="_selectedCategory" Filter="true" Class="mb-4" T="string">
+                <MudChip Text="Todos" Value="@("all")" Default="true" T="string" />
+                @foreach (var category in _categories)
+                {
+                    <MudChip Text="@category" Value="@category" T="string" />
+                }
+            </MudChipSet>
+
+            <div class="widget-catalog">
+                @foreach (var widget in _filteredWidgets)
+                {
+                    <MudCard Class="widget-catalog-item mb-3" @onclick="() => SelectWidget(widget)">
+                        <MudCardContent>
+                            <div class="d-flex align-items-start">
+                                @if (!string.IsNullOrEmpty(widget.Icon))
+                                {
+                                    <MudIcon Icon="@widget.Icon" Size="MudBlazor.Size.Large" Class="mr-3" Color="MudBlazor.Color.Primary" />
+                                }
+                                <div style="flex: 1;">
+                                    <MudText Typo="Typo.subtitle1">@widget.Title</MudText>
+                                    <MudText Typo="Typo.body2" Color="MudBlazor.Color.Secondary">@widget.Description</MudText>
+                                    @if (!string.IsNullOrEmpty(widget.Category))
+                                    {
+                                        <MudChip Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Default" Class="mt-2" T="string">@widget.Category</MudChip>
+                                    }
+                                </div>
+                                <MudIconButton Icon="@Icons.Material.Filled.Add" 
+                                             Color="MudBlazor.Color.Primary"
+                                             OnClick="() => SelectWidget(widget)" />
+                            </div>
+                        </MudCardContent>
+                    </MudCard>
+                }
+            </div>
+
+            @if (!_filteredWidgets.Any())
+            {
+                <MudAlert Severity="Severity.Info" Class="mt-4">
+                    Nenhum widget encontrado com os filtros aplicados.
+                </MudAlert>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private bool _loading = true;
+    private string _searchTerm = string.Empty;
+    private MudChip<string>? _selectedCategory;
+    private List<WidgetCatalogItem> _availableWidgets = new();
+    private List<WidgetCatalogItem> _filteredWidgets = new();
+    private HashSet<string> _categories = new();
+    private string? _userId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            _userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var userRoles = user.FindAll(System.Security.Claims.ClaimTypes.Role).Select(c => c.Value).ToArray();
+            
+            _availableWidgets = LayoutService.GetAvailableWidgets(userRoles);
+            _categories = _availableWidgets
+                .Where(w => !string.IsNullOrEmpty(w.Category))
+                .Select(w => w.Category!)
+                .Distinct()
+                .OrderBy(c => c)
+                .ToHashSet();
+            
+            FilterWidgets();
+        }
+        
+        _loading = false;
+    }
+
+    private void FilterWidgets()
+    {
+        var filtered = _availableWidgets.AsEnumerable();
+
+        // Filter by category
+        var categoryValue = _selectedCategory?.Value;
+        if (!string.IsNullOrEmpty(categoryValue) && categoryValue != "all")
+        {
+            filtered = filtered.Where(w => w.Category == categoryValue);
+        }
+
+        // Filter by search term
+        if (!string.IsNullOrEmpty(_searchTerm))
+        {
+            var search = _searchTerm.ToLower();
+            filtered = filtered.Where(w =>
+                w.Title.ToLower().Contains(search) ||
+                w.Description.ToLower().Contains(search) ||
+                (!string.IsNullOrEmpty(w.Category) && w.Category.ToLower().Contains(search))
+            );
+        }
+
+        _filteredWidgets = filtered.ToList();
+    }
+
+    private async Task SelectWidget(WidgetCatalogItem widget)
+    {
+        if (string.IsNullOrEmpty(_userId)) return;
+
+        var widgetConfig = await LayoutService.AddWidgetAsync(_userId, widget.ProviderKey, widget.WidgetKey);
+        MudDialog?.Close(DialogResult.Ok(widgetConfig));
+    }
+
+    private void Cancel()
+    {
+        MudDialog?.Cancel();
+    }
+}
+
+<style>
+    .widget-catalog {
+        max-height: 500px;
+        overflow-y: auto;
+    }
+
+    .widget-catalog-item {
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .widget-catalog-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+</style>

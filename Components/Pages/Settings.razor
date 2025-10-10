@@ -1,39 +1,441 @@
 @page "/ajustes"
 @attribute [Authorize]
 @using erp.Services
+@using MudBlazor
+@using System
+@using System.Linq
+@using erp.DTOs.Preferences
+@using Color = MudBlazor.Color
+@using Size = MudBlazor.Size
+@inject ISnackbar Snackbar
 
 <PageTitle>Configurações</PageTitle>
 
 <MudText Typo="Typo.h3" GutterBottom="true">Configurações</MudText>
 <MudText Typo="Typo.body1" GutterBottom="true">Faça ajustes na plataforma e deixe de acordo com sua preferência</MudText>
 
-<MudTabs Position="Position.Top" Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-2" Outlined="true">
-    <MudTabPanel Text="Perfil" Icon="@Icons.Material.Filled.Person"/>
-    <MudTabPanel Text="Segurança" Icon="@Icons.Material.Filled.Security"/>
-    <MudTabPanel Text="Visual" Icon="@Icons.Material.Filled.Brightness6">
-        <MudSwitch T="bool"
-                   Value="@ThemeService.IsDarkMode"
-                   ValueChanged="@OnThemeSwitchChanged"
-                   ThumbIcon="@ThemeIcon"
-                   Color="Color.Primary"
-                   Label="@ThemeLabel"
-                   ThumbIconChecked="@Icons.Material.Filled.DarkMode"
-                   ThumbIconUnchecked="@Icons.Material.Filled.LightMode"
-                   Class="mb-2">
-        </MudSwitch>
+<MudGrid>
+    <MudItem xs="12" md="8">
+        <MudTabs Position="Position.Top" Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-2" Outlined="true">
+    <MudTabPanel Text="Perfil" Icon="@Icons.Material.Filled.Person">
+        <MudText Typo="Typo.body2">Configurações de perfil serão adicionadas aqui.</MudText>
     </MudTabPanel>
-    <MudTabPanel Text="Notificações" Icon="@Icons.Material.Filled.Notifications"/>
-    <MudTabPanel Text="Áudio" Icon="@Icons.Material.Filled.VolumeUp"/>
 
-</MudTabs>
+    <MudTabPanel Text="Segurança" Icon="@Icons.Material.Filled.Security">
+        <MudStack Row="false" Spacing="2">
+            <MudSwitch T="bool"
+                       Value="@PreferenceService.CurrentPreferences.Security.TwoFactor"
+                       ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Security.TwoFactor = v))"
+                       Color="MudBlazor.Color.Primary"
+                       Label="Autenticação de dois fatores (preferência)" />
+
+            <MudNumericField T="int"
+                             Label="Tempo para sair automaticamente (minutos)"
+                             Min="1" Max="480" Step="5"
+                             Value="@PreferenceService.CurrentPreferences.Security.AutoLogoutMinutes"
+                             ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Security.AutoLogoutMinutes = v))"
+                             Variant="Variant.Outlined" />
+        </MudStack>
+    </MudTabPanel>
+
+    <MudTabPanel Text="Visual" Icon="@Icons.Material.Filled.Brightness6">
+        <MudStack Row="false" Spacing="2">
+            <MudSwitch T="bool"
+                       Value="@ThemeService.IsDarkMode"
+                       ValueChanged="@OnThemeSwitchChanged"
+                       ThumbIcon="@ThemeIcon"
+                       Color="MudBlazor.Color.Primary"
+                       Label="@ThemeLabel"
+                       ThumbIconChecked="@Icons.Material.Filled.DarkMode"
+                       ThumbIconUnchecked="@Icons.Material.Filled.LightMode" />
+
+            <MudSelect T="string" Label="Densidade" Variant="Variant.Outlined"
+                       Value="@PreferenceService.CurrentPreferences.Ui.Density"
+                       ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Ui.Density = v))">
+                <MudSelectItem T="string" Value="@("comfortable")">Confortável</MudSelectItem>
+                <MudSelectItem T="string" Value="@("compact")">Compacto</MudSelectItem>
+            </MudSelect>
+
+            <MudSelect T="string" Label="Tamanho da fonte" Variant="Variant.Outlined"
+                       Value="@PreferenceService.CurrentPreferences.Ui.FontSize"
+                       ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Ui.FontSize = v))">
+                <MudSelectItem T="string" Value="@("base")">Padrão</MudSelectItem>
+                <MudSelectItem T="string" Value="@("large")">Grande</MudSelectItem>
+            </MudSelect>
+
+            <MudSwitch T="bool" Color="MudBlazor.Color.Primary" Label="Alto contraste"
+                       Value="@PreferenceService.CurrentPreferences.Ui.HighContrast"
+                       ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Ui.HighContrast = v))" />
+
+            <MudSwitch T="bool" Color="MudBlazor.Color.Primary" Label="Reduzir animações"
+                       Value="@PreferenceService.CurrentPreferences.Ui.ReduceMotion"
+                       ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Ui.ReduceMotion = v))" />
+        </MudStack>
+    </MudTabPanel>
+
+    <MudTabPanel Text="Localização" Icon="@Icons.Material.Filled.Language">
+        <MudStack Row="false" Spacing="2">
+            <MudSelect T="string" Label="Idioma" Variant="Variant.Outlined"
+                       Value="@PreferenceService.CurrentPreferences.Locale.Language"
+                       ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Locale.Language = v))">
+                <MudSelectItem T="string" Value="@("pt-BR")">Português (Brasil)</MudSelectItem>
+                <MudSelectItem T="string" Value="@("en-US")">English (US)</MudSelectItem>
+                <MudSelectItem T="string" Value="@("es-ES")">Español (ES)</MudSelectItem>
+            </MudSelect>
+
+            <MudTextField T="string" Label="Fuso horário (IANA)" Variant="Variant.Outlined"
+                           Value="@PreferenceService.CurrentPreferences.Locale.TimeZone"
+                           ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Locale.TimeZone = v))" />
+
+            <MudSelect T="string" Label="Formato de data" Variant="Variant.Outlined"
+                       Value="@PreferenceService.CurrentPreferences.Locale.DateFormat"
+                       ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Locale.DateFormat = v))">
+                <MudSelectItem T="string" Value="@("dd/MM/yyyy")">dd/MM/yyyy</MudSelectItem>
+                <MudSelectItem T="string" Value="@("MM/dd/yyyy")">MM/dd/yyyy</MudSelectItem>
+                <MudSelectItem T="string" Value="@("yyyy-MM-dd")">yyyy-MM-dd</MudSelectItem>
+            </MudSelect>
+
+            <MudSelect T="string" Label="Formato numérico" Variant="Variant.Outlined"
+                       Value="@PreferenceService.CurrentPreferences.Locale.NumberFormat"
+                       ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Locale.NumberFormat = v))">
+                <MudSelectItem T="string" Value="@("1.234,56")">1.234,56</MudSelectItem>
+                <MudSelectItem T="string" Value="@("1,234.56")">1,234.56</MudSelectItem>
+            </MudSelect>
+
+            <MudSelect T="string" Label="Moeda" Variant="Variant.Outlined"
+                       Value="@PreferenceService.CurrentPreferences.Locale.Currency"
+                       ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Locale.Currency = v))">
+                <MudSelectItem T="string" Value="@("BRL")">BRL</MudSelectItem>
+                <MudSelectItem T="string" Value="@("USD")">USD</MudSelectItem>
+                <MudSelectItem T="string" Value="@("EUR")">EUR</MudSelectItem>
+            </MudSelect>
+        </MudStack>
+    </MudTabPanel>
+
+    <MudTabPanel Text="Tabelas" Icon="@Icons.Material.Filled.TableRows">
+        <MudStack Row="false" Spacing="2">
+            <MudSelect T="int" Label="Itens por página" Variant="Variant.Outlined"
+                       Value="@PreferenceService.CurrentPreferences.Tables.PageSize"
+                       ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Tables.PageSize = v))">
+                <MudSelectItem T="int" Value="10">10</MudSelectItem>
+                <MudSelectItem T="int" Value="25">25</MudSelectItem>
+                <MudSelectItem T="int" Value="50">50</MudSelectItem>
+                <MudSelectItem T="int" Value="100">100</MudSelectItem>
+            </MudSelect>
+
+            <MudDivider Class="my-2" />
+            <MudText Typo="Typo.subtitle2">Ordenação padrão por módulo</MudText>
+
+            @foreach (var row in DefaultSortRows)
+            {
+                <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                    <MudTextField T="string" Label="Módulo" Variant="Variant.Outlined" Class="w-30"
+                                  Value="@row.Module"
+                                  ValueChanged="@(v => { row.Module = v; SyncDefaultSortDict(); })" />
+                    <MudTextField T="string" Label="Campo:direção (ex.: Nome:asc)" Variant="Variant.Outlined" Class="w-50"
+                                  Value="@row.Sort"
+                                  ValueChanged="@(v => { row.Sort = v; SyncDefaultSortDict(); })" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="MudBlazor.Color.Error" OnClick="() => RemoveDefaultSortRow(row)" />
+                </MudStack>
+            }
+            <MudButton Variant="Variant.Outlined" Color="MudBlazor.Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AddDefaultSortRow">Adicionar</MudButton>
+
+            <MudDivider Class="my-4" />
+            <MudText Typo="Typo.subtitle2">Colunas visíveis por módulo</MudText>
+            @foreach (var row in VisibleColumnsRows)
+            {
+                <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                    <MudTextField T="string" Label="Módulo" Variant="Variant.Outlined" Class="w-30"
+                                  Value="@row.Module"
+                                  ValueChanged="@(v => { row.Module = v; SyncVisibleColumnsDict(); })" />
+                    <MudTextField T="string" Label="Colunas (separadas por vírgula)" Variant="Variant.Outlined" Class="w-50"
+                                  Value="@row.ColumnsCsv"
+                                  ValueChanged="@(v => { row.ColumnsCsv = v; SyncVisibleColumnsDict(); })" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="MudBlazor.Color.Error" OnClick="() => RemoveVisibleColumnsRow(row)" />
+                </MudStack>
+            }
+            <MudButton Variant="Variant.Outlined" Color="MudBlazor.Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AddVisibleColumnsRow">Adicionar</MudButton>
+        </MudStack>
+    </MudTabPanel>
+
+    <MudTabPanel Text="Dashboard" Icon="@Icons.Material.Filled.Dashboard">
+        <MudStack Row="false" Spacing="2">
+            <MudSelect T="string" Label="Página inicial" Variant="Variant.Outlined"
+                       Value="@PreferenceService.CurrentPreferences.Dashboard.DefaultStartPage"
+                       ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Dashboard.DefaultStartPage = v))">
+                <MudSelectItem T="string" Value="@("Dashboard")">Dashboard</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Vendas")">Vendas</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Clientes")">Clientes</MudSelectItem>
+            </MudSelect>
+
+    <MudSelect T="string" Label="Widgets" Variant="Variant.Outlined" MultiSelection="true"
+               SelectedValues="@PreferenceService.CurrentPreferences.Dashboard.Widgets"
+               SelectedValuesChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Dashboard.Widgets = v?.ToList() ?? new()))">
+                @foreach (var w in AvailableWidgets)
+                {
+            <MudSelectItem T="string" Value="@w">@w</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                <MudTextField T="string" Label="Adicionar widget" Variant="Variant.Outlined" @bind-Value="NewWidgetName" Class="w-50" />
+                <MudButton Variant="Variant.Filled" Color="MudBlazor.Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AddCustomWidget">Adicionar</MudButton>
+            </MudStack>
+        </MudStack>
+    </MudTabPanel>
+
+    <MudTabPanel Text="Notificações" Icon="@Icons.Material.Filled.Notifications">
+        <MudStack Row="false" Spacing="2">
+            <MudSwitch T="bool" Color="MudBlazor.Color.Primary" Label="Notificações no app"
+                       Value="@PreferenceService.CurrentPreferences.Notifications.InApp"
+                       ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Notifications.InApp = v))" />
+
+            <MudSwitch T="bool" Color="MudBlazor.Color.Primary" Label="Notificar por e-mail"
+                       Value="@PreferenceService.CurrentPreferences.Notifications.Email"
+                       ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Notifications.Email = v))" />
+
+            <MudRadioGroup T="string" Label="Frequência do resumo" Row="true"
+                           Value="@PreferenceService.CurrentPreferences.Notifications.Digest"
+                           ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Notifications.Digest = v))">
+                <MudRadio T="string" Option="@("immediate")" Color="MudBlazor.Color.Primary">Imediato</MudRadio>
+                <MudRadio T="string" Option="@("daily")" Color="MudBlazor.Color.Primary">Diário</MudRadio>
+                <MudRadio T="string" Option="@("weekly")" Color="MudBlazor.Color.Primary">Semanal</MudRadio>
+            </MudRadioGroup>
+        </MudStack>
+    </MudTabPanel>
+
+    <MudTabPanel Text="Áudio" Icon="@Icons.Material.Filled.VolumeUp">
+        <MudStack Row="false" Spacing="2">
+            <MudSwitch T="bool" Color="MudBlazor.Color.Primary" Label="Sons"
+                       Value="@PreferenceService.CurrentPreferences.Notifications.Sounds"
+                       ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Notifications.Sounds = v))" />
+
+            <MudSlider T="int" Min="0" Max="100" Step="1"
+                       Value="@PreferenceService.CurrentPreferences.Notifications.Volume"
+                       ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Notifications.Volume = v))"
+                       Color="MudBlazor.Color.Primary" Label="true" />
+        </MudStack>
+    </MudTabPanel>
+
+    <MudTabPanel Text="Exportação" Icon="@Icons.Material.Filled.IosShare">
+        <MudStack Row="false" Spacing="2">
+            <MudSelect T="string" Label="Formato padrão" Variant="Variant.Outlined"
+                       Value="@PreferenceService.CurrentPreferences.Export.DefaultFormat"
+                       ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Export.DefaultFormat = v))">
+                <MudSelectItem T="string" Value="@("CSV")">CSV</MudSelectItem>
+                <MudSelectItem T="string" Value="@("XLSX")">XLSX</MudSelectItem>
+                <MudSelectItem T="string" Value="@("PDF")">PDF</MudSelectItem>
+            </MudSelect>
+
+            <MudSwitch T="bool" Color="MudBlazor.Color.Primary" Label="Incluir cabeçalho"
+                       Value="@PreferenceService.CurrentPreferences.Export.PrintHeader"
+                       ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Export.PrintHeader = v))" />
+        </MudStack>
+    </MudTabPanel>
+
+        </MudTabs>
+    </MudItem>
+    
+    <MudItem xs="12" md="4">
+        <MudPaper Elevation="2" Class="pa-4" Style="position: sticky; top: 80px;">
+            <MudText Typo="Typo.h6" GutterBottom="true">
+                <MudIcon Icon="@Icons.Material.Filled.Visibility" Class="mr-2" />
+                Preview ao Vivo
+            </MudText>
+            <MudDivider Class="mb-3" />
+            
+            <MudStack Spacing="3">
+                <!-- Theme Preview -->
+                <MudPaper Elevation="1" Class="pa-3" Style="@GetPreviewStyle()">
+                    <MudText Typo="Typo.subtitle2" GutterBottom="true">Tema: @(ThemeService.IsDarkMode ? "Escuro" : "Claro")</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Este é um exemplo de como o texto aparece no tema atual.
+                    </MudText>
+                </MudPaper>
+
+                <!-- Density Preview -->
+                <MudPaper Elevation="1" Class="pa-3">
+                    <MudText Typo="Typo.subtitle2" GutterBottom="true">Densidade</MudText>
+                    <MudStack Spacing="@GetDensitySpacing()">
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small" FullWidth="true">Botão Exemplo</MudButton>
+                        <MudTextField T="string" Label="Campo de texto" Variant="Variant.Outlined" Margin="@GetDensityMargin()" />
+                    </MudStack>
+                </MudPaper>
+
+                <!-- Font Size Preview -->
+                <MudPaper Elevation="1" Class="pa-3">
+                    <MudText Typo="Typo.subtitle2" GutterBottom="true">Tamanho da Fonte</MudText>
+                    <div style="@GetFontSizeStyle()">
+                        <MudText Typo="Typo.h6">Título</MudText>
+                        <MudText Typo="Typo.body1">Texto normal com o tamanho de fonte configurado.</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Texto secundário.</MudText>
+                    </div>
+                </MudPaper>
+
+                <!-- Contrast & Motion Preview -->
+                <MudPaper Elevation="1" Class="pa-3">
+                    <MudText Typo="Typo.subtitle2" GutterBottom="true">Acessibilidade</MudText>
+                    <MudStack Spacing="2">
+                        @if (PreferenceService.CurrentPreferences.Ui.HighContrast)
+                        {
+                            <MudChip T="string" Color="Color.Dark" Size="Size.Small">
+                                <MudIcon Icon="@Icons.Material.Filled.Contrast" Size="Size.Small" Class="mr-1" />
+                                Alto Contraste
+                            </MudChip>
+                        }
+                        @if (PreferenceService.CurrentPreferences.Ui.ReduceMotion)
+                        {
+                            <MudChip T="string" Color="Color.Info" Size="Size.Small">
+                                <MudIcon Icon="@Icons.Material.Filled.Animation" Size="Size.Small" Class="mr-1" />
+                                Reduzir Animações
+                            </MudChip>
+                        }
+                        @if (!PreferenceService.CurrentPreferences.Ui.HighContrast && !PreferenceService.CurrentPreferences.Ui.ReduceMotion)
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Nenhuma opção de acessibilidade ativa</MudText>
+                        }
+                    </MudStack>
+                </MudPaper>
+
+                <!-- Locale Preview -->
+                <MudPaper Elevation="1" Class="pa-3">
+                    <MudText Typo="Typo.subtitle2" GutterBottom="true">Localização</MudText>
+                    <MudStack Spacing="1">
+                        <MudText Typo="Typo.body2">
+                            <strong>Data:</strong> @DateTime.Now.ToString(PreferenceService.CurrentPreferences.Locale.DateFormat)
+                        </MudText>
+                        <MudText Typo="Typo.body2">
+                            <strong>Número:</strong> @FormatNumber(1234.56)
+                        </MudText>
+                        <MudText Typo="Typo.body2">
+                            <strong>Moeda:</strong> @PreferenceService.CurrentPreferences.Locale.Currency
+                        </MudText>
+                    </MudStack>
+                </MudPaper>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
 
 @code {
     [Inject] ThemeService ThemeService { get; set; } = null!;
+    [Inject] PreferenceService PreferenceService { get; set; } = null!;
     private string ThemeLabel => ThemeService.IsDarkMode ? "Modo escuro" : "Modo claro";
     private string ThemeIcon => ThemeService.IsDarkMode ? Icons.Material.Filled.DarkMode : Icons.Material.Filled.LightMode;
+    private string[] AvailableWidgets { get; } = new[] { "Vendas do dia", "Estoque", "Tarefas", "Atalhos", "Indicadores" };
+    private string NewWidgetName { get; set; } = string.Empty;
+
+    // Helpers to edit dictionary preferences in a simple list form
+    private List<DefaultSortRow> DefaultSortRows = new();
+    private List<VisibleColumnsRow> VisibleColumnsRows = new();
+
+    protected override void OnInitialized()
+    {
+        // Seed rows from current preferences for editing
+        var ds = PreferenceService.CurrentPreferences.Tables.DefaultSortPerModule;
+        if (ds != null)
+            DefaultSortRows = ds.Select(kv => new DefaultSortRow { Module = kv.Key, Sort = kv.Value }).ToList();
+
+        var vc = PreferenceService.CurrentPreferences.Tables.VisibleColumnsPerModule;
+        if (vc != null)
+            VisibleColumnsRows = vc.Select(kv => new VisibleColumnsRow { Module = kv.Key, ColumnsCsv = string.Join(",", kv.Value) }).ToList();
+    }
 
     private async Task OnThemeSwitchChanged(bool newValue)
     {
         await ThemeService.SetDarkModeAsync(newValue);
+    }
+
+    private async Task OnChange(Func<Task> mutator)
+    {
+        await mutator();
+        await PreferenceService.SaveAsync();
+        Snackbar.Add("Preferências salvas", Severity.Success, cfg => { cfg.VisibleStateDuration = 1500; });
+        StateHasChanged();
+    }
+
+    // Dashboard helpers
+    private async Task AddCustomWidget()
+    {
+        var name = (NewWidgetName ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(name)) return;
+        if (!PreferenceService.CurrentPreferences.Dashboard.Widgets.Contains(name))
+        {
+            PreferenceService.CurrentPreferences.Dashboard.Widgets.Add(name);
+            NewWidgetName = string.Empty;
+            await PreferenceService.SaveAsync();
+            Snackbar.Add("Widget adicionado", Severity.Info, c => c.VisibleStateDuration = 1200);
+        }
+    }
+
+    // Tables helpers (DefaultSortPerModule)
+    private void AddDefaultSortRow() => DefaultSortRows.Add(new DefaultSortRow());
+    private void RemoveDefaultSortRow(DefaultSortRow row)
+    {
+        DefaultSortRows.Remove(row);
+        SyncDefaultSortDict();
+    }
+    private async void SyncDefaultSortDict()
+    {
+        var dict = DefaultSortRows
+            .Where(r => !string.IsNullOrWhiteSpace(r.Module) && !string.IsNullOrWhiteSpace(r.Sort))
+            .GroupBy(r => r.Module!)
+            .ToDictionary(g => g.Key, g => g.Last().Sort!);
+        PreferenceService.CurrentPreferences.Tables.DefaultSortPerModule = dict.Count == 0 ? null : dict;
+        await PreferenceService.SaveAsync();
+        Snackbar.Add("Preferências de ordenação salvas", Severity.Success, c => c.VisibleStateDuration = 1200);
+    }
+
+    // Tables helpers (VisibleColumnsPerModule)
+    private void AddVisibleColumnsRow() => VisibleColumnsRows.Add(new VisibleColumnsRow());
+    private void RemoveVisibleColumnsRow(VisibleColumnsRow row)
+    {
+        VisibleColumnsRows.Remove(row);
+        SyncVisibleColumnsDict();
+    }
+    private async void SyncVisibleColumnsDict()
+    {
+        var dict = VisibleColumnsRows
+            .Where(r => !string.IsNullOrWhiteSpace(r.Module))
+            .GroupBy(r => r.Module!)
+            .ToDictionary(g => g.Key, g => g.Last().ColumnsCsv?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? Array.Empty<string>());
+        PreferenceService.CurrentPreferences.Tables.VisibleColumnsPerModule = dict.Count == 0 ? null : dict;
+        await PreferenceService.SaveAsync();
+        Snackbar.Add("Preferências de colunas salvas", Severity.Success, c => c.VisibleStateDuration = 1200);
+    }
+
+    private class DefaultSortRow { public string? Module { get; set; } public string? Sort { get; set; } }
+    private class VisibleColumnsRow { public string? Module { get; set; } public string? ColumnsCsv { get; set; } }
+
+    // Preview helpers
+    private string GetPreviewStyle()
+    {
+        var bg = ThemeService.IsDarkMode ? "#1e1e1e" : "#ffffff";
+        var text = ThemeService.IsDarkMode ? "#ffffff" : "#000000";
+        return $"background-color: {bg}; color: {text};";
+    }
+
+    private int GetDensitySpacing()
+    {
+        return PreferenceService.CurrentPreferences.Ui.Density == "compact" ? 1 : 3;
+    }
+
+    private Margin GetDensityMargin()
+    {
+        return PreferenceService.CurrentPreferences.Ui.Density == "compact" ? Margin.Dense : Margin.Normal;
+    }
+
+    private string GetFontSizeStyle()
+    {
+        var size = PreferenceService.CurrentPreferences.Ui.FontSize == "large" ? "1.1em" : "1em";
+        return $"font-size: {size};";
+    }
+
+    private string FormatNumber(double number)
+    {
+        var format = PreferenceService.CurrentPreferences.Locale.NumberFormat;
+        return format == "1.234,56" 
+            ? number.ToString("N2", new System.Globalization.CultureInfo("pt-BR"))
+            : number.ToString("N2", new System.Globalization.CultureInfo("en-US"));
     }
 }
