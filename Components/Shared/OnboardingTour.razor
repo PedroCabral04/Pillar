@@ -1,0 +1,222 @@
+@using erp.DTOs.Onboarding
+@using erp.Services.Onboarding
+@using Microsoft.AspNetCore.Components.Authorization
+@using MudBlazor
+@using TourModel = erp.DTOs.Onboarding.OnboardingTour
+@inject IOnboardingService OnboardingService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<div class="onboarding-overlay @(IsActive ? "active" : "")" @onclick="OnOverlayClick">
+    @if (IsActive && CurrentTour != null && CurrentStep != null)
+    {
+        <div class="onboarding-spotlight" style="@GetSpotlightStyle()"></div>
+        
+        <div class="onboarding-popup @GetPopupPositionClass()" style="@GetPopupStyle()">
+            <div class="onboarding-popup-header">
+                <MudText Typo="Typo.h6">@CurrentStep.Title</MudText>
+                <MudIconButton Icon="@Icons.Material.Filled.Close" 
+                              Size="Size.Small" 
+                              OnClick="@SkipTour" />
+            </div>
+            
+            <div class="onboarding-popup-body">
+                <MudText Typo="Typo.body1">@CurrentStep.Description</MudText>
+                
+                <div class="onboarding-progress">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Passo @(CurrentStepIndex + 1) de @CurrentTour.Steps.Count
+                    </MudText>
+                    <MudProgressLinear Color="Color.Primary" 
+                                      Value="@GetProgress()" 
+                                      Size="Size.Small" 
+                                      Class="my-2" />
+                </div>
+            </div>
+            
+            <div class="onboarding-popup-footer">
+                @if (CurrentStep.ShowSkip)
+                {
+                    <MudButton Variant="Variant.Text" 
+                              Color="Color.Default" 
+                              OnClick="@SkipTour">
+                        Pular Tour
+                    </MudButton>
+                }
+                
+                <div style="flex: 1;"></div>
+                
+                @if (CurrentStep.ShowPrevious && CurrentStepIndex > 0)
+                {
+                    <MudButton Variant="Variant.Outlined" 
+                              Color="Color.Primary" 
+                              OnClick="@PreviousStep"
+                              Class="mr-2">
+                        Anterior
+                    </MudButton>
+                }
+                
+                @if (CurrentStep.ShowNext && CurrentStepIndex < CurrentTour.Steps.Count - 1)
+                {
+                    <MudButton Variant="Variant.Filled" 
+                              Color="Color.Primary" 
+                              OnClick="@NextStep">
+                        Próximo
+                    </MudButton>
+                }
+                else if (CurrentStepIndex == CurrentTour.Steps.Count - 1)
+                {
+                    <MudButton Variant="Variant.Filled" 
+                              Color="Color.Success" 
+                              OnClick="@CompleteTour">
+                        Concluir
+                    </MudButton>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback<string> OnTourCompleted { get; set; }
+    
+    [Parameter]
+    public EventCallback<string> OnTourSkipped { get; set; }
+
+    private bool IsActive { get; set; }
+    private TourModel? CurrentTour { get; set; }
+    private OnboardingStep? CurrentStep { get; set; }
+    private int CurrentStepIndex { get; set; }
+    private string? UserId { get; set; }
+    private string[]? UserRoles { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            UserId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            UserRoles = user.FindAll(System.Security.Claims.ClaimTypes.Role).Select(c => c.Value).ToArray();
+        }
+    }
+
+    public async Task StartTour(string tourId)
+    {
+        if (string.IsNullOrEmpty(UserId)) return;
+
+        CurrentTour = OnboardingService.GetTourById(tourId);
+        if (CurrentTour == null) return;
+
+        var progress = await OnboardingService.GetUserProgressAsync(UserId, tourId);
+        CurrentStepIndex = progress?.CurrentStep ?? 0;
+        
+        if (CurrentStepIndex >= CurrentTour.Steps.Count)
+        {
+            CurrentStepIndex = 0;
+        }
+
+        CurrentStep = CurrentTour.Steps[CurrentStepIndex];
+        IsActive = true;
+        StateHasChanged();
+
+        // Scroll to target element
+        await ScrollToTarget();
+    }
+
+    private async Task NextStep()
+    {
+        if (CurrentTour == null || CurrentStepIndex >= CurrentTour.Steps.Count - 1) return;
+
+        CurrentStepIndex++;
+        CurrentStep = CurrentTour.Steps[CurrentStepIndex];
+        
+        if (!string.IsNullOrEmpty(UserId) && CurrentTour != null)
+        {
+            await OnboardingService.CompleteStepAsync(UserId, CurrentTour.Id, CurrentStepIndex - 1);
+        }
+        
+        StateHasChanged();
+        await ScrollToTarget();
+    }
+
+    private async Task PreviousStep()
+    {
+        if (CurrentStepIndex <= 0) return;
+
+        CurrentStepIndex--;
+        CurrentStep = CurrentTour.Steps[CurrentStepIndex];
+        StateHasChanged();
+        await ScrollToTarget();
+    }
+
+    private async Task CompleteTour()
+    {
+        if (CurrentTour == null || string.IsNullOrEmpty(UserId)) return;
+
+        await OnboardingService.CompleteTourAsync(UserId, CurrentTour.Id);
+        await OnTourCompleted.InvokeAsync(CurrentTour.Id);
+        
+        IsActive = false;
+        CurrentTour = null;
+        CurrentStep = null;
+        StateHasChanged();
+    }
+
+    private async Task SkipTour()
+    {
+        if (CurrentTour == null || string.IsNullOrEmpty(UserId)) return;
+
+        await OnboardingService.SkipTourAsync(UserId, CurrentTour.Id);
+        await OnTourSkipped.InvokeAsync(CurrentTour.Id);
+        
+        IsActive = false;
+        CurrentTour = null;
+        CurrentStep = null;
+        StateHasChanged();
+    }
+
+    private void OnOverlayClick()
+    {
+        // Prevent closing on overlay click, user must use buttons
+    }
+
+    private double GetProgress()
+    {
+        if (CurrentTour == null) return 0;
+        return ((double)(CurrentStepIndex + 1) / CurrentTour.Steps.Count) * 100;
+    }
+
+    private string GetSpotlightStyle()
+    {
+        // This would need JS interop to get actual element position
+        // For now, return empty - will be enhanced with JS
+        return string.Empty;
+    }
+
+    private string GetPopupStyle()
+    {
+        // This would need JS interop to position popup near target
+        return string.Empty;
+    }
+
+    private string GetPopupPositionClass()
+    {
+        return CurrentStep?.Placement switch
+        {
+            "center" => "position-center",
+            "top" => "position-top",
+            "bottom" => "position-bottom",
+            "left" => "position-left",
+            "right" => "position-right",
+            _ => "position-bottom"
+        };
+    }
+
+    private async Task ScrollToTarget()
+    {
+        // This would use JS interop to scroll to target element
+        await Task.CompletedTask;
+    }
+}
