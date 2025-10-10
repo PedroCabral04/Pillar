@@ -5,6 +5,8 @@
 @using System
 @using System.Linq
 @using erp.DTOs.Preferences
+@using Color = MudBlazor.Color
+@using Size = MudBlazor.Size
 @inject ISnackbar Snackbar
 
 <PageTitle>Configurações</PageTitle>
@@ -12,7 +14,9 @@
 <MudText Typo="Typo.h3" GutterBottom="true">Configurações</MudText>
 <MudText Typo="Typo.body1" GutterBottom="true">Faça ajustes na plataforma e deixe de acordo com sua preferência</MudText>
 
-<MudTabs Position="Position.Top" Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-2" Outlined="true">
+<MudGrid>
+    <MudItem xs="12" md="8">
+        <MudTabs Position="Position.Top" Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-2" Outlined="true">
     <MudTabPanel Text="Perfil" Icon="@Icons.Material.Filled.Person">
         <MudText Typo="Typo.body2">Configurações de perfil serão adicionadas aqui.</MudText>
     </MudTabPanel>
@@ -229,7 +233,89 @@
         </MudStack>
     </MudTabPanel>
 
-</MudTabs>
+        </MudTabs>
+    </MudItem>
+    
+    <MudItem xs="12" md="4">
+        <MudPaper Elevation="2" Class="pa-4" Style="position: sticky; top: 80px;">
+            <MudText Typo="Typo.h6" GutterBottom="true">
+                <MudIcon Icon="@Icons.Material.Filled.Visibility" Class="mr-2" />
+                Preview ao Vivo
+            </MudText>
+            <MudDivider Class="mb-3" />
+            
+            <MudStack Spacing="3">
+                <!-- Theme Preview -->
+                <MudPaper Elevation="1" Class="pa-3" Style="@GetPreviewStyle()">
+                    <MudText Typo="Typo.subtitle2" GutterBottom="true">Tema: @(ThemeService.IsDarkMode ? "Escuro" : "Claro")</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Este é um exemplo de como o texto aparece no tema atual.
+                    </MudText>
+                </MudPaper>
+
+                <!-- Density Preview -->
+                <MudPaper Elevation="1" Class="pa-3">
+                    <MudText Typo="Typo.subtitle2" GutterBottom="true">Densidade</MudText>
+                    <MudStack Spacing="@GetDensitySpacing()">
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small" FullWidth="true">Botão Exemplo</MudButton>
+                        <MudTextField T="string" Label="Campo de texto" Variant="Variant.Outlined" Margin="@GetDensityMargin()" />
+                    </MudStack>
+                </MudPaper>
+
+                <!-- Font Size Preview -->
+                <MudPaper Elevation="1" Class="pa-3">
+                    <MudText Typo="Typo.subtitle2" GutterBottom="true">Tamanho da Fonte</MudText>
+                    <div style="@GetFontSizeStyle()">
+                        <MudText Typo="Typo.h6">Título</MudText>
+                        <MudText Typo="Typo.body1">Texto normal com o tamanho de fonte configurado.</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Texto secundário.</MudText>
+                    </div>
+                </MudPaper>
+
+                <!-- Contrast & Motion Preview -->
+                <MudPaper Elevation="1" Class="pa-3">
+                    <MudText Typo="Typo.subtitle2" GutterBottom="true">Acessibilidade</MudText>
+                    <MudStack Spacing="2">
+                        @if (PreferenceService.CurrentPreferences.Ui.HighContrast)
+                        {
+                            <MudChip T="string" Color="Color.Dark" Size="Size.Small">
+                                <MudIcon Icon="@Icons.Material.Filled.Contrast" Size="Size.Small" Class="mr-1" />
+                                Alto Contraste
+                            </MudChip>
+                        }
+                        @if (PreferenceService.CurrentPreferences.Ui.ReduceMotion)
+                        {
+                            <MudChip T="string" Color="Color.Info" Size="Size.Small">
+                                <MudIcon Icon="@Icons.Material.Filled.Animation" Size="Size.Small" Class="mr-1" />
+                                Reduzir Animações
+                            </MudChip>
+                        }
+                        @if (!PreferenceService.CurrentPreferences.Ui.HighContrast && !PreferenceService.CurrentPreferences.Ui.ReduceMotion)
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Nenhuma opção de acessibilidade ativa</MudText>
+                        }
+                    </MudStack>
+                </MudPaper>
+
+                <!-- Locale Preview -->
+                <MudPaper Elevation="1" Class="pa-3">
+                    <MudText Typo="Typo.subtitle2" GutterBottom="true">Localização</MudText>
+                    <MudStack Spacing="1">
+                        <MudText Typo="Typo.body2">
+                            <strong>Data:</strong> @DateTime.Now.ToString(PreferenceService.CurrentPreferences.Locale.DateFormat)
+                        </MudText>
+                        <MudText Typo="Typo.body2">
+                            <strong>Número:</strong> @FormatNumber(1234.56)
+                        </MudText>
+                        <MudText Typo="Typo.body2">
+                            <strong>Moeda:</strong> @PreferenceService.CurrentPreferences.Locale.Currency
+                        </MudText>
+                    </MudStack>
+                </MudPaper>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
 
 @code {
     [Inject] ThemeService ThemeService { get; set; } = null!;
@@ -320,4 +406,36 @@
 
     private class DefaultSortRow { public string? Module { get; set; } public string? Sort { get; set; } }
     private class VisibleColumnsRow { public string? Module { get; set; } public string? ColumnsCsv { get; set; } }
+
+    // Preview helpers
+    private string GetPreviewStyle()
+    {
+        var bg = ThemeService.IsDarkMode ? "#1e1e1e" : "#ffffff";
+        var text = ThemeService.IsDarkMode ? "#ffffff" : "#000000";
+        return $"background-color: {bg}; color: {text};";
+    }
+
+    private int GetDensitySpacing()
+    {
+        return PreferenceService.CurrentPreferences.Ui.Density == "compact" ? 1 : 3;
+    }
+
+    private Margin GetDensityMargin()
+    {
+        return PreferenceService.CurrentPreferences.Ui.Density == "compact" ? Margin.Dense : Margin.Normal;
+    }
+
+    private string GetFontSizeStyle()
+    {
+        var size = PreferenceService.CurrentPreferences.Ui.FontSize == "large" ? "1.1em" : "1em";
+        return $"font-size: {size};";
+    }
+
+    private string FormatNumber(double number)
+    {
+        var format = PreferenceService.CurrentPreferences.Locale.NumberFormat;
+        return format == "1.234,56" 
+            ? number.ToString("N2", new System.Globalization.CultureInfo("pt-BR"))
+            : number.ToString("N2", new System.Globalization.CultureInfo("en-US"));
+    }
 }
