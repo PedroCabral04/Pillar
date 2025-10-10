@@ -90,6 +90,39 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         return Created($"/api/kanban/cards/{card.Id}", new KanbanCardDto(card.Id, card.Title, card.Description, card.Position, card.ColumnId));
     }
 
+    [HttpPut("cards/{id}")] // update card
+    public async Task<IActionResult> UpdateCard(int id, [FromBody] UpdateCardRequest req)
+    {
+        var myId = await GetMyUserIdAsync();
+        var card = await db.KanbanCards.Include(t => t.Column).ThenInclude(c => c.Board).FirstOrDefaultAsync(t => t.Id == id);
+        if (card is null) return NotFound();
+        if (card.Column.Board.OwnerId != myId) return Forbid();
+        
+        card.Title = req.Title;
+        card.Description = req.Description;
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    [HttpDelete("cards/{id}")] // delete card
+    public async Task<IActionResult> DeleteCard(int id)
+    {
+        var myId = await GetMyUserIdAsync();
+        var card = await db.KanbanCards.Include(t => t.Column).ThenInclude(c => c.Board).FirstOrDefaultAsync(t => t.Id == id);
+        if (card is null) return NotFound();
+        if (card.Column.Board.OwnerId != myId) return Forbid();
+        
+        // Shift positions of cards after this one
+        var laterCards = await db.KanbanCards
+            .Where(t => t.ColumnId == card.ColumnId && t.Position > card.Position)
+            .ToListAsync();
+        foreach (var c in laterCards) c.Position--;
+        
+        db.KanbanCards.Remove(card);
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
     [HttpPost("cards/move")] // move or reorder card
     public async Task<IActionResult> MoveCard([FromBody] MoveCardRequest req)
     {

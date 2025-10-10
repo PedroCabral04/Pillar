@@ -3,8 +3,11 @@
 @using erp.DTOs.Kanban
 @using erp.Services
 @using MudBlazor
+@using erp.Components.Shared.Dialogs
 @inject IApiService Api
 @inject NavigationManager Nav
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
 
 <div class="kanban-page">
     <div class="kanban-header">
@@ -36,16 +39,16 @@
                             <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
                                 <MudText Typo="Typo.subtitle1">@col.Title</MudText>
                                 <MudSpacer/>
-                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="MudBlazor.Size.Small" OnClick="() => RenameColumn(col)"/>
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="MudBlazor.Size.Small" OnClick="() => EditColumn(col)"/>
                             </MudStack>
                             <MudDivider Class="my-1"/>
                             <MudDropZone T="KanbanCardDto" Identifier="@col.Id.ToString()" Class="kanban-cards mud-height-full" />
-                            <MudButton Size="MudBlazor.Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add" OnClick="() => NewCard(col)">Adicionar</MudButton>
+                            <MudButton Size="MudBlazor.Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add" OnClick="() => CreateCard(col)">Adicionar</MudButton>
                         </MudPaper>
                     }
                 </ChildContent>
                 <ItemRenderer>
-                        <MudPaper Elevation="2" Class="pa-2 rounded-lg my-2 kanban-item" Style="cursor: grab;">
+                        <MudPaper Elevation="2" Class="pa-2 rounded-lg my-2 kanban-item" Style="cursor: grab;" @onclick="() => EditCard(context)">
                         <MudText Typo="Typo.body1">@context.Title</MudText>
                         @if (!string.IsNullOrWhiteSpace(context.Description))
                         {
@@ -81,43 +84,124 @@
 
     private async Task NewColumn()
     {
-        var title = await PromptAsync("Título da coluna");
-        if (string.IsNullOrWhiteSpace(title)) return;
-        var created = await Api.PostAsJsonAsync("api/kanban/columns", new CreateColumnRequest(title));
-        if (created.IsSuccessStatusCode)
+        var options = new DialogOptions { CloseOnEscapeKey = true, CloseButton = true, MaxWidth = MaxWidth.Small };
+        var dialog = await DialogService.ShowAsync<KanbanColumnDialog>("Nova Coluna", options);
+        var result = await dialog.Result;
+        
+        if (result is { Canceled: false } && result.Data is string title)
         {
-            var data = await Api.GetAsync<ColumnsResponse>("api/kanban/columns");
-            _columns = data?.Columns ?? new();
-            _allCards = _columns.SelectMany(c => c.Cards).ToList();
-            _dropContainer?.Refresh();
+            var created = await Api.PostAsJsonAsync("api/kanban/columns", new CreateColumnRequest(title));
+            if (created.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Coluna criada com sucesso!", Severity.Success);
+                await RefreshData();
+            }
+            else
+            {
+                Snackbar.Add("Erro ao criar coluna.", Severity.Error);
+            }
         }
     }
 
-    private async Task RenameColumn(ColumnVm col)
+    private async Task EditColumn(ColumnVm col)
     {
-        var title = await PromptAsync("Novo título", col.Title);
-        if (string.IsNullOrWhiteSpace(title)) return;
-    var res = await Api.PutAsJsonAsync($"api/kanban/columns/{col.Id}/title", new RenameColumnRequest(title));
-        if (res.IsSuccessStatusCode)
+        var parameters = new DialogParameters<KanbanColumnDialog>
         {
-            col.Title = title;
-            StateHasChanged();
+            { x => x.InitialTitle, col.Title },
+            { x => x.IsEdit, true }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, CloseButton = true, MaxWidth = MaxWidth.Small };
+        var dialog = await DialogService.ShowAsync<KanbanColumnDialog>("Editar Coluna", parameters, options);
+        var result = await dialog.Result;
+        
+        if (result is { Canceled: false } && result.Data is string title)
+        {
+            var res = await Api.PutAsJsonAsync($"api/kanban/columns/{col.Id}/title", new RenameColumnRequest(title));
+            if (res.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Coluna atualizada com sucesso!", Severity.Success);
+                col.Title = title;
+                StateHasChanged();
+            }
+            else
+            {
+                Snackbar.Add("Erro ao atualizar coluna.", Severity.Error);
+            }
         }
     }
 
-    private async Task NewCard(ColumnVm col)
+    private async Task CreateCard(ColumnVm col)
     {
-        var title = await PromptAsync("Título do card");
-        if (string.IsNullOrWhiteSpace(title)) return;
-        var desc = await PromptAsync("Descrição (opcional)");
-        var res = await Api.PostAsJsonAsync("api/kanban/cards", new CreateCardRequest(col.Id, title, desc));
-        if (res.IsSuccessStatusCode)
+        var options = new DialogOptions { CloseOnEscapeKey = true, CloseButton = true, MaxWidth = MaxWidth.Medium };
+        var dialog = await DialogService.ShowAsync<KanbanCardDialog>("Novo Card", options);
+        var result = await dialog.Result;
+        
+        if (result is { Canceled: false } && result.Data is KanbanCardDialog.CardDialogResult cardResult)
         {
-            var data = await Api.GetAsync<ColumnsResponse>("api/kanban/columns");
-            _columns = data?.Columns ?? new();
-            _allCards = _columns.SelectMany(c => c.Cards).ToList();
-            _dropContainer?.Refresh();
+            var res = await Api.PostAsJsonAsync("api/kanban/cards", new CreateCardRequest(col.Id, cardResult.Title, cardResult.Description));
+            if (res.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Card criado com sucesso!", Severity.Success);
+                await RefreshData();
+            }
+            else
+            {
+                Snackbar.Add("Erro ao criar card.", Severity.Error);
+            }
         }
+    }
+
+    private async Task EditCard(KanbanCardDto card)
+    {
+        var parameters = new DialogParameters<KanbanCardDialog>
+        {
+            { x => x.InitialTitle, card.Title },
+            { x => x.InitialDescription, card.Description },
+            { x => x.IsEdit, true },
+            { x => x.CardId, card.Id }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, CloseButton = true, MaxWidth = MaxWidth.Medium };
+        var dialog = await DialogService.ShowAsync<KanbanCardDialog>("Editar Card", parameters, options);
+        var result = await dialog.Result;
+        
+        if (result is { Canceled: false } && result.Data is KanbanCardDialog.CardDialogResult cardResult)
+        {
+            if (cardResult.Delete)
+            {
+                var deleteRes = await Api.DeleteAsync($"api/kanban/cards/{card.Id}");
+                if (deleteRes.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("Card excluído com sucesso!", Severity.Success);
+                    await RefreshData();
+                }
+                else
+                {
+                    Snackbar.Add("Erro ao excluir card.", Severity.Error);
+                }
+            }
+            else
+            {
+                var updateRes = await Api.PutAsJsonAsync($"api/kanban/cards/{card.Id}", new UpdateCardRequest(cardResult.Title, cardResult.Description));
+                if (updateRes.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("Card atualizado com sucesso!", Severity.Success);
+                    await RefreshData();
+                }
+                else
+                {
+                    Snackbar.Add("Erro ao atualizar card.", Severity.Error);
+                }
+            }
+        }
+    }
+
+    private async Task RefreshData()
+    {
+        var data = await Api.GetAsync<ColumnsResponse>("api/kanban/columns");
+        _columns = data?.Columns ?? new();
+        _allCards = _columns.SelectMany(c => c.Cards).ToList();
+        _dropContainer?.Refresh();
+        StateHasChanged();
     }
 
     private MudDropContainer<KanbanCardDto>? _dropContainer;

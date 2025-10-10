@@ -1,0 +1,81 @@
+@using System.ComponentModel.DataAnnotations
+@using erp.DTOs.Kanban
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="_title" 
+                          Label="Título do Card" 
+                          Required="true"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          HelperText="Digite o título do card"
+                          Immediate="true" />
+            
+            <MudTextField @bind-Value="_description" 
+                          Label="Descrição" 
+                          Lines="5"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          HelperText="Adicione uma descrição detalhada (opcional)"
+                          Immediate="true" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        @if (IsEdit && CardId.HasValue)
+        {
+            <MudButton Color="MudBlazor.Color.Error" 
+                       Variant="Variant.Text"
+                       StartIcon="@Icons.Material.Filled.Delete"
+                       OnClick="Delete">
+                Excluir
+            </MudButton>
+        }
+        <MudSpacer />
+        <MudButton Color="MudBlazor.Color.Primary" 
+                   Variant="Variant.Filled"
+                   OnClick="Submit"
+                   Disabled="@(string.IsNullOrWhiteSpace(_title))">
+            @(IsEdit ? "Salvar" : "Criar")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    
+    [Parameter] public string? InitialTitle { get; set; }
+    [Parameter] public string? InitialDescription { get; set; }
+    [Parameter] public bool IsEdit { get; set; } = false;
+    [Parameter] public int? CardId { get; set; }
+
+    private string _title = string.Empty;
+    private string _description = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        _title = InitialTitle ?? string.Empty;
+        _description = InitialDescription ?? string.Empty;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+    
+    private void Submit()
+    {
+        if (!string.IsNullOrWhiteSpace(_title))
+        {
+            var result = new CardDialogResult(_title, _description, false);
+            MudDialog.Close(DialogResult.Ok(result));
+        }
+    }
+
+    private void Delete()
+    {
+        var result = new CardDialogResult(_title, _description, true);
+        MudDialog.Close(DialogResult.Ok(result));
+    }
+
+    public record CardDialogResult(string Title, string Description, bool Delete);
+}
