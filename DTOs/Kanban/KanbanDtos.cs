@@ -8,6 +8,8 @@ public record KanbanCardDto(int Id, string Title, string? Description, int Posit
 
 public record CreateCardRequest(int ColumnId, string Title, string? Description);
 
+public record UpdateCardRequest(string Title, string? Description);
+
 public record MoveCardRequest(int CardId, int ToColumnId, int ToPosition);
 
 public record CreateColumnRequest(string Title);
