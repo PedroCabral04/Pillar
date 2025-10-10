@@ -26,18 +26,6 @@
     </MudButton>
 </MudStack>
 
-<style>
-    .dialog-blur {
-        backdrop-filter: blur(5px);
-    }
-</style>
-
-<style>
-    .dialog-blur {
-        backdrop-filter: blur(5px);
-    }
-</style>
-
 @if (_loadError != null)
 {
     <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
@@ -211,7 +199,7 @@
 
     private async Task ShowUserUpdateDialog(int userId)
     {
-        var options = new DialogOptions { CloseOnEscapeKey = true, CloseButton = true, BackgroundClass = "dialog-blur" };
+        var options = new DialogOptions { CloseOnEscapeKey = true, CloseButton = true, MaxWidth = MaxWidth.Medium };
         var parameters = new DialogParameters<UserUpdateDialog> { { x => x.UserId, userId } };
 
         var userName = _users?.FirstOrDefault(u => u.Id == userId)?.Username ?? "usuário";
