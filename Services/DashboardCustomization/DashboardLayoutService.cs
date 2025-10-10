@@ -146,25 +146,21 @@ public class DashboardLayoutService : IDashboardLayoutService
     public List<WidgetCatalogItem> GetAvailableWidgets(string[] userRoles)
     {
         var catalog = new List<WidgetCatalogItem>();
-        var providers = _registry.GetAllProviders();
+        var definitions = _registry.ListAll();
 
-        foreach (var provider in providers)
+        foreach (var def in definitions)
         {
-            var definitions = provider.GetWidgetDefinitions();
-            foreach (var def in definitions)
+            catalog.Add(new WidgetCatalogItem
             {
-                catalog.Add(new WidgetCatalogItem
-                {
-                    ProviderKey = def.ProviderKey,
-                    WidgetKey = def.WidgetKey,
-                    Title = def.Title,
-                    Description = def.Description ?? "Dashboard widget",
-                    Icon = def.Icon,
-                    Category = def.Category,
-                    RequiresConfiguration = false,
-                    RequiredRoles = null // TODO: Implement role-based widgets
-                });
-            }
+                ProviderKey = def.ProviderKey,
+                WidgetKey = def.WidgetKey,
+                Title = def.Title,
+                Description = def.Description ?? "Dashboard widget",
+                Icon = def.Icon,
+                Category = def.ProviderKey, // Use provider key as category
+                RequiresConfiguration = false,
+                RequiredRoles = null // TODO: Implement role-based widgets
+            });
         }
 
         return catalog;
@@ -181,36 +177,32 @@ public class DashboardLayoutService : IDashboardLayoutService
         };
 
         // Add some default widgets
-        var providers = _registry.GetAllProviders();
+        var definitions = _registry.ListAll().Take(6); // Limit to first 6 widgets
         int order = 0;
         int row = 0;
         int col = 0;
 
-        foreach (var provider in providers.Take(6)) // Limit to first 6 widgets
+        foreach (var def in definitions)
         {
-            var definitions = provider.GetWidgetDefinitions();
-            foreach (var def in definitions.Take(1)) // One widget per provider
+            layout.Widgets.Add(new WidgetConfiguration
             {
-                layout.Widgets.Add(new WidgetConfiguration
-                {
-                    WidgetId = $"{def.ProviderKey}_{def.WidgetKey}_default",
-                    ProviderKey = def.ProviderKey,
-                    WidgetKey = def.WidgetKey,
-                    Order = order++,
-                    Row = row,
-                    Column = col,
-                    Width = 1,
-                    Height = 1,
-                    IsVisible = true,
-                    IsCollapsed = false
-                });
+                WidgetId = $"{def.ProviderKey}_{def.WidgetKey}_default",
+                ProviderKey = def.ProviderKey,
+                WidgetKey = def.WidgetKey,
+                Order = order++,
+                Row = row,
+                Column = col,
+                Width = 1,
+                Height = 1,
+                IsVisible = true,
+                IsCollapsed = false
+            });
 
-                col++;
-                if (col >= layout.Columns)
-                {
-                    col = 0;
-                    row++;
-                }
+            col++;
+            if (col >= layout.Columns)
+            {
+                col = 0;
+                row++;
             }
         }
 
