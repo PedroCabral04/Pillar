@@ -316,7 +316,7 @@ public class AdvancedNotificationService : IAdvancedNotificationService
             CountByCategory = activeNotifications
                 .Where(n => !string.IsNullOrEmpty(n.Category))
                 .GroupBy(n => n.Category!)
-                .ToDictionary(g => g, g => g.Count())
+                .ToDictionary(g => g.Key, g => g.Count())
         };
 
         return Task.FromResult(summary);

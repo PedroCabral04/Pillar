@@ -77,10 +77,10 @@
                                                   Size="MudBlazor.Size.Small" 
                                                   Color="MudBlazor.Color.Primary" />
                                 }
-                                <MudIconButton Icon="@Icons.Material.Filled.Close" 
-                                              Size="MudBlazor.Size.Small"
-                                              OnClick="@(() => DeleteNotification(notification.Id))"
-                                              @onclick:stopPropagation="true" />
+                                <div @onclick="@(() => DeleteNotification(notification.Id))" @onclick:stopPropagation="true">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Close" 
+                                                  Size="MudBlazor.Size.Small" />
+                                </div>
                             </div>
                         </div>
                     }
