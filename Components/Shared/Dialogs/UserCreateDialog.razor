@@ -7,63 +7,164 @@
 @using erp.DTOs.Role
 @using erp.Services
 
-<MudDialog>
+<MudDialog Class="user-dialog">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Color="MudBlazor.Color.Primary" Size="MudBlazor.Size.Large" />
+            <MudText Typo="Typo.h6">Adicionar Novo Usuário</MudText>
+        </MudStack>
+    </TitleContent>
     <DialogContent>
         @if (_loading)
         {
-            <MudProgressCircular Color="MudBlazor.Color.Primary" Indeterminate="true" />
-            <MudText>Carregando permissões...</MudText>
+            <MudStack AlignItems="AlignItems.Center" Spacing="3" Class="pa-6">
+                <MudProgressCircular Color="MudBlazor.Color.Primary" Indeterminate="true" Size="MudBlazor.Size.Large" />
+                <MudText Typo="Typo.body1" Color="MudBlazor.Color.Secondary">Carregando permissões...</MudText>
+            </MudStack>
         }
         else if (_loadError != null)
         {
-            <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
+            <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Icon="@Icons.Material.Filled.Error">
+                @_loadError
+            </MudAlert>
         }
         else
         {
-            <MudForm @ref="_form">
-                <MudTextField T="string" Label="Nome" Variant="Variant.Outlined" Margin="Margin.Dense"
-                              InputType="InputType.Text"
-                              @bind-Value="_newUser.Username"
-                              Validation="@(_usernameRules)"/>
+            <MudForm @ref="_form" Class="pa-2">
+                <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.Badge" Size="MudBlazor.Size.Small" Class="mr-1" />
+                    Informações Pessoais
+                </MudText>
+                
+                <MudGrid Spacing="3">
+                    <MudItem xs="12">
+                        <MudTextField T="string" 
+                                      Label="Nome completo" 
+                                      Variant="Variant.Outlined" 
+                                      InputType="InputType.Text"
+                                      @bind-Value="_newUser.Username"
+                                      Validation="@(_usernameRules)"
+                                      Immediate="true"
+                                      HelperText="Mínimo 3 caracteres"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Person"/>
+                    </MudItem>
+                    
+                    <MudItem xs="12" md="6">
+                        <MudTextField T="string" 
+                                      Label="E-mail" 
+                                      Variant="Variant.Outlined"
+                                      InputType="InputType.Email"
+                                      @bind-Value="_newUser.Email"
+                                      Validation="@(_emailRules)"
+                                      Immediate="true"
+                                      HelperText="exemplo@empresa.com"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Email"/>
+                    </MudItem>
+                    
+                    <MudItem xs="12" md="6">
+                        <MudTextField T="string" 
+                                      Label="Telefone" 
+                                      Variant="Variant.Outlined"
+                                      InputType="InputType.Telephone"
+                                      Placeholder="(00) 00000-0000" 
+                                      Mask="@(new PatternMask("(00) 00000-0000"))"
+                                      @bind-Value="_newUser.Phone"
+                                      Validation="@(_phoneRules)"
+                                      Immediate="true"
+                                      HelperText="Com DDD"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Phone"/>
+                    </MudItem>
+                </MudGrid>
 
-                <MudTextField T="string" Label="Email" Variant="Variant.Outlined" Margin="Margin.Dense"
-                              InputType="InputType.Email"
-                              @bind-Value="_newUser.Email"
-                              Validation="@(_emailRules)"/>
+                <MudDivider Class="my-4" />
 
-                <MudTextField T="string" Label="Telefone" Variant="Variant.Outlined" Margin="Margin.Dense"
-                              InputType="InputType.Telephone"
-                              Placeholder="(00) 00000-0000" Mask="@(new PatternMask("(00) 00000-0000"))"
-                              @bind-Value="_newUser.Phone"
-                              Validation="@(_phoneRules)"/>
+                <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.Security" Size="MudBlazor.Size.Small" Class="mr-1" />
+                    Permissões de Acesso
+                </MudText>
 
-                <MudSelect T="@RoleDto" @bind-SelectedValues="_selectedRoles" Label="Função/Permissão" MultiSelection="true"
-                           Variant="Variant.Outlined" Margin="Margin.Dense" Required="true"
-                           RequiredError="Escolha pelo menos uma permissão" SelectAll="true" SelectAllText="Selecionar todos">
+                <MudSelect T="@RoleDto" 
+                           @bind-SelectedValues="_selectedRoles" 
+                           Label="Funções/Permissões" 
+                           MultiSelection="true"
+                           Variant="Variant.Outlined" 
+                           Required="true"
+                           RequiredError="Selecione pelo menos uma permissão" 
+                           SelectAll="true" 
+                           SelectAllText="Selecionar todas"
+                           Adornment="Adornment.Start"
+                           AdornmentIcon="@Icons.Material.Filled.AdminPanelSettings"
+                           HelperText="Selecione uma ou mais funções para o usuário"
+                           Immediate="true">
                     @foreach (var roleOption in _rolesList)
                     {
-                        <MudSelectItem T="@RoleDto" Value="@roleOption">@roleOption.Name</MudSelectItem>
+                        <MudSelectItem T="@RoleDto" Value="@roleOption">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                <MudIcon Icon="@GetRoleIcon(roleOption.Name)" Size="MudBlazor.Size.Small" />
+                                <div>
+                                    <MudText Typo="Typo.body2">@roleOption.Name</MudText>
+                                    <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">@GetRoleDescription(roleOption.Name)</MudText>
+                                </div>
+                            </MudStack>
+                        </MudSelectItem>
                     }
                 </MudSelect>
+
+                @if (_selectedRoles.Any())
+                {
+                    <MudChipSet T="string" Class="mt-2">
+                        @foreach (var role in _selectedRoles)
+                        {
+                            <MudChip T="string" 
+                                     Text="@role.Name" 
+                                     Color="MudBlazor.Color.Primary" 
+                                     Variant="Variant.Filled"
+                                     Size="MudBlazor.Size.Small"
+                                     Icon="@GetRoleIcon(role.Name)" />
+                        }
+                    </MudChipSet>
+                }
             </MudForm>
         }
     </DialogContent>
     <DialogActions>
-        <MudButton Color="MudBlazor.Color.Default" Variant="Variant.Text" OnClick="@Cancel">Cancelar</MudButton>
-        <MudButton Color="MudBlazor.Color.Primary" Variant="Variant.Filled" OnClick="@CreateUser" 
-                   Disabled="@(_loading || _submitting || _loadError != null)">
+        <MudButton Color="MudBlazor.Color.Default" 
+                   Variant="Variant.Text" 
+                   OnClick="@Cancel"
+                   StartIcon="@Icons.Material.Filled.Close">
+            Cancelar
+        </MudButton>
+        <MudButton Color="MudBlazor.Color.Primary" 
+                   Variant="Variant.Filled" 
+                   OnClick="@CreateUser" 
+                   Disabled="@(_loading || _submitting || _loadError != null)"
+                   StartIcon="@(_submitting ? null : Icons.Material.Filled.Check)">
             @if (_submitting)
             {
-                <MudProgressCircular Class="ms-n1" Size="MudBlazor.Size.Small" Indeterminate="true"/>
-                <MudText Class="ms-2">Criando...</MudText>
+                <MudProgressCircular Class="mr-2" Size="MudBlazor.Size.Small" Indeterminate="true"/>
+                <span>Criando usuário...</span>
             }
             else
             {
-                <MudText>Adicionar usuário</MudText>
+                <span>Adicionar Usuário</span>
             }
         </MudButton>       
     </DialogActions>
 </MudDialog>
+
+<style>
+    .user-dialog .mud-dialog-content {
+        overflow-y: auto;
+        max-height: 70vh;
+    }
+    
+    .user-dialog .mud-input-adornment {
+        color: var(--mud-palette-primary);
+    }
+</style>
 
 @code {
     [CascadingParameter]
@@ -196,5 +297,27 @@
         {
             _submitting = false;
         }
+    }
+
+    private string GetRoleIcon(string roleName)
+    {
+        return roleName.ToLower() switch
+        {
+            "administrador" => Icons.Material.Filled.AdminPanelSettings,
+            "gerente" => Icons.Material.Filled.ManageAccounts,
+            "vendedor" => Icons.Material.Filled.StoreMallDirectory,
+            _ => Icons.Material.Filled.Person
+        };
+    }
+
+    private string GetRoleDescription(string roleName)
+    {
+        return roleName.ToLower() switch
+        {
+            "administrador" => "Acesso total ao sistema",
+            "gerente" => "Gerenciar equipes e relatórios",
+            "vendedor" => "Registro de vendas e atendimento",
+            _ => "Usuário comum"
+        };
     }
 }
