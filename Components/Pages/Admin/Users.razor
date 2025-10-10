@@ -36,8 +36,47 @@
     <ToolBarContent>
         <MudText Typo="Typo.h5">Usuários Cadastrados</MudText>
         <MudSpacer/>
-        <MudTextField T="string" ValueChanged="OnSearch" Immediate="true" Placeholder="Procurar" Variant="Variant.Outlined" Margin="Margin.Dense"
-                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true"/>
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudTextField T="string" ValueChanged="OnSearch" Immediate="true" Placeholder="Procurar" Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true" Style="min-width: 200px;"/>
+            <MudSelect T="string" 
+                       Value="_statusFilter" 
+                       ValueChanged="OnStatusFilterChanged"
+                       Label="Status" 
+                       Variant="Variant.Outlined" 
+                       Margin="Margin.Dense"
+                       Clearable="true"
+                       Style="min-width: 120px;">
+                <MudSelectItem T="string" Value="@("active")">Ativos</MudSelectItem>
+                <MudSelectItem T="string" Value="@("inactive")">Inativos</MudSelectItem>
+            </MudSelect>
+            <MudSelect T="string" 
+                       Value="_roleFilter" 
+                       ValueChanged="OnRoleFilterChanged"
+                       Label="Função" 
+                       Variant="Variant.Outlined" 
+                       Margin="Margin.Dense"
+                       Clearable="true"
+                       Style="min-width: 150px;">
+                @if (_availableRoles != null)
+                {
+                    @foreach (var role in _availableRoles)
+                    {
+                        <MudSelectItem T="string" Value="@role.Name">@role.Name</MudSelectItem>
+                    }
+                }
+            </MudSelect>
+            @if (HasActiveFilters())
+            {
+                <MudButton Variant="Variant.Text" 
+                           Color="MudBlazor.Color.Secondary" 
+                           StartIcon="@Icons.Material.Filled.FilterAltOff"
+                           OnClick="ClearFilters"
+                           Size="MudBlazor.Size.Small">
+                    Limpar Filtros
+                </MudButton>
+            }
+        </MudStack>
     </ToolBarContent>
     <HeaderContent>
         <MudTh><MudTableSortLabel SortLabel="username" T="UserDto">Nome</MudTableSortLabel></MudTh>
@@ -86,6 +125,9 @@
     private IEnumerable<UserDto>? _users;
     private int _totalItems;
     private string _searchString = "";
+    private string _statusFilter = "";
+    private string _roleFilter = "";
+    private List<RoleDto>? _availableRoles;
 
     private System.Timers.Timer? _debounceTimer;
     private const int DebounceDelayMs = 600;
@@ -97,6 +139,20 @@
         _debounceTimer = new System.Timers.Timer(DebounceDelayMs);
         _debounceTimer.Elapsed += OnDebounceTimerElapsed;
         _debounceTimer.AutoReset = false;
+        
+        // Load available roles for filter
+        try
+        {
+            var rolesResponse = await ApiService.GetAsync("api/roles");
+            if (rolesResponse.IsSuccessStatusCode)
+            {
+                _availableRoles = await rolesResponse.Content.ReadFromJsonAsync<List<RoleDto>>() ?? new List<RoleDto>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Erro ao carregar funções: {ex.Message}");
+        }
     }
 
     private async Task<TableData<UserDto>> ServerReload(TableState state, CancellationToken token)
@@ -127,15 +183,29 @@
 
             data = data.Where(user =>
             {
-                if (string.IsNullOrWhiteSpace(_searchString))
-                    return true;
-                if (user.Username.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
-                    return true;
-                if (user.Email.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
-                    return true;
-                if (user.Phone.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
-                    return true;
-                return user.RoleNames.Any(r => r.Contains(_searchString, StringComparison.OrdinalIgnoreCase));
+                // Search filter
+                if (!string.IsNullOrWhiteSpace(_searchString))
+                {
+                    if (!user.Username.Contains(_searchString, StringComparison.OrdinalIgnoreCase) &&
+                        !user.Email.Contains(_searchString, StringComparison.OrdinalIgnoreCase) &&
+                        !user.Phone.Contains(_searchString, StringComparison.OrdinalIgnoreCase) &&
+                        !user.RoleNames.Any(r => r.Contains(_searchString, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        return false;
+                    }
+                }
+                
+                // Status filter
+                if (_statusFilter == "active" && !user.IsActive)
+                    return false;
+                if (_statusFilter == "inactive" && user.IsActive)
+                    return false;
+                
+                // Role filter
+                if (!string.IsNullOrWhiteSpace(_roleFilter) && !user.RoleNames.Contains(_roleFilter, StringComparer.OrdinalIgnoreCase))
+                    return false;
+                
+                return true;
             });
 
             _totalItems = data.Count();
@@ -179,6 +249,33 @@
     private void OnDebounceTimerElapsed(object? sender, System.Timers.ElapsedEventArgs e)
     {
         InvokeAsync(async () => { if (_table != null) await _table.ReloadServerData(); });
+    }
+
+    private async void OnStatusFilterChanged(string value)
+    {
+        _statusFilter = value ?? "";
+        if (_table != null) await _table.ReloadServerData();
+    }
+
+    private async void OnRoleFilterChanged(string value)
+    {
+        _roleFilter = value ?? "";
+        if (_table != null) await _table.ReloadServerData();
+    }
+
+    private bool HasActiveFilters()
+    {
+        return !string.IsNullOrWhiteSpace(_searchString) || 
+               !string.IsNullOrWhiteSpace(_statusFilter) || 
+               !string.IsNullOrWhiteSpace(_roleFilter);
+    }
+
+    private async void ClearFilters()
+    {
+        _searchString = "";
+        _statusFilter = "";
+        _roleFilter = "";
+        if (_table != null) await _table.ReloadServerData();
     }
 
     private async Task ShowUserCreateDialog()
