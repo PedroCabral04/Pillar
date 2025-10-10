@@ -15,7 +15,7 @@
             <div class="onboarding-popup-header">
                 <MudText Typo="Typo.h6">@CurrentStep.Title</MudText>
                 <MudIconButton Icon="@Icons.Material.Filled.Close" 
-                              Size="Size.Small" 
+                              Size="MudBlazor.Size.Small" 
                               OnClick="@SkipTour" />
             </div>
             
@@ -23,12 +23,12 @@
                 <MudText Typo="Typo.body1">@CurrentStep.Description</MudText>
                 
                 <div class="onboarding-progress">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">
                         Passo @(CurrentStepIndex + 1) de @CurrentTour.Steps.Count
                     </MudText>
-                    <MudProgressLinear Color="Color.Primary" 
+                    <MudProgressLinear Color="MudBlazor.Color.Primary" 
                                       Value="@GetProgress()" 
-                                      Size="Size.Small" 
+                                      Size="MudBlazor.Size.Small" 
                                       Class="my-2" />
                 </div>
             </div>
@@ -37,7 +37,7 @@
                 @if (CurrentStep.ShowSkip)
                 {
                     <MudButton Variant="Variant.Text" 
-                              Color="Color.Default" 
+                              Color="MudBlazor.Color.Default" 
                               OnClick="@SkipTour">
                         Pular Tour
                     </MudButton>
@@ -48,7 +48,7 @@
                 @if (CurrentStep.ShowPrevious && CurrentStepIndex > 0)
                 {
                     <MudButton Variant="Variant.Outlined" 
-                              Color="Color.Primary" 
+                              Color="MudBlazor.Color.Primary" 
                               OnClick="@PreviousStep"
                               Class="mr-2">
                         Anterior
@@ -58,7 +58,7 @@
                 @if (CurrentStep.ShowNext && CurrentStepIndex < CurrentTour.Steps.Count - 1)
                 {
                     <MudButton Variant="Variant.Filled" 
-                              Color="Color.Primary" 
+                              Color="MudBlazor.Color.Primary" 
                               OnClick="@NextStep">
                         Próximo
                     </MudButton>
@@ -66,7 +66,7 @@
                 else if (CurrentStepIndex == CurrentTour.Steps.Count - 1)
                 {
                     <MudButton Variant="Variant.Filled" 
-                              Color="Color.Success" 
+                              Color="MudBlazor.Color.Success" 
                               OnClick="@CompleteTour">
                         Concluir
                     </MudButton>
