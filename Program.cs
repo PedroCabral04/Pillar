@@ -16,7 +16,7 @@ using erp.Models.Identity;
 using erp.Services.Dashboard;
 using erp.Services.Dashboard.Providers.Sales;
 using erp.Services.Dashboard.Providers.Finance;
-using ApexCharts;
+// using ApexCharts; // TODO: Instalar pacote ApexCharts se necessário
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -110,7 +110,7 @@ builder.Services.AddMudServices(config =>
     config.SnackbarConfiguration.ShowTransitionDuration = 200;
     config.SnackbarConfiguration.SnackbarVariant = MudBlazor.Variant.Filled;
 });
-builder.Services.AddApexCharts();
+// builder.Services.AddApexCharts(); // TODO: Instalar pacote ApexCharts se necessário
 builder.Services.AddBlazoredLocalStorage();
 
 // Antiforgery hardening (used by UseAntiforgery)
@@ -135,6 +135,7 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<PreferenceService>();
 builder.Services.AddScoped<ThemeService>();
 builder.Services.AddScoped<IApiService, ApiService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
 // Dashboard services
 builder.Services.AddScoped<IDashboardRegistry, DashboardRegistry>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();

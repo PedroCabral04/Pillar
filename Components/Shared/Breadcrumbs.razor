@@ -1,0 +1,96 @@
+@using MudBlazor
+@inject NavigationManager NavigationManager
+@implements IDisposable
+
+<MudBreadcrumbs Items="_items" Separator=">">
+    <ItemTemplate Context="item">
+        @if (item.Href != null)
+        {
+            <MudLink Href="@item.Href" Color="MudBlazor.Color.Inherit">@item.Text</MudLink>
+        }
+        else
+        {
+            <MudText>@item.Text</MudText>
+        }
+    </ItemTemplate>
+</MudBreadcrumbs>
+
+@code {
+    private List<BreadcrumbItem> _items = new();
+
+    protected override void OnInitialized()
+    {
+        NavigationManager.LocationChanged += OnLocationChanged;
+        UpdateBreadcrumbs();
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        UpdateBreadcrumbs();
+        StateHasChanged();
+    }
+
+    private void UpdateBreadcrumbs()
+    {
+        var uri = new Uri(NavigationManager.Uri);
+        var path = uri.AbsolutePath.TrimStart('/');
+        
+        _items = new List<BreadcrumbItem>
+        {
+            new BreadcrumbItem("Home", href: "/", icon: Icons.Material.Filled.Home)
+        };
+
+        if (string.IsNullOrEmpty(path))
+        {
+            return;
+        }
+
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        var currentPath = "";
+
+        for (int i = 0; i < segments.Length; i++)
+        {
+            currentPath += "/" + segments[i];
+            var isLast = i == segments.Length - 1;
+            var displayName = GetDisplayName(segments[i], segments, i);
+
+            _items.Add(new BreadcrumbItem(
+                displayName,
+                href: isLast ? null : currentPath,
+                icon: GetIcon(segments[i])
+            ));
+        }
+    }
+
+    private string GetDisplayName(string segment, string[] allSegments, int index)
+    {
+        return segment.ToLower() switch
+        {
+            "dashboard" => "Dashboard",
+            "admin" => "Administração",
+            "users" => "Usuários",
+            "kanban" => "Kanban",
+            "ajustes" => "Configurações",
+            "login" => "Login",
+            _ => segment.Length > 0 ? char.ToUpper(segment[0]) + segment.Substring(1) : segment
+        };
+    }
+
+    private string? GetIcon(string segment)
+    {
+        return segment.ToLower() switch
+        {
+            "dashboard" => Icons.Material.Filled.Dashboard,
+            "admin" => Icons.Material.Filled.AdminPanelSettings,
+            "users" => Icons.Material.Filled.People,
+            "kanban" => Icons.Material.Filled.ViewKanban,
+            "ajustes" => Icons.Material.Filled.Settings,
+            _ => null
+        };
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
+}

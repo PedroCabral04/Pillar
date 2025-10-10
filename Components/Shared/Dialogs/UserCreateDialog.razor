@@ -1,0 +1,200 @@
+@using MudBlazor
+@inject ISnackbar Snackbar;
+@inject IApiService ApiService;
+@inject ILogger<UserCreateDialog> Logger;
+@using System.ComponentModel.DataAnnotations
+@using erp.DTOs.User
+@using erp.DTOs.Role
+@using erp.Services
+
+<MudDialog>
+    <DialogContent>
+        @if (_loading)
+        {
+            <MudProgressCircular Color="MudBlazor.Color.Primary" Indeterminate="true" />
+            <MudText>Carregando permissões...</MudText>
+        }
+        else if (_loadError != null)
+        {
+            <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
+        }
+        else
+        {
+            <MudForm @ref="_form">
+                <MudTextField T="string" Label="Nome" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              InputType="InputType.Text"
+                              @bind-Value="_newUser.Username"
+                              Validation="@(_usernameRules)"/>
+
+                <MudTextField T="string" Label="Email" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              InputType="InputType.Email"
+                              @bind-Value="_newUser.Email"
+                              Validation="@(_emailRules)"/>
+
+                <MudTextField T="string" Label="Telefone" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              InputType="InputType.Telephone"
+                              Placeholder="(00) 00000-0000" Mask="@(new PatternMask("(00) 00000-0000"))"
+                              @bind-Value="_newUser.Phone"
+                              Validation="@(_phoneRules)"/>
+
+                <MudSelect T="@RoleDto" @bind-SelectedValues="_selectedRoles" Label="Função/Permissão" MultiSelection="true"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" Required="true"
+                           RequiredError="Escolha pelo menos uma permissão" SelectAll="true" SelectAllText="Selecionar todos">
+                    @foreach (var roleOption in _rolesList)
+                    {
+                        <MudSelectItem T="@RoleDto" Value="@roleOption">@roleOption.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudForm>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="MudBlazor.Color.Default" Variant="Variant.Text" OnClick="@Cancel">Cancelar</MudButton>
+        <MudButton Color="MudBlazor.Color.Primary" Variant="Variant.Filled" OnClick="@CreateUser" 
+                   Disabled="@(_loading || _submitting || _loadError != null)">
+            @if (_submitting)
+            {
+                <MudProgressCircular Class="ms-n1" Size="MudBlazor.Size.Small" Indeterminate="true"/>
+                <MudText Class="ms-2">Criando...</MudText>
+            }
+            else
+            {
+                <MudText>Adicionar usuário</MudText>
+            }
+        </MudButton>       
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private CreateUserDto _newUser = new() { RoleIds = new List<int>() };
+    private IEnumerable<RoleDto> _selectedRoles = new List<RoleDto>();
+    private List<RoleDto> _rolesList = new List<RoleDto>();
+    
+    private bool _loading = true;
+    private bool _submitting = false;
+    private string? _loadError;
+    private MudForm? _form;
+
+    // Regras de validação do formulário (client-side)
+    private Func<string, string?> _required(string fieldName) =>
+        v => string.IsNullOrWhiteSpace(v) ? $"{fieldName} é obrigatório" : null;
+
+    private IEnumerable<Func<string, string?>> _usernameRules => new List<Func<string, string?>>
+    {
+        _required("Nome"),
+        v => v?.Trim().Length < 3 ? "Nome deve ter pelo menos 3 caracteres" : null,
+        v => v?.Trim().Length > 50 ? "Nome não pode exceder 50 caracteres" : null
+    };
+
+    private IEnumerable<Func<string, string?>> _emailRules => new List<Func<string, string?>>
+    {
+        _required("Email"),
+        v => new EmailAddressAttribute().IsValid(v) ? null : "Email inválido"
+    };
+
+    private static string OnlyDigits(string? s) => new string((s ?? string.Empty).Where(char.IsDigit).ToArray());
+    private IEnumerable<Func<string, string?>> _phoneRules => new List<Func<string, string?>>
+    {
+        _required("Telefone"),
+        v =>
+        {
+            var digits = OnlyDigits(v);
+            return (digits.Length is < 10 or > 11) ? "Telefone deve conter DDD + número (10 ou 11 dígitos)" : null;
+        }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRolesAsync();
+        _loading = false;
+    }
+    
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task LoadRolesAsync()
+    {
+        try
+        {
+            var response = await ApiService.GetAsync("api/roles");
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                _loadError = "Você precisa estar autenticado para acessar as funções.";
+                return;
+            }
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                _loadError = "Você não tem permissão para acessar as funções.";
+                return;
+            }
+            
+            response.EnsureSuccessStatusCode();
+            
+            var roles = await response.Content.ReadFromJsonAsync<List<RoleDto>>();
+            _rolesList = roles ?? new List<RoleDto>();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Erro ao buscar funções: {ex.Message}");
+            _loadError = "Erro ao carregar funções. Tente novamente.";
+        }
+    }
+
+    private async Task CreateUser()
+    {
+        try
+        {
+            // Validação client-side
+            await (_form?.Validate() ?? Task.CompletedTask);
+            if (!(_form?.IsValid ?? false))
+            {
+                Snackbar.Add("Verifique os campos destacados e tente novamente.", Severity.Warning);
+                return;
+            }
+
+            if (_selectedRoles == null || !_selectedRoles.Any())
+            {
+                Snackbar.Add("Escolha pelo menos uma permissão.", Severity.Warning);
+                return;
+            }
+
+            // Sanitiza telefone para enviar apenas dígitos
+            _newUser.Phone = OnlyDigits(_newUser.Phone);
+            if (_newUser.Phone.Length is < 10 or > 11)
+            {
+                Snackbar.Add("Telefone inválido. Informe DDD + número (10 ou 11 dígitos).", Severity.Warning);
+                return;
+            }
+
+            _submitting = true;
+            _newUser.RoleIds = _selectedRoles.Select(r => r.Id).ToList();
+            var response = await ApiService.PostAsJsonAsync("api/users", _newUser);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                Logger.LogInformation("Usuário adicionado com sucesso.");
+                Snackbar.Add("✓ Usuário adicionado com sucesso!", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                var errorMessage = ErrorMessageHelper.GetUserOperationErrorMessage(response.StatusCode, "create");
+                Logger.LogError($"Erro ao adicionar usuário: {response.StatusCode}");
+                Snackbar.Add(errorMessage, Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Erro ao adicionar usuário: {ex.Message}");
+            Snackbar.Add("Erro inesperado ao adicionar usuário.", Severity.Error);
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

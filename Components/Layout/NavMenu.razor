@@ -1,4 +1,6 @@
-﻿@implements IDisposable
+﻿@using erp.Components.Shared.Dialogs
+@using MudBlazor
+@implements IDisposable
 
 @inject NavigationManager NavigationManager
 
@@ -67,17 +69,32 @@
     }
 
     [Inject] IJSRuntime JS { get; set; } = null!;
+    [Inject] IDialogService DialogService { get; set; } = null!;
 
     private async Task LogoutAsync()
     {
-        try
+        var parameters = new DialogParameters
         {
-            await JS.InvokeVoidAsync("erpAuth.logout");
-            NavigationManager.NavigateTo("/login", forceLoad: true);
-        }
-        catch
+            { "ContentText", "Tem certeza que deseja sair do sistema?" },
+            { "ButtonText", "Sair" },
+            { "Color", MudBlazor.Color.Error }
+        };
+
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.Small };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirmar saída", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
         {
-            NavigationManager.NavigateTo("/login", forceLoad: true);
+            try
+            {
+                await JS.InvokeVoidAsync("erpAuth.logout");
+                NavigationManager.NavigateTo("/login", forceLoad: true);
+            }
+            catch
+            {
+                NavigationManager.NavigateTo("/login", forceLoad: true);
+            }
         }
     }
 }

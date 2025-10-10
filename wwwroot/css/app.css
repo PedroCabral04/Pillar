@@ -1,0 +1,48 @@
+/* Breadcrumbs personalizados */
+.mud-breadcrumbs {
+    padding: 8px 0;
+}
+
+.mud-breadcrumb-item {
+    font-size: 0.875rem;
+}
+
+/* Melhorias gerais de UX */
+.full-height-content {
+    min-height: 100vh;
+}
+
+/* Animações suaves */
+.mud-dialog {
+    animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Hover states melhorados */
+.mud-table-row:hover {
+    background-color: rgba(0, 0, 0, 0.02);
+    transition: background-color 0.2s ease;
+}
+
+/* Focus indicators para acessibilidade */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+    outline: 2px solid var(--mud-palette-primary);
+    outline-offset: 2px;
+}
+
+/* Chips com melhor espaçamento */
+.mud-chip {
+    font-weight: 500;
+}
