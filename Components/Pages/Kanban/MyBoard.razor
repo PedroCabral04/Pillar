@@ -11,10 +11,21 @@
 
 <div class="kanban-page">
     <div class="kanban-header">
-        <MudStack Row Spacing="2">
+        <MudStack Row Spacing="2" AlignItems="AlignItems.Center">
+            <MudIcon Icon="@Icons.Material.Filled.ViewKanban" Size="MudBlazor.Size.Large" />
             <MudText Typo="Typo.h5">Meu Kanban</MudText>
             <MudSpacer />
-            <MudButton Color="MudBlazor.Color.Primary" Variant="Variant.Filled" OnClick="NewColumn">Nova Coluna</MudButton>
+            @if (_isLoading)
+            {
+                <MudProgressCircular Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Primary" Indeterminate="true"/>
+            }
+            <MudButton Color="MudBlazor.Color.Primary" 
+                       Variant="Variant.Filled" 
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="NewColumn"
+                       Disabled="@_isLoading">
+                Nova Coluna
+            </MudButton>
         </MudStack>
         <MudDivider Class="my-2"/>
     </div>
@@ -22,7 +33,25 @@
     <div class="kanban-scroll">
         @if (_columns is null)
         {
-            <MudProgressCircular Color="MudBlazor.Color.Primary" Indeterminate="true"/>
+            <div class="kanban-loading">
+                <MudProgressCircular Color="MudBlazor.Color.Primary" Indeterminate="true" Size="MudBlazor.Size.Large"/>
+                <MudText Typo="Typo.body1" Class="mt-2">Carregando quadro...</MudText>
+            </div>
+        }
+        else if (_columns.Count == 0)
+        {
+            <div class="kanban-empty">
+                <MudIcon Icon="@Icons.Material.Outlined.ViewColumn" Size="MudBlazor.Size.Large" />
+                <MudText Typo="Typo.h6" Class="mt-2">Nenhuma coluna criada</MudText>
+                <MudText Typo="Typo.body2" Color="MudBlazor.Color.Secondary">Crie sua primeira coluna para começar!</MudText>
+                <MudButton Color="MudBlazor.Color.Primary" 
+                           Variant="Variant.Filled" 
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="NewColumn"
+                           Class="mt-3">
+                    Criar Coluna
+                </MudButton>
+            </div>
         }
         else
         {
@@ -36,24 +65,38 @@
                     @foreach (var col in _columns.OrderBy(c => c.Position))
                     {
                         <MudPaper Elevation="6" Class="kanban-column pa-2">
-                            <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
-                                <MudText Typo="Typo.subtitle1">@col.Title</MudText>
+                            <MudStack Row AlignItems="AlignItems.Center" Spacing="1" Class="column-header">
+                                <MudText Typo="Typo.subtitle1"><strong>@col.Title</strong></MudText>
+                                <MudChip T="string" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Info">@col.Cards.Count</MudChip>
                                 <MudSpacer/>
-                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="MudBlazor.Size.Small" OnClick="() => EditColumn(col)"/>
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                                              Size="MudBlazor.Size.Small" 
+                                              OnClick="() => EditColumn(col)"
+                                              Title="Editar coluna"/>
                             </MudStack>
-                            <MudDivider Class="my-1"/>
-                            <MudDropZone T="KanbanCardDto" Identifier="@col.Id.ToString()" Class="kanban-cards mud-height-full" />
-                            <MudButton Size="MudBlazor.Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add" OnClick="() => CreateCard(col)">Adicionar</MudButton>
+                            <MudDivider Class="my-2"/>
+                            <MudDropZone T="KanbanCardDto" Identifier="@col.Id.ToString()" Class="kanban-cards mud-height-full" AllowReorder="true" />
+                            <MudButton Size="MudBlazor.Size.Small" 
+                                      Variant="Variant.Outlined" 
+                                      StartIcon="@Icons.Material.Filled.Add" 
+                                      OnClick="() => CreateCard(col)"
+                                      FullWidth="true"
+                                      Class="add-card-btn">
+                                Adicionar Card
+                            </MudButton>
                         </MudPaper>
                     }
                 </ChildContent>
                 <ItemRenderer>
-                        <MudPaper Elevation="2" Class="pa-2 rounded-lg my-2 kanban-item" Style="cursor: grab;" @onclick="() => EditCard(context)">
-                        <MudText Typo="Typo.body1">@context.Title</MudText>
+                        <MudPaper Elevation="2" Class="pa-3 rounded-lg my-2 kanban-item" Style="cursor: grab;" @onclick="() => EditCard(context)">
+                        <MudText Typo="Typo.body1" Class="kanban-card-title">@context.Title</MudText>
                         @if (!string.IsNullOrWhiteSpace(context.Description))
                         {
-                            <MudText Typo="Typo.caption" Class="text-secondary">@context.Description</MudText>
+                            <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary" Class="mt-1 kanban-card-desc">@context.Description</MudText>
                         }
+                        <div class="kanban-card-footer">
+                            <MudIcon Icon="@Icons.Material.Outlined.Edit" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Primary" />
+                        </div>
                     </MudPaper>
                 </ItemRenderer>
             </MudDropContainer>
@@ -63,6 +106,7 @@
 
 @code {
     private List<ColumnVm>? _columns;
+    private bool _isLoading = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -90,11 +134,21 @@
         
         if (result is { Canceled: false } && result.Data is string title)
         {
-            var created = await Api.PostAsJsonAsync("api/kanban/columns", new CreateColumnRequest(title));
-            if (created.IsSuccessStatusCode)
+            var created = await Api.PostAsJsonAsync<CreateColumnRequest, KanbanColumnDto>("api/kanban/columns", new CreateColumnRequest(title));
+            if (created is not null && _columns is not null)
             {
+                // Optimistic update: add column immediately
+                var newColumn = new ColumnVm
+                {
+                    Id = created.Id,
+                    Title = created.Title,
+                    Position = created.Position,
+                    Cards = new()
+                };
+                _columns.Add(newColumn);
+                StateHasChanged();
+                
                 Snackbar.Add("Coluna criada com sucesso!", Severity.Success);
-                await RefreshData();
             }
             else
             {
@@ -138,11 +192,23 @@
         
         if (result is { Canceled: false } && result.Data is KanbanCardDialog.CardDialogResult cardResult)
         {
-            var res = await Api.PostAsJsonAsync("api/kanban/cards", new CreateCardRequest(col.Id, cardResult.Title, cardResult.Description));
-            if (res.IsSuccessStatusCode)
+            var res = await Api.PostAsJsonAsync<CreateCardRequest, KanbanCardDto>("api/kanban/cards", new CreateCardRequest(col.Id, cardResult.Title, cardResult.Description));
+            if (res is not null && _columns is not null)
             {
+                // Optimistic update: add card immediately to UI
+                var newCard = new KanbanCardDto(res.Id, res.Title, res.Description, res.Position, res.ColumnId);
+                _allCards.Add(newCard);
+                
+                var column = _columns.FirstOrDefault(c => c.Id == col.Id);
+                if (column is not null)
+                {
+                    column.Cards.Add(newCard);
+                }
+                
+                _dropContainer?.Refresh();
+                StateHasChanged();
+                
                 Snackbar.Add("Card criado com sucesso!", Severity.Success);
-                await RefreshData();
             }
             else
             {
@@ -164,32 +230,60 @@
         var dialog = await DialogService.ShowAsync<KanbanCardDialog>("Editar Card", parameters, options);
         var result = await dialog.Result;
         
-        if (result is { Canceled: false } && result.Data is KanbanCardDialog.CardDialogResult cardResult)
+        if (result is { Canceled: false } && result.Data is KanbanCardDialog.CardDialogResult cardResult && _columns is not null)
         {
             if (cardResult.Delete)
             {
+                // Optimistic delete: remove from UI immediately
+                _allCards.RemoveAll(c => c.Id == card.Id);
+                foreach (var col in _columns)
+                {
+                    col.Cards.RemoveAll(c => c.Id == card.Id);
+                }
+                _dropContainer?.Refresh();
+                StateHasChanged();
+                
                 var deleteRes = await Api.DeleteAsync($"api/kanban/cards/{card.Id}");
                 if (deleteRes.IsSuccessStatusCode)
                 {
                     Snackbar.Add("Card excluído com sucesso!", Severity.Success);
-                    await RefreshData();
                 }
                 else
                 {
                     Snackbar.Add("Erro ao excluir card.", Severity.Error);
+                    await RefreshData(); // Revert on error
                 }
             }
             else
             {
+                // Optimistic update: update UI immediately
+                var idx = _allCards.FindIndex(c => c.Id == card.Id);
+                if (idx >= 0)
+                {
+                    var updated = new KanbanCardDto(card.Id, cardResult.Title, cardResult.Description, card.Position, card.ColumnId);
+                    _allCards[idx] = updated;
+                    
+                    foreach (var col in _columns)
+                    {
+                        var cardIdx = col.Cards.FindIndex(c => c.Id == card.Id);
+                        if (cardIdx >= 0)
+                        {
+                            col.Cards[cardIdx] = updated;
+                        }
+                    }
+                }
+                _dropContainer?.Refresh();
+                StateHasChanged();
+                
                 var updateRes = await Api.PutAsJsonAsync($"api/kanban/cards/{card.Id}", new UpdateCardRequest(cardResult.Title, cardResult.Description));
                 if (updateRes.IsSuccessStatusCode)
                 {
                     Snackbar.Add("Card atualizado com sucesso!", Severity.Success);
-                    await RefreshData();
                 }
                 else
                 {
                     Snackbar.Add("Erro ao atualizar card.", Severity.Error);
+                    await RefreshData(); // Revert on error
                 }
             }
         }
@@ -197,11 +291,32 @@
 
     private async Task RefreshData()
     {
-        var data = await Api.GetAsync<ColumnsResponse>("api/kanban/columns");
-        _columns = data?.Columns ?? new();
-        _allCards = _columns.SelectMany(c => c.Cards).ToList();
-        _dropContainer?.Refresh();
-        StateHasChanged();
+        try
+        {
+            var data = await Api.GetAsync<ColumnsResponse>("api/kanban/columns");
+            if (data is not null)
+            {
+                await InvokeAsync(() =>
+                {
+                    _columns = data.Columns ?? new();
+                    _allCards = _columns.SelectMany(c => c.Cards).ToList();
+                    
+                    if (_dropContainer is not null)
+                    {
+                        _dropContainer.Refresh();
+                    }
+                    
+                    StateHasChanged();
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            await InvokeAsync(() =>
+            {
+                Snackbar.Add($"Erro ao atualizar dados: {ex.Message}", Severity.Error);
+            });
+        }
     }
 
     private MudDropContainer<KanbanCardDto>? _dropContainer;
@@ -209,32 +324,58 @@
 
     private async Task OnCardDropped(MudItemDropInfo<KanbanCardDto> info)
     {
-        if (info?.Item is null || string.IsNullOrWhiteSpace(info.DropzoneIdentifier))
+        if (info?.Item is null || string.IsNullOrWhiteSpace(info.DropzoneIdentifier) || _columns is null)
             return;
 
         if (!int.TryParse(info.DropzoneIdentifier, out var toColumnId))
             return;
 
-        // Optimistic update: move item locally so UI reflects immediately (records have init-only props)
-        var idx = _allCards.FindIndex(c => c.Id == info.Item.Id);
-        if (idx >= 0)
+        var originalColumnId = info.Item.ColumnId;
+        var originalPosition = info.Item.Position;
+
+        try
         {
-            var m = _allCards[idx];
-            _allCards[idx] = new KanbanCardDto(m.Id, m.Title, m.Description, m.Position, toColumnId);
+            // Optimistic update: move item locally so UI reflects immediately
+            var idx = _allCards.FindIndex(c => c.Id == info.Item.Id);
+            if (idx >= 0)
+            {
+                var m = _allCards[idx];
+                var updatedCard = new KanbanCardDto(m.Id, m.Title, m.Description, m.Position, toColumnId);
+                _allCards[idx] = updatedCard;
+                
+                // Update in columns list too
+                foreach (var col in _columns)
+                {
+                    col.Cards.RemoveAll(c => c.Id == m.Id);
+                    if (col.Id == toColumnId)
+                    {
+                        col.Cards.Add(updatedCard);
+                    }
+                }
+            }
+            
+            if (_dropContainer is not null)
+            {
+                _dropContainer.Refresh();
+            }
+            StateHasChanged();
+
+            // Persist on server (append at end for now)
+            var toPosition = _allCards.Count(c => c.ColumnId == toColumnId && c.Id != info.Item.Id);
+            var moveResult = await Api.PostAsJsonAsync("api/kanban/cards/move", new MoveCardRequest(info.Item.Id, toColumnId, toPosition));
+
+            if (!moveResult.IsSuccessStatusCode)
+            {
+                // Revert on error
+                Snackbar.Add("Erro ao mover card. Revertendo...", Severity.Warning);
+                await RefreshData();
+            }
         }
-        _dropContainer?.Refresh();
-        StateHasChanged();
-
-        // Persist on server (append at end for now)
-        var toPosition = _allCards.Count(c => c.ColumnId == toColumnId && c.Id != info.Item.Id);
-        await Api.PostAsJsonAsync("api/kanban/cards/move", new MoveCardRequest(info.Item.Id, toColumnId, toPosition));
-
-        // Re-sync from server to ensure positions/order are authoritative
-        var data = await Api.GetAsync<ColumnsResponse>("api/kanban/columns");
-        _columns = data?.Columns ?? new();
-        _allCards = _columns.SelectMany(c => c.Cards).ToList();
-        _dropContainer?.Refresh();
-        StateHasChanged();
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao mover card: {ex.Message}", Severity.Error);
+            await RefreshData();
+        }
     }
 
     
@@ -255,30 +396,180 @@
 }
 
 <style>
-.kanban-page { display: flex; flex-direction: column; min-height: 100vh; }
-.kanban-header { padding: 16px; }
-.kanban-scroll { flex: 1; overflow-x: auto; overflow-y: hidden; }
-
-.kanban-board { display: flex; flex-direction: row; align-items: flex-start; gap: 16px; padding: 8px 16px 16px; }
-.kanban-column { width: 280px; min-width: 280px; background: var(--mud-palette-background); border-radius: 8px; min-height: 20px; }
-.kanban-cards { display: flex; flex-direction: column; gap: 8px; padding: 6px; border-radius: 6px; background: var(--mud-palette-background-grey); min-height: 20px; }
-.kanban-card { background: var(--mud-palette-surface); border-radius: 6px; box-shadow: var(--mud-elevation-2); padding: 8px; }
-.kanban-card .title { font-weight: 600; }
-.kanban-card.dragging { opacity: 0.6; }
-
-.mud-paper.kanban-column .mud-divider { opacity: .5; }
-.mud-paper.kanban-column .mud-button { margin-top: 8px; }
-
-/* Hover suave nos cards */
-.kanban-item,
-.kanban-card {
-  transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease, background-color 120ms ease;
+.kanban-page { 
+    display: flex; 
+    flex-direction: column; 
+    min-height: 100vh;
+    background: var(--mud-palette-background);
 }
 
-.kanban-item:hover,
-.kanban-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--mud-elevation-8);
-  filter: brightness(1.03);
+.kanban-header { 
+    padding: 16px 24px;
+    background: var(--mud-palette-surface);
+    box-shadow: var(--mud-elevation-2);
+}
+
+.kanban-scroll { 
+    flex: 1; 
+    overflow-x: auto; 
+    overflow-y: hidden;
+    padding: 16px;
+}
+
+.kanban-loading,
+.kanban-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 400px;
+}
+
+.kanban-board { 
+    display: flex; 
+    flex-direction: row; 
+    align-items: flex-start; 
+    gap: 20px; 
+    padding: 8px;
+    min-height: 500px;
+}
+
+.kanban-column { 
+    width: 320px; 
+    min-width: 320px; 
+    background: var(--mud-palette-surface);
+    border-radius: 12px;
+    min-height: 100px;
+    display: flex;
+    flex-direction: column;
+    transition: box-shadow 200ms ease;
+}
+
+.kanban-column:hover {
+    box-shadow: var(--mud-elevation-8);
+}
+
+.kanban-column .column-header {
+    padding-bottom: 4px;
+}
+
+.kanban-cards { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 10px; 
+    padding: 8px; 
+    border-radius: 8px; 
+    background: var(--mud-palette-background-grey);
+    min-height: 100px;
+    flex: 1;
+    margin-bottom: 8px;
+}
+
+.kanban-item {
+    background: var(--mud-palette-surface);
+    border-radius: 8px;
+    cursor: grab;
+    transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    border: 2px solid transparent;
+}
+
+.kanban-item:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: var(--mud-elevation-12);
+    border-color: var(--mud-palette-primary);
+}
+
+.kanban-item:active {
+    cursor: grabbing;
+    transform: scale(0.98);
+}
+
+.kanban-card-title {
+    font-weight: 600;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.kanban-card-desc {
+    line-height: 1.4;
+    word-break: break-word;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.kanban-card-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
+    opacity: 0;
+    transition: opacity 150ms ease;
+}
+
+.kanban-item:hover .kanban-card-footer {
+    opacity: 1;
+}
+
+.add-card-btn {
+    margin-top: 8px;
+    border-style: dashed !important;
+    transition: all 150ms ease;
+}
+
+.add-card-btn:hover {
+    background: var(--mud-palette-primary);
+    color: white;
+    border-style: solid !important;
+}
+
+.mud-paper.kanban-column .mud-divider { 
+    opacity: 0.3; 
+}
+
+/* Drag feedback */
+.mud-drop-zone {
+    transition: background-color 200ms ease;
+}
+
+.mud-drop-zone.mud-drop-zone-drag-enter {
+    background: var(--mud-palette-primary-darken);
+    opacity: 0.8;
+}
+
+/* Scroll customization */
+.kanban-scroll::-webkit-scrollbar {
+    height: 12px;
+}
+
+.kanban-scroll::-webkit-scrollbar-track {
+    background: var(--mud-palette-background);
+    border-radius: 10px;
+}
+
+.kanban-scroll::-webkit-scrollbar-thumb {
+    background: var(--mud-palette-divider);
+    border-radius: 10px;
+}
+
+.kanban-scroll::-webkit-scrollbar-thumb:hover {
+    background: var(--mud-palette-text-secondary);
+}
+
+/* Animation for new items */
+@@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.kanban-item {
+    animation: slideIn 250ms ease-out;
 }
 </style>
