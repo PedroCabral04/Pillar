@@ -30,6 +30,11 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Models.Inventory.StockCount> StockCounts { get; set; } = null!;
     public DbSet<Models.Inventory.StockCountItem> StockCountItems { get; set; } = null!;
 
+    // Sales
+    public DbSet<Models.Sales.Customer> Customers { get; set; } = null!;
+    public DbSet<Models.Sales.Sale> Sales { get; set; } = null!;
+    public DbSet<Models.Sales.SaleItem> SaleItems { get; set; } = null!;
+
     protected override void OnConfiguring(DbContextOptionsBuilder options)
         => options.UseNpgsql("Host=localhost;Database=erp;Username=postgres;Password=123");
 
@@ -130,6 +135,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         // Inventory model configuration
         ConfigureInventoryModels(modelBuilder);
+        
+        // Sales model configuration
+        ConfigureSalesModels(modelBuilder);
     }
 
     private void ConfigureInventoryModels(ModelBuilder modelBuilder)
@@ -258,6 +266,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             m.HasIndex(x => x.MovementDate);
             m.HasIndex(x => x.Type);
             m.HasIndex(x => x.WarehouseId);
+            m.HasIndex(x => x.SaleOrderId);
             
             m.HasOne(x => x.Product)
                 .WithMany(x => x.StockMovements)
@@ -267,6 +276,11 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             m.HasOne(x => x.Warehouse)
                 .WithMany(x => x.StockMovements)
                 .HasForeignKey(x => x.WarehouseId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            m.HasOne(x => x.SaleOrder)
+                .WithMany()
+                .HasForeignKey(x => x.SaleOrderId)
                 .OnDelete(DeleteBehavior.Restrict);
                 
             m.HasOne(x => x.CreatedByUser)
@@ -315,6 +329,77 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             i.HasOne(x => x.StockCount)
                 .WithMany(x => x.Items)
                 .HasForeignKey(x => x.StockCountId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            i.HasOne(x => x.Product)
+                .WithMany()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private void ConfigureSalesModels(ModelBuilder modelBuilder)
+    {
+        // Customer
+        modelBuilder.Entity<Models.Sales.Customer>(c =>
+        {
+            c.ToTable("Customers");
+            c.HasKey(x => x.Id);
+            c.Property(x => x.Document).HasMaxLength(14).IsRequired();
+            c.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            c.Property(x => x.Email).HasMaxLength(200);
+            c.Property(x => x.Phone).HasMaxLength(20);
+            c.Property(x => x.Mobile).HasMaxLength(20);
+            c.Property(x => x.ZipCode).HasMaxLength(10);
+            c.Property(x => x.Address).HasMaxLength(200);
+            c.Property(x => x.Number).HasMaxLength(10);
+            c.Property(x => x.Complement).HasMaxLength(100);
+            c.Property(x => x.Neighborhood).HasMaxLength(100);
+            c.Property(x => x.City).HasMaxLength(100);
+            c.Property(x => x.State).HasMaxLength(2);
+            
+            c.HasIndex(x => x.Document).IsUnique();
+            c.HasIndex(x => x.Name);
+            c.HasIndex(x => x.Email);
+        });
+
+        // Sale
+        modelBuilder.Entity<Models.Sales.Sale>(s =>
+        {
+            s.ToTable("Sales");
+            s.HasKey(x => x.Id);
+            s.Property(x => x.SaleNumber).HasMaxLength(20).IsRequired();
+            s.Property(x => x.Status).HasMaxLength(20).IsRequired();
+            s.Property(x => x.PaymentMethod).HasMaxLength(50);
+            
+            s.HasIndex(x => x.SaleNumber).IsUnique();
+            s.HasIndex(x => x.CustomerId);
+            s.HasIndex(x => x.UserId);
+            s.HasIndex(x => x.SaleDate);
+            s.HasIndex(x => x.Status);
+            
+            s.HasOne(x => x.Customer)
+                .WithMany(x => x.Sales)
+                .HasForeignKey(x => x.CustomerId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            s.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // SaleItem
+        modelBuilder.Entity<Models.Sales.SaleItem>(i =>
+        {
+            i.ToTable("SaleItems");
+            i.HasKey(x => x.Id);
+            
+            i.HasIndex(x => new { x.SaleId, x.ProductId });
+            
+            i.HasOne(x => x.Sale)
+                .WithMany(x => x.Items)
+                .HasForeignKey(x => x.SaleId)
                 .OnDelete(DeleteBehavior.Cascade);
                 
             i.HasOne(x => x.Product)

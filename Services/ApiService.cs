@@ -12,6 +12,10 @@ public interface IApiService
     Task<HttpResponseMessage> PutAsJsonAsync<T>(string endpoint, T data, CancellationToken cancellationToken = default);
     Task<HttpResponseMessage> DeleteAsync(string endpoint, CancellationToken cancellationToken = default);
     
+    // Simplified overloads
+    Task<T?> PostAsync<T>(string endpoint, object? data, CancellationToken cancellationToken = default);
+    Task<T?> PutAsync<T>(string endpoint, object data, CancellationToken cancellationToken = default);
+    
     event EventHandler<bool>? LoadingStateChanged;
     event EventHandler<string>? ErrorOccurred;
     bool IsLoading { get; }
@@ -215,6 +219,42 @@ public class ApiService : IApiService
         {
             EndLoading();
         }
+    }
+
+    public async Task<T?> PostAsync<T>(string endpoint, object? data, CancellationToken cancellationToken = default)
+    {
+        var response = await PostAsJsonAsync(endpoint, data!, cancellationToken);
+        
+        if (response.IsSuccessStatusCode)
+        {
+            var content = await response.Content.ReadAsStringAsync(cancellationToken);
+            return JsonSerializer.Deserialize<T>(content, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+        }
+        
+        // If not successful, throw exception with error details
+        var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+        throw new HttpRequestException($"Request failed with status {response.StatusCode}: {errorContent}");
+    }
+
+    public async Task<T?> PutAsync<T>(string endpoint, object data, CancellationToken cancellationToken = default)
+    {
+        var response = await PutAsJsonAsync(endpoint, data, cancellationToken);
+        
+        if (response.IsSuccessStatusCode)
+        {
+            var content = await response.Content.ReadAsStringAsync(cancellationToken);
+            return JsonSerializer.Deserialize<T>(content, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+        }
+        
+        // If not successful, throw exception with error details
+        var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+        throw new HttpRequestException($"Request failed with status {response.StatusCode}: {errorContent}");
     }
 
     /// <summary>

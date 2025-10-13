@@ -10,14 +10,30 @@
     <MudDivider/>
     <MudNavLink Href="dashboard" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
     <MudDivider/>
-    @*<MudNavLink Href="counter" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Add">Counter</MudNavLink>
+    
+    <MudNavGroup Title="Vendas" Icon="@Icons.Material.Filled.ShoppingCart" Expanded="false">
+        <MudNavLink Href="sales" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Receipt">Vendas</MudNavLink>
+        <MudNavLink Href="sales/customers" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.People">Clientes</MudNavLink>
+    </MudNavGroup>
     <MudDivider/>
-    <MudNavLink Href="weather" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.List">Weather</MudNavLink>
-    <MudDivider/>*@
-    <MudNavLink Href="admin/users" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.People">Usuários</MudNavLink>
+    
+    <MudNavGroup Title="Estoque" Icon="@Icons.Material.Filled.Inventory" Expanded="false">
+        <MudNavLink Href="inventory/products" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Category">Produtos</MudNavLink>
+        <MudNavLink Href="inventory/movements" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.SwapHoriz">Movimentações</MudNavLink>
+        <MudNavLink Href="inventory/counts" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Checklist">Contagens</MudNavLink>
+    </MudNavGroup>
     <MudDivider/>
+    
     <MudNavLink Href="kanban" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.ViewKanban">Meu Kanban</MudNavLink>
     <MudDivider/>
+    
+    <AuthorizeView Roles="Administrador">
+        <Authorized>
+            <MudNavLink Href="admin/users" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AdminPanelSettings">Usuários</MudNavLink>
+            <MudDivider/>
+        </Authorized>
+    </AuthorizeView>
+    
     <MudNavLink Href="ajustes" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Settings">Configurações</MudNavLink>
     <MudDivider/>
     <MudNavLink OnClick="LogoutAsync" Icon="@Icons.Material.Filled.Logout">Sair</MudNavLink>

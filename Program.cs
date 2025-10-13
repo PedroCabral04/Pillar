@@ -16,6 +16,8 @@ using erp.Models.Identity;
 using erp.Services.Dashboard;
 using erp.Services.Dashboard.Providers.Sales;
 using erp.Services.Dashboard.Providers.Finance;
+using erp.Services.Dashboard.Providers.Inventory;
+using erp.Services.Sales;
 // using ApexCharts; // TODO: Instalar pacote ApexCharts se necessário
 
 var builder = WebApplication.CreateBuilder(args);
@@ -165,6 +167,7 @@ builder.Services.AddScoped<IDashboardRegistry, DashboardRegistry>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IDashboardWidgetProvider, SalesDashboardProvider>();
 builder.Services.AddScoped<IDashboardWidgetProvider, FinanceDashboardProvider>();
+builder.Services.AddScoped<IDashboardWidgetProvider, erp.Services.Dashboard.Providers.Inventory.InventoryDashboardProvider>();
 builder.Services.AddScoped<erp.Services.DashboardCustomization.IDashboardLayoutService, erp.Services.DashboardCustomization.DashboardLayoutService>();
 // Validation services
 builder.Services.AddScoped<erp.Services.Validation.IUserValidationService, erp.Services.Validation.UserValidationService>();
@@ -176,11 +179,16 @@ builder.Services.AddScoped<erp.Services.Inventory.IInventoryService, erp.Service
 builder.Services.AddScoped<erp.Services.Inventory.IStockMovementService, erp.Services.Inventory.StockMovementService>();
 builder.Services.AddScoped<erp.Services.Inventory.IStockCountService, erp.Services.Inventory.StockCountService>();
 
+// Sales services
+builder.Services.AddScoped<erp.Services.Sales.ICustomerService, erp.Services.Sales.CustomerService>();
+builder.Services.AddScoped<erp.Services.Sales.ISalesService, erp.Services.Sales.SalesService>();
+
 // ------- REGISTRO DO MAPPERLY -------
 builder.Services.AddScoped<UserMapper, UserMapper>();
 builder.Services.AddScoped<ProductMapper, ProductMapper>();
 builder.Services.AddScoped<StockMovementMapper, StockMovementMapper>();
 builder.Services.AddScoped<StockCountMapper, StockCountMapper>();
+builder.Services.AddScoped<SalesMapper, SalesMapper>();
 
 // --- Constrói a aplicação ---
 var app = builder.Build();

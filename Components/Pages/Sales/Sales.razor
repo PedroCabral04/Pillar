@@ -1,0 +1,290 @@
+@page "/sales"
+@using erp.DTOs.Sales
+@using erp.Services
+@using erp.Components.Shared.Dialogs
+@using MudBlazor
+@using Size = MudBlazor.Size
+@using Color = MudBlazor.Color
+@attribute [Authorize]
+
+@inject IApiService ApiService
+@inject ILogger<Sales> Logger
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager Navigation
+
+<PageTitle>Vendas</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Gerenciar Vendas</MudText>
+    <MudButton Color="Color.Primary" 
+               Variant="Variant.Filled" 
+               StartIcon="@Icons.Material.Filled.Add"
+               Href="/sales/create">
+        Nova Venda
+    </MudButton>
+</MudStack>
+
+@if (_loadError != null)
+{
+    <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
+}
+
+<MudTable T="SaleDto" ServerData="ServerReload" 
+          Dense="false" Hover="true" Elevation="4" @ref="_table" Striped="true" Loading="@_loading">
+    <ToolBarContent>
+        <MudText Typo="Typo.h5">Vendas Registradas</MudText>
+        <MudSpacer/>
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudTextField T="string" ValueChanged="OnSearch" Immediate="false" Placeholder="Procurar venda" 
+                          Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
+                          Clearable="true" Style="min-width: 200px;"/>
+            <MudSelect T="string" 
+                       Value="_statusFilter" 
+                       ValueChanged="OnStatusFilterChanged"
+                       Label="Status" 
+                       Variant="Variant.Outlined" 
+                       Margin="Margin.Dense"
+                       Clearable="true"
+                       Style="min-width: 120px;">
+                <MudSelectItem T="string" Value="@("Pendente")">Pendente</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Finalizada")">Finalizada</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Cancelada")">Cancelada</MudSelectItem>
+            </MudSelect>
+            <MudDatePicker Label="Data Inicial" 
+                          @bind-Date="_startDate" 
+                          Variant="Variant.Outlined" 
+                          Margin="Margin.Dense"
+                          Clearable="true"/>
+            <MudDatePicker Label="Data Final" 
+                          @bind-Date="_endDate" 
+                          Variant="Variant.Outlined" 
+                          Margin="Margin.Dense"
+                          Clearable="true"/>
+            <MudIconButton Icon="@Icons.Material.Filled.FilterAlt" 
+                          Color="Color.Primary"
+                          OnClick="ApplyDateFilter"/>
+        </MudStack>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh>Número</MudTh>
+        <MudTh>Data</MudTh>
+        <MudTh>Cliente</MudTh>
+        <MudTh>Vendedor</MudTh>
+        <MudTh Style="text-align: right">Valor Total</MudTh>
+        <MudTh Style="text-align: right">Valor Líquido</MudTh>
+        <MudTh>Status</MudTh>
+        <MudTh Style="text-align: center">Ações</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Número">
+            <MudText Typo="Typo.body2" Style="font-family: monospace">@context.SaleNumber</MudText>
+        </MudTd>
+        <MudTd DataLabel="Data">@context.SaleDate.ToString("dd/MM/yyyy")</MudTd>
+        <MudTd DataLabel="Cliente">@(context.CustomerName ?? "Cliente não informado")</MudTd>
+        <MudTd DataLabel="Vendedor">@context.UserName</MudTd>
+        <MudTd DataLabel="Total" Style="text-align: right">@context.TotalAmount.ToString("C2")</MudTd>
+        <MudTd DataLabel="Líquido" Style="text-align: right">
+            <MudText Typo="Typo.body2" Style="font-weight: 600">@context.NetAmount.ToString("C2")</MudText>
+        </MudTd>
+        <MudTd DataLabel="Status">
+            <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">@context.Status</MudChip>
+        </MudTd>
+        <MudTd DataLabel="Ações" Style="text-align: center">
+            <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
+                           Size="Size.Small"
+                           Href="@($"/sales/{context.Id}")"
+                           Title="Ver detalhes"/>
+            @if (context.Status == "Pendente")
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" 
+                               Size="Size.Small"
+                               Color="Color.Success"
+                               OnClick="@(() => FinalizeSale(context))"
+                               Title="Finalizar venda"/>
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                               Size="Size.Small"
+                               Href="@($"/sales/{context.Id}/edit")"
+                               Title="Editar"/>
+                <MudIconButton Icon="@Icons.Material.Filled.Cancel" 
+                               Size="Size.Small" 
+                               Color="Color.Error"
+                               OnClick="@(() => CancelSale(context))"
+                               Title="Cancelar"/>
+            }
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText>Nenhuma venda encontrada</MudText>
+    </NoRecordsContent>
+    <LoadingContent>
+        <MudText>Carregando...</MudText>
+    </LoadingContent>
+    <PagerContent>
+        <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private MudTable<SaleDto>? _table;
+    private string? _loadError;
+    private string? _searchString;
+    private string? _statusFilter;
+    private DateTime? _startDate;
+    private DateTime? _endDate;
+    private bool _loading = false;
+
+    private async Task<TableData<SaleDto>> ServerReload(TableState state, CancellationToken ct)
+    {
+        _loading = true;
+        try
+        {
+            var page = state.Page + 1;
+            var pageSize = state.PageSize;
+
+            var queryParams = new List<string>
+            {
+                $"page={page}",
+                $"pageSize={pageSize}"
+            };
+
+            if (!string.IsNullOrWhiteSpace(_searchString))
+            {
+                queryParams.Add($"search={Uri.EscapeDataString(_searchString)}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(_statusFilter))
+            {
+                queryParams.Add($"status={Uri.EscapeDataString(_statusFilter)}");
+            }
+
+            if (_startDate.HasValue)
+            {
+                queryParams.Add($"startDate={_startDate.Value:yyyy-MM-dd}");
+            }
+
+            if (_endDate.HasValue)
+            {
+                queryParams.Add($"endDate={_endDate.Value:yyyy-MM-dd}");
+            }
+
+            var query = string.Join("&", queryParams);
+            var response = await ApiService.GetAsync<dynamic>($"/api/sales?{query}");
+
+            if (response != null)
+            {
+                var items = ((IEnumerable<dynamic>)response.items)
+                    .Select(item => System.Text.Json.JsonSerializer.Deserialize<SaleDto>(
+                        item.ToString() ?? "{}", 
+                        new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }))
+                    .Where(s => s != null)
+                    .Cast<SaleDto>()
+                    .ToList();
+
+                return new TableData<SaleDto>
+                {
+                    Items = items,
+                    TotalItems = (int)response.total
+                };
+            }
+
+            return new TableData<SaleDto> { Items = new List<SaleDto>(), TotalItems = 0 };
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar vendas");
+            _loadError = $"Erro ao carregar vendas: {ex.Message}";
+            Snackbar.Add("Erro ao carregar vendas", Severity.Error);
+            return new TableData<SaleDto> { Items = new List<SaleDto>(), TotalItems = 0 };
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OnSearch(string? text)
+    {
+        _searchString = text;
+        _table?.ReloadServerData();
+    }
+
+    private void OnStatusFilterChanged(string? status)
+    {
+        _statusFilter = status;
+        _table?.ReloadServerData();
+    }
+
+    private void ApplyDateFilter()
+    {
+        _table?.ReloadServerData();
+    }
+
+    private async Task FinalizeSale(SaleDto sale)
+    {
+        var parameters = new DialogParameters
+        {
+            { "ContentText", $"Deseja finalizar a venda {sale.SaleNumber}?" },
+            { "ButtonText", "Finalizar" },
+            { "Color", Color.Success }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Finalizar Venda", parameters);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            try
+            {
+                await ApiService.PostAsync<object>($"/api/sales/{sale.Id}/finalize", null);
+                Snackbar.Add("Venda finalizada com sucesso", Severity.Success);
+                await _table!.ReloadServerData();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Erro ao finalizar venda {SaleId}", sale.Id);
+                Snackbar.Add($"Erro ao finalizar venda: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task CancelSale(SaleDto sale)
+    {
+        var parameters = new DialogParameters
+        {
+            { "ContentText", $"Tem certeza que deseja cancelar a venda {sale.SaleNumber}?" },
+            { "ButtonText", "Cancelar Venda" },
+            { "Color", Color.Error }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Cancelar Venda", parameters);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            try
+            {
+                await ApiService.PostAsync<object>($"/api/sales/{sale.Id}/cancel", null);
+                Snackbar.Add("Venda cancelada com sucesso", Severity.Success);
+                await _table!.ReloadServerData();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Erro ao cancelar venda {SaleId}", sale.Id);
+                Snackbar.Add($"Erro ao cancelar venda: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private MudBlazor.Color GetStatusColor(string status)
+    {
+        return status switch
+        {
+            "Pendente" => MudBlazor.Color.Warning,
+            "Finalizada" => MudBlazor.Color.Success,
+            "Cancelada" => MudBlazor.Color.Error,
+            _ => MudBlazor.Color.Default
+        };
+    }
+}

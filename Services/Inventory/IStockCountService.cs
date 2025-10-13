@@ -1,4 +1,5 @@
 using erp.DTOs.Inventory;
+using erp.Models.Inventory;
 
 namespace erp.Services.Inventory;
 

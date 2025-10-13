@@ -1,0 +1,149 @@
+@using erp.DTOs.Sales
+@using erp.Services
+@using MudBlazor
+@using Size = MudBlazor.Size
+@using Color = MudBlazor.Color
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+@inject ILogger<CustomerCreateDialog> Logger
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" Model="@_model" Validation="@(new Func<object, string, Task<IEnumerable<string>>>(ValidateValue))">
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_model.Document" 
+                                  Label="CPF/CNPJ" 
+                                  Required="true"
+                                  Immediate="true"
+                                  Variant="Variant.Outlined"/>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_model.Name" 
+                                  Label="Nome/Razão Social" 
+                                  Required="true"
+                                  Immediate="true"
+                                  Variant="Variant.Outlined"/>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_model.Email" 
+                                  Label="E-mail"
+                                  InputType="InputType.Email"
+                                  Variant="Variant.Outlined"/>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudTextField @bind-Value="_model.Phone" 
+                                  Label="Telefone"
+                                  Variant="Variant.Outlined"/>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudTextField @bind-Value="_model.Mobile" 
+                                  Label="Celular"
+                                  Variant="Variant.Outlined"/>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudTextField @bind-Value="_model.ZipCode" 
+                                  Label="CEP"
+                                  Variant="Variant.Outlined"/>
+                </MudItem>
+                <MudItem xs="12" md="7">
+                    <MudTextField @bind-Value="_model.Address" 
+                                  Label="Endereço"
+                                  Variant="Variant.Outlined"/>
+                </MudItem>
+                <MudItem xs="12" md="2">
+                    <MudTextField @bind-Value="_model.Number" 
+                                  Label="Número"
+                                  Variant="Variant.Outlined"/>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudTextField @bind-Value="_model.Complement" 
+                                  Label="Complemento"
+                                  Variant="Variant.Outlined"/>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudTextField @bind-Value="_model.Neighborhood" 
+                                  Label="Bairro"
+                                  Variant="Variant.Outlined"/>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudTextField @bind-Value="_model.City" 
+                                  Label="Cidade"
+                                  Variant="Variant.Outlined"/>
+                </MudItem>
+                <MudItem xs="12" md="8">
+                    <MudSelect @bind-Value="_model.State" 
+                               Label="Estado"
+                               Variant="Variant.Outlined">
+                        @foreach (var state in _brazilianStates)
+                        {
+                            <MudSelectItem Value="@state">@state</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@_processing">
+            @if (_processing)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true"/>
+            }
+            else
+            {
+                <text>Salvar</text>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private MudForm? _form;
+    private CreateCustomerDto _model = new();
+    private bool _processing = false;
+
+    private readonly string[] _brazilianStates = new[]
+    {
+        "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA",
+        "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN",
+        "RS", "RO", "RR", "SC", "SP", "SE", "TO"
+    };
+
+    private async Task Submit()
+    {
+        await _form!.Validate();
+        if (!_form.IsValid)
+        {
+            return;
+        }
+
+        _processing = true;
+        try
+        {
+            var customer = await ApiService.PostAsync<CustomerDto>("/api/sales/customers", _model);
+            Snackbar.Add("Cliente criado com sucesso", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(customer));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao criar cliente");
+            Snackbar.Add($"Erro ao criar cliente: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _processing = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private Task<IEnumerable<string>> ValidateValue(object model, string propertyName)
+    {
+        // Add custom validation logic here if needed
+        return Task.FromResult(Enumerable.Empty<string>());
+    }
+}

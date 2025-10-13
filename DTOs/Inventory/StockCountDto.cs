@@ -51,13 +51,12 @@ public class StockCountItemDto
 
 public class CreateStockCountDto
 {
-    [StringLength(50, ErrorMessage = "Número da contagem deve ter no máximo 50 caracteres")]
-    public string? CountNumber { get; set; }
+    [Required(ErrorMessage = "Armazém é obrigatório")]
+    [Range(1, int.MaxValue, ErrorMessage = "Armazém inválido")]
+    public int WarehouseId { get; set; }
     
-    public int? WarehouseId { get; set; }
-    
-    [StringLength(1000, ErrorMessage = "Observações devem ter no máximo 1000 caracteres")]
-    public string? Notes { get; set; }
+    [StringLength(1000, ErrorMessage = "Descrição deve ter no máximo 1000 caracteres")]
+    public string? Description { get; set; }
     
     public DateTime CountDate { get; set; } = DateTime.UtcNow;
 }
@@ -65,6 +64,7 @@ public class CreateStockCountDto
 public class AddStockCountItemDto
 {
     [Required(ErrorMessage = "ID da contagem é obrigatório")]
+    [Range(1, int.MaxValue, ErrorMessage = "ID da contagem inválido")]
     public int StockCountId { get; set; }
     
     [Required(ErrorMessage = "Produto é obrigatório")]
@@ -82,7 +82,11 @@ public class AddStockCountItemDto
 public class ApproveStockCountDto
 {
     [Required(ErrorMessage = "ID da contagem é obrigatório")]
+    [Range(1, int.MaxValue, ErrorMessage = "ID da contagem inválido")]
     public int StockCountId { get; set; }
+    
+    [StringLength(1000, ErrorMessage = "Observações de aprovação devem ter no máximo 1000 caracteres")]
+    public string? Notes { get; set; }
     
     public bool ApplyAdjustments { get; set; } = true;
 }

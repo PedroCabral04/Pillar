@@ -28,6 +28,7 @@ public class StockMovement
     // Referências
     public string? DocumentNumber { get; set; }
     public int? SaleOrderId { get; set; }
+    public virtual Models.Sales.Sale? SaleOrder { get; set; }
     public int? PurchaseOrderId { get; set; }
     public int? TransferId { get; set; }
     

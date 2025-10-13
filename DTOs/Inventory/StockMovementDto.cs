@@ -71,3 +71,20 @@ public class CreateStockMovementDto
     
     public DateTime MovementDate { get; set; } = DateTime.UtcNow;
 }
+
+public class CreateStockAdjustmentDto
+{
+    [Required(ErrorMessage = "Produto é obrigatório")]
+    [Range(1, int.MaxValue, ErrorMessage = "Produto inválido")]
+    public int ProductId { get; set; }
+    
+    public int? WarehouseId { get; set; }
+    
+    [Required(ErrorMessage = "Novo estoque é obrigatório")]
+    [Range(0, double.MaxValue, ErrorMessage = "Novo estoque deve ser positivo ou zero")]
+    public decimal NewStock { get; set; }
+    
+    [Required(ErrorMessage = "Motivo do ajuste é obrigatório")]
+    [StringLength(500, ErrorMessage = "Motivo deve ter no máximo 500 caracteres")]
+    public string Reason { get; set; } = string.Empty;
+}

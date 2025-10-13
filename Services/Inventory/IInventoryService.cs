@@ -14,14 +14,6 @@ public interface IInventoryService
     Task<bool> DeleteProductAsync(int id);
     Task<bool> BulkUpdatePricesAsync(BulkUpdatePriceDto dto);
     
-    // Category operations
-    Task<IEnumerable<ProductCategoryDto>> GetCategoriesAsync();
-    Task<ProductCategoryDto?> GetCategoryByIdAsync(int id);
-    
-    // Stock operations
-    Task<decimal> GetProductStockAsync(int productId, int? warehouseId = null);
-    Task<bool> ValidateStockAvailabilityAsync(int productId, decimal quantity, int? warehouseId = null);
-    
     // Alert operations
     Task<IEnumerable<StockAlertDto>> GetStockAlertsAsync();
     Task<IEnumerable<StockAlertDto>> GetLowStockProductsAsync();
