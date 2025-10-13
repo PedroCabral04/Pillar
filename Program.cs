@@ -171,8 +171,16 @@ builder.Services.AddScoped<erp.Services.Validation.IUserValidationService, erp.S
 // Onboarding services
 builder.Services.AddScoped<erp.Services.Onboarding.IOnboardingService, erp.Services.Onboarding.OnboardingService>();
 
+// Inventory services
+builder.Services.AddScoped<erp.Services.Inventory.IInventoryService, erp.Services.Inventory.InventoryService>();
+builder.Services.AddScoped<erp.Services.Inventory.IStockMovementService, erp.Services.Inventory.StockMovementService>();
+builder.Services.AddScoped<erp.Services.Inventory.IStockCountService, erp.Services.Inventory.StockCountService>();
+
 // ------- REGISTRO DO MAPPERLY -------
 builder.Services.AddScoped<UserMapper, UserMapper>();
+builder.Services.AddScoped<ProductMapper, ProductMapper>();
+builder.Services.AddScoped<StockMovementMapper, StockMovementMapper>();
+builder.Services.AddScoped<StockCountMapper, StockCountMapper>();
 
 // --- Constrói a aplicação ---
 var app = builder.Build();
