@@ -49,8 +49,8 @@ public class OnboardingService : IOnboardingService
                     new OnboardingStep
                     {
                         Id = "step-2",
-                        Title = "Dashboard",
-                        Description = "Aqui você encontra uma visão geral do seu negócio com métricas e gráficos em tempo real.",
+                        Title = "Dashboard Principal",
+                        Description = "Aqui você encontra uma visão geral do seu negócio com métricas e gráficos em tempo real. Use os filtros de data para personalizar as informações exibidas.",
                         Target = ".dashboard-section",
                         Placement = "bottom",
                         Order = 2

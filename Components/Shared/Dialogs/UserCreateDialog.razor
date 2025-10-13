@@ -6,6 +6,8 @@
 @using erp.DTOs.User
 @using erp.DTOs.Role
 @using erp.Services
+@using erp.Services.Validation
+@inject IUserValidationService ValidationService
 
 <MudDialog Class="user-dialog">
     <TitleContent>
@@ -60,7 +62,9 @@
                                       Immediate="true"
                                       HelperText="exemplo@empresa.com"
                                       Adornment="Adornment.Start"
-                                      AdornmentIcon="@Icons.Material.Filled.Email"/>
+                                      AdornmentIcon="@Icons.Material.Filled.Email"
+                                      DebounceInterval="500"
+                                      OnDebounceIntervalElapsed="@ValidateEmailAsync"/>
                     </MudItem>
                     
                     <MudItem xs="12" md="6">
@@ -193,9 +197,31 @@
     private IEnumerable<Func<string, string?>> _emailRules => new List<Func<string, string?>>
     {
         _required("Email"),
+<<<<<<< HEAD
         v => new EmailAddressAttribute().IsValid(v) ? null : "Email inválido"
     };
 
+=======
+        v => new EmailAddressAttribute().IsValid(v) ? null : "Email inválido",
+        v => _emailValidationMessage
+    };
+
+    private string? _emailValidationMessage;
+    
+    private async Task ValidateEmailAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newUser.Email) || !new EmailAddressAttribute().IsValid(_newUser.Email))
+        {
+            _emailValidationMessage = null;
+            return;
+        }
+
+        var isAvailable = await ValidationService.IsEmailAvailableAsync(_newUser.Email);
+        _emailValidationMessage = isAvailable ? null : "Este email já está em uso";
+        await (_form?.Validate() ?? Task.CompletedTask);
+    }
+
+>>>>>>> main
     private static string OnlyDigits(string? s) => new string((s ?? string.Empty).Where(char.IsDigit).ToArray());
     private IEnumerable<Func<string, string?>> _phoneRules => new List<Func<string, string?>>
     {
