@@ -1,60 +1,230 @@
 ﻿@page "/"
 @attribute [Authorize]
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Início - Pillar ERP</PageTitle>
 
-<MudText Typo="Typo.h3" GutterBottom="true">Hello, world!</MudText>
-<MudText Class="mb-8">Welcome to your new app, powered by MudBlazor and the .NET 9 Template!</MudText>
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    @if (_isLoading)
+    {
+        <MudProgressLinear Color="MudBlazor.Color.Primary" Indeterminate="true" />
+    }
+    else
+    {
+        <!-- Seção de Boas-vindas -->
+        <MudPaper Elevation="0" Class="pa-6 mb-4" Style="background: linear-gradient(135deg, var(--mud-palette-primary) 0%, var(--mud-palette-primary-darken) 100%);">
+            <MudGrid>
+                <MudItem xs="12" md="8">
+                    <MudText Typo="Typo.h3" Style="color: white; font-weight: 600;" Class="mb-2">
+                        Olá, @_userName! 👋
+                    </MudText>
+                    <MudText Typo="Typo.h6" Style="color: rgba(255,255,255,0.9);">
+                        Bem-vindo ao Pillar ERP - Seu sistema de gestão empresarial
+                    </MudText>
+                </MudItem>
+                <MudItem xs="12" md="4" Class="d-flex align-center justify-end">
+                    <MudText Typo="Typo.h4" Style="color: white;">
+                        @DateTime.Now.ToString("dd/MM/yyyy")
+                    </MudText>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
 
-<MudAlert Severity="Severity.Normal" ContentAlignment="HorizontalAlignment.Start">
-    You can find documentation and examples on our website here:
-    <MudLink Href="https://mudblazor.com" Target="_blank" Typo="Typo.body2" Color="MudBlazor.Color.Primary">
-        <b>www.mudblazor.com</b>
-    </MudLink>
-</MudAlert>
+        <!-- Cards de Acesso Rápido -->
+        <MudText Typo="Typo.h5" Class="mb-3 mt-6">Acesso Rápido</MudText>
+        <MudGrid>
+            <!-- Dashboard -->
+            <MudItem xs="12" sm="6" md="4">
+                <MudCard Elevation="2" Class="cursor-pointer hover-card" @onclick="@(() => NavigateTo("/dashboard"))">
+                    <MudCardContent Class="pa-6">
+                        <div class="d-flex align-center mb-3">
+                            <MudIcon Icon="@Icons.Material.Filled.Dashboard" Size="Size.Large" Color="MudBlazor.Color.Primary" Class="mr-3" />
+                            <MudText Typo="Typo.h6">Dashboard</MudText>
+                        </div>
+                        <MudText Typo="Typo.body2" Color="MudBlazor.Color.Secondary">
+                            Visualize métricas e indicadores do seu negócio em tempo real
+                        </MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
 
-<br/>
-<MudText Typo="Typo.h5" GutterBottom="true">Interactivity in this Template</MudText>
-<br/>
-<MudText Typo="Typo.body2">
-    When you opt for the "Global" Interactivity Location, <br/>
-    the render modes are defined in App.razor and consequently apply to all child components.<br/>
-    In this case, providers are globally set in the MainLayout.<br/>
-    <br/>
-    On the other hand, if you choose the "Per page/component" Interactivity Location,<br/>
-    it is necessary to include the <br/>
-    <br/>
-    &lt;MudPopoverProvider /&gt; <br/>
-    &lt;MudDialogProvider /&gt; <br/>
-    &lt;MudSnackbarProvider /&gt; <br/>
-    <br/>
-    components on every interactive page.<br/>
-    <br/>
-    If a render mode is not specified for a page, it defaults to Server-Side Rendering (SSR),<br/>
-    similar to this page. While MudBlazor allows pages to be rendered in SSR,<br/>
-    please note that interactive features, such as buttons and dropdown menus, will not be functional.
-</MudText>
+            <!-- Kanban -->
+            <MudItem xs="12" sm="6" md="4">
+                <MudCard Elevation="2" Class="cursor-pointer hover-card" @onclick="@(() => NavigateTo("/kanban"))">
+                    <MudCardContent Class="pa-6">
+                        <div class="d-flex align-center mb-3">
+                            <MudIcon Icon="@Icons.Material.Filled.ViewKanban" Size="Size.Large" Color="MudBlazor.Color.Success" Class="mr-3" />
+                            <MudText Typo="Typo.h6">Kanban</MudText>
+                        </div>
+                        <MudText Typo="Typo.body2" Color="MudBlazor.Color.Secondary">
+                            Organize suas tarefas e projetos de forma visual e colaborativa
+                        </MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
 
-<br/>
-<MudText Typo="Typo.h5" GutterBottom="true">What's New in Blazor with the Release of .NET 9</MudText>
-<br/>
+            <!-- Administração -->
+            @if (_isAdmin)
+            {
+                <MudItem xs="12" sm="6" md="4">
+                    <MudCard Elevation="2" Class="cursor-pointer hover-card" @onclick="@(() => NavigateTo("/admin/users"))">
+                        <MudCardContent Class="pa-6">
+                            <div class="d-flex align-center mb-3">
+                                <MudIcon Icon="@Icons.Material.Filled.AdminPanelSettings" Size="Size.Large" Color="MudBlazor.Color.Warning" Class="mr-3" />
+                                <MudText Typo="Typo.h6">Administração</MudText>
+                            </div>
+                            <MudText Typo="Typo.body2" Color="MudBlazor.Color.Secondary">
+                                Gerencie usuários, permissões e configurações do sistema
+                            </MudText>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
 
-<MudText Typo="Typo.h6" GutterBottom="true">Prerendering</MudText>
-<MudText Typo="Typo.body2" GutterBottom="true">
-    If you're exploring the features of .NET 9 Blazor,<br/> you might be pleasantly surprised to learn that each page is prerendered on the server,<br/> regardless of the selected render mode.<br/><br/>
-    This means that you'll need to inject all necessary services on the server,<br/> even when opting for the wasm (WebAssembly) render mode.<br/><br/>
-    This prerendering functionality is crucial to ensuring that WebAssembly mode feels fast and responsive,<br/> especially when it comes to initial page load times.<br/><br/>
-    For more information on how to detect prerendering and leverage the RenderContext, you can refer to the following link:
-    <MudLink Href="https://github.com/dotnet/aspnetcore/issues/51468#issuecomment-1783568121" Target="_blank" Typo="Typo.body2" Color="MudBlazor.Color.Primary">
-        More details
-    </MudLink>
-</MudText>
+            <!-- Configurações -->
+            <MudItem xs="12" sm="6" md="4">
+                <MudCard Elevation="2" Class="cursor-pointer hover-card" @onclick="@(() => NavigateTo("/settings"))">
+                    <MudCardContent Class="pa-6">
+                        <div class="d-flex align-center mb-3">
+                            <MudIcon Icon="@Icons.Material.Filled.Settings" Size="Size.Large" Color="MudBlazor.Color.Info" Class="mr-3" />
+                            <MudText Typo="Typo.h6">Configurações</MudText>
+                        </div>
+                        <MudText Typo="Typo.body2" Color="MudBlazor.Color.Secondary">
+                            Personalize sua experiência e ajuste suas preferências
+                        </MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
 
-<br/>
-<MudText Typo="Typo.h6" GutterBottom="true">InteractiveAuto</MudText>
-<MudText Typo="Typo.body2">
-    A discussion on how to achieve this can be found here:
-    <MudLink Href="https://github.com/dotnet/aspnetcore/issues/51468#issue-1950424116" Target="_blank" Typo="Typo.body2" Color="MudBlazor.Color.Primary">
-        More details
-    </MudLink>
-</MudText>
+        <!-- Seção de Recursos -->
+        <MudText Typo="Typo.h5" Class="mb-3 mt-8">Recursos do Sistema</MudText>
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudPaper Elevation="1" Class="pa-4">
+                    <div class="d-flex align-center mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Speed" Color="MudBlazor.Color.Primary" Class="mr-2" />
+                        <MudText Typo="Typo.h6">Performance e Eficiência</MudText>
+                    </div>
+                    <MudText Typo="Typo.body2" Class="mb-2">
+                        Sistema construído com tecnologias modernas (.NET 9, Blazor Server) para máxima performance
+                    </MudText>
+                    <MudChip Size="Size.Small" Color="MudBlazor.Color.Primary" Variant="Variant.Text">Blazor Server</MudChip>
+                    <MudChip Size="Size.Small" Color="MudBlazor.Color.Primary" Variant="Variant.Text">.NET 9</MudChip>
+                    <MudChip Size="Size.Small" Color="MudBlazor.Color.Primary" Variant="Variant.Text">MudBlazor</MudChip>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <MudPaper Elevation="1" Class="pa-4">
+                    <div class="d-flex align-center mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Security" Color="MudBlazor.Color.Success" Class="mr-2" />
+                        <MudText Typo="Typo.h6">Segurança Robusta</MudText>
+                    </div>
+                    <MudText Typo="Typo.body2" Class="mb-2">
+                        Autenticação ASP.NET Core Identity, cookies hardening e proteção CSRF
+                    </MudText>
+                    <MudChip Size="Size.Small" Color="MudBlazor.Color.Success" Variant="Variant.Text">Identity</MudChip>
+                    <MudChip Size="Size.Small" Color="MudBlazor.Color.Success" Variant="Variant.Text">HTTPS</MudChip>
+                    <MudChip Size="Size.Small" Color="MudBlazor.Color.Success" Variant="Variant.Text">CSRF Protection</MudChip>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <MudPaper Elevation="1" Class="pa-4">
+                    <div class="d-flex align-center mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Palette" Color="MudBlazor.Color.Info" Class="mr-2" />
+                        <MudText Typo="Typo.h6">Interface Moderna</MudText>
+                    </div>
+                    <MudText Typo="Typo.body2" Class="mb-2">
+                        Design responsivo e intuitivo com suporte a temas claro e escuro
+                    </MudText>
+                    <MudChip Size="Size.Small" Color="MudBlazor.Color.Info" Variant="Variant.Text">Material Design</MudChip>
+                    <MudChip Size="Size.Small" Color="MudBlazor.Color.Info" Variant="Variant.Text">Responsivo</MudChip>
+                    <MudChip Size="Size.Small" Color="MudBlazor.Color.Info" Variant="Variant.Text">Dark Mode</MudChip>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <MudPaper Elevation="1" Class="pa-4">
+                    <div class="d-flex align-center mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Extension" Color="MudBlazor.Color.Warning" Class="mr-2" />
+                        <MudText Typo="Typo.h6">Modular e Extensível</MudText>
+                    </div>
+                    <MudText Typo="Typo.body2" Class="mb-2">
+                        Arquitetura modular que permite fácil expansão e customização
+                    </MudText>
+                    <MudChip Size="Size.Small" Color="MudBlazor.Color.Warning" Variant="Variant.Text">Widgets</MudChip>
+                    <MudChip Size="Size.Small" Color="MudBlazor.Color.Warning" Variant="Variant.Text">Providers</MudChip>
+                    <MudChip Size="Size.Small" Color="MudBlazor.Color.Warning" Variant="Variant.Text">API REST</MudChip>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        <!-- Dica do Dia -->
+        <MudPaper Elevation="0" Class="pa-4 mt-6" Style="border-left: 4px solid var(--mud-palette-primary);">
+            <div class="d-flex align-start">
+                <MudIcon Icon="@Icons.Material.Filled.Lightbulb" Color="MudBlazor.Color.Primary" Class="mr-3 mt-1" />
+                <div>
+                    <MudText Typo="Typo.h6" Class="mb-2">💡 Dica do Dia</MudText>
+                    <MudText Typo="Typo.body2">
+                        Você sabia que pode personalizar completamente o seu dashboard? 
+                        Acesse <MudLink Href="/dashboard">Dashboard</MudLink> e clique em "Personalizar" para adicionar, 
+                        remover ou reorganizar widgets de acordo com suas necessidades.
+                    </MudText>
+                </div>
+            </div>
+        </MudPaper>
+    }
+</MudContainer>
+
+<style>
+    .hover-card {
+        transition: all 0.3s ease;
+    }
+
+    .hover-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 16px rgba(0,0,0,0.15) !important;
+    }
+
+    .cursor-pointer {
+        cursor: pointer;
+    }
+</style>
+
+@code {
+    private bool _isLoading = true;
+    private string _userName = "";
+    private bool _isAdmin = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            if (user.Identity?.IsAuthenticated == true)
+            {
+                _userName = user.Identity.Name ?? "Usuário";
+                _isAdmin = user.IsInRole("Admin");
+            }
+        }
+        catch (Exception)
+        {
+            _userName = "Usuário";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void NavigateTo(string url)
+    {
+        NavigationManager.NavigateTo(url);
+    }
+}

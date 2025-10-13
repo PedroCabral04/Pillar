@@ -72,12 +72,9 @@
 </MudStack>
 
 <!-- Onboarding Tour -->
-@if (_showTour && _dashboardTour != null)
-{
-    <erp.Components.Shared.OnboardingTour Tour="@_dashboardTour" 
-                                         OnComplete="@HandleTourComplete" 
-                                         OnSkip="@HandleTourSkip" />
-}
+<erp.Components.Shared.OnboardingTour @ref="_tourComponent"
+                                     OnTourCompleted="@HandleTourComplete" 
+                                     OnTourSkipped="@HandleTourSkip" />
 
 @code {
     private List<DashboardWidgetDefinition>? _widgets;
@@ -90,8 +87,7 @@
     private string _userId = string.Empty;
     private string[] _userRoles = Array.Empty<string>();
     
-    private bool _showTour = false;
-    private OnboardingTour? _dashboardTour;
+    private erp.Components.Shared.OnboardingTour? _tourComponent;
 
     protected override async Task OnInitializedAsync()
     {
@@ -137,11 +133,11 @@
     
     private async Task InitializeTourAsync()
     {
-        if (string.IsNullOrEmpty(_userId))
+        if (string.IsNullOrEmpty(_userId) || _tourComponent == null)
             return;
             
-        _dashboardTour = OnboardingService.GetTourById("dashboard-tour");
-        if (_dashboardTour == null)
+        var dashboardTour = OnboardingService.GetTourById("dashboard-tour");
+        if (dashboardTour == null)
             return;
             
         var progress = await OnboardingService.GetUserProgressAsync(_userId, "dashboard-tour");
@@ -151,27 +147,20 @@
         {
             // Pequeno delay para garantir que a página foi renderizada
             await Task.Delay(500);
-            _showTour = true;
-            StateHasChanged();
+            await _tourComponent.StartTour("dashboard-tour");
         }
     }
     
-    private async Task HandleTourComplete()
+    private async Task HandleTourComplete(string tourId)
     {
-        _showTour = false;
-        if (!string.IsNullOrEmpty(_userId))
-        {
-            await OnboardingService.CompleteTourAsync(_userId, "dashboard-tour");
-        }
+        // Tour completion is already handled by the OnboardingTour component
+        await Task.CompletedTask;
     }
     
-    private async Task HandleTourSkip()
+    private async Task HandleTourSkip(string tourId)
     {
-        _showTour = false;
-        if (!string.IsNullOrEmpty(_userId))
-        {
-            await OnboardingService.SkipTourAsync(_userId, "dashboard-tour");
-        }
+        // Tour skip is already handled by the OnboardingTour component
+        await Task.CompletedTask;
     }
 
     private enum DatePreset

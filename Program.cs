@@ -134,7 +134,30 @@ builder.Services.AddScoped<IUserDao, UserDao>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<PreferenceService>();
 builder.Services.AddScoped<ThemeService>();
-builder.Services.AddScoped<IApiService, ApiService>();
+
+// Register HttpClient for ApiService with proper configuration
+builder.Services.AddHttpClient<IApiService, ApiService>((serviceProvider, client) =>
+{
+    // Get the current request's base URL for Blazor Server
+    var httpContextAccessor = serviceProvider.GetRequiredService<IHttpContextAccessor>();
+    var httpContext = httpContextAccessor.HttpContext;
+    
+    if (httpContext != null)
+    {
+        var request = httpContext.Request;
+        var baseUrl = $"{request.Scheme}://{request.Host}";
+        client.BaseAddress = new Uri(baseUrl);
+    }
+    else
+    {
+        // Fallback for cases where HttpContext is not available
+        // This should work for most dev scenarios
+        client.BaseAddress = new Uri("https://localhost:7051");
+    }
+    
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<erp.Services.Notifications.IAdvancedNotificationService, erp.Services.Notifications.AdvancedNotificationService>();
 // Dashboard services

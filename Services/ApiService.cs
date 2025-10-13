@@ -48,13 +48,16 @@ public class ApiService : IApiService
         _httpClient = httpClient;
         _httpContextAccessor = httpContextAccessor;
         _logger = logger;
-        _httpClient.Timeout = _defaultTimeout;
+        // Timeout is configured in Program.cs via AddHttpClient
+        _defaultTimeout = _httpClient.Timeout;
     }
     
     public void SetTimeout(TimeSpan timeout)
     {
         _defaultTimeout = timeout;
-        _httpClient.Timeout = timeout;
+        // Don't set timeout on HttpClient after it's been created
+        // Instead, use CancellationTokenSource with timeout for individual requests
+        _logger.LogWarning("SetTimeout called but timeout changes after HttpClient creation are not supported. Configure timeout in Program.cs instead.");
     }
 
     private void BeginLoading()
