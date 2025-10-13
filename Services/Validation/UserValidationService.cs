@@ -1,6 +1,6 @@
 using erp.Services;
 
-namespace erp.Services.User;
+namespace erp.Services.Validation;
 
 public interface IUserValidationService
 {

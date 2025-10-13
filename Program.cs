@@ -132,7 +132,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // Registra DAOs e Serviços
 builder.Services.AddScoped<IUserDao, UserDao>();
 builder.Services.AddScoped<IUserService, UserService>();
-builder.Services.AddScoped<erp.Services.User.IUserValidationService, erp.Services.User.UserValidationService>();
+builder.Services.AddScoped<erp.Services.Validation.IUserValidationService, erp.Services.Validation.UserValidationService>();
 builder.Services.AddScoped<PreferenceService>();
 builder.Services.AddScoped<ThemeService>();
 builder.Services.AddScoped<IApiService, ApiService>();
