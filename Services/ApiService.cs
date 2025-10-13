@@ -12,9 +12,8 @@ public interface IApiService
     Task<HttpResponseMessage> PutAsJsonAsync<T>(string endpoint, T data, CancellationToken cancellationToken = default);
     Task<HttpResponseMessage> DeleteAsync(string endpoint, CancellationToken cancellationToken = default);
     
-    // Loading state management
-    bool IsLoading { get; }
     event EventHandler<bool>? LoadingStateChanged;
+    bool IsLoading { get; }
 }
 
 public class ApiService : IApiService
@@ -22,7 +21,22 @@ public class ApiService : IApiService
     private readonly HttpClient _httpClient;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private int _activeRequests = 0;
-    private readonly object _lock = new();
+    private bool _isLoading;
+
+    public event EventHandler<bool>? LoadingStateChanged;
+    
+    public bool IsLoading
+    {
+        get => _isLoading;
+        private set
+        {
+            if (_isLoading != value)
+            {
+                _isLoading = value;
+                LoadingStateChanged?.Invoke(this, value);
+            }
+        }
+    }
 
     public ApiService(HttpClient httpClient, IHttpContextAccessor httpContextAccessor)
     {
@@ -30,39 +44,21 @@ public class ApiService : IApiService
         _httpContextAccessor = httpContextAccessor;
     }
 
-    public bool IsLoading => _activeRequests > 0;
-    public event EventHandler<bool>? LoadingStateChanged;
-
-    private void SetLoading(bool loading)
+    private void BeginLoading()
     {
-        bool shouldNotify = false;
-        bool newState = false;
-
-        lock (_lock)
+        _activeRequests++;
+        if (_activeRequests == 1)
         {
-            if (loading)
-            {
-                _activeRequests++;
-                if (_activeRequests == 1)
-                {
-                    shouldNotify = true;
-                    newState = true;
-                }
-            }
-            else
-            {
-                _activeRequests = Math.Max(0, _activeRequests - 1);
-                if (_activeRequests == 0)
-                {
-                    shouldNotify = true;
-                    newState = false;
-                }
-            }
+            IsLoading = true;
         }
+    }
 
-        if (shouldNotify)
+    private void EndLoading()
+    {
+        _activeRequests--;
+        if (_activeRequests == 0)
         {
-            LoadingStateChanged?.Invoke(this, newState);
+            IsLoading = false;
         }
     }
 
@@ -101,9 +97,10 @@ public class ApiService : IApiService
 
     public async Task<HttpResponseMessage> GetAsync(string endpoint, CancellationToken cancellationToken = default)
     {
-        SetLoading(true);
         try
         {
+            BeginLoading();
+            
             var fullUri = new Uri(_httpClient.BaseAddress!, endpoint);
             var uriBuilder = new UriBuilder(fullUri);
             var query = System.Web.HttpUtility.ParseQueryString(uriBuilder.Query);
@@ -115,15 +112,16 @@ public class ApiService : IApiService
         }
         finally
         {
-            SetLoading(false);
+            EndLoading();
         }
     }
 
     public async Task<HttpResponseMessage> PostAsJsonAsync<T>(string endpoint, T data, CancellationToken cancellationToken = default)
     {
-        SetLoading(true);
         try
         {
+            BeginLoading();
+            
             var request = CreateRequestWithCookies(HttpMethod.Post, endpoint);
             var json = JsonSerializer.Serialize(data);
             request.Content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -131,7 +129,7 @@ public class ApiService : IApiService
         }
         finally
         {
-            SetLoading(false);
+            EndLoading();
         }
     }
 
@@ -153,9 +151,10 @@ public class ApiService : IApiService
 
     public async Task<HttpResponseMessage> PutAsJsonAsync<T>(string endpoint, T data, CancellationToken cancellationToken = default)
     {
-        SetLoading(true);
         try
         {
+            BeginLoading();
+            
             var request = CreateRequestWithCookies(HttpMethod.Put, endpoint);
             var json = JsonSerializer.Serialize(data);
             request.Content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -163,21 +162,22 @@ public class ApiService : IApiService
         }
         finally
         {
-            SetLoading(false);
+            EndLoading();
         }
     }
 
     public async Task<HttpResponseMessage> DeleteAsync(string endpoint, CancellationToken cancellationToken = default)
     {
-        SetLoading(true);
         try
         {
+            BeginLoading();
+            
             var request = CreateRequestWithCookies(HttpMethod.Delete, endpoint);
             return await _httpClient.SendAsync(request, cancellationToken);
         }
         finally
         {
-            SetLoading(false);
+            EndLoading();
         }
     }
 }

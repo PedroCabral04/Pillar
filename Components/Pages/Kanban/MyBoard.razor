@@ -192,7 +192,6 @@
         
         if (result is { Canceled: false } && result.Data is KanbanCardDialog.CardDialogResult cardResult)
         {
-<<<<<<< HEAD
             var res = await Api.PostAsJsonAsync<CreateCardRequest, KanbanCardDto>("api/kanban/cards", new CreateCardRequest(col.Id, cardResult.Title, cardResult.Description));
             if (res is not null && _columns is not null)
             {
@@ -210,13 +209,6 @@
                 StateHasChanged();
                 
                 Snackbar.Add("Card criado com sucesso!", Severity.Success);
-=======
-            var res = await Api.PostAsJsonAsync("api/kanban/cards", new CreateCardRequest(col.Id, cardResult.Title, cardResult.Description));
-            if (res.IsSuccessStatusCode)
-            {
-                Snackbar.Add("Card criado com sucesso!", Severity.Success);
-                await RefreshData();
->>>>>>> main
             }
             else
             {
@@ -238,7 +230,6 @@
         var dialog = await DialogService.ShowAsync<KanbanCardDialog>("Editar Card", parameters, options);
         var result = await dialog.Result;
         
-<<<<<<< HEAD
         if (result is { Canceled: false } && result.Data is KanbanCardDialog.CardDialogResult cardResult && _columns is not null)
         {
             if (cardResult.Delete)
@@ -252,33 +243,19 @@
                 _dropContainer?.Refresh();
                 StateHasChanged();
                 
-=======
-        if (result is { Canceled: false } && result.Data is KanbanCardDialog.CardDialogResult cardResult)
-        {
-            if (cardResult.Delete)
-            {
->>>>>>> main
                 var deleteRes = await Api.DeleteAsync($"api/kanban/cards/{card.Id}");
                 if (deleteRes.IsSuccessStatusCode)
                 {
                     Snackbar.Add("Card excluído com sucesso!", Severity.Success);
-<<<<<<< HEAD
-=======
-                    await RefreshData();
->>>>>>> main
                 }
                 else
                 {
                     Snackbar.Add("Erro ao excluir card.", Severity.Error);
-<<<<<<< HEAD
                     await RefreshData(); // Revert on error
-=======
->>>>>>> main
                 }
             }
             else
             {
-<<<<<<< HEAD
                 // Optimistic update: update UI immediately
                 var idx = _allCards.FindIndex(c => c.Id == card.Id);
                 if (idx >= 0)
@@ -298,24 +275,15 @@
                 _dropContainer?.Refresh();
                 StateHasChanged();
                 
-=======
->>>>>>> main
                 var updateRes = await Api.PutAsJsonAsync($"api/kanban/cards/{card.Id}", new UpdateCardRequest(cardResult.Title, cardResult.Description));
                 if (updateRes.IsSuccessStatusCode)
                 {
                     Snackbar.Add("Card atualizado com sucesso!", Severity.Success);
-<<<<<<< HEAD
-=======
-                    await RefreshData();
->>>>>>> main
                 }
                 else
                 {
                     Snackbar.Add("Erro ao atualizar card.", Severity.Error);
-<<<<<<< HEAD
                     await RefreshData(); // Revert on error
-=======
->>>>>>> main
                 }
             }
         }
@@ -323,7 +291,6 @@
 
     private async Task RefreshData()
     {
-<<<<<<< HEAD
         try
         {
             var data = await Api.GetAsync<ColumnsResponse>("api/kanban/columns");
@@ -350,13 +317,6 @@
                 Snackbar.Add($"Erro ao atualizar dados: {ex.Message}", Severity.Error);
             });
         }
-=======
-        var data = await Api.GetAsync<ColumnsResponse>("api/kanban/columns");
-        _columns = data?.Columns ?? new();
-        _allCards = _columns.SelectMany(c => c.Cards).ToList();
-        _dropContainer?.Refresh();
-        StateHasChanged();
->>>>>>> main
     }
 
     private MudDropContainer<KanbanCardDto>? _dropContainer;
@@ -364,17 +324,12 @@
 
     private async Task OnCardDropped(MudItemDropInfo<KanbanCardDto> info)
     {
-<<<<<<< HEAD
         if (info?.Item is null || string.IsNullOrWhiteSpace(info.DropzoneIdentifier) || _columns is null)
-=======
-        if (info?.Item is null || string.IsNullOrWhiteSpace(info.DropzoneIdentifier))
->>>>>>> main
             return;
 
         if (!int.TryParse(info.DropzoneIdentifier, out var toColumnId))
             return;
 
-<<<<<<< HEAD
         var originalColumnId = info.Item.ColumnId;
         var originalPosition = info.Item.Position;
 
@@ -421,28 +376,6 @@
             Snackbar.Add($"Erro ao mover card: {ex.Message}", Severity.Error);
             await RefreshData();
         }
-=======
-        // Optimistic update: move item locally so UI reflects immediately (records have init-only props)
-        var idx = _allCards.FindIndex(c => c.Id == info.Item.Id);
-        if (idx >= 0)
-        {
-            var m = _allCards[idx];
-            _allCards[idx] = new KanbanCardDto(m.Id, m.Title, m.Description, m.Position, toColumnId);
-        }
-        _dropContainer?.Refresh();
-        StateHasChanged();
-
-        // Persist on server (append at end for now)
-        var toPosition = _allCards.Count(c => c.ColumnId == toColumnId && c.Id != info.Item.Id);
-        await Api.PostAsJsonAsync("api/kanban/cards/move", new MoveCardRequest(info.Item.Id, toColumnId, toPosition));
-
-        // Re-sync from server to ensure positions/order are authoritative
-        var data = await Api.GetAsync<ColumnsResponse>("api/kanban/columns");
-        _columns = data?.Columns ?? new();
-        _allCards = _columns.SelectMany(c => c.Cards).ToList();
-        _dropContainer?.Refresh();
-        StateHasChanged();
->>>>>>> main
     }
 
     
@@ -463,7 +396,6 @@
 }
 
 <style>
-<<<<<<< HEAD
 .kanban-page { 
     display: flex; 
     flex-direction: column; 
@@ -639,32 +571,5 @@
 
 .kanban-item {
     animation: slideIn 250ms ease-out;
-=======
-.kanban-page { display: flex; flex-direction: column; min-height: 100vh; }
-.kanban-header { padding: 16px; }
-.kanban-scroll { flex: 1; overflow-x: auto; overflow-y: hidden; }
-
-.kanban-board { display: flex; flex-direction: row; align-items: flex-start; gap: 16px; padding: 8px 16px 16px; }
-.kanban-column { width: 280px; min-width: 280px; background: var(--mud-palette-background); border-radius: 8px; min-height: 20px; }
-.kanban-cards { display: flex; flex-direction: column; gap: 8px; padding: 6px; border-radius: 6px; background: var(--mud-palette-background-grey); min-height: 20px; }
-.kanban-card { background: var(--mud-palette-surface); border-radius: 6px; box-shadow: var(--mud-elevation-2); padding: 8px; }
-.kanban-card .title { font-weight: 600; }
-.kanban-card.dragging { opacity: 0.6; }
-
-.mud-paper.kanban-column .mud-divider { opacity: .5; }
-.mud-paper.kanban-column .mud-button { margin-top: 8px; }
-
-/* Hover suave nos cards */
-.kanban-item,
-.kanban-card {
-  transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease, background-color 120ms ease;
-}
-
-.kanban-item:hover,
-.kanban-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--mud-elevation-8);
-  filter: brightness(1.03);
->>>>>>> main
 }
 </style>

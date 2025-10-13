@@ -5,35 +5,19 @@
 @using System.Security.Claims
 @using Color = MudBlazor.Color
 @using Size = MudBlazor.Size
-@using erp.Services.Onboarding
-@using erp.Services
 
 @inject IDashboardService Dashboard
 @inject AuthenticationStateProvider AuthenticationStateProvider
-@inject IOnboardingService OnboardingService
-@inject ISnackbar Snackbar
-@inject PreferenceService PreferenceService
 
-<MudStack Spacing="3" id="main-content">
+<MudStack Spacing="3">
     <!-- Greeting Section -->
-    <MudPaper Class="pa-4 dashboard-section" Elevation="2">
+    <MudPaper Class="pa-4" Elevation="2">
         <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
             <MudStack Spacing="1">
                 <MudText Typo="Typo.h4">@_greeting, @_userName!</MudText>
                 <MudText Typo="Typo.body2" Color="Color.Secondary">@DateTime.Now.ToString("dddd, dd 'de' MMMM 'de' yyyy")</MudText>
             </MudStack>
-            <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
-                @if (!_tourCompleted)
-                {
-                    <MudTooltip Text="Iniciar tour guiado">
-                        <MudIconButton Icon="@Icons.Material.Filled.Help" 
-                                      Color="Color.Info" 
-                                      OnClick="StartDashboardTour"
-                                      Size="Size.Medium"/>
-                    </MudTooltip>
-                }
-                <MudIcon Icon="@_greetingIcon" Size="Size.Large" Color="Color.Primary" />
-            </MudStack>
+            <MudIcon Icon="@_greetingIcon" Size="Size.Large" Color="Color.Primary" />
         </MudStack>
     </MudPaper>
 
@@ -84,11 +68,6 @@
     </MudGrid>
 </MudStack>
 
-<!-- Onboarding Tour Component -->
-<erp.Components.Shared.OnboardingTour @ref="_tourComponent" 
-                                       OnTourCompleted="HandleTourCompleted"
-                                       OnTourSkipped="HandleTourSkipped" />
-
 @code {
     private List<DashboardWidgetDefinition>? _widgets;
     private DateRange _range = new(DateTime.Today.AddMonths(-1), DateTime.Today);
@@ -97,10 +76,6 @@
     private string _greeting = "";
     private string _greetingIcon = Icons.Material.Filled.WbSunny;
     private string _userName = "Usuário";
-    private string? _userId;
-    private bool _tourCompleted = false;
-    
-    private erp.Components.Shared.OnboardingTour? _tourComponent;
 
     protected override async Task OnInitializedAsync()
     {
@@ -122,7 +97,7 @@
             _greetingIcon = Icons.Material.Filled.DarkMode;
         }
 
-        // Get user name and ID
+        // Get user name
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
         if (user.Identity?.IsAuthenticated == true)
@@ -131,58 +106,10 @@
                         ?? user.FindFirst("sub")?.Value 
                         ?? user.Identity.Name 
                         ?? "Usuário";
-            _userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         }
 
         var list = await Dashboard.GetWidgetsAsync();
         _widgets = list.ToList();
-
-        // Check if tour should be shown
-        await CheckTourStatus();
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender && !_tourCompleted && _userId != null)
-        {
-            // Small delay to ensure page is fully rendered
-            await Task.Delay(1000);
-            
-            var progress = await OnboardingService.GetUserProgressAsync(_userId, "welcome-tour");
-            if (progress == null || !progress.IsCompleted)
-            {
-                await StartDashboardTour();
-            }
-        }
-    }
-
-    private async Task CheckTourStatus()
-    {
-        if (_userId == null) return;
-        
-        var progress = await OnboardingService.GetUserProgressAsync(_userId, "welcome-tour");
-        _tourCompleted = progress?.IsCompleted ?? false;
-    }
-
-    private async Task StartDashboardTour()
-    {
-        if (_tourComponent != null)
-        {
-            await _tourComponent.StartTour("welcome-tour");
-        }
-    }
-
-    private async Task HandleTourCompleted(string tourId)
-    {
-        _tourCompleted = true;
-        Snackbar.Add("🎉 Tour concluído! Bem-vindo ao Pillar ERP!", Severity.Success);
-        StateHasChanged();
-    }
-
-    private async Task HandleTourSkipped(string tourId)
-    {
-        _tourCompleted = true;
-        StateHasChanged();
     }
 
     private enum DatePreset
