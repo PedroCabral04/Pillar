@@ -187,5 +187,46 @@ namespace erp.Controllers
 
             return NoContent();
         }
+
+        // Validation endpoints for async validation in forms
+        [HttpGet("validate/email")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        public async Task<IActionResult> ValidateEmail([FromQuery] string email, [FromQuery] int? excludeUserId = null)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+                return BadRequest("Email é obrigatório");
+
+            var existingUser = await _users.FindByEmailAsync(email);
+            
+            if (existingUser == null)
+                return Ok(new { available = true });
+
+            // Se estamos editando e é o mesmo usuário, ok
+            if (excludeUserId.HasValue && existingUser.Id == excludeUserId.Value)
+                return Ok(new { available = true });
+
+            return Conflict(new { available = false, message = "Este email já está em uso" });
+        }
+
+        [HttpGet("validate/username")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        public async Task<IActionResult> ValidateUsername([FromQuery] string username, [FromQuery] int? excludeUserId = null)
+        {
+            if (string.IsNullOrWhiteSpace(username))
+                return BadRequest("Username é obrigatório");
+
+            var existingUser = await _users.FindByNameAsync(username);
+            
+            if (existingUser == null)
+                return Ok(new { available = true });
+
+            // Se estamos editando e é o mesmo usuário, ok
+            if (excludeUserId.HasValue && existingUser.Id == excludeUserId.Value)
+                return Ok(new { available = true });
+
+            return Conflict(new { available = false, message = "Este nome de usuário já está em uso" });
+        }
     }
 }
