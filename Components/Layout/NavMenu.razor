@@ -4,42 +4,72 @@
 
 @inject NavigationManager NavigationManager
 
-<MudNavMenu Rounded="true" Class="mud-nav-menu-dark">
-    <MudText GutterBottom="true" Typo="Typo.h6" Class="px-4">Pillar</MudText>
-    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
-    <MudDivider/>
-    <MudNavLink Href="dashboard" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
-    <MudDivider/>
+<MudNavMenu Rounded="false" Class="py-2">
+    @if (IsOpen)
+    {
+        <div class="d-flex align-center justify-space-between px-3 py-3 mb-2">
+            <MudText Typo="Typo.h5" Style="font-weight: 600;">Pillar</MudText>
+            <MudIconButton Icon="@Icons.Material.Filled.MenuOpen" 
+                          Color="MudBlazor.Color.Inherit" 
+                          Size="MudBlazor.Size.Small"
+                          OnClick="OnToggleDrawer" 
+                          Title="Fechar menu" />
+        </div>
+    }
+    else
+    {
+        <div class="d-flex justify-center py-3 mb-2">
+            <MudIconButton Icon="@Icons.Material.Filled.Menu" 
+                          Color="MudBlazor.Color.Inherit" 
+                          Size="MudBlazor.Size.Medium"
+                          OnClick="OnToggleDrawer" 
+                          Title="Abrir menu" />
+        </div>
+    }
     
-    <MudNavGroup Title="Vendas" Icon="@Icons.Material.Filled.ShoppingCart" Expanded="false">
-        <MudNavLink Href="sales" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Receipt">Vendas</MudNavLink>
-        <MudNavLink Href="sales/customers" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.People">Clientes</MudNavLink>
-    </MudNavGroup>
-    <MudDivider/>
+    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home" Class="my-1">Home</MudNavLink>
+    <MudNavLink Href="dashboard" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Dashboard" Class="my-1">Dashboard</MudNavLink>
     
-    <MudNavGroup Title="Estoque" Icon="@Icons.Material.Filled.Inventory" Expanded="false">
-        <MudNavLink Href="inventory/products" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Category">Produtos</MudNavLink>
-        <MudNavLink Href="inventory/movements" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.SwapHoriz">Movimentações</MudNavLink>
-        <MudNavLink Href="inventory/counts" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Checklist">Contagens</MudNavLink>
-    </MudNavGroup>
-    <MudDivider/>
+    <MudDivider Class="my-2"/>
     
-    <MudNavLink Href="kanban" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.ViewKanban">Meu Kanban</MudNavLink>
-    <MudDivider/>
+    @if (IsOpen)
+    {
+        <MudNavGroup Title="Vendas" Icon="@Icons.Material.Filled.ShoppingCart" Expanded="false" Class="my-1" HideExpandIcon="false">
+            <MudNavLink Href="sales" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Receipt">Vendas</MudNavLink>
+            <MudNavLink Href="sales/customers" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.People">Clientes</MudNavLink>
+        </MudNavGroup>
+        
+        <MudNavGroup Title="Estoque" Icon="@Icons.Material.Filled.Inventory" Expanded="false" Class="my-1" HideExpandIcon="false">
+            <MudNavLink Href="inventory/products" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Category">Produtos</MudNavLink>
+            <MudNavLink Href="inventory/movements" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.SwapHoriz">Movimentações</MudNavLink>
+            <MudNavLink Href="inventory/counts" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Checklist">Contagens</MudNavLink>
+        </MudNavGroup>
+    }
+    else
+    {
+        <MudNavLink Href="sales" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.ShoppingCart" Class="my-1" />
+        <MudNavLink Href="inventory/products" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Inventory" Class="my-1" />
+    }
+    
+    <MudNavLink Href="kanban" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.ViewKanban" Class="my-1">Kanban</MudNavLink>
+    
+    <MudDivider Class="my-2"/>
     
     <AuthorizeView Roles="Administrador">
         <Authorized>
-            <MudNavLink Href="admin/users" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AdminPanelSettings">Usuários</MudNavLink>
-            <MudDivider/>
+            <MudNavLink Href="admin/users" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AdminPanelSettings" Class="my-1">Administração</MudNavLink>
         </Authorized>
     </AuthorizeView>
     
-    <MudNavLink Href="ajustes" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Settings">Configurações</MudNavLink>
-    <MudDivider/>
-    <MudNavLink OnClick="LogoutAsync" Icon="@Icons.Material.Filled.Logout">Sair</MudNavLink>
+    <MudNavLink Href="settings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Settings" Class="my-1">Configurações</MudNavLink>
+    
+    <MudDivider Class="my-2"/>
+    
+    <MudNavLink OnClick="LogoutAsync" Icon="@Icons.Material.Filled.Logout" Class="my-1">Sair</MudNavLink>
+    
     <AuthorizeView>
         <NotAuthorized>
-            <MudNavLink Href="login" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Login">Entrar</MudNavLink>
+            <MudNavLink Href="login" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Login" Class="my-1">Entrar</MudNavLink>
         </NotAuthorized>
     </AuthorizeView>
 
@@ -64,6 +94,9 @@
 
 
 @code {
+    [Parameter] public bool IsOpen { get; set; } = true;
+    [Parameter] public EventCallback OnToggleDrawer { get; set; }
+    
     [Inject] HttpClient Http { get; set; } = null!;
     private string? currentUrl;
 

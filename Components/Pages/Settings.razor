@@ -1,3 +1,4 @@
+@page "/settings"
 @page "/ajustes"
 @attribute [Authorize]
 @using erp.Services
@@ -12,7 +13,7 @@
 <PageTitle>Configurações</PageTitle>
 
 <MudText Typo="Typo.h3" GutterBottom="true">Configurações</MudText>
-<MudText Typo="Typo.body1" GutterBottom="true">Faça ajustes na plataforma e deixe de acordo com sua preferência</MudText>
+<MudText Typo="Typo.body1" GutterBottom="true">Personalize a plataforma de acordo com suas preferências</MudText>
 
 <MudGrid>
     <MudItem xs="12" md="8">
@@ -48,6 +49,13 @@
                        Label="@ThemeLabel"
                        ThumbIconChecked="@Icons.Material.Filled.DarkMode"
                        ThumbIconUnchecked="@Icons.Material.Filled.LightMode" />
+
+            <MudSelect T="string" Label="Tipo de navegação" Variant="Variant.Outlined"
+                       Value="@PreferenceService.CurrentPreferences.Ui.NavigationType"
+                       ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Ui.NavigationType = v))">
+                <MudSelectItem T="string" Value="@("sidebar")">Barra lateral (Sidebar)</MudSelectItem>
+                <MudSelectItem T="string" Value="@("topbar")">Barra superior (Topbar)</MudSelectItem>
+            </MudSelect>
 
             <MudSelect T="string" Label="Densidade" Variant="Variant.Outlined"
                        Value="@PreferenceService.CurrentPreferences.Ui.Density"

@@ -1,0 +1,144 @@
+@using erp.Components.Shared.Dialogs
+@using MudBlazor
+@using Color = MudBlazor.Color
+@implements IDisposable
+
+@inject NavigationManager NavigationManager
+
+<MudAppBar Elevation="2" Dense="false" Class="px-3">
+    <MudText Typo="Typo.h5" Class="mr-6" Style="font-weight: 600;">Pillar</MudText>
+    
+    <MudButton 
+               Color="@(IsActive("") ? Color.Primary : Color.Inherit)" 
+               Variant="@(IsActive("") ? Variant.Filled : Variant.Text)"
+               Href="" 
+               Class="mx-1"
+               Style="text-transform: none;">
+        Home
+    </MudButton>
+    
+    <MudButton 
+               Color="@(IsActive("dashboard") ? Color.Primary : Color.Inherit)"
+               Variant="@(IsActive("dashboard") ? Variant.Filled : Variant.Text)"
+               Href="dashboard" 
+               Class="mx-1"
+               Style="text-transform: none;">
+        Dashboard
+    </MudButton>
+    
+    <MudMenu 
+             Label="Vendas" 
+             Color="@(IsActive("sales") ? Color.Primary : Color.Inherit)" 
+             Variant="@(IsActive("sales") ? Variant.Filled : Variant.Text)"
+             Class="mx-1"
+             Style="text-transform: none;"
+             StartIcon="@Icons.Material.Filled.ArrowDropDown"
+             EndIcon="">
+        <MudMenuItem Href="sales" Icon="@Icons.Material.Filled.Receipt">Vendas</MudMenuItem>
+        <MudMenuItem Href="sales/customers" Icon="@Icons.Material.Filled.People">Clientes</MudMenuItem>
+    </MudMenu>
+    
+    <MudMenu 
+             Label="Estoque" 
+             Color="@(IsActive("inventory") ? Color.Primary : Color.Inherit)" 
+             Variant="@(IsActive("inventory") ? Variant.Filled : Variant.Text)"
+             Class="mx-1"
+             Style="text-transform: none;"
+             StartIcon="@Icons.Material.Filled.ArrowDropDown"
+             EndIcon="">
+        <MudMenuItem Href="inventory/products" Icon="@Icons.Material.Filled.Category">Produtos</MudMenuItem>
+        <MudMenuItem Href="inventory/movements" Icon="@Icons.Material.Filled.SwapHoriz">Movimentações</MudMenuItem>
+        <MudMenuItem Href="inventory/counts" Icon="@Icons.Material.Filled.Checklist">Contagens</MudMenuItem>
+    </MudMenu>
+    
+    <MudButton 
+               Color="@(IsActive("kanban") ? Color.Primary : Color.Inherit)"
+               Variant="@(IsActive("kanban") ? Variant.Filled : Variant.Text)"
+               Href="kanban" 
+               Class="mx-1"
+               Style="text-transform: none;">
+        Kanban
+    </MudButton>
+    
+    <MudSpacer />
+    
+    <AuthorizeView Roles="Administrador">
+        <Authorized>
+            <MudIconButton Icon="@Icons.Material.Filled.AdminPanelSettings" 
+                          Color="@(IsActive("admin") ? Color.Primary : Color.Inherit)" 
+                          Href="admin/users"
+                          Title="Administração" />
+        </Authorized>
+    </AuthorizeView>
+    
+    <MudIconButton Icon="@Icons.Material.Filled.Settings" 
+                  Color="@(IsActive("settings") ? Color.Primary : Color.Inherit)" 
+                  Href="settings"
+                  Title="Configurações" />
+    
+    <MudIconButton Icon="@Icons.Material.Filled.Logout" 
+                  Color="Color.Inherit" 
+                  OnClick="LogoutAsync"
+                  Title="Sair" />
+</MudAppBar>
+
+@code {
+    [Inject] HttpClient Http { get; set; } = null!;
+    private string? currentUrl;
+
+    protected override void OnInitialized()
+    {
+        currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        NavigationManager.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
+        StateHasChanged();
+    }
+
+    private bool IsActive(string path)
+    {
+        if (string.IsNullOrEmpty(path))
+        {
+            return string.IsNullOrEmpty(currentUrl) || currentUrl == "/";
+        }
+        return currentUrl?.StartsWith(path, StringComparison.OrdinalIgnoreCase) ?? false;
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
+
+    [Inject] IJSRuntime JS { get; set; } = null!;
+    [Inject] IDialogService DialogService { get; set; } = null!;
+
+    private async Task LogoutAsync()
+    {
+        var parameters = new DialogParameters
+        {
+            { "ContentText", "Tem certeza que deseja sair do sistema?" },
+            { "ButtonText", "Sair" },
+            { "Color", MudBlazor.Color.Error }
+        };
+
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.Small };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirmar saída", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("erpAuth.logout");
+                NavigationManager.NavigateTo("/login", forceLoad: true);
+            }
+            catch
+            {
+                NavigationManager.NavigateTo("/login", forceLoad: true);
+            }
+        }
+    }
+}
