@@ -46,3 +46,95 @@ input:focus-visible {
 .mud-chip {
     font-weight: 500;
 }
+
+/* Estilos modernos para a navegação */
+.mud-nav-link {
+    border-radius: 8px;
+    margin: 4px 8px;
+    padding: 10px 16px !important;
+    transition: all 0.2s ease;
+}
+
+.mud-nav-link:hover {
+    background-color: rgba(103, 58, 183, 0.08);
+    transform: translateX(2px);
+}
+
+.mud-nav-link.active {
+    background-color: rgba(103, 58, 183, 0.12);
+    font-weight: 600;
+}
+
+.mud-nav-group {
+    margin: 4px 8px;
+}
+
+.mud-nav-group .mud-nav-group-header {
+    border-radius: 8px;
+    padding: 10px 16px !important;
+    transition: all 0.2s ease;
+}
+
+.mud-nav-group .mud-nav-group-header:hover {
+    background-color: rgba(103, 58, 183, 0.08);
+}
+
+/* Topbar moderna */
+.mud-appbar {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+.mud-appbar .mud-button-root {
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.mud-appbar .mud-button-root:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.mud-appbar .mud-menu {
+    border-radius: 8px;
+}
+
+/* Drawer moderno */
+#nav-drawer {
+    border-right: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
+    transition: width 0.3s ease, min-width 0.3s ease;
+}
+
+/* Ocultar setinhas quando drawer está fechado (mini mode) */
+#nav-drawer.mud-drawer--closed .mud-nav-group .mud-nav-group-header .mud-icon-button,
+#nav-drawer .mud-drawer-content[style*="width: 56px"] .mud-nav-group .mud-nav-group-header .mud-icon-button {
+    display: none !important;
+}
+
+/* Menu items no dropdown da topbar */
+.mud-popover .mud-list-item {
+    border-radius: 6px;
+    margin: 2px 8px;
+    transition: all 0.15s ease;
+}
+
+.mud-popover .mud-list-item:hover {
+    background-color: rgba(103, 58, 183, 0.08);
+    transform: translateX(2px);
+}
+
+/* Transição suave para o conteúdo principal */
+.mud-main-content {
+    transition: margin-left 0.3s ease;
+}
+
+/* Melhorar hover no botão toggle */
+.mud-icon-button {
+    transition: transform 0.2s ease;
+}
+
+.mud-icon-button:hover {
+    transform: scale(1.1);
+}

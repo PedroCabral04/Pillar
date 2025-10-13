@@ -13,31 +13,45 @@
 <MudDialogProvider/>
 <MudSnackbarProvider/>
 <MudLayout>
-    <MudPaper Style="position: relative; height: 100vh; display: flex" >
-        <MudDrawerContainer Class="mud-height-full">
-            <MudDrawer id="nav-drawer" 
-                       Fixed="false" 
-                       Variant="@DrawerVariant.Mini" 
-                       OpenMiniOnHover="true" 
-                       @bind-Open="_drawerOpen" 
-                       ClipMode="DrawerClipMode.Always" 
-                       Elevation="2"
-                       Width="170px">
-                    <NavMenu/>
-            </MudDrawer>
-        </MudDrawerContainer>
-        <MudMainContent 
-            Class="pa-4 full-height-content" 
-            Style="@MainContentStyle()">
+    @if (IsTopbarNavigation)
+    {
+        <NavMenuTopbar />
+        <MudMainContent Class="pa-4" Style="@MainContentStyleTopbar()">
             <div class="mb-4">
                 <erp.Components.Shared.Breadcrumbs />
             </div>
             @Body
         </MudMainContent>
-        <MudScrollToTop>
-            <MudFab Color="MudBlazor.Color.Tertiary" StartIcon="@Icons.Material.Filled.ArrowCircleUp" />
-        </MudScrollToTop>
-    </MudPaper>
+    }
+    else
+    {
+        <MudPaper Style="position: relative; height: 100vh; display: flex" >
+            <MudDrawerContainer Class="mud-height-full">
+                <MudDrawer id="nav-drawer" 
+                           Fixed="false" 
+                           Variant="@(_drawerOpen ? DrawerVariant.Persistent : DrawerVariant.Mini)" 
+                           OpenMiniOnHover="false" 
+                           @bind-Open="_drawerOpen" 
+                           ClipMode="DrawerClipMode.Always" 
+                           Elevation="2"
+                           Width="240px"
+                           MiniWidth="56px">
+                        <NavMenu IsOpen="_drawerOpen" OnToggleDrawer="@ToggleDrawer"/>
+                </MudDrawer>
+            </MudDrawerContainer>
+            <MudMainContent 
+                Class="pa-4 full-height-content" 
+                Style="@MainContentStyle()">
+                <div class="mb-4">
+                    <erp.Components.Shared.Breadcrumbs />
+                </div>
+                @Body
+            </MudMainContent>
+            <MudScrollToTop>
+                <MudFab Color="MudBlazor.Color.Tertiary" StartIcon="@Icons.Material.Filled.ArrowCircleUp" />
+            </MudScrollToTop>
+        </MudPaper>
+    }
 </MudLayout>
 
 
@@ -48,9 +62,17 @@
     <div/>*@
 
 @code {
-    private bool _drawerOpen = false;
+    private bool _drawerOpen = true;
     private MudThemeProvider _mudThemeProvider = null!;
     public bool IsDarkMode;
+
+    private bool IsTopbarNavigation => 
+        PreferenceService.CurrentPreferences?.Ui?.NavigationType == "topbar";
+
+    private void ToggleDrawer()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -131,12 +153,26 @@
 
         string SetMarginForDrawer()
     {
-        return _drawerOpen ? "margin-left: 170px;" : "margin-left: 56px;";
+        return _drawerOpen ? "margin-left: 240px;" : "margin-left: 56px;";
     }
 
     private string MainContentStyle()
     {
-        var style = $"{SetMarginForDrawer()} flex: 1 1 auto; min-height: 0; overflow-y: auto;";
+        var style = $"{SetMarginForDrawer()} flex: 1 1 auto; min-height: 0; overflow-y: auto; transition: margin-left 0.3s ease;";
+        if (PreferenceService.CurrentPreferences?.Ui?.FontSize == "small")
+        {
+            style += "font-size: 0.9rem;";
+        }
+        else if (PreferenceService.CurrentPreferences?.Ui?.FontSize == "large")
+        {
+            style += "font-size: 1.1rem;";
+        }
+        return style;
+    }
+
+    private string MainContentStyleTopbar()
+    {
+        var style = "min-height: calc(100vh - 64px);";
         if (PreferenceService.CurrentPreferences?.Ui?.FontSize == "small")
         {
             style += "font-size: 0.9rem;";

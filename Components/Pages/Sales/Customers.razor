@@ -1,0 +1,248 @@
+@page "/sales/customers"
+@using erp.DTOs.Sales
+@using erp.Services
+@using erp.Components.Shared.Dialogs
+@using erp.Components.Shared.Dialogs.Sales
+@using MudBlazor
+@using Size = MudBlazor.Size
+@using Color = MudBlazor.Color
+@attribute [Authorize]
+
+@inject IApiService ApiService
+@inject ILogger<Customers> Logger
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Clientes</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Gerenciar Clientes</MudText>
+    <MudButton Color="Color.Primary" 
+               Variant="Variant.Filled" 
+               StartIcon="@Icons.Material.Filled.PersonAdd"
+               OnClick="ShowCreateDialog">
+        Adicionar Cliente
+    </MudButton>
+</MudStack>
+
+@if (_loadError != null)
+{
+    <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
+}
+
+<MudTable T="CustomerDto" ServerData="ServerReload" 
+          Dense="false" Hover="true" Elevation="4" @ref="_table" Striped="true" Loading="@_loading">
+    <ToolBarContent>
+        <MudText Typo="Typo.h5">Clientes Cadastrados</MudText>
+        <MudSpacer/>
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudTextField T="string" ValueChanged="OnSearch" Immediate="false" Placeholder="Procurar cliente" 
+                          Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
+                          Clearable="true" Style="min-width: 250px;"/>
+            <MudSelect T="string" 
+                       Value="_statusFilter" 
+                       ValueChanged="OnStatusFilterChanged"
+                       Label="Status" 
+                       Variant="Variant.Outlined" 
+                       Margin="Margin.Dense"
+                       Clearable="true"
+                       Style="min-width: 120px;">
+                <MudSelectItem T="string" Value="@("true")">Ativo</MudSelectItem>
+                <MudSelectItem T="string" Value="@("false")">Inativo</MudSelectItem>
+            </MudSelect>
+        </MudStack>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh>Documento</MudTh>
+        <MudTh>Nome</MudTh>
+        <MudTh>E-mail</MudTh>
+        <MudTh>Telefone</MudTh>
+        <MudTh>Cidade</MudTh>
+        <MudTh>Status</MudTh>
+        <MudTh Style="text-align: center">Ações</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Documento">
+            <MudText Typo="Typo.body2" Style="font-family: monospace">@FormatDocument(context.Document)</MudText>
+        </MudTd>
+        <MudTd DataLabel="Nome">@context.Name</MudTd>
+        <MudTd DataLabel="E-mail">@context.Email</MudTd>
+        <MudTd DataLabel="Telefone">@(context.Mobile ?? context.Phone)</MudTd>
+        <MudTd DataLabel="Cidade">@context.City, @context.State</MudTd>
+        <MudTd DataLabel="Status">
+            <MudChip T="string" Size="Size.Small" Color="@(context.IsActive ? MudBlazor.Color.Success : MudBlazor.Color.Default)">
+                @(context.IsActive ? "Ativo" : "Inativo")
+            </MudChip>
+        </MudTd>
+        <MudTd DataLabel="Ações" Style="text-align: center">
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                           Size="Size.Small"
+                           OnClick="@(() => ShowEditDialog(context))"
+                           Title="Editar"/>
+            <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                           Size="Size.Small" 
+                           Color="Color.Error"
+                           OnClick="@(() => DeleteCustomer(context))"
+                           Title="Inativar"/>
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText>Nenhum cliente encontrado</MudText>
+    </NoRecordsContent>
+    <LoadingContent>
+        <MudText>Carregando...</MudText>
+    </LoadingContent>
+    <PagerContent>
+        <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private MudTable<CustomerDto>? _table;
+    private string? _loadError;
+    private string? _searchString;
+    private string? _statusFilter;
+    private bool _loading = false;
+
+    private async Task<TableData<CustomerDto>> ServerReload(TableState state, CancellationToken ct)
+    {
+        _loading = true;
+        try
+        {
+            var page = state.Page + 1;
+            var pageSize = state.PageSize;
+
+            var queryParams = new List<string>
+            {
+                $"page={page}",
+                $"pageSize={pageSize}"
+            };
+
+            if (!string.IsNullOrWhiteSpace(_searchString))
+            {
+                queryParams.Add($"search={Uri.EscapeDataString(_searchString)}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(_statusFilter))
+            {
+                queryParams.Add($"isActive={_statusFilter}");
+            }
+
+            var query = string.Join("&", queryParams);
+            var response = await ApiService.GetAsync<dynamic>($"/api/sales/customers?{query}");
+
+            if (response != null)
+            {
+                var items = ((IEnumerable<dynamic>)response.items)
+                    .Select(item => System.Text.Json.JsonSerializer.Deserialize<CustomerDto>(
+                        item.ToString() ?? "{}", 
+                        new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }))
+                    .Where(c => c != null)
+                    .Cast<CustomerDto>()
+                    .ToList();
+
+                return new TableData<CustomerDto>
+                {
+                    Items = items,
+                    TotalItems = (int)response.total
+                };
+            }
+
+            return new TableData<CustomerDto> { Items = new List<CustomerDto>(), TotalItems = 0 };
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar clientes");
+            _loadError = $"Erro ao carregar clientes: {ex.Message}";
+            Snackbar.Add("Erro ao carregar clientes", Severity.Error);
+            return new TableData<CustomerDto> { Items = new List<CustomerDto>(), TotalItems = 0 };
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OnSearch(string? text)
+    {
+        _searchString = text;
+        _table?.ReloadServerData();
+    }
+
+    private void OnStatusFilterChanged(string? status)
+    {
+        _statusFilter = status;
+        _table?.ReloadServerData();
+    }
+
+    private async Task ShowCreateDialog()
+    {
+        var dialog = await DialogService.ShowAsync<CustomerCreateDialog>("Novo Cliente");
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await _table!.ReloadServerData();
+        }
+    }
+
+    private async Task ShowEditDialog(CustomerDto customer)
+    {
+        var parameters = new DialogParameters { { "CustomerId", customer.Id } };
+        var dialog = await DialogService.ShowAsync<CustomerEditDialog>("Editar Cliente", parameters);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await _table!.ReloadServerData();
+        }
+    }
+
+    private async Task DeleteCustomer(CustomerDto customer)
+    {
+        var parameters = new DialogParameters
+        {
+            { "ContentText", $"Tem certeza que deseja inativar o cliente '{customer.Name}'?" },
+            { "ButtonText", "Inativar" },
+            { "Color", Color.Warning }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirmar inativação", parameters);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            try
+            {
+                await ApiService.DeleteAsync($"/api/sales/customers/{customer.Id}");
+                Snackbar.Add("Cliente inativado com sucesso", Severity.Success);
+                await _table!.ReloadServerData();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Erro ao inativar cliente {CustomerId}", customer.Id);
+                Snackbar.Add($"Erro ao inativar cliente: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private string FormatDocument(string document)
+    {
+        if (string.IsNullOrEmpty(document)) return "";
+        
+        // CPF: 000.000.000-00
+        if (document.Length == 11)
+        {
+            return $"{document.Substring(0, 3)}.{document.Substring(3, 3)}.{document.Substring(6, 3)}-{document.Substring(9, 2)}";
+        }
+        
+        // CNPJ: 00.000.000/0000-00
+        if (document.Length == 14)
+        {
+            return $"{document.Substring(0, 2)}.{document.Substring(2, 3)}.{document.Substring(5, 3)}/{document.Substring(8, 4)}-{document.Substring(12, 2)}";
+        }
+        
+        return document;
+    }
+}

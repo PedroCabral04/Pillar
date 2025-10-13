@@ -70,7 +70,7 @@
             "admin" => "Administração",
             "users" => "Usuários",
             "kanban" => "Kanban",
-            "ajustes" => "Configurações",
+            "settings" or "ajustes" => "Configurações",
             "login" => "Login",
             _ => segment.Length > 0 ? char.ToUpper(segment[0]) + segment.Substring(1) : segment
         };
@@ -84,7 +84,7 @@
             "admin" => Icons.Material.Filled.AdminPanelSettings,
             "users" => Icons.Material.Filled.People,
             "kanban" => Icons.Material.Filled.ViewKanban,
-            "ajustes" => Icons.Material.Filled.Settings,
+            "settings" or "ajustes" => Icons.Material.Filled.Settings,
             _ => null
         };
     }

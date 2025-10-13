@@ -1,0 +1,241 @@
+@page "/inventory/products"
+@using erp.DTOs.Inventory
+@using erp.Services
+@using MudBlazor
+@using Size = MudBlazor.Size
+@using Color = MudBlazor.Color
+@attribute [Authorize]
+
+@inject IApiService ApiService
+@inject ILogger<Products> Logger
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Produtos</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Gerenciar Produtos</MudText>
+    <MudButton Color="Color.Primary" 
+               Variant="Variant.Filled" 
+               StartIcon="@Icons.Material.Filled.Add"
+               Href="/inventory/products/create">
+        Adicionar Produto
+    </MudButton>
+</MudStack>
+
+@if (_loadError != null)
+{
+    <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
+}
+
+<MudTable T="ProductDto" ServerData="ServerReload" 
+          Dense="false" Hover="true" Elevation="4" @ref="_table" Striped="true" Loading="@_loading">
+    <ToolBarContent>
+        <MudText Typo="Typo.h5">Produtos Cadastrados</MudText>
+        <MudSpacer/>
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudTextField T="string" ValueChanged="OnSearch" Immediate="false" Placeholder="Procurar produto" 
+                          Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
+                          Clearable="true" Style="min-width: 250px;"/>
+            <MudSelect T="string" 
+                       Value="_statusFilter" 
+                       ValueChanged="OnStatusFilterChanged"
+                       Label="Status" 
+                       Variant="Variant.Outlined" 
+                       Margin="Margin.Dense"
+                       Clearable="true"
+                       Style="min-width: 120px;">
+                <MudSelectItem T="string" Value="@("Ativo")">Ativo</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Inativo")">Inativo</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Descontinuado")">Descontinuado</MudSelectItem>
+            </MudSelect>
+        </MudStack>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh>SKU</MudTh>
+        <MudTh>Nome</MudTh>
+        <MudTh>Categoria</MudTh>
+        <MudTh Style="text-align: right">Estoque</MudTh>
+        <MudTh Style="text-align: right">Preço Venda</MudTh>
+        <MudTh>Status</MudTh>
+        <MudTh Style="text-align: center">Ações</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="SKU">
+            <MudText Typo="Typo.body2" Style="font-family: monospace">@context.Sku</MudText>
+        </MudTd>
+        <MudTd DataLabel="Nome">
+            <MudText Typo="Typo.body2">@context.Name</MudText>
+            @if (!string.IsNullOrEmpty(context.Barcode))
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Barcode</MudText>
+            }
+        </MudTd>
+        <MudTd DataLabel="Categoria">@context.CategoryName</MudTd>
+        <MudTd DataLabel="Estoque" Style="text-align: right">
+            <MudChip T="string" Size="Size.Small" Color="@GetStockColor(context)">
+                @context.CurrentStock.ToString("N2") @context.Unit
+            </MudChip>
+        </MudTd>
+        <MudTd DataLabel="Preço" Style="text-align: right">
+            <MudText Typo="Typo.body2">@context.SalePrice.ToString("C2")</MudText>
+        </MudTd>
+        <MudTd DataLabel="Status">
+            <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">@context.Status.ToString()</MudChip>
+        </MudTd>
+        <MudTd DataLabel="Ações" Style="text-align: center">
+            <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
+                           Size="Size.Small" 
+                           Href="@($"/inventory/products/{context.Id}")"
+                           Title="Ver detalhes"/>
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                           Size="Size.Small"
+                           Href="@($"/inventory/products/{context.Id}/edit")"
+                           Title="Editar"/>
+            <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                           Size="Size.Small" 
+                           Color="Color.Error"
+                           OnClick="@(() => DeleteProduct(context))"
+                           Title="Excluir"/>
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText>Nenhum produto encontrado</MudText>
+    </NoRecordsContent>
+    <LoadingContent>
+        <MudText>Carregando...</MudText>
+    </LoadingContent>
+    <PagerContent>
+        <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private MudTable<ProductDto>? _table;
+    private string? _loadError;
+    private string? _searchString;
+    private string? _statusFilter;
+    private bool _loading = false;
+
+    private async Task<TableData<ProductDto>> ServerReload(TableState state, CancellationToken ct)
+    {
+        _loading = true;
+        try
+        {
+            var page = state.Page + 1;
+            var pageSize = state.PageSize;
+
+            var queryParams = new List<string>
+            {
+                $"page={page}",
+                $"pageSize={pageSize}"
+            };
+
+            if (!string.IsNullOrWhiteSpace(_searchString))
+            {
+                queryParams.Add($"search={Uri.EscapeDataString(_searchString)}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(_statusFilter))
+            {
+                queryParams.Add($"status={Uri.EscapeDataString(_statusFilter)}");
+            }
+
+            var query = string.Join("&", queryParams);
+            var response = await ApiService.GetAsync<dynamic>($"/api/products?{query}");
+
+            if (response != null)
+            {
+                var items = ((IEnumerable<dynamic>)response.items)
+                    .Select(item => System.Text.Json.JsonSerializer.Deserialize<ProductDto>(
+                        item.ToString() ?? "{}", 
+                        new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }))
+                    .Where(p => p != null)
+                    .Cast<ProductDto>()
+                    .ToList();
+
+                return new TableData<ProductDto>
+                {
+                    Items = items,
+                    TotalItems = (int)response.total
+                };
+            }
+
+            return new TableData<ProductDto> { Items = new List<ProductDto>(), TotalItems = 0 };
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar produtos");
+            _loadError = $"Erro ao carregar produtos: {ex.Message}";
+            Snackbar.Add("Erro ao carregar produtos", Severity.Error);
+            return new TableData<ProductDto> { Items = new List<ProductDto>(), TotalItems = 0 };
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OnSearch(string? text)
+    {
+        _searchString = text;
+        _table?.ReloadServerData();
+    }
+
+    private void OnStatusFilterChanged(string? status)
+    {
+        _statusFilter = status;
+        _table?.ReloadServerData();
+    }
+
+    private async Task DeleteProduct(ProductDto product)
+    {
+        var parameters = new DialogParameters
+        {
+            { "ContentText", $"Tem certeza que deseja excluir o produto '{product.Name}'?" },
+            { "ButtonText", "Excluir" },
+            { "Color", Color.Error }
+        };
+
+        var dialog = await DialogService.ShowAsync<erp.Components.Shared.Dialogs.ConfirmDialog>(
+            "Confirmar exclusão", parameters);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            try
+            {
+                await ApiService.DeleteAsync($"/api/products/{product.Id}");
+                Snackbar.Add("Produto excluído com sucesso", Severity.Success);
+                await _table!.ReloadServerData();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Erro ao excluir produto {ProductId}", product.Id);
+                Snackbar.Add($"Erro ao excluir produto: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private MudBlazor.Color GetStockColor(ProductDto product)
+    {
+        if (product.CurrentStock <= 0)
+            return MudBlazor.Color.Error;
+        if (product.CurrentStock <= product.MinimumStock)
+            return MudBlazor.Color.Warning;
+        return MudBlazor.Color.Success;
+    }
+
+    private MudBlazor.Color GetStatusColor(int status)
+    {
+        // 0 = Active, 1 = Inactive, 2 = Discontinued
+        return status switch
+        {
+            0 => MudBlazor.Color.Success,
+            1 => MudBlazor.Color.Warning,
+            2 => MudBlazor.Color.Error,
+            _ => MudBlazor.Color.Default
+        };
+    }
+}

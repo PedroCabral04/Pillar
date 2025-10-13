@@ -12,6 +12,10 @@ public interface IApiService
     Task<HttpResponseMessage> PutAsJsonAsync<T>(string endpoint, T data, CancellationToken cancellationToken = default);
     Task<HttpResponseMessage> DeleteAsync(string endpoint, CancellationToken cancellationToken = default);
     
+    // Simplified overloads
+    Task<T?> PostAsync<T>(string endpoint, object? data, CancellationToken cancellationToken = default);
+    Task<T?> PutAsync<T>(string endpoint, object data, CancellationToken cancellationToken = default);
+    
     event EventHandler<bool>? LoadingStateChanged;
     event EventHandler<string>? ErrorOccurred;
     bool IsLoading { get; }
@@ -48,13 +52,16 @@ public class ApiService : IApiService
         _httpClient = httpClient;
         _httpContextAccessor = httpContextAccessor;
         _logger = logger;
-        _httpClient.Timeout = _defaultTimeout;
+        // Timeout is configured in Program.cs via AddHttpClient
+        _defaultTimeout = _httpClient.Timeout;
     }
     
     public void SetTimeout(TimeSpan timeout)
     {
         _defaultTimeout = timeout;
-        _httpClient.Timeout = timeout;
+        // Don't set timeout on HttpClient after it's been created
+        // Instead, use CancellationTokenSource with timeout for individual requests
+        _logger.LogWarning("SetTimeout called but timeout changes after HttpClient creation are not supported. Configure timeout in Program.cs instead.");
     }
 
     private void BeginLoading()
@@ -212,6 +219,42 @@ public class ApiService : IApiService
         {
             EndLoading();
         }
+    }
+
+    public async Task<T?> PostAsync<T>(string endpoint, object? data, CancellationToken cancellationToken = default)
+    {
+        var response = await PostAsJsonAsync(endpoint, data!, cancellationToken);
+        
+        if (response.IsSuccessStatusCode)
+        {
+            var content = await response.Content.ReadAsStringAsync(cancellationToken);
+            return JsonSerializer.Deserialize<T>(content, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+        }
+        
+        // If not successful, throw exception with error details
+        var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+        throw new HttpRequestException($"Request failed with status {response.StatusCode}: {errorContent}");
+    }
+
+    public async Task<T?> PutAsync<T>(string endpoint, object data, CancellationToken cancellationToken = default)
+    {
+        var response = await PutAsJsonAsync(endpoint, data, cancellationToken);
+        
+        if (response.IsSuccessStatusCode)
+        {
+            var content = await response.Content.ReadAsStringAsync(cancellationToken);
+            return JsonSerializer.Deserialize<T>(content, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+        }
+        
+        // If not successful, throw exception with error details
+        var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+        throw new HttpRequestException($"Request failed with status {response.StatusCode}: {errorContent}");
     }
 
     /// <summary>

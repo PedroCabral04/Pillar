@@ -16,6 +16,8 @@ using erp.Models.Identity;
 using erp.Services.Dashboard;
 using erp.Services.Dashboard.Providers.Sales;
 using erp.Services.Dashboard.Providers.Finance;
+using erp.Services.Dashboard.Providers.Inventory;
+using erp.Services.Sales;
 // using ApexCharts; // TODO: Instalar pacote ApexCharts se necessário
 
 var builder = WebApplication.CreateBuilder(args);
@@ -134,7 +136,30 @@ builder.Services.AddScoped<IUserDao, UserDao>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<PreferenceService>();
 builder.Services.AddScoped<ThemeService>();
-builder.Services.AddScoped<IApiService, ApiService>();
+
+// Register HttpClient for ApiService with proper configuration
+builder.Services.AddHttpClient<IApiService, ApiService>((serviceProvider, client) =>
+{
+    // Get the current request's base URL for Blazor Server
+    var httpContextAccessor = serviceProvider.GetRequiredService<IHttpContextAccessor>();
+    var httpContext = httpContextAccessor.HttpContext;
+    
+    if (httpContext != null)
+    {
+        var request = httpContext.Request;
+        var baseUrl = $"{request.Scheme}://{request.Host}";
+        client.BaseAddress = new Uri(baseUrl);
+    }
+    else
+    {
+        // Fallback for cases where HttpContext is not available
+        // This should work for most dev scenarios
+        client.BaseAddress = new Uri("https://localhost:7051");
+    }
+    
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<erp.Services.Notifications.IAdvancedNotificationService, erp.Services.Notifications.AdvancedNotificationService>();
 // Dashboard services
@@ -142,14 +167,28 @@ builder.Services.AddScoped<IDashboardRegistry, DashboardRegistry>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IDashboardWidgetProvider, SalesDashboardProvider>();
 builder.Services.AddScoped<IDashboardWidgetProvider, FinanceDashboardProvider>();
+builder.Services.AddScoped<IDashboardWidgetProvider, erp.Services.Dashboard.Providers.Inventory.InventoryDashboardProvider>();
 builder.Services.AddScoped<erp.Services.DashboardCustomization.IDashboardLayoutService, erp.Services.DashboardCustomization.DashboardLayoutService>();
 // Validation services
 builder.Services.AddScoped<erp.Services.Validation.IUserValidationService, erp.Services.Validation.UserValidationService>();
 // Onboarding services
 builder.Services.AddScoped<erp.Services.Onboarding.IOnboardingService, erp.Services.Onboarding.OnboardingService>();
 
+// Inventory services
+builder.Services.AddScoped<erp.Services.Inventory.IInventoryService, erp.Services.Inventory.InventoryService>();
+builder.Services.AddScoped<erp.Services.Inventory.IStockMovementService, erp.Services.Inventory.StockMovementService>();
+builder.Services.AddScoped<erp.Services.Inventory.IStockCountService, erp.Services.Inventory.StockCountService>();
+
+// Sales services
+builder.Services.AddScoped<erp.Services.Sales.ICustomerService, erp.Services.Sales.CustomerService>();
+builder.Services.AddScoped<erp.Services.Sales.ISalesService, erp.Services.Sales.SalesService>();
+
 // ------- REGISTRO DO MAPPERLY -------
 builder.Services.AddScoped<UserMapper, UserMapper>();
+builder.Services.AddScoped<ProductMapper, ProductMapper>();
+builder.Services.AddScoped<StockMovementMapper, StockMovementMapper>();
+builder.Services.AddScoped<StockCountMapper, StockCountMapper>();
+builder.Services.AddScoped<SalesMapper, SalesMapper>();
 
 // --- Constrói a aplicação ---
 var app = builder.Build();

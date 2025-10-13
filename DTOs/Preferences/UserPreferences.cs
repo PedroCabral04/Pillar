@@ -20,6 +20,7 @@ namespace erp.DTOs.Preferences
         public bool HighContrast { get; set; } = false;
         public bool ReduceMotion { get; set; } = false;
         public string FontSize { get; set; } = "base"; // small|base|large
+        public string NavigationType { get; set; } = "sidebar"; // sidebar|topbar
     }
 
     public class LocalePreferences
