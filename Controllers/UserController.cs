@@ -187,5 +187,55 @@ namespace erp.Controllers
 
             return NoContent();
         }
+
+        /// <summary>
+        /// Valida se um email está disponível para uso
+        /// </summary>
+        [HttpGet("validate/email")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        public async Task<ActionResult<ValidationResponse>> ValidateEmail([FromQuery] string email, [FromQuery] int? excludeUserId = null)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+                return BadRequest(new ValidationResponse { IsAvailable = false, Message = "Email é obrigatório" });
+
+            var existingUser = await _users.FindByEmailAsync(email.Trim());
+            
+            // Se encontrou um usuário e não é o que estamos excluindo da validação
+            if (existingUser != null && (!excludeUserId.HasValue || existingUser.Id != excludeUserId.Value))
+            {
+                return Conflict(new ValidationResponse { IsAvailable = false, Message = "Este email já está em uso" });
+            }
+
+            return Ok(new ValidationResponse { IsAvailable = true, Message = "Email disponível" });
+        }
+
+        /// <summary>
+        /// Valida se um username está disponível para uso
+        /// </summary>
+        [HttpGet("validate/username")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        public async Task<ActionResult<ValidationResponse>> ValidateUsername([FromQuery] string username, [FromQuery] int? excludeUserId = null)
+        {
+            if (string.IsNullOrWhiteSpace(username))
+                return BadRequest(new ValidationResponse { IsAvailable = false, Message = "Username é obrigatório" });
+
+            var existingUser = await _users.FindByNameAsync(username.Trim());
+            
+            // Se encontrou um usuário e não é o que estamos excluindo da validação
+            if (existingUser != null && (!excludeUserId.HasValue || existingUser.Id != excludeUserId.Value))
+            {
+                return Conflict(new ValidationResponse { IsAvailable = false, Message = "Este nome de usuário já está em uso" });
+            }
+
+            return Ok(new ValidationResponse { IsAvailable = true, Message = "Username disponível" });
+        }
+    }
+
+    public class ValidationResponse
+    {
+        public bool IsAvailable { get; set; }
+        public string Message { get; set; } = string.Empty;
     }
 }

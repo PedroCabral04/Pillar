@@ -5,11 +5,14 @@
 @using System.Security.Claims
 @using Color = MudBlazor.Color
 @using Size = MudBlazor.Size
+@using erp.Services.Onboarding
+@using erp.DTOs.Onboarding
 
 @inject IDashboardService Dashboard
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IOnboardingService OnboardingService
 
-<MudStack Spacing="3">
+<MudStack Spacing="3" Class="dashboard-section">
     <!-- Greeting Section -->
     <MudPaper Class="pa-4" Elevation="2">
         <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
@@ -68,6 +71,14 @@
     </MudGrid>
 </MudStack>
 
+<!-- Onboarding Tour -->
+@if (_showTour && _dashboardTour != null)
+{
+    <erp.Components.Shared.OnboardingTour Tour="@_dashboardTour" 
+                                         OnComplete="@HandleTourComplete" 
+                                         OnSkip="@HandleTourSkip" />
+}
+
 @code {
     private List<DashboardWidgetDefinition>? _widgets;
     private DateRange _range = new(DateTime.Today.AddMonths(-1), DateTime.Today);
@@ -76,6 +87,11 @@
     private string _greeting = "";
     private string _greetingIcon = Icons.Material.Filled.WbSunny;
     private string _userName = "Usuário";
+    private string _userId = string.Empty;
+    private string[] _userRoles = Array.Empty<string>();
+    
+    private bool _showTour = false;
+    private OnboardingTour? _dashboardTour;
 
     protected override async Task OnInitializedAsync()
     {
@@ -97,7 +113,7 @@
             _greetingIcon = Icons.Material.Filled.DarkMode;
         }
 
-        // Get user name
+        // Get user info
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
         if (user.Identity?.IsAuthenticated == true)
@@ -106,10 +122,56 @@
                         ?? user.FindFirst("sub")?.Value 
                         ?? user.Identity.Name 
                         ?? "Usuário";
+            
+            _userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+            _userRoles = user.FindAll(ClaimTypes.Role).Select(c => c.Value).ToArray();
         }
 
+        // Load dashboard widgets
         var list = await Dashboard.GetWidgetsAsync();
         _widgets = list.ToList();
+        
+        // Check if should show dashboard tour
+        await InitializeTourAsync();
+    }
+    
+    private async Task InitializeTourAsync()
+    {
+        if (string.IsNullOrEmpty(_userId))
+            return;
+            
+        _dashboardTour = OnboardingService.GetTourById("dashboard-tour");
+        if (_dashboardTour == null)
+            return;
+            
+        var progress = await OnboardingService.GetUserProgressAsync(_userId, "dashboard-tour");
+        
+        // Mostra o tour se não foi completado ainda
+        if (progress == null || !progress.IsCompleted)
+        {
+            // Pequeno delay para garantir que a página foi renderizada
+            await Task.Delay(500);
+            _showTour = true;
+            StateHasChanged();
+        }
+    }
+    
+    private async Task HandleTourComplete()
+    {
+        _showTour = false;
+        if (!string.IsNullOrEmpty(_userId))
+        {
+            await OnboardingService.CompleteTourAsync(_userId, "dashboard-tour");
+        }
+    }
+    
+    private async Task HandleTourSkip()
+    {
+        _showTour = false;
+        if (!string.IsNullOrEmpty(_userId))
+        {
+            await OnboardingService.SkipTourAsync(_userId, "dashboard-tour");
+        }
     }
 
     private enum DatePreset

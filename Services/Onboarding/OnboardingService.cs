@@ -96,6 +96,72 @@ public class OnboardingService : IOnboardingService
             },
             new OnboardingTour
             {
+                Id = "dashboard-tour",
+                Name = "Tour do Dashboard",
+                Description = "Descubra como usar o dashboard para visualizar métricas e personalizar sua experiência",
+                IsRequired = false,
+                Steps = new List<OnboardingStep>
+                {
+                    new OnboardingStep
+                    {
+                        Id = "dashboard-1",
+                        Title = "Bem-vindo ao Dashboard!",
+                        Description = "Aqui você encontra uma visão completa do seu negócio com gráficos interativos e métricas em tempo real.",
+                        Target = ".dashboard-section",
+                        Placement = "center",
+                        Order = 1,
+                        ShowPrevious = false
+                    },
+                    new OnboardingStep
+                    {
+                        Id = "dashboard-2",
+                        Title = "Saudação Personalizada",
+                        Description = "O dashboard te cumprimenta de acordo com o horário do dia e exibe a data atual.",
+                        Target = ".mud-paper:first-child",
+                        Placement = "bottom",
+                        Order = 2
+                    },
+                    new OnboardingStep
+                    {
+                        Id = "dashboard-3",
+                        Title = "Filtros de Data",
+                        Description = "Use este seletor para escolher um período personalizado e visualizar dados específicos.",
+                        Target = ".mud-picker",
+                        Placement = "bottom",
+                        Order = 3
+                    },
+                    new OnboardingStep
+                    {
+                        Id = "dashboard-4",
+                        Title = "Presets Rápidos",
+                        Description = "Economize tempo com presets: hoje, últimos 7 dias, este mês e mais!",
+                        Target = ".mud-chipset",
+                        Placement = "bottom",
+                        Order = 4
+                    },
+                    new OnboardingStep
+                    {
+                        Id = "dashboard-5",
+                        Title = "Widgets Interativos",
+                        Description = "Cada widget mostra métricas importantes. Clique neles para ver mais detalhes!",
+                        Target = ".mud-grid",
+                        Placement = "top",
+                        Order = 5
+                    },
+                    new OnboardingStep
+                    {
+                        Id = "dashboard-6",
+                        Title = "Você está pronto!",
+                        Description = "Explore os widgets, experimente os filtros e personalize seu dashboard. Bom trabalho!",
+                        Target = ".dashboard-section",
+                        Placement = "center",
+                        Order = 6,
+                        ShowNext = false
+                    }
+                }
+            },
+            new OnboardingTour
+            {
                 Id = "admin-tour",
                 Name = "Tour de Administração",
                 Description = "Aprenda a gerenciar usuários e configurações do sistema",
