@@ -1,6 +1,7 @@
 ﻿@page "/"
 @attribute [Authorize]
 @using Microsoft.AspNetCore.Components.Authorization
+@using MudBlazor
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
 
@@ -40,7 +41,7 @@
                 <MudCard Elevation="2" Class="cursor-pointer hover-card" @onclick="@(() => NavigateTo("/dashboard"))">
                     <MudCardContent Class="pa-6">
                         <div class="d-flex align-center mb-3">
-                            <MudIcon Icon="@Icons.Material.Filled.Dashboard" Size="Size.Large" Color="MudBlazor.Color.Primary" Class="mr-3" />
+                            <MudIcon Icon="@Icons.Material.Filled.Dashboard" Size="MudBlazor.Size.Large" Color="MudBlazor.Color.Primary" Class="mr-3" />
                             <MudText Typo="Typo.h6">Dashboard</MudText>
                         </div>
                         <MudText Typo="Typo.body2" Color="MudBlazor.Color.Secondary">
@@ -55,7 +56,7 @@
                 <MudCard Elevation="2" Class="cursor-pointer hover-card" @onclick="@(() => NavigateTo("/kanban"))">
                     <MudCardContent Class="pa-6">
                         <div class="d-flex align-center mb-3">
-                            <MudIcon Icon="@Icons.Material.Filled.ViewKanban" Size="Size.Large" Color="MudBlazor.Color.Success" Class="mr-3" />
+                            <MudIcon Icon="@Icons.Material.Filled.ViewKanban" Size="MudBlazor.Size.Large" Color="MudBlazor.Color.Success" Class="mr-3" />
                             <MudText Typo="Typo.h6">Kanban</MudText>
                         </div>
                         <MudText Typo="Typo.body2" Color="MudBlazor.Color.Secondary">
@@ -72,7 +73,7 @@
                     <MudCard Elevation="2" Class="cursor-pointer hover-card" @onclick="@(() => NavigateTo("/admin/users"))">
                         <MudCardContent Class="pa-6">
                             <div class="d-flex align-center mb-3">
-                                <MudIcon Icon="@Icons.Material.Filled.AdminPanelSettings" Size="Size.Large" Color="MudBlazor.Color.Warning" Class="mr-3" />
+                                <MudIcon Icon="@Icons.Material.Filled.AdminPanelSettings" Size="MudBlazor.Size.Large" Color="MudBlazor.Color.Warning" Class="mr-3" />
                                 <MudText Typo="Typo.h6">Administração</MudText>
                             </div>
                             <MudText Typo="Typo.body2" Color="MudBlazor.Color.Secondary">
@@ -88,7 +89,7 @@
                 <MudCard Elevation="2" Class="cursor-pointer hover-card" @onclick="@(() => NavigateTo("/settings"))">
                     <MudCardContent Class="pa-6">
                         <div class="d-flex align-center mb-3">
-                            <MudIcon Icon="@Icons.Material.Filled.Settings" Size="Size.Large" Color="MudBlazor.Color.Info" Class="mr-3" />
+                            <MudIcon Icon="@Icons.Material.Filled.Settings" Size="MudBlazor.Size.Large" Color="MudBlazor.Color.Info" Class="mr-3" />
                             <MudText Typo="Typo.h6">Configurações</MudText>
                         </div>
                         <MudText Typo="Typo.body2" Color="MudBlazor.Color.Secondary">
@@ -96,70 +97,6 @@
                         </MudText>
                     </MudCardContent>
                 </MudCard>
-            </MudItem>
-        </MudGrid>
-
-        <!-- Seção de Recursos -->
-        <MudText Typo="Typo.h5" Class="mb-3 mt-8">Recursos do Sistema</MudText>
-        <MudGrid>
-            <MudItem xs="12" md="6">
-                <MudPaper Elevation="1" Class="pa-4">
-                    <div class="d-flex align-center mb-3">
-                        <MudIcon Icon="@Icons.Material.Filled.Speed" Color="MudBlazor.Color.Primary" Class="mr-2" />
-                        <MudText Typo="Typo.h6">Performance e Eficiência</MudText>
-                    </div>
-                    <MudText Typo="Typo.body2" Class="mb-2">
-                        Sistema construído com tecnologias modernas (.NET 9, Blazor Server) para máxima performance
-                    </MudText>
-                    <MudChip Size="Size.Small" Color="MudBlazor.Color.Primary" Variant="Variant.Text">Blazor Server</MudChip>
-                    <MudChip Size="Size.Small" Color="MudBlazor.Color.Primary" Variant="Variant.Text">.NET 9</MudChip>
-                    <MudChip Size="Size.Small" Color="MudBlazor.Color.Primary" Variant="Variant.Text">MudBlazor</MudChip>
-                </MudPaper>
-            </MudItem>
-
-            <MudItem xs="12" md="6">
-                <MudPaper Elevation="1" Class="pa-4">
-                    <div class="d-flex align-center mb-3">
-                        <MudIcon Icon="@Icons.Material.Filled.Security" Color="MudBlazor.Color.Success" Class="mr-2" />
-                        <MudText Typo="Typo.h6">Segurança Robusta</MudText>
-                    </div>
-                    <MudText Typo="Typo.body2" Class="mb-2">
-                        Autenticação ASP.NET Core Identity, cookies hardening e proteção CSRF
-                    </MudText>
-                    <MudChip Size="Size.Small" Color="MudBlazor.Color.Success" Variant="Variant.Text">Identity</MudChip>
-                    <MudChip Size="Size.Small" Color="MudBlazor.Color.Success" Variant="Variant.Text">HTTPS</MudChip>
-                    <MudChip Size="Size.Small" Color="MudBlazor.Color.Success" Variant="Variant.Text">CSRF Protection</MudChip>
-                </MudPaper>
-            </MudItem>
-
-            <MudItem xs="12" md="6">
-                <MudPaper Elevation="1" Class="pa-4">
-                    <div class="d-flex align-center mb-3">
-                        <MudIcon Icon="@Icons.Material.Filled.Palette" Color="MudBlazor.Color.Info" Class="mr-2" />
-                        <MudText Typo="Typo.h6">Interface Moderna</MudText>
-                    </div>
-                    <MudText Typo="Typo.body2" Class="mb-2">
-                        Design responsivo e intuitivo com suporte a temas claro e escuro
-                    </MudText>
-                    <MudChip Size="Size.Small" Color="MudBlazor.Color.Info" Variant="Variant.Text">Material Design</MudChip>
-                    <MudChip Size="Size.Small" Color="MudBlazor.Color.Info" Variant="Variant.Text">Responsivo</MudChip>
-                    <MudChip Size="Size.Small" Color="MudBlazor.Color.Info" Variant="Variant.Text">Dark Mode</MudChip>
-                </MudPaper>
-            </MudItem>
-
-            <MudItem xs="12" md="6">
-                <MudPaper Elevation="1" Class="pa-4">
-                    <div class="d-flex align-center mb-3">
-                        <MudIcon Icon="@Icons.Material.Filled.Extension" Color="MudBlazor.Color.Warning" Class="mr-2" />
-                        <MudText Typo="Typo.h6">Modular e Extensível</MudText>
-                    </div>
-                    <MudText Typo="Typo.body2" Class="mb-2">
-                        Arquitetura modular que permite fácil expansão e customização
-                    </MudText>
-                    <MudChip Size="Size.Small" Color="MudBlazor.Color.Warning" Variant="Variant.Text">Widgets</MudChip>
-                    <MudChip Size="Size.Small" Color="MudBlazor.Color.Warning" Variant="Variant.Text">Providers</MudChip>
-                    <MudChip Size="Size.Small" Color="MudBlazor.Color.Warning" Variant="Variant.Text">API REST</MudChip>
-                </MudPaper>
             </MudItem>
         </MudGrid>
 
