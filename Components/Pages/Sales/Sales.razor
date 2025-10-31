@@ -170,22 +170,14 @@
             }
 
             var query = string.Join("&", queryParams);
-            var response = await ApiService.GetAsync<dynamic>($"/api/sales?{query}");
+            var response = await ApiService.GetAsync<PaginatedSalesResponse>($"/api/sales?{query}");
 
             if (response != null)
             {
-                var items = ((IEnumerable<dynamic>)response.items)
-                    .Select(item => System.Text.Json.JsonSerializer.Deserialize<SaleDto>(
-                        item.ToString() ?? "{}", 
-                        new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }))
-                    .Where(s => s != null)
-                    .Cast<SaleDto>()
-                    .ToList();
-
                 return new TableData<SaleDto>
                 {
-                    Items = items,
-                    TotalItems = (int)response.total
+                    Items = response.Items,
+                    TotalItems = response.Total
                 };
             }
 
