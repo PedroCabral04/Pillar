@@ -30,7 +30,6 @@ try
 {
     // Loads .env from current directory by default and sets variables for the process
     DotNetEnv.Env.Load();
-    DotNetEnv
 }
 catch
 {
