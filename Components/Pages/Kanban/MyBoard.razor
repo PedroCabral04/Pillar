@@ -76,6 +76,15 @@
                             </MudStack>
                             <MudDivider Class="my-2"/>
                             <MudDropZone T="KanbanCardDto" Identifier="@col.Id.ToString()" Class="kanban-cards mud-height-full" AllowReorder="true" />
+
+                            <!-- Delete bar: arraste um card aqui para excluir -->
+                            <MudDropZone T="KanbanCardDto" Identifier="@($"delete-{col.Id}")" Class="kanban-delete-zone" AllowReorder="false">
+                                <div class="delete-zone-content">
+                                    <MudIcon Icon="@Icons.Material.Filled.Delete" Size="@MudBlazor.Size.Medium" />
+                                    <span class="delete-zone-text">Arraste aqui para excluir</span>
+                                </div>
+                            </MudDropZone>
+
                             <MudButton Size="MudBlazor.Size.Small" 
                                       Variant="Variant.Outlined" 
                                       StartIcon="@Icons.Material.Filled.Add" 
@@ -327,6 +336,43 @@
         if (info?.Item is null || string.IsNullOrWhiteSpace(info.DropzoneIdentifier) || _columns is null)
             return;
 
+        // Handle deletion when dropped onto the delete bar (identifier: "delete-{columnId}")
+        if (info.DropzoneIdentifier.StartsWith("delete-"))
+        {
+            // optimistic delete in UI
+            var cardId = info.Item.Id;
+            _allCards.RemoveAll(c => c.Id == cardId);
+            foreach (var col in _columns)
+            {
+                col.Cards.RemoveAll(c => c.Id == cardId);
+            }
+            _dropContainer?.Refresh();
+            StateHasChanged();
+
+            // Call API to delete
+            try
+            {
+                var deleteRes = await Api.DeleteAsync($"api/kanban/cards/{cardId}");
+                if (deleteRes.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("Card excluído com sucesso!", Severity.Success);
+                }
+                else
+                {
+                    Snackbar.Add("Erro ao excluir card. Revertendo...", Severity.Warning);
+                    await RefreshData();
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao excluir card: {ex.Message}", Severity.Error);
+                await RefreshData();
+            }
+
+            return;
+        }
+
+        // Normal move handling (drop into a column)
         if (!int.TryParse(info.DropzoneIdentifier, out var toColumnId))
             return;
 
@@ -572,4 +618,64 @@
 .kanban-item {
     animation: slideIn 250ms ease-out;
 }
+
+.kanban-delete-zone {
+    height: 56px;
+    border-radius: 8px;
+    background: #fff7f7;
+    border: 2px dashed rgba(176,0,32,0.15);
+    display: none; /* hidden by default - only visible while dragging */
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 8px;
+    transition: background-color 150ms ease, border-color 150ms ease, transform 120ms ease, opacity 120ms ease;
+}
+
+.kanban-delete-zone .delete-zone-content {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    color: #b00020;
+    font-weight: 600;
+}
+
+/* Show delete zone while dragging */
+.kanban-dragging .kanban-delete-zone {
+    display: flex;
+    opacity: 1;
+}
+
+.kanban-delete-zone.mud-drop-zone-drag-enter {
+    background: #ffecec;
+    border-color: #b00020;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(176,0,32,0.12);
+}
 </style>
+
+<script>
+(function(){
+    if (window.__kanbanDragInit) return;
+    window.__kanbanDragInit = true;
+
+    function onStart(e) {
+        var el = e.target;
+        while (el && !el.classList?.contains('kanban-item')) el = el.parentElement;
+        if (el) document.body.classList.add('kanban-dragging');
+    }
+
+    function onEnd(e) { document.body.classList.remove('kanban-dragging'); }
+
+    document.addEventListener('dragstart', onStart);
+    document.addEventListener('dragend', onEnd);
+    document.addEventListener('drop', onEnd);
+
+    // Mouse fallback: show during press on an item until mouseup
+    document.addEventListener('mousedown', function(e){
+        var el = e.target;
+        while (el && !el.classList?.contains('kanban-item')) el = el.parentElement;
+        if (el) document.body.classList.add('kanban-dragging');
+    });
+    document.addEventListener('mouseup', onEnd);
+})();
+</script>
