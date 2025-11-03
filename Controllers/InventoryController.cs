@@ -27,9 +27,44 @@ public class InventoryController : ControllerBase
     #region Stock Counts
 
     /// <summary>
+    /// Lista contagens de estoque com paginação e filtros
+    /// </summary>
+    [HttpGet("counts")]
+    public async Task<ActionResult> GetStockCounts(
+        [FromQuery] string? status = null,
+        [FromQuery] int? warehouseId = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        try
+        {
+            var (counts, totalCount) = await _stockCountService.GetCountsAsync(
+                status, warehouseId, page, pageSize);
+            
+            var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+            
+            return Ok(new
+            {
+                items = counts,
+                totalItems = totalCount,
+                page,
+                pageSize,
+                totalPages,
+                hasNextPage = page < totalPages,
+                hasPreviousPage = page > 1
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao listar contagens de estoque");
+            return StatusCode(500, new { message = "Erro ao listar contagens", error = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Cria uma nova contagem de estoque
     /// </summary>
-    [HttpPost("stock-counts")]
+    [HttpPost("counts")]
     public async Task<ActionResult<StockCountDto>> CreateStockCount([FromBody] CreateStockCountDto createDto)
     {
         try
@@ -205,6 +240,145 @@ public class InventoryController : ControllerBase
         {
             _logger.LogError(ex, "Erro ao cancelar contagem {CountId}", id);
             return StatusCode(500, new { message = "Erro ao cancelar contagem", error = ex.Message });
+        }
+    }
+
+    #endregion
+
+    #region Stock Movements
+
+    /// <summary>
+    /// Lista movimentações de estoque com paginação e filtros
+    /// </summary>
+    [HttpGet("movements")]
+    public async Task<ActionResult> GetStockMovements(
+        [FromQuery] int? productId = null,
+        [FromQuery] string? movementType = null,
+        [FromQuery] int? warehouseId = null,
+        [FromQuery] DateTime? startDate = null,
+        [FromQuery] DateTime? endDate = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        try
+        {
+            var (movements, totalCount) = await _inventoryService.GetStockMovementsAsync(
+                productId, movementType, warehouseId, startDate, endDate, page, pageSize);
+            
+            var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+            
+            return Ok(new
+            {
+                items = movements,
+                totalItems = totalCount,
+                page,
+                pageSize,
+                totalPages,
+                hasNextPage = page < totalPages,
+                hasPreviousPage = page > 1
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao listar movimentações de estoque");
+            return StatusCode(500, new { message = "Erro ao listar movimentações", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Cria uma nova movimentação de estoque
+    /// </summary>
+    [HttpPost("movements")]
+    public async Task<ActionResult<StockMovementDto>> CreateStockMovement([FromBody] CreateStockMovementDto createDto)
+    {
+        try
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+            {
+                return Unauthorized(new { message = "Usuário não autenticado" });
+            }
+
+            var movement = await _inventoryService.CreateStockMovementAsync(createDto, userId);
+            
+            return CreatedAtAction(nameof(GetStockMovementById), new { id = movement.Id }, movement);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Erro de validação ao criar movimentação");
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao criar movimentação de estoque");
+            return StatusCode(500, new { message = "Erro ao criar movimentação", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Busca movimentação por ID
+    /// </summary>
+    [HttpGet("movements/{id:int}")]
+    public async Task<ActionResult<StockMovementDto>> GetStockMovementById(int id)
+    {
+        try
+        {
+            var movement = await _inventoryService.GetStockMovementByIdAsync(id);
+            
+            if (movement == null)
+            {
+                return NotFound(new { message = $"Movimentação com ID {id} não encontrada" });
+            }
+
+            return Ok(movement);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao buscar movimentação {MovementId}", id);
+            return StatusCode(500, new { message = "Erro ao buscar movimentação", error = ex.Message });
+        }
+    }
+
+    #endregion
+
+    #region Warehouses
+
+    /// <summary>
+    /// Lista todos os armazéns/depósitos
+    /// </summary>
+    [HttpGet("warehouses")]
+    public async Task<ActionResult> GetWarehouses(
+        [FromQuery] bool? isActive = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 100)
+    {
+        try
+        {
+            var (warehouses, totalCount) = await _inventoryService.GetWarehousesAsync(
+                isActive, page, pageSize);
+            
+            var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+            
+            return Ok(new
+            {
+                items = warehouses,
+                totalItems = totalCount,
+                page,
+                pageSize,
+                totalPages,
+                hasNextPage = page < totalPages,
+                hasPreviousPage = page > 1
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao listar armazéns");
+            return StatusCode(500, new { message = "Erro ao listar armazéns", error = ex.Message });
         }
     }
 

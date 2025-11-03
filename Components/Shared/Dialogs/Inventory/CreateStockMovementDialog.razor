@@ -1,0 +1,343 @@
+@using MudBlazor
+@using erp.DTOs.Inventory
+@using erp.Services
+@inject ISnackbar Snackbar
+@inject IApiService ApiService
+@inject ILogger<CreateStockMovementDialog> Logger
+
+<MudDialog Class="create-movement-dialog" Style="min-width: 600px; max-width: 90vw;">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.CompareArrows" Color="MudBlazor.Color.Primary" Size="MudBlazor.Size.Large" />
+            <MudText Typo="Typo.h6">Nova Movimentação de Estoque</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        @if (_loading)
+        {
+            <MudStack AlignItems="AlignItems.Center" Spacing="3" Class="pa-6">
+                <MudProgressCircular Color="MudBlazor.Color.Primary" Indeterminate="true" Size="MudBlazor.Size.Large" />
+                <MudText Typo="Typo.body1" Color="MudBlazor.Color.Secondary">Processando...</MudText>
+            </MudStack>
+        }
+        else
+        {
+            <MudForm @ref="_form" Class="pa-2">
+                <MudGrid Spacing="3">
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-2">
+                            <MudIcon Icon="@Icons.Material.Filled.Info" Size="MudBlazor.Size.Small" Class="mr-1" />
+                            Informações da Movimentação
+                        </MudText>
+                    </MudItem>
+                    
+                    <MudItem xs="12">
+                        <MudAutocomplete T="ProductDto"
+                                        Label="Produto"
+                                        @bind-Value="_selectedProduct"
+                                        SearchFunc="SearchProducts"
+                                        ToStringFunc="@(p => p != null ? $"{p.Sku} - {p.Name}" : "")"
+                                        Variant="Variant.Outlined"
+                                        Required="true"
+                                        Adornment="Adornment.Start"
+                                        AdornmentIcon="@Icons.Material.Filled.Inventory"
+                                        DebounceInterval="300">
+                            <ItemTemplate Context="product">
+                                <MudStack Spacing="0">
+                                    <MudText Typo="Typo.body2">@product.Name</MudText>
+                                    <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">
+                                        SKU: @product.Sku | Estoque: @product.CurrentStock.ToString("N2")
+                                    </MudText>
+                                </MudStack>
+                            </ItemTemplate>
+                        </MudAutocomplete>
+                    </MudItem>
+                    
+                    <MudItem xs="12" md="6">
+                        <MudSelect T="int"
+                                  Label="Tipo de Movimentação"
+                                  @bind-Value="_newMovement.Type"
+                                  Variant="Variant.Outlined"
+                                  Required="true"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.SwapHoriz">
+                            <MudSelectItem T="int" Value="0">Entrada</MudSelectItem>
+                            <MudSelectItem T="int" Value="1">Saída</MudSelectItem>
+                            <MudSelectItem T="int" Value="2">Ajuste</MudSelectItem>
+                            <MudSelectItem T="int" Value="3">Transferência</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    
+                    <MudItem xs="12" md="6">
+                        <MudSelect T="int"
+                                  Label="Motivo"
+                                  @bind-Value="_newMovement.Reason"
+                                  Variant="Variant.Outlined"
+                                  Required="true"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Description">
+                            @foreach (var reason in GetReasonsForType())
+                            {
+                                <MudSelectItem T="int" Value="@reason.Value">@reason.Text</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    
+                    <MudItem xs="12" md="6">
+                        <MudNumericField T="decimal"
+                                        Label="Quantidade"
+                                        @bind-Value="_newMovement.Quantity"
+                                        Min="0.01m"
+                                        Step="1"
+                                        Variant="Variant.Outlined"
+                                        Required="true"
+                                        Adornment="Adornment.Start"
+                                        AdornmentIcon="@Icons.Material.Filled.Numbers"
+                                        HelperText="@GetStockInfo()"/>
+                    </MudItem>
+                    
+                    <MudItem xs="12" md="6">
+                        <MudNumericField T="decimal"
+                                        Label="Custo Unitário"
+                                        @bind-Value="_newMovement.UnitCost"
+                                        Min="0"
+                                        Step="0.01m"
+                                        Variant="Variant.Outlined"
+                                        Format="C2"
+                                        Adornment="Adornment.Start"
+                                        AdornmentText="R$"
+                                        HelperText="Opcional"/>
+                    </MudItem>
+                    
+                    <MudItem xs="12" md="6">
+                        <MudDatePicker Label="Data da Movimentação"
+                                      @bind-Date="_movementDate"
+                                      Variant="Variant.Outlined"
+                                      Required="true"
+                                      Editable="true"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.CalendarToday"/>
+                    </MudItem>
+                    
+                    <MudItem xs="12" md="6">
+                        <MudTextField T="string"
+                                     Label="Número do Documento"
+                                     @bind-Value="_newMovement.DocumentNumber"
+                                     Variant="Variant.Outlined"
+                                     Placeholder="Ex: NF-001234"
+                                     Adornment="Adornment.Start"
+                                     AdornmentIcon="@Icons.Material.Filled.Receipt"
+                                     HelperText="Opcional"/>
+                    </MudItem>
+                    
+                    <MudItem xs="12">
+                        <MudTextField T="string"
+                                     Label="Observações"
+                                     @bind-Value="_newMovement.Notes"
+                                     Variant="Variant.Outlined"
+                                     Lines="3"
+                                     Adornment="Adornment.Start"
+                                     AdornmentIcon="@Icons.Material.Filled.Notes"/>
+                    </MudItem>
+                    
+                    @if (_selectedProduct != null)
+                    {
+                        <MudItem xs="12">
+                            <MudPaper Elevation="2" Class="pa-3" Style="background: var(--mud-palette-background-gray);">
+                                <MudStack Spacing="1">
+                                    <MudText Typo="Typo.subtitle2">Informações do Produto</MudText>
+                                    <MudDivider/>
+                                    <MudText Typo="Typo.body2">
+                                        <strong>Estoque Atual:</strong> @_selectedProduct.CurrentStock.ToString("N2") @_selectedProduct.Unit
+                                    </MudText>
+                                    <MudText Typo="Typo.body2">
+                                        <strong>Estoque Após Movimentação:</strong> 
+                                        <span style="@GetNewStockStyle()">
+                                            @GetNewStock().ToString("N2") @_selectedProduct.Unit
+                                        </span>
+                                    </MudText>
+                                    @if (_newMovement.UnitCost > 0)
+                                    {
+                                        <MudText Typo="Typo.body2">
+                                            <strong>Custo Total:</strong> @(_newMovement.Quantity * _newMovement.UnitCost).ToString("C2")
+                                        </MudText>
+                                    }
+                                </MudStack>
+                            </MudPaper>
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudForm>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Outlined">Cancelar</MudButton>
+        <MudButton OnClick="Submit" Variant="Variant.Filled" Color="MudBlazor.Color.Primary" Disabled="@(_loading || _selectedProduct == null)">
+            <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-1"/>
+            Registrar Movimentação
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] 
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+    
+    private MudForm? _form;
+    private bool _loading = false;
+    private CreateStockMovementDto _newMovement = new();
+    private ProductDto? _selectedProduct;
+    private DateTime? _movementDate = DateTime.Now;
+    
+    protected override void OnInitialized()
+    {
+        _newMovement.MovementDate = DateTime.Now;
+        _newMovement.Type = 0; // Entrada
+        _newMovement.Reason = 0;
+    }
+    
+    private async Task<IEnumerable<ProductDto>> SearchProducts(string value, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return Array.Empty<ProductDto>();
+        
+        try
+        {
+            var response = await ApiService.GetAsync<PaginatedProductsResponse>(
+                $"/api/products?search={Uri.EscapeDataString(value)}&pageSize=20&status=Ativo");
+            return response?.Items ?? new List<ProductDto>();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao buscar produtos");
+            return Array.Empty<ProductDto>();
+        }
+    }
+    
+    private List<(int Value, string Text)> GetReasonsForType()
+    {
+        return _newMovement.Type switch
+        {
+            0 => new() // Entrada
+            {
+                (0, "Compra"),
+                (1, "Devolução de Cliente"),
+                (2, "Produção"),
+                (3, "Doação Recebida"),
+                (4, "Outros")
+            },
+            1 => new() // Saída
+            {
+                (5, "Venda"),
+                (6, "Devolução ao Fornecedor"),
+                (7, "Consumo Interno"),
+                (8, "Perda"),
+                (9, "Doação"),
+                (10, "Outros")
+            },
+            2 => new() // Ajuste
+            {
+                (11, "Inventário"),
+                (12, "Correção de Erro"),
+                (13, "Avaria"),
+                (14, "Outros")
+            },
+            3 => new() // Transferência
+            {
+                (15, "Entre Armazéns"),
+                (16, "Entre Lojas"),
+                (17, "Outros")
+            },
+            _ => new()
+        };
+    }
+    
+    private string GetStockInfo()
+    {
+        if (_selectedProduct == null)
+            return string.Empty;
+        
+        return $"Estoque atual: {_selectedProduct.CurrentStock:N2} {_selectedProduct.Unit}";
+    }
+    
+    private decimal GetNewStock()
+    {
+        if (_selectedProduct == null)
+            return 0;
+        
+        return _newMovement.Type switch
+        {
+            0 => _selectedProduct.CurrentStock + _newMovement.Quantity, // Entrada
+            1 => _selectedProduct.CurrentStock - _newMovement.Quantity, // Saída
+            2 => _selectedProduct.CurrentStock + _newMovement.Quantity, // Ajuste (pode ser + ou -)
+            _ => _selectedProduct.CurrentStock
+        };
+    }
+    
+    private string GetNewStockStyle()
+    {
+        var newStock = GetNewStock();
+        if (_selectedProduct == null)
+            return string.Empty;
+        
+        if (newStock < _selectedProduct.MinimumStock)
+            return "color: var(--mud-palette-error); font-weight: 600;";
+        if (newStock > _selectedProduct.MaximumStock)
+            return "color: var(--mud-palette-warning); font-weight: 600;";
+        
+        return "color: var(--mud-palette-success); font-weight: 600;";
+    }
+    
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+    
+    private async Task Submit()
+    {
+        if (_form != null)
+        {
+            await _form.Validate();
+            if (!_form.IsValid)
+            {
+                Snackbar.Add("Por favor, corrija os erros no formulário", Severity.Error);
+                return;
+            }
+        }
+        
+        if (_selectedProduct == null)
+        {
+            Snackbar.Add("Selecione um produto", Severity.Warning);
+            return;
+        }
+        
+        _loading = true;
+        try
+        {
+            _newMovement.ProductId = _selectedProduct.Id;
+            _newMovement.MovementDate = _movementDate ?? DateTime.Now;
+            
+            var result = await ApiService.PostAsync<StockMovementDto>(
+                "/api/inventory/movements", _newMovement);
+            
+            if (result != null)
+            {
+                Snackbar.Add("Movimentação registrada com sucesso!", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(result));
+            }
+            else
+            {
+                Snackbar.Add("Erro ao registrar movimentação", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao registrar movimentação");
+            Snackbar.Add($"Erro ao registrar movimentação: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

@@ -1,0 +1,214 @@
+@using MudBlazor
+@using erp.DTOs.Inventory
+@using erp.Services
+@inject ISnackbar Snackbar
+@inject IApiService ApiService
+@inject ILogger<CreateStockCountDialog> Logger
+
+<MudDialog Class="create-count-dialog">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Inventory2" Color="MudBlazor.Color.Primary" Size="MudBlazor.Size.Large" />
+            <MudText Typo="Typo.h6">Nova Contagem de Estoque</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        @if (_loading)
+        {
+            <MudStack AlignItems="AlignItems.Center" Spacing="3" Class="pa-6">
+                <MudProgressCircular Color="MudBlazor.Color.Primary" Indeterminate="true" Size="MudBlazor.Size.Large" />
+                <MudText Typo="Typo.body1" Color="MudBlazor.Color.Secondary">Carregando armazéns...</MudText>
+            </MudStack>
+        }
+        else
+        {
+            <MudForm @ref="_form" Class="pa-2">
+                <MudGrid Spacing="3">
+                    <MudItem xs="12">
+                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                            A contagem de estoque será criada e você poderá adicionar produtos para contagem na próxima tela.
+                        </MudAlert>
+                    </MudItem>
+                    
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-2">
+                            <MudIcon Icon="@Icons.Material.Filled.Info" Size="MudBlazor.Size.Small" Class="mr-1" />
+                            Informações da Contagem
+                        </MudText>
+                    </MudItem>
+                    
+                    <MudItem xs="12">
+                        <MudSelect T="int"
+                                  Label="Armazém"
+                                  @bind-Value="_newCount.WarehouseId"
+                                  Variant="Variant.Outlined"
+                                  Required="true"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Warehouse"
+                                  HelperText="Selecione o armazém para realizar a contagem">
+                            @foreach (var warehouse in _warehouses)
+                            {
+                                <MudSelectItem T="int" Value="@warehouse.Id">@warehouse.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    
+                    <MudItem xs="12">
+                        <MudDatePicker Label="Data da Contagem"
+                                      @bind-Date="_countDate"
+                                      Variant="Variant.Outlined"
+                                      Required="true"
+                                      Editable="true"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.CalendarToday"/>
+                    </MudItem>
+                    
+                    <MudItem xs="12">
+                        <MudTextField T="string"
+                                     Label="Descrição/Observações"
+                                     @bind-Value="_newCount.Description"
+                                     Variant="Variant.Outlined"
+                                     Lines="4"
+                                     Placeholder="Descreva o motivo ou objetivo desta contagem..."
+                                     Adornment="Adornment.Start"
+                                     AdornmentIcon="@Icons.Material.Filled.Notes"/>
+                    </MudItem>
+                    
+                    <MudItem xs="12">
+                        <MudPaper Elevation="2" Class="pa-3" Style="background: var(--mud-palette-info-lighten);">
+                            <MudStack Spacing="2">
+                                <MudText Typo="Typo.subtitle2">
+                                    <MudIcon Icon="@Icons.Material.Filled.Info" Size="MudBlazor.Size.Small" Class="mr-1" />
+                                    Próximos Passos
+                                </MudText>
+                                <MudList T="string" Dense="true">
+                                    <MudListItem T="string" Icon="@Icons.Material.Filled.Check">
+                                        Adicione os produtos que deseja contar
+                                    </MudListItem>
+                                    <MudListItem T="string" Icon="@Icons.Material.Filled.Check">
+                                        Informe o estoque físico de cada produto
+                                    </MudListItem>
+                                    <MudListItem T="string" Icon="@Icons.Material.Filled.Check">
+                                        Revise as diferenças encontradas
+                                    </MudListItem>
+                                    <MudListItem T="string" Icon="@Icons.Material.Filled.Check">
+                                        Aprove a contagem para aplicar os ajustes
+                                    </MudListItem>
+                                </MudList>
+                            </MudStack>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </MudForm>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Outlined">Cancelar</MudButton>
+        <MudButton OnClick="Submit" Variant="Variant.Filled" Color="MudBlazor.Color.Primary" Disabled="@_loading">
+            <MudIcon Icon="@Icons.Material.Filled.Add" Class="mr-1"/>
+            Criar Contagem
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] 
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+    
+    private MudForm? _form;
+    private bool _loading = false;
+    private CreateStockCountDto _newCount = new();
+    private List<WarehouseDto> _warehouses = new();
+    private DateTime? _countDate = DateTime.Now;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+        try
+        {
+            // Carrega lista de armazéns
+            var response = await ApiService.GetAsync<List<WarehouseDto>>("/api/inventory/warehouses");
+            _warehouses = response ?? new List<WarehouseDto>();
+            
+            if (!_warehouses.Any())
+            {
+                // Se não houver armazéns, cria um padrão
+                _warehouses.Add(new WarehouseDto { Id = 1, Name = "Armazém Principal" });
+            }
+            
+            // Inicializa com primeiro armazém
+            if (_warehouses.Any())
+            {
+                _newCount.WarehouseId = _warehouses.First().Id;
+            }
+            
+            _newCount.CountDate = DateTime.Now;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar armazéns");
+            Snackbar.Add("Erro ao carregar armazéns. Usando armazém padrão.", Severity.Warning);
+            _warehouses.Add(new WarehouseDto { Id = 1, Name = "Armazém Principal" });
+            _newCount.WarehouseId = 1;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+    
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+    
+    private async Task Submit()
+    {
+        if (_form != null)
+        {
+            await _form.Validate();
+            if (!_form.IsValid)
+            {
+                Snackbar.Add("Por favor, corrija os erros no formulário", Severity.Error);
+                return;
+            }
+        }
+        
+        _loading = true;
+        try
+        {
+            _newCount.CountDate = _countDate ?? DateTime.Now;
+            
+            var result = await ApiService.PostAsync<StockCountDto>(
+                "/api/inventory/counts", _newCount);
+            
+            if (result != null)
+            {
+                Snackbar.Add("Contagem criada com sucesso! Adicione os produtos para contagem.", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(result));
+            }
+            else
+            {
+                Snackbar.Add("Erro ao criar contagem", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao criar contagem");
+            Snackbar.Add($"Erro ao criar contagem: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+    
+    // DTO temporário para armazéns (criar arquivo separado depois)
+    public class WarehouseDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? Location { get; set; }
+        public bool IsActive { get; set; } = true;
+    }
+}

@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore; 
+using DotNetEnv;
+using System;
 using MudBlazor.Services;
 using erp.Components;
 using erp.DAOs;
@@ -19,6 +21,20 @@ using erp.Services.Dashboard.Providers.Finance;
 using erp.Services.Dashboard.Providers.Inventory;
 using erp.Services.Sales;
 // using ApexCharts; // TODO: Instalar pacote ApexCharts se necessário
+
+// Prefer using DotNetEnv to load .env into environment variables in dev.
+// This keeps the bootstrap simple and delegates parsing to a tested library.
+// If DotNetEnv is not available the call will be no-op at runtime only if
+// you choose not to reference the package; we add the package in the project.
+try
+{
+    // Loads .env from current directory by default and sets variables for the process
+    DotNetEnv.Env.Load();
+}
+catch
+{
+    // If DotNetEnv isn't present for any reason, continue without failing.
+}
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -182,6 +198,9 @@ builder.Services.AddScoped<erp.Services.Inventory.IStockCountService, erp.Servic
 // Sales services
 builder.Services.AddScoped<erp.Services.Sales.ICustomerService, erp.Services.Sales.CustomerService>();
 builder.Services.AddScoped<erp.Services.Sales.ISalesService, erp.Services.Sales.SalesService>();
+
+// Chatbot services
+builder.Services.AddScoped<erp.Services.Chatbot.IChatbotService, erp.Services.Chatbot.ChatbotService>();
 
 // ------- REGISTRO DO MAPPERLY -------
 builder.Services.AddScoped<UserMapper, UserMapper>();

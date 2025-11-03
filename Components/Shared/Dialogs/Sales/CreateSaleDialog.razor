@@ -1,0 +1,402 @@
+@using MudBlazor
+@using erp.DTOs.Sales
+@using erp.DTOs.Inventory
+@using erp.Services
+@inject ISnackbar Snackbar
+@inject IApiService ApiService
+@inject ILogger<CreateSaleDialog> Logger
+
+<MudDialog Class="create-sale-dialog" Style="min-width: 800px; max-width: 90vw;">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.ShoppingCart" Color="MudBlazor.Color.Primary" Size="MudBlazor.Size.Large" />
+            <MudText Typo="Typo.h6">Nova Venda</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        @if (_loading)
+        {
+            <MudStack AlignItems="AlignItems.Center" Spacing="3" Class="pa-6">
+                <MudProgressCircular Color="MudBlazor.Color.Primary" Indeterminate="true" Size="MudBlazor.Size.Large" />
+                <MudText Typo="Typo.body1" Color="MudBlazor.Color.Secondary">Carregando dados...</MudText>
+            </MudStack>
+        }
+        else
+        {
+            <MudForm @ref="_form" Class="pa-2">
+                <MudGrid Spacing="3">
+                    <!-- Informações da Venda -->
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-2">
+                            <MudIcon Icon="@Icons.Material.Filled.Info" Size="MudBlazor.Size.Small" Class="mr-1" />
+                            Informações da Venda
+                        </MudText>
+                    </MudItem>
+                    
+                    <MudItem xs="12" md="6">
+                        <MudAutocomplete T="CustomerDto"
+                                        Label="Cliente (opcional)"
+                                        @bind-Value="_selectedCustomer"
+                                        SearchFunc="SearchCustomers"
+                                        ToStringFunc="@(c => c?.Name ?? "")"
+                                        Variant="Variant.Outlined"
+                                        Clearable="true"
+                                        Adornment="Adornment.Start"
+                                        AdornmentIcon="@Icons.Material.Filled.Person"
+                                        DebounceInterval="300"/>
+                    </MudItem>
+                    
+                    <MudItem xs="12" md="6">
+                        <MudDatePicker Label="Data da Venda"
+                                      @bind-Date="_saleDate"
+                                      Variant="Variant.Outlined"
+                                      Required="true"
+                                      Editable="true"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.CalendarToday"/>
+                    </MudItem>
+                    
+                    <MudItem xs="12" md="6">
+                        <MudSelect T="string"
+                                  Label="Método de Pagamento"
+                                  @bind-Value="_newSale.PaymentMethod"
+                                  Variant="Variant.Outlined"
+                                  Clearable="true"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Payment">
+                            <MudSelectItem T="string" Value="@("Dinheiro")">Dinheiro</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Débito")">Débito</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Crédito")">Crédito</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("PIX")">PIX</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Boleto")">Boleto</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    
+                    <MudItem xs="12" md="6">
+                        <MudSelect T="string"
+                                  Label="Status"
+                                  @bind-Value="_newSale.Status"
+                                  Variant="Variant.Outlined"
+                                  Required="true"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.CheckCircle">
+                            <MudSelectItem T="string" Value="@("Pendente")">Pendente</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Finalizada")">Finalizada</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+
+                    <!-- Itens da Venda -->
+                    <MudItem xs="12">
+                        <MudDivider Class="my-2"/>
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+                            <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary">
+                                <MudIcon Icon="@Icons.Material.Filled.ShoppingBasket" Size="MudBlazor.Size.Small" Class="mr-1" />
+                                Itens da Venda
+                            </MudText>
+                            <MudButton OnClick="AddItem" 
+                                      StartIcon="@Icons.Material.Filled.Add" 
+                                      Size="MudBlazor.Size.Small"
+                                      Variant="Variant.Outlined"
+                                      Color="MudBlazor.Color.Primary">
+                                Adicionar Item
+                            </MudButton>
+                        </MudStack>
+                    </MudItem>
+                    
+                    @if (_newSale.Items.Any())
+                    {
+                        <MudItem xs="12">
+                            <MudPaper Elevation="2" Class="pa-3">
+                                @foreach (var (item, index) in _newSale.Items.Select((item, idx) => (item, idx)))
+                                {
+                                    <MudPaper Elevation="1" Class="pa-3 mb-3" Style="border-left: 3px solid var(--mud-palette-primary);">
+                                        <MudGrid Spacing="2">
+                                            <MudItem xs="12" md="5">
+                                                <MudAutocomplete T="ProductDto"
+                                                                Label="Produto"
+                                                                Value="_selectedProducts.ContainsKey(index) ? _selectedProducts[index] : null"
+                                                                ValueChanged="@(p => OnProductSelected(index, p))"
+                                                                SearchFunc="SearchProducts"
+                                                                ToStringFunc="@(p => p != null ? $"{p.Sku} - {p.Name}" : "")"
+                                                                Variant="Variant.Outlined"
+                                                                Required="true"
+                                                                Dense="true"
+                                                                Adornment="Adornment.Start"
+                                                                AdornmentIcon="@Icons.Material.Filled.Inventory"
+                                                                DebounceInterval="300"/>
+                                            </MudItem>
+                                            <MudItem xs="12" md="2">
+                                                <MudNumericField T="decimal"
+                                                                Label="Quantidade"
+                                                                @bind-Value="item.Quantity"
+                                                                Min="0.01m"
+                                                                Step="1"
+                                                                Variant="Variant.Outlined"
+                                                                Required="true"
+                                                                Dense="true"
+                                                                Adornment="Adornment.Start"
+                                                                AdornmentIcon="@Icons.Material.Filled.Numbers"/>
+                                            </MudItem>
+                                            <MudItem xs="12" md="2">
+                                                <MudNumericField T="decimal"
+                                                                Label="Preço Unit."
+                                                                @bind-Value="item.UnitPrice"
+                                                                Min="0"
+                                                                Step="0.01m"
+                                                                Variant="Variant.Outlined"
+                                                                Required="true"
+                                                                Dense="true"
+                                                                Format="C2"
+                                                                Adornment="Adornment.Start"
+                                                                AdornmentText="R$"/>
+                                            </MudItem>
+                                            <MudItem xs="12" md="2">
+                                                <MudNumericField T="decimal"
+                                                                Label="Desconto"
+                                                                @bind-Value="item.Discount"
+                                                                Min="0"
+                                                                Step="0.01m"
+                                                                Variant="Variant.Outlined"
+                                                                Dense="true"
+                                                                Format="C2"
+                                                                Adornment="Adornment.Start"
+                                                                AdornmentText="R$"/>
+                                            </MudItem>
+                                            <MudItem xs="12" md="1" Class="d-flex align-center justify-center">
+                                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                              Color="MudBlazor.Color.Error"
+                                                              Size="MudBlazor.Size.Small"
+                                                              OnClick="@(() => RemoveItem(index))"/>
+                                            </MudItem>
+                                            <MudItem xs="12">
+                                                <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">
+                                                    <strong>Subtotal:</strong> @((item.Quantity * item.UnitPrice - item.Discount).ToString("C2"))
+                                                </MudText>
+                                            </MudItem>
+                                        </MudGrid>
+                                    </MudPaper>
+                                }
+                            </MudPaper>
+                        </MudItem>
+                    }
+                    else
+                    {
+                        <MudItem xs="12">
+                            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                                Nenhum item adicionado. Clique em "Adicionar Item" para começar.
+                            </MudAlert>
+                        </MudItem>
+                    }
+                    
+                    <!-- Totais -->
+                    <MudItem xs="12">
+                        <MudDivider Class="my-2"/>
+                    </MudItem>
+                    
+                    <MudItem xs="12" md="6">
+                        <MudNumericField T="decimal"
+                                        Label="Desconto Geral"
+                                        @bind-Value="_newSale.DiscountAmount"
+                                        Min="0"
+                                        Step="0.01m"
+                                        Variant="Variant.Outlined"
+                                        Format="C2"
+                                        Adornment="Adornment.Start"
+                                        AdornmentText="R$"/>
+                    </MudItem>
+                    
+                    <MudItem xs="12" md="6">
+                        <MudPaper Elevation="3" Class="pa-3" Style="background: var(--mud-palette-primary); color: white;">
+                            <MudStack Spacing="1">
+                                <MudText Typo="Typo.caption">Total dos Itens</MudText>
+                                <MudText Typo="Typo.h6">@GetItemsTotal().ToString("C2")</MudText>
+                                <MudDivider Light="true" Class="my-1"/>
+                                <MudText Typo="Typo.caption">Desconto Total</MudText>
+                                <MudText Typo="Typo.body2">@GetTotalDiscount().ToString("C2")</MudText>
+                                <MudDivider Light="true" Class="my-1"/>
+                                <MudText Typo="Typo.subtitle1" Style="font-weight: bold;">TOTAL: @GetNetTotal().ToString("C2")</MudText>
+                            </MudStack>
+                        </MudPaper>
+                    </MudItem>
+                    
+                    <MudItem xs="12">
+                        <MudTextField T="string"
+                                     Label="Observações"
+                                     @bind-Value="_newSale.Notes"
+                                     Variant="Variant.Outlined"
+                                     Lines="3"
+                                     Adornment="Adornment.Start"
+                                     AdornmentIcon="@Icons.Material.Filled.Notes"/>
+                    </MudItem>
+                </MudGrid>
+            </MudForm>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Outlined">Cancelar</MudButton>
+        <MudButton OnClick="Submit" Variant="Variant.Filled" Color="MudBlazor.Color.Primary" Disabled="@(_loading || !_newSale.Items.Any())">
+            <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-1"/>
+            Criar Venda
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] 
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+    
+    private MudForm? _form;
+    private bool _loading = false;
+    private CreateSaleDto _newSale = new();
+    private CustomerDto? _selectedCustomer;
+    private Dictionary<int, ProductDto?> _selectedProducts = new();
+    private DateTime? _saleDate = DateTime.Now;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+        try
+        {
+            // Inicializa com status pendente
+            _newSale.Status = "Pendente";
+            _newSale.SaleDate = DateTime.Now;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+    
+    private async Task<IEnumerable<CustomerDto>> SearchCustomers(string value, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return Array.Empty<CustomerDto>();
+        
+        try
+        {
+            var response = await ApiService.GetAsync<PaginatedCustomersResponse>(
+                $"/api/sales/customers?search={Uri.EscapeDataString(value)}&pageSize=10");
+            return response?.Items ?? new List<CustomerDto>();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao buscar clientes");
+            return Array.Empty<CustomerDto>();
+        }
+    }
+    
+    private async Task<IEnumerable<ProductDto>> SearchProducts(string value, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return Array.Empty<ProductDto>();
+        
+        try
+        {
+            var response = await ApiService.GetAsync<PaginatedProductsResponse>(
+                $"/api/products?search={Uri.EscapeDataString(value)}&pageSize=20&status=Ativo");
+            return response?.Items ?? new List<ProductDto>();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao buscar produtos");
+            return Array.Empty<ProductDto>();
+        }
+    }
+    
+    private void AddItem()
+    {
+        _newSale.Items.Add(new CreateSaleItemDto
+        {
+            Quantity = 1,
+            UnitPrice = 0,
+            Discount = 0
+        });
+        StateHasChanged();
+    }
+    
+    private void RemoveItem(int index)
+    {
+        _newSale.Items.RemoveAt(index);
+        _selectedProducts.Remove(index);
+        StateHasChanged();
+    }
+    
+    private void OnProductSelected(int index, ProductDto? product)
+    {
+        if (product != null)
+        {
+            _selectedProducts[index] = product;
+            _newSale.Items[index].ProductId = product.Id;
+            _newSale.Items[index].UnitPrice = product.SalePrice;
+        }
+        StateHasChanged();
+    }
+    
+    private decimal GetItemsTotal()
+    {
+        return _newSale.Items.Sum(i => i.Quantity * i.UnitPrice);
+    }
+    
+    private decimal GetTotalDiscount()
+    {
+        var itemsDiscount = _newSale.Items.Sum(i => i.Discount);
+        return itemsDiscount + _newSale.DiscountAmount;
+    }
+    
+    private decimal GetNetTotal()
+    {
+        return GetItemsTotal() - GetTotalDiscount();
+    }
+    
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+    
+    private async Task Submit()
+    {
+        if (_form != null)
+        {
+            await _form.Validate();
+            if (!_form.IsValid)
+            {
+                Snackbar.Add("Por favor, corrija os erros no formulário", Severity.Error);
+                return;
+            }
+        }
+        
+        if (!_newSale.Items.Any())
+        {
+            Snackbar.Add("Adicione pelo menos um item à venda", Severity.Warning);
+            return;
+        }
+        
+        _loading = true;
+        try
+        {
+            _newSale.CustomerId = _selectedCustomer?.Id;
+            _newSale.SaleDate = _saleDate ?? DateTime.Now;
+            
+            var result = await ApiService.PostAsync<SaleDto>("/api/sales", _newSale);
+            
+            if (result != null)
+            {
+                Snackbar.Add("Venda criada com sucesso!", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(result));
+            }
+            else
+            {
+                Snackbar.Add("Erro ao criar venda", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao criar venda");
+            Snackbar.Add($"Erro ao criar venda: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

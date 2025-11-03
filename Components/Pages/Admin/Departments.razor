@@ -1,0 +1,226 @@
+@page "/admin/departments"
+@using erp.DTOs.User
+@using erp.Services
+@using erp.Components.Shared.Dialogs
+@using MudBlazor
+@attribute [Authorize]
+
+@inject IApiService ApiService
+@inject ILogger<Departments> Logger
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Gerenciar Departamentos</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Gerenciar Departamentos</MudText>
+    <MudButton Color="MudBlazor.Color.Primary" 
+               Variant="Variant.Filled" 
+               StartIcon="@Icons.Material.Filled.Add"
+               OnClick="ShowCreateDialog">
+        Adicionar Departamento
+    </MudButton>
+</MudStack>
+
+@if (_loadError != null)
+{
+    <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
+}
+
+<MudTable T="DepartmentDto" 
+          ServerData="ServerReload" 
+          Dense="false" 
+          Hover="true" 
+          Elevation="4" 
+          @ref="_table" 
+          Striped="true"
+          Loading="_loading">
+    <ToolBarContent>
+        <MudText Typo="Typo.h5">Departamentos Cadastrados</MudText>
+        <MudSpacer/>
+        <MudTextField T="string" 
+                      ValueChanged="OnSearch" 
+                      Immediate="true" 
+                      Placeholder="Procurar" 
+                      Variant="Variant.Outlined" 
+                      Margin="Margin.Dense"
+                      Adornment="Adornment.Start" 
+                      AdornmentIcon="@Icons.Material.Filled.Search" 
+                      Clearable="true" 
+                      Style="min-width: 250px;"/>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh><MudTableSortLabel SortLabel="code" T="DepartmentDto">Código</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel SortLabel="name" T="DepartmentDto">Nome</MudTableSortLabel></MudTh>
+        <MudTh>Departamento Pai</MudTh>
+        <MudTh>Gerente</MudTh>
+        <MudTh>Centro de Custo</MudTh>
+        <MudTh><MudTableSortLabel SortLabel="employees" T="DepartmentDto">Funcionários</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel SortLabel="active" T="DepartmentDto">Status</MudTableSortLabel></MudTh>
+        <MudTh>Ações</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Código">@context.Code</MudTd>
+        <MudTd DataLabel="Nome">
+            <MudText Typo="Typo.body2" Style="font-weight: 600;">@context.Name</MudText>
+            @if (!string.IsNullOrEmpty(context.Description))
+            {
+                <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">@context.Description</MudText>
+            }
+        </MudTd>
+        <MudTd DataLabel="Departamento Pai">@(context.ParentDepartmentName ?? "-")</MudTd>
+        <MudTd DataLabel="Gerente">@(context.ManagerName ?? "-")</MudTd>
+        <MudTd DataLabel="Centro de Custo">@(context.CostCenter ?? "-")</MudTd>
+        <MudTd DataLabel="Funcionários">
+            <MudChip T="string" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Info">
+                @context.EmployeeCount
+            </MudChip>
+        </MudTd>
+        <MudTd DataLabel="Status">
+            <MudChip T="string" Size="MudBlazor.Size.Small" Color="@(context.IsActive ? MudBlazor.Color.Success : MudBlazor.Color.Default)">
+                @(context.IsActive ? "Ativo" : "Inativo")
+            </MudChip>
+        </MudTd>
+        <MudTd>
+            <MudButtonGroup Variant="Variant.Outlined" Size="MudBlazor.Size.Small">
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                               Color="MudBlazor.Color.Info" 
+                               Title="Editar"
+                               OnClick="@(() => ShowEditDialog(context))"/>
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                               Color="MudBlazor.Color.Error" 
+                               Title="Excluir"
+                               OnClick="@(() => DeleteDepartment(context))"/>
+            </MudButtonGroup>
+        </MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private MudTable<DepartmentDto>? _table;
+    private string? _loadError;
+    private string _searchString = "";
+    private bool _loading = false;
+
+    private async Task<TableData<DepartmentDto>> ServerReload(TableState state, CancellationToken token)
+    {
+        _loading = true;
+        _loadError = null;
+
+        try
+        {
+            var departments = await ApiService.GetAsync<List<DepartmentDto>>("api/departments", token);
+            
+            if (departments == null)
+            {
+                return new TableData<DepartmentDto> { Items = new List<DepartmentDto>(), TotalItems = 0 };
+            }
+
+            // Filtrar por busca
+            var filteredData = departments.AsQueryable();
+            if (!string.IsNullOrWhiteSpace(_searchString))
+            {
+                filteredData = filteredData.Where(d => 
+                    (d.Name != null && d.Name.Contains(_searchString, StringComparison.OrdinalIgnoreCase)) ||
+                    (d.Code != null && d.Code.Contains(_searchString, StringComparison.OrdinalIgnoreCase)) ||
+                    (d.Description != null && d.Description.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+                );
+            }
+
+            // Ordenar
+            filteredData = state.SortLabel switch
+            {
+                "code" => filteredData.OrderByDirection(state.SortDirection, d => d.Code),
+                "name" => filteredData.OrderByDirection(state.SortDirection, d => d.Name),
+                "employees" => filteredData.OrderByDirection(state.SortDirection, d => d.EmployeeCount),
+                "active" => filteredData.OrderByDirection(state.SortDirection, d => d.IsActive),
+                _ => filteredData.OrderBy(d => d.Name)
+            };
+
+            var totalItems = filteredData.Count();
+            var items = filteredData.Skip(state.Page * state.PageSize).Take(state.PageSize).ToList();
+
+            return new TableData<DepartmentDto> { Items = items, TotalItems = totalItems };
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar departamentos");
+            _loadError = $"Erro ao carregar departamentos: {ex.Message}";
+            return new TableData<DepartmentDto> { Items = new List<DepartmentDto>(), TotalItems = 0 };
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OnSearch(string text)
+    {
+        _searchString = text;
+        _table?.ReloadServerData();
+    }
+
+    private async Task ShowCreateDialog()
+    {
+        var parameters = new DialogParameters<DepartmentDialog>
+        {
+            { x => x.IsEdit, false }
+        };
+
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<DepartmentDialog>("Novo Departamento", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await _table!.ReloadServerData();
+            Snackbar.Add("Departamento criado com sucesso!", Severity.Success);
+        }
+    }
+
+    private async Task ShowEditDialog(DepartmentDto department)
+    {
+        var parameters = new DialogParameters<DepartmentDialog>
+        {
+            { x => x.IsEdit, true },
+            { x => x.DepartmentId, department.Id }
+        };
+
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<DepartmentDialog>("Editar Departamento", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await _table!.ReloadServerData();
+            Snackbar.Add("Departamento atualizado com sucesso!", Severity.Success);
+        }
+    }
+
+    private async Task DeleteDepartment(DepartmentDto department)
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Confirmar Exclusão",
+            $"Tem certeza que deseja excluir o departamento '{department.Name}'?",
+            yesText: "Excluir", cancelText: "Cancelar");
+
+        if (confirmed == true)
+        {
+            try
+            {
+                await ApiService.DeleteAsync($"api/departments/{department.Id}");
+                await _table!.ReloadServerData();
+                Snackbar.Add("Departamento excluído com sucesso!", Severity.Success);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Erro ao excluir departamento");
+                Snackbar.Add($"Erro ao excluir: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}
+

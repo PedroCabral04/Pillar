@@ -1,0 +1,217 @@
+@using MudBlazor
+@using erp.DTOs.Inventory
+@using erp.Services
+@inject ISnackbar Snackbar
+@inject IApiService ApiService
+@inject ILogger<EditProductCategoryDialog> Logger
+
+<MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Edit" Color="MudBlazor.Color.Primary" Size="MudBlazor.Size.Large" />
+            <MudText Typo="Typo.h6">Editar Categoria</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        @if (_loading)
+        {
+            <MudStack AlignItems="AlignItems.Center" Spacing="3" Class="pa-6">
+                <MudProgressCircular Color="MudBlazor.Color.Primary" Indeterminate="true" Size="MudBlazor.Size.Large" />
+                <MudText Typo="Typo.body1" Color="MudBlazor.Color.Secondary">Carregando...</MudText>
+            </MudStack>
+        }
+        else
+        {
+            <MudForm @ref="_form" Class="pa-2">
+                <MudGrid Spacing="3">
+                    <MudItem xs="12">
+                        <MudTextField T="string"
+                                     Label="Nome da Categoria"
+                                     @bind-Value="_updateCategory.Name"
+                                     Variant="Variant.Outlined"
+                                     Required="true"
+                                     Immediate="true"
+                                     Adornment="Adornment.Start"
+                                     AdornmentIcon="@Icons.Material.Filled.Label"
+                                     HelperText="Nome descritivo da categoria"/>
+                    </MudItem>
+                    
+                    <MudItem xs="12">
+                        <MudTextField T="string"
+                                     Label="Código"
+                                     @bind-Value="_updateCategory.Code"
+                                     Variant="Variant.Outlined"
+                                     Required="true"
+                                     Immediate="true"
+                                     Adornment="Adornment.Start"
+                                     AdornmentIcon="@Icons.Material.Filled.Tag"
+                                     HelperText="Código único para identificação"/>
+                    </MudItem>
+                    
+                    <MudItem xs="12">
+                        <MudSelect T="int?"
+                                  Label="Categoria Pai (opcional)"
+                                  @bind-Value="_updateCategory.ParentCategoryId"
+                                  Variant="Variant.Outlined"
+                                  Clearable="true"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Folder"
+                                  HelperText="Deixe em branco para categoria raiz">
+                            @foreach (var cat in _categories.Where(c => c.Id != Category?.Id))
+                            {
+                                <MudSelectItem T="int?" Value="@((int?)cat.Id)">@cat.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    
+                    <MudItem xs="12">
+                        <MudSwitch T="bool" 
+                                  @bind-Value="_updateCategory.IsActive" 
+                                  Color="MudBlazor.Color.Success"
+                                  Label="Categoria Ativa"/>
+                    </MudItem>
+                    
+                    @if (Category?.SubCategories.Any() == true)
+                    {
+                        <MudItem xs="12">
+                            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                                <strong>Atenção:</strong> Esta categoria possui @Category.SubCategories.Count subcategoria(s).
+                                Ao desativá-la, verifique o impacto nas subcategorias.
+                            </MudAlert>
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudForm>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Outlined">Cancelar</MudButton>
+        <MudButton OnClick="Submit" Variant="Variant.Filled" Color="MudBlazor.Color.Primary" Disabled="@_loading">
+            <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-1"/>
+            Salvar Alterações
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] 
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+    
+    [Parameter]
+    public ProductCategoryDto? Category { get; set; }
+    
+    private MudForm? _form;
+    private bool _loading = false;
+    private UpdateProductCategoryDto _updateCategory = new();
+    private List<ProductCategoryDto> _categories = new();
+    
+    protected override async Task OnInitializedAsync()
+    {
+        if (Category == null)
+        {
+            Snackbar.Add("Erro: Categoria não informada", Severity.Error);
+            MudDialog.Cancel();
+            return;
+        }
+        
+        _loading = true;
+        try
+        {
+            // Carrega todas as categorias exceto a atual
+            var response = await ApiService.GetAsync<PaginatedCategoryResponse>("/api/products/categories?pageSize=1000");
+            _categories = response?.Items ?? new List<ProductCategoryDto>();
+            
+            // Preenche os dados da categoria atual
+            _updateCategory.Name = Category.Name;
+            _updateCategory.Code = Category.Code;
+            _updateCategory.ParentCategoryId = Category.ParentCategoryId;
+            _updateCategory.IsActive = Category.IsActive;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar categorias");
+            Snackbar.Add("Erro ao carregar categorias", Severity.Warning);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+    
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+    
+    private async Task Submit()
+    {
+        if (_form != null)
+        {
+            await _form.Validate();
+            if (!_form.IsValid)
+            {
+                Snackbar.Add("Por favor, corrija os erros no formulário", Severity.Error);
+                return;
+            }
+        }
+        
+        if (Category == null)
+        {
+            Snackbar.Add("Erro: Categoria não encontrada", Severity.Error);
+            return;
+        }
+        
+        if (string.IsNullOrWhiteSpace(_updateCategory.Name))
+        {
+            Snackbar.Add("Nome da categoria é obrigatório", Severity.Warning);
+            return;
+        }
+        
+        if (string.IsNullOrWhiteSpace(_updateCategory.Code))
+        {
+            Snackbar.Add("Código da categoria é obrigatório", Severity.Warning);
+            return;
+        }
+        
+        // Validação: não pode ser pai de si mesma
+        if (_updateCategory.ParentCategoryId == Category.Id)
+        {
+            Snackbar.Add("Uma categoria não pode ser pai de si mesma", Severity.Warning);
+            return;
+        }
+        
+        _loading = true;
+        try
+        {
+            var result = await ApiService.PutAsync<ProductCategoryDto>(
+                $"/api/products/categories/{Category.Id}", _updateCategory);
+            
+            if (result != null)
+            {
+                Snackbar.Add("Categoria atualizada com sucesso!", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(result));
+            }
+            else
+            {
+                Snackbar.Add("Erro ao atualizar categoria", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao atualizar categoria");
+            Snackbar.Add($"Erro ao atualizar categoria: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private class PaginatedCategoryResponse
+    {
+        public List<ProductCategoryDto> Items { get; set; } = new();
+        public int TotalItems { get; set; }
+        public int Page { get; set; }
+        public int PageSize { get; set; }
+    }
+}
