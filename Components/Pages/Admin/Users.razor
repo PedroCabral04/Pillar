@@ -82,6 +82,8 @@
         <MudTh><MudTableSortLabel SortLabel="username" T="UserDto">Nome</MudTableSortLabel></MudTh>
         <MudTh><MudTableSortLabel SortLabel="email" T="UserDto">Email</MudTableSortLabel></MudTh>
         <MudTh><MudTableSortLabel SortLabel="phone" T="UserDto">Telefone</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel SortLabel="department" T="UserDto">Departamento</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel SortLabel="position" T="UserDto">Cargo</MudTableSortLabel></MudTh>
         <MudTh><MudTableSortLabel SortLabel="roles" T="UserDto">Função/Permissão</MudTableSortLabel></MudTh>
         <MudTh><MudTableSortLabel SortLabel="active" T="UserDto">Ativo</MudTableSortLabel></MudTh>
         <MudTh>Ações</MudTh>
@@ -90,6 +92,30 @@
         <MudTd DataLabel="Nome">@context.Username</MudTd>
         <MudTd DataLabel="Email">@context.Email</MudTd>
         <MudTd DataLabel="Telefone">@context.Phone</MudTd>
+        <MudTd DataLabel="Departamento">
+            @if (!string.IsNullOrWhiteSpace(context.DepartmentName))
+            {
+                <MudChip T="string" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Primary" Variant="Variant.Outlined">
+                    @context.DepartmentName
+                </MudChip>
+            }
+            else
+            {
+                <MudText Typo="Typo.caption" Color="MudBlazor.Color.Default">-</MudText>
+            }
+        </MudTd>
+        <MudTd DataLabel="Cargo">
+            @if (!string.IsNullOrWhiteSpace(context.PositionTitle))
+            {
+                <MudChip T="string" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Info" Variant="Variant.Outlined">
+                    @context.PositionTitle
+                </MudChip>
+            }
+            else
+            {
+                <MudText Typo="Typo.caption" Color="MudBlazor.Color.Default">-</MudText>
+            }
+        </MudTd>
         <MudTd DataLabel="Permissões">@string.Join(", ", context.RoleAbbreviations)</MudTd>
         <MudTd DataLabel="Ativo">
             <MudChip T="string" Size="MudBlazor.Size.Small" Color="@(context.IsActive ? MudBlazor.Color.Success : MudBlazor.Color.Default)">
@@ -215,6 +241,8 @@
                 "username" => data.OrderByDirection(state.SortDirection, u => u.Username),
                 "email" => data.OrderByDirection(state.SortDirection, u => u.Email),
                 "phone" => data.OrderByDirection(state.SortDirection, u => u.Phone),
+                "department" => data.OrderByDirection(state.SortDirection, u => u.DepartmentName ?? ""),
+                "position" => data.OrderByDirection(state.SortDirection, u => u.PositionTitle ?? ""),
                 "roles" => data.OrderByDirection(state.SortDirection, u => string.Join(",", u.RoleNames)),
                 "active" => data.OrderByDirection(state.SortDirection, u => u.IsActive),
                 _ => data

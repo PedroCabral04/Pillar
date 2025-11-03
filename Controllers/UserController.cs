@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using erp.Models.Identity;
 using Microsoft.EntityFrameworkCore;
+using erp.Data;
 
 namespace erp.Controllers
 {
@@ -18,11 +19,13 @@ namespace erp.Controllers
     {
         private readonly UserManager<ApplicationUser> _users;
         private readonly RoleManager<ApplicationRole> _roles;
+        private readonly ApplicationDbContext _context;
 
-        public UsersController(UserManager<ApplicationUser> users, RoleManager<ApplicationRole> roles)
+        public UsersController(UserManager<ApplicationUser> users, RoleManager<ApplicationRole> roles, ApplicationDbContext context)
         {
             _users = users;
             _roles = roles;
+            _context = context;
         }
 
         [HttpGet]
@@ -30,9 +33,13 @@ namespace erp.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         public async Task<ActionResult<IEnumerable<UserDto>>> GetAllUsers()
         {
-            
             // Força uma nova consulta ao banco usando ToListAsync para garantir dados atualizados
-            var allUsers = await _users.Users.AsNoTracking().ToListAsync();
+            var allUsers = await _users.Users
+                .AsNoTracking()
+                .Include(u => u.Department)
+                .Include(u => u.Position)
+                .ToListAsync();
+                
             var userDtos = new List<UserDto>(allUsers.Count);
             foreach (var u in allUsers)
             {
@@ -45,7 +52,44 @@ namespace erp.Controllers
                     Phone = u.PhoneNumber ?? string.Empty,
                     RoleNames = roles.ToList(),
                     RoleAbbreviations = roles.ToList(),
-                    IsActive = (u as ApplicationUser)?.IsActive ?? true
+                    IsActive = u.IsActive,
+                    FullName = u.FullName,
+                    Cpf = u.Cpf,
+                    Rg = u.Rg,
+                    DateOfBirth = u.DateOfBirth,
+                    Gender = u.Gender,
+                    MaritalStatus = u.MaritalStatus,
+                    ProfilePhotoUrl = u.ProfilePhotoUrl,
+                    PostalCode = u.PostalCode,
+                    Street = u.Street,
+                    Number = u.Number,
+                    Complement = u.Complement,
+                    Neighborhood = u.Neighborhood,
+                    City = u.City,
+                    State = u.State,
+                    Country = u.Country,
+                    DepartmentId = u.DepartmentId,
+                    DepartmentName = u.Department?.Name,
+                    PositionId = u.PositionId,
+                    PositionTitle = u.Position?.Title,
+                    Salary = u.Salary,
+                    HireDate = u.HireDate,
+                    TerminationDate = u.TerminationDate,
+                    ContractType = u.ContractType,
+                    EmploymentStatus = u.EmploymentStatus,
+                    BankCode = u.BankCode,
+                    BankName = u.BankName,
+                    BankAgency = u.BankAgency,
+                    BankAccount = u.BankAccount,
+                    BankAccountType = u.BankAccountType,
+                    EmergencyContactName = u.EmergencyContactName,
+                    EmergencyContactRelationship = u.EmergencyContactRelationship,
+                    EmergencyContactPhone = u.EmergencyContactPhone,
+                    WorkCard = u.WorkCard,
+                    PisNumber = u.PisNumber,
+                    EducationLevel = u.EducationLevel,
+                    CreatedAt = u.CreatedAt,
+                    UpdatedAt = u.UpdatedAt
                 });
             }
             return Ok(userDtos);
@@ -56,7 +100,11 @@ namespace erp.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<ActionResult<UserDto>> GetUserById(int id)
         {
-            var user = await _users.FindByIdAsync(id.ToString());
+            var user = await _users.Users
+                .Include(u => u.Department)
+                .Include(u => u.Position)
+                .FirstOrDefaultAsync(u => u.Id == id);
+                
             if (user == null)
                 return NotFound($"Usuário com ID {id} não encontrado.");
 
@@ -69,7 +117,44 @@ namespace erp.Controllers
                 Phone = user.PhoneNumber ?? string.Empty,
                 RoleNames = roles.ToList(),
                 RoleAbbreviations = roles.ToList(),
-                IsActive = (user as ApplicationUser)?.IsActive ?? true
+                IsActive = user.IsActive,
+                FullName = user.FullName,
+                Cpf = user.Cpf,
+                Rg = user.Rg,
+                DateOfBirth = user.DateOfBirth,
+                Gender = user.Gender,
+                MaritalStatus = user.MaritalStatus,
+                ProfilePhotoUrl = user.ProfilePhotoUrl,
+                PostalCode = user.PostalCode,
+                Street = user.Street,
+                Number = user.Number,
+                Complement = user.Complement,
+                Neighborhood = user.Neighborhood,
+                City = user.City,
+                State = user.State,
+                Country = user.Country,
+                DepartmentId = user.DepartmentId,
+                DepartmentName = user.Department?.Name,
+                PositionId = user.PositionId,
+                PositionTitle = user.Position?.Title,
+                Salary = user.Salary,
+                HireDate = user.HireDate,
+                TerminationDate = user.TerminationDate,
+                ContractType = user.ContractType,
+                EmploymentStatus = user.EmploymentStatus,
+                BankCode = user.BankCode,
+                BankName = user.BankName,
+                BankAgency = user.BankAgency,
+                BankAccount = user.BankAccount,
+                BankAccountType = user.BankAccountType,
+                EmergencyContactName = user.EmergencyContactName,
+                EmergencyContactRelationship = user.EmergencyContactRelationship,
+                EmergencyContactPhone = user.EmergencyContactPhone,
+                WorkCard = user.WorkCard,
+                PisNumber = user.PisNumber,
+                EducationLevel = user.EducationLevel,
+                CreatedAt = user.CreatedAt,
+                UpdatedAt = user.UpdatedAt
             };
             return Ok(userDto);
         }
@@ -89,7 +174,39 @@ namespace erp.Controllers
                 UserName = createUserDto.Username,
                 Email = createUserDto.Email,
                 PhoneNumber = createUserDto.Phone,
-                IsActive = true
+                IsActive = true,
+                FullName = createUserDto.FullName,
+                Cpf = createUserDto.Cpf,
+                Rg = createUserDto.Rg,
+                DateOfBirth = createUserDto.DateOfBirth,
+                Gender = createUserDto.Gender,
+                MaritalStatus = createUserDto.MaritalStatus,
+                PostalCode = createUserDto.PostalCode,
+                Street = createUserDto.Street,
+                Number = createUserDto.Number,
+                Complement = createUserDto.Complement,
+                Neighborhood = createUserDto.Neighborhood,
+                City = createUserDto.City,
+                State = createUserDto.State,
+                Country = createUserDto.Country,
+                DepartmentId = createUserDto.DepartmentId,
+                PositionId = createUserDto.PositionId,
+                Salary = createUserDto.Salary,
+                HireDate = createUserDto.HireDate,
+                ContractType = createUserDto.ContractType,
+                EmploymentStatus = createUserDto.EmploymentStatus ?? "Ativo",
+                BankCode = createUserDto.BankCode,
+                BankName = createUserDto.BankName,
+                BankAgency = createUserDto.BankAgency,
+                BankAccount = createUserDto.BankAccount,
+                BankAccountType = createUserDto.BankAccountType,
+                EmergencyContactName = createUserDto.EmergencyContactName,
+                EmergencyContactRelationship = createUserDto.EmergencyContactRelationship,
+                EmergencyContactPhone = createUserDto.EmergencyContactPhone,
+                WorkCard = createUserDto.WorkCard,
+                PisNumber = createUserDto.PisNumber,
+                EducationLevel = createUserDto.EducationLevel,
+                CreatedAt = DateTime.UtcNow
             };
 
             var password = string.IsNullOrWhiteSpace(createUserDto.Password) ? "User@123!" : createUserDto.Password!;
@@ -134,8 +251,42 @@ namespace erp.Controllers
             user.UserName = updateUserDto.Username ?? user.UserName;
             user.Email = updateUserDto.Email ?? user.Email;
             user.PhoneNumber = updateUserDto.Phone ?? user.PhoneNumber;
-            if (user is ApplicationUser au)
-                au.IsActive = updateUserDto.IsActive;
+            user.IsActive = updateUserDto.IsActive;
+            user.FullName = updateUserDto.FullName;
+            user.Cpf = updateUserDto.Cpf;
+            user.Rg = updateUserDto.Rg;
+            user.DateOfBirth = updateUserDto.DateOfBirth;
+            user.Gender = updateUserDto.Gender;
+            user.MaritalStatus = updateUserDto.MaritalStatus;
+            user.ProfilePhotoUrl = updateUserDto.ProfilePhotoUrl;
+            user.PostalCode = updateUserDto.PostalCode;
+            user.Street = updateUserDto.Street;
+            user.Number = updateUserDto.Number;
+            user.Complement = updateUserDto.Complement;
+            user.Neighborhood = updateUserDto.Neighborhood;
+            user.City = updateUserDto.City;
+            user.State = updateUserDto.State;
+            user.Country = updateUserDto.Country;
+            user.DepartmentId = updateUserDto.DepartmentId;
+            user.PositionId = updateUserDto.PositionId;
+            user.Salary = updateUserDto.Salary;
+            user.HireDate = updateUserDto.HireDate;
+            user.TerminationDate = updateUserDto.TerminationDate;
+            user.ContractType = updateUserDto.ContractType;
+            user.EmploymentStatus = updateUserDto.EmploymentStatus;
+            user.BankCode = updateUserDto.BankCode;
+            user.BankName = updateUserDto.BankName;
+            user.BankAgency = updateUserDto.BankAgency;
+            user.BankAccount = updateUserDto.BankAccount;
+            user.BankAccountType = updateUserDto.BankAccountType;
+            user.EmergencyContactName = updateUserDto.EmergencyContactName;
+            user.EmergencyContactRelationship = updateUserDto.EmergencyContactRelationship;
+            user.EmergencyContactPhone = updateUserDto.EmergencyContactPhone;
+            user.WorkCard = updateUserDto.WorkCard;
+            user.PisNumber = updateUserDto.PisNumber;
+            user.EducationLevel = updateUserDto.EducationLevel;
+            user.Notes = updateUserDto.Notes;
+            user.UpdatedAt = DateTime.UtcNow;
 
             var update = await _users.UpdateAsync(user);
             if (!update.Succeeded)

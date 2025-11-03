@@ -1,0 +1,257 @@
+@page "/admin/positions"
+@using erp.DTOs.User
+@using erp.Services
+@using erp.Components.Shared.Dialogs
+@using MudBlazor
+@attribute [Authorize]
+
+@inject IApiService ApiService
+@inject ILogger<Positions> Logger
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Gerenciar Cargos</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Gerenciar Cargos</MudText>
+    <MudButton Color="MudBlazor.Color.Primary" 
+               Variant="Variant.Filled" 
+               StartIcon="@Icons.Material.Filled.Add"
+               OnClick="ShowCreateDialog">
+        Adicionar Cargo
+    </MudButton>
+</MudStack>
+
+@if (_loadError != null)
+{
+    <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
+}
+
+<MudTable T="PositionDto" 
+          ServerData="ServerReload" 
+          Dense="false" 
+          Hover="true" 
+          Elevation="4" 
+          @ref="_table" 
+          Striped="true"
+          Loading="_loading">
+    <ToolBarContent>
+        <MudText Typo="Typo.h5">Cargos Cadastrados</MudText>
+        <MudSpacer/>
+        <MudTextField T="string" 
+                      ValueChanged="OnSearch" 
+                      Immediate="true" 
+                      Placeholder="Procurar" 
+                      Variant="Variant.Outlined" 
+                      Margin="Margin.Dense"
+                      Adornment="Adornment.Start" 
+                      AdornmentIcon="@Icons.Material.Filled.Search" 
+                      Clearable="true" 
+                      Style="min-width: 250px;"/>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh><MudTableSortLabel SortLabel="code" T="PositionDto">Código</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel SortLabel="title" T="PositionDto">Cargo</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel SortLabel="level" T="PositionDto">Nível</MudTableSortLabel></MudTh>
+        <MudTh>Departamento</MudTh>
+        <MudTh>Faixa Salarial</MudTh>
+        <MudTh><MudTableSortLabel SortLabel="employees" T="PositionDto">Funcionários</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel SortLabel="active" T="PositionDto">Status</MudTableSortLabel></MudTh>
+        <MudTh>Ações</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Código">@context.Code</MudTd>
+        <MudTd DataLabel="Cargo">
+            <MudText Typo="Typo.body2" Style="font-weight: 600;">@context.Title</MudText>
+            @if (!string.IsNullOrEmpty(context.Description))
+            {
+                <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">@context.Description</MudText>
+            }
+        </MudTd>
+        <MudTd DataLabel="Nível">
+            @if (context.Level.HasValue)
+            {
+                <MudChip T="string" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Secondary">
+                    Nível @context.Level
+                </MudChip>
+            }
+            else
+            {
+                <text>-</text>
+            }
+        </MudTd>
+        <MudTd DataLabel="Departamento">@(context.DefaultDepartmentName ?? "-")</MudTd>
+        <MudTd DataLabel="Faixa Salarial">
+            @if (context.MinSalary.HasValue && context.MaxSalary.HasValue)
+            {
+                <MudText Typo="Typo.body2">
+                    @context.MinSalary.Value.ToString("C") - @context.MaxSalary.Value.ToString("C")
+                </MudText>
+            }
+            else if (context.MinSalary.HasValue)
+            {
+                <MudText Typo="Typo.body2">A partir de @context.MinSalary.Value.ToString("C")</MudText>
+            }
+            else if (context.MaxSalary.HasValue)
+            {
+                <MudText Typo="Typo.body2">Até @context.MaxSalary.Value.ToString("C")</MudText>
+            }
+            else
+            {
+                <text>-</text>
+            }
+        </MudTd>
+        <MudTd DataLabel="Funcionários">
+            <MudChip T="string" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Info">
+                @context.EmployeeCount
+            </MudChip>
+        </MudTd>
+        <MudTd DataLabel="Status">
+            <MudChip T="string" Size="MudBlazor.Size.Small" Color="@(context.IsActive ? MudBlazor.Color.Success : MudBlazor.Color.Default)">
+                @(context.IsActive ? "Ativo" : "Inativo")
+            </MudChip>
+        </MudTd>
+        <MudTd>
+            <MudButtonGroup Variant="Variant.Outlined" Size="MudBlazor.Size.Small">
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                               Color="MudBlazor.Color.Info" 
+                               Title="Editar"
+                               OnClick="@(() => ShowEditDialog(context))"/>
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                               Color="MudBlazor.Color.Error" 
+                               Title="Excluir"
+                               OnClick="@(() => DeletePosition(context))"/>
+            </MudButtonGroup>
+        </MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private MudTable<PositionDto>? _table;
+    private string? _loadError;
+    private string _searchString = "";
+    private bool _loading = false;
+
+    private async Task<TableData<PositionDto>> ServerReload(TableState state, CancellationToken token)
+    {
+        _loading = true;
+        _loadError = null;
+
+        try
+        {
+            var positions = await ApiService.GetAsync<List<PositionDto>>("api/positions", token);
+            
+            if (positions == null)
+            {
+                return new TableData<PositionDto> { Items = new List<PositionDto>(), TotalItems = 0 };
+            }
+
+            // Filtrar por busca
+            var filteredData = positions.AsQueryable();
+            if (!string.IsNullOrWhiteSpace(_searchString))
+            {
+                filteredData = filteredData.Where(p => 
+                    (p.Title != null && p.Title.Contains(_searchString, StringComparison.OrdinalIgnoreCase)) ||
+                    (p.Code != null && p.Code.Contains(_searchString, StringComparison.OrdinalIgnoreCase)) ||
+                    (p.Description != null && p.Description.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+                );
+            }
+
+            // Ordenar
+            filteredData = state.SortLabel switch
+            {
+                "code" => filteredData.OrderByDirection(state.SortDirection, p => p.Code),
+                "title" => filteredData.OrderByDirection(state.SortDirection, p => p.Title),
+                "level" => filteredData.OrderByDirection(state.SortDirection, p => p.Level),
+                "employees" => filteredData.OrderByDirection(state.SortDirection, p => p.EmployeeCount),
+                "active" => filteredData.OrderByDirection(state.SortDirection, p => p.IsActive),
+                _ => filteredData.OrderBy(p => p.Title)
+            };
+
+            var totalItems = filteredData.Count();
+            var items = filteredData.Skip(state.Page * state.PageSize).Take(state.PageSize).ToList();
+
+            return new TableData<PositionDto> { Items = items, TotalItems = totalItems };
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar cargos");
+            _loadError = $"Erro ao carregar cargos: {ex.Message}";
+            return new TableData<PositionDto> { Items = new List<PositionDto>(), TotalItems = 0 };
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OnSearch(string text)
+    {
+        _searchString = text;
+        _table?.ReloadServerData();
+    }
+
+    private async Task ShowCreateDialog()
+    {
+        var parameters = new DialogParameters<PositionDialog>
+        {
+            { x => x.IsEdit, false }
+        };
+
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<PositionDialog>("Novo Cargo", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await _table!.ReloadServerData();
+            Snackbar.Add("Cargo criado com sucesso!", Severity.Success);
+        }
+    }
+
+    private async Task ShowEditDialog(PositionDto position)
+    {
+        var parameters = new DialogParameters<PositionDialog>
+        {
+            { x => x.IsEdit, true },
+            { x => x.PositionId, position.Id }
+        };
+
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<PositionDialog>("Editar Cargo", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await _table!.ReloadServerData();
+            Snackbar.Add("Cargo atualizado com sucesso!", Severity.Success);
+        }
+    }
+
+    private async Task DeletePosition(PositionDto position)
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Confirmar Exclusão",
+            $"Tem certeza que deseja excluir o cargo '{position.Title}'?",
+            yesText: "Excluir", cancelText: "Cancelar");
+
+        if (confirmed == true)
+        {
+            try
+            {
+                await ApiService.DeleteAsync($"api/positions/{position.Id}");
+                await _table!.ReloadServerData();
+                Snackbar.Add("Cargo excluído com sucesso!", Severity.Success);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Erro ao excluir cargo");
+                Snackbar.Add($"Erro ao excluir: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}
+

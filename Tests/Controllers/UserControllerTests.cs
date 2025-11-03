@@ -4,6 +4,7 @@ using erp.DTOs.User;
 using erp.Models.Identity;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 namespace erp.Tests.Controllers;
 
@@ -17,6 +18,8 @@ public class UserControllerTests
     private readonly Mock<RoleManager<ApplicationRole>> _mockRoleManager;
     private readonly UsersController _controller;
 
+    private readonly Mock<erp.Data.ApplicationDbContext> _mockContext;
+    
     public UserControllerTests()
     {
         // Setup UserManager mock
@@ -28,8 +31,11 @@ public class UserControllerTests
         var roleStore = new Mock<IRoleStore<ApplicationRole>>();
         _mockRoleManager = new Mock<RoleManager<ApplicationRole>>(
             roleStore.Object, null!, null!, null!, null!);
+        
+        // Setup DbContext mock - apenas mock simples, sem banco real
+        _mockContext = new Mock<erp.Data.ApplicationDbContext>();
 
-        _controller = new UsersController(_mockUserManager.Object, _mockRoleManager.Object);
+        _controller = new UsersController(_mockUserManager.Object, _mockRoleManager.Object, _mockContext.Object);
 
         // Setup user context
         var user = new ClaimsPrincipal(new ClaimsIdentity(new Claim[]

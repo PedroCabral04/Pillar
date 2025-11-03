@@ -34,6 +34,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Models.Sales.Customer> Customers { get; set; } = null!;
     public DbSet<Models.Sales.Sale> Sales { get; set; } = null!;
     public DbSet<Models.Sales.SaleItem> SaleItems { get; set; } = null!;
+    
+    // HR Management
+    public DbSet<Department> Departments { get; set; } = null!;
+    public DbSet<Position> Positions { get; set; } = null!;
 
     protected override void OnConfiguring(DbContextOptionsBuilder options)
         => options.UseNpgsql("Host=localhost;Database=erp;Username=postgres;Password=123");
@@ -138,6 +142,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         
         // Sales model configuration
         ConfigureSalesModels(modelBuilder);
+        
+        // HR Management model configuration
+        ConfigureHRModels(modelBuilder);
     }
 
     private void ConfigureInventoryModels(ModelBuilder modelBuilder)
@@ -406,6 +413,76 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
                 .WithMany()
                 .HasForeignKey(x => x.ProductId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+    
+    private void ConfigureHRModels(ModelBuilder modelBuilder)
+    {
+        // Department
+        modelBuilder.Entity<Department>(d =>
+        {
+            d.ToTable("Departments");
+            d.HasKey(x => x.Id);
+            d.Property(x => x.Name).HasMaxLength(100).IsRequired();
+            d.Property(x => x.Description).HasMaxLength(500);
+            d.Property(x => x.Code).HasMaxLength(10);
+            d.Property(x => x.CostCenter).HasMaxLength(50);
+            
+            d.HasIndex(x => x.Code).IsUnique();
+            d.HasIndex(x => x.ParentDepartmentId);
+            d.HasIndex(x => x.ManagerId);
+            
+            // Relacionamento hierárquico
+            d.HasOne(x => x.ParentDepartment)
+                .WithMany(x => x.SubDepartments)
+                .HasForeignKey(x => x.ParentDepartmentId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            // Gerente do departamento
+            d.HasOne(x => x.Manager)
+                .WithMany()
+                .HasForeignKey(x => x.ManagerId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+        
+        // Position
+        modelBuilder.Entity<Position>(p =>
+        {
+            p.ToTable("Positions");
+            p.HasKey(x => x.Id);
+            p.Property(x => x.Title).HasMaxLength(100).IsRequired();
+            p.Property(x => x.Description).HasMaxLength(500);
+            p.Property(x => x.Code).HasMaxLength(10);
+            
+            p.HasIndex(x => x.Code).IsUnique();
+            p.HasIndex(x => x.DefaultDepartmentId);
+            
+            p.HasOne(x => x.DefaultDepartment)
+                .WithMany()
+                .HasForeignKey(x => x.DefaultDepartmentId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+        
+        // ApplicationUser - Configuração adicional para relacionamentos de RH
+        modelBuilder.Entity<ApplicationUser>(u =>
+        {
+            u.HasIndex(x => x.Cpf).IsUnique().HasFilter("\"Cpf\" IS NOT NULL");
+            u.HasIndex(x => x.Rg).HasFilter("\"Rg\" IS NOT NULL");
+            u.HasIndex(x => x.FullName);
+            u.HasIndex(x => x.DepartmentId);
+            u.HasIndex(x => x.PositionId);
+            u.HasIndex(x => x.HireDate);
+            u.HasIndex(x => x.EmploymentStatus);
+            
+            u.HasOne(x => x.Department)
+                .WithMany(x => x.Employees)
+                .HasForeignKey(x => x.DepartmentId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            u.HasOne(x => x.Position)
+                .WithMany(x => x.Employees)
+                .HasForeignKey(x => x.PositionId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 }
