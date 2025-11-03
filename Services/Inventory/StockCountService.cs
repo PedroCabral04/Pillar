@@ -22,6 +22,43 @@ public class StockCountService : IStockCountService
         _movementService = movementService;
     }
 
+    public async Task<(IEnumerable<StockCountDto> Counts, int TotalCount)> GetCountsAsync(
+        string? status = null,
+        int? warehouseId = null,
+        int page = 1,
+        int pageSize = 20)
+    {
+        var query = _context.StockCounts
+            .Include(c => c.Warehouse)
+            .Include(c => c.CreatedByUser)
+            .Include(c => c.ApprovedByUser)
+            .Include(c => c.Items)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            if (Enum.TryParse<StockCountStatus>(status, out var statusEnum))
+            {
+                query = query.Where(c => c.Status == statusEnum);
+            }
+        }
+
+        if (warehouseId.HasValue)
+        {
+            query = query.Where(c => c.WarehouseId == warehouseId.Value);
+        }
+
+        var totalCount = await query.CountAsync();
+
+        var counts = await query
+            .OrderByDescending(c => c.CountDate)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return (counts.Select(c => _mapper.MapWithDetails(c)), totalCount);
+    }
+
     public async Task<StockCountDto> CreateCountAsync(CreateStockCountDto dto, int userId)
     {
         var count = _mapper.CreateCountDtoToCount(dto);
