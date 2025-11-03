@@ -1,0 +1,345 @@
+@page "/inventory/counts"
+@using erp.DTOs.Inventory
+@using erp.Services
+@using erp.Components.Shared.Dialogs.Inventory
+@using MudBlazor
+@using Size = MudBlazor.Size
+@using Color = MudBlazor.Color
+@attribute [Authorize]
+
+@inject IApiService ApiService
+@inject ILogger<StockCounts> Logger
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager Navigation
+
+<PageTitle>Contagens de Estoque</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Contagens de Estoque</MudText>
+    <MudButton Color="Color.Primary" 
+               Variant="Variant.Filled" 
+               StartIcon="@Icons.Material.Filled.Add"
+               OnClick="OpenCreateDialog">
+        Nova Contagem
+    </MudButton>
+</MudStack>
+
+@if (_loadError != null)
+{
+    <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
+}
+
+<MudTable T="StockCountDto" ServerData="ServerReload" 
+          Dense="false" Hover="true" Elevation="4" @ref="_table" Striped="true" Loading="@_loading">
+    <ToolBarContent>
+        <MudText Typo="Typo.h5">Histórico de Contagens</MudText>
+        <MudSpacer/>
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudTextField T="string" ValueChanged="OnSearch" Immediate="false" Placeholder="Procurar contagem" 
+                          Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
+                          Clearable="true" Style="min-width: 200px;"/>
+            <MudSelect T="string" 
+                       Value="_statusFilter" 
+                       ValueChanged="OnStatusFilterChanged"
+                       Label="Status" 
+                       Variant="Variant.Outlined" 
+                       Margin="Margin.Dense"
+                       Clearable="true"
+                       Style="min-width: 120px;">
+                <MudSelectItem T="string" Value="@("Pendente")">Pendente</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Em Contagem")">Em Contagem</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Finalizada")">Finalizada</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Cancelada")">Cancelada</MudSelectItem>
+            </MudSelect>
+            <MudDatePicker Label="Data Inicial" 
+                          @bind-Date="_startDate" 
+                          Variant="Variant.Outlined" 
+                          Margin="Margin.Dense"
+                          Clearable="true"/>
+            <MudDatePicker Label="Data Final" 
+                          @bind-Date="_endDate" 
+                          Variant="Variant.Outlined" 
+                          Margin="Margin.Dense"
+                          Clearable="true"/>
+            <MudIconButton Icon="@Icons.Material.Filled.FilterAlt" 
+                          Color="Color.Primary"
+                          OnClick="ApplyDateFilter"/>
+        </MudStack>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh>Número</MudTh>
+        <MudTh>Data</MudTh>
+        <MudTh>Armazém</MudTh>
+        <MudTh Style="text-align: center">Total Itens</MudTh>
+        <MudTh Style="text-align: center">Diferenças</MudTh>
+        <MudTh Style="text-align: right">Valor Diferença</MudTh>
+        <MudTh>Status</MudTh>
+        <MudTh>Criado por</MudTh>
+        <MudTh Style="text-align: center">Ações</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Número">
+            <MudText Typo="Typo.body2" Style="font-family: monospace">@context.CountNumber</MudText>
+        </MudTd>
+        <MudTd DataLabel="Data">
+            <MudText Typo="Typo.body2">@context.CountDate.ToString("dd/MM/yyyy")</MudText>
+            @if (context.ClosedDate.HasValue)
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    Fechada: @context.ClosedDate.Value.ToString("dd/MM/yyyy")
+                </MudText>
+            }
+        </MudTd>
+        <MudTd DataLabel="Armazém">
+            @(context.WarehouseName ?? "Todos")
+        </MudTd>
+        <MudTd DataLabel="Total" Style="text-align: center">
+            <MudChip T="string" Size="Size.Small">@context.TotalItems</MudChip>
+        </MudTd>
+        <MudTd DataLabel="Diferenças" Style="text-align: center">
+            @if (context.ItemsWithDifference > 0)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Warning">@context.ItemsWithDifference</MudChip>
+            }
+            else
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Success">0</MudChip>
+            }
+        </MudTd>
+        <MudTd DataLabel="Valor" Style="text-align: right">
+            <MudText Typo="Typo.body2" Style="@GetDifferenceStyle(context.TotalDifferenceValue)">
+                @context.TotalDifferenceValue.ToString("C2")
+            </MudText>
+        </MudTd>
+        <MudTd DataLabel="Status">
+            <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.StatusName)">
+                @context.StatusName
+            </MudChip>
+        </MudTd>
+        <MudTd DataLabel="Criado por">
+            <MudText Typo="Typo.caption">@context.CreatedByUserName</MudText>
+        </MudTd>
+        <MudTd DataLabel="Ações" Style="text-align: center">
+            <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
+                           Size="Size.Small"
+                           Href="@($"/inventory/counts/{context.Id}")"
+                           Title="Ver detalhes"/>
+            @if (context.StatusName == "Pendente" || context.StatusName == "Em Contagem")
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                               Size="Size.Small"
+                               Href="@($"/inventory/counts/{context.Id}/edit")"
+                               Title="Editar"/>
+                <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" 
+                               Size="Size.Small"
+                               Color="Color.Success"
+                               OnClick="@(() => ApproveCount(context))"
+                               Title="Aprovar e aplicar ajustes"/>
+                <MudIconButton Icon="@Icons.Material.Filled.Cancel" 
+                               Size="Size.Small" 
+                               Color="Color.Error"
+                               OnClick="@(() => CancelCount(context))"
+                               Title="Cancelar"/>
+            }
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText>Nenhuma contagem encontrada</MudText>
+    </NoRecordsContent>
+    <LoadingContent>
+        <MudText>Carregando...</MudText>
+    </LoadingContent>
+    <PagerContent>
+        <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private MudTable<StockCountDto>? _table;
+    private string? _loadError;
+    private string? _searchString;
+    private string? _statusFilter;
+    private DateTime? _startDate;
+    private DateTime? _endDate;
+    private bool _loading = false;
+
+    private async Task<TableData<StockCountDto>> ServerReload(TableState state, CancellationToken ct)
+    {
+        _loading = true;
+        try
+        {
+            var page = state.Page + 1;
+            var pageSize = state.PageSize;
+
+            var queryParams = new List<string>
+            {
+                $"page={page}",
+                $"pageSize={pageSize}"
+            };
+
+            if (!string.IsNullOrWhiteSpace(_searchString))
+            {
+                queryParams.Add($"search={Uri.EscapeDataString(_searchString)}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(_statusFilter))
+            {
+                queryParams.Add($"status={Uri.EscapeDataString(_statusFilter)}");
+            }
+
+            if (_startDate.HasValue)
+            {
+                queryParams.Add($"startDate={_startDate.Value:yyyy-MM-dd}");
+            }
+
+            if (_endDate.HasValue)
+            {
+                queryParams.Add($"endDate={_endDate.Value:yyyy-MM-dd}");
+            }
+
+            var query = string.Join("&", queryParams);
+            var response = await ApiService.GetAsync<PaginatedResponse<StockCountDto>>($"/api/inventory/counts?{query}");
+
+            if (response != null)
+            {
+                return new TableData<StockCountDto>
+                {
+                    Items = response.Items,
+                    TotalItems = response.TotalItems
+                };
+            }
+
+            return new TableData<StockCountDto> { Items = Array.Empty<StockCountDto>(), TotalItems = 0 };
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar contagens");
+            _loadError = "Erro ao carregar contagens: " + ex.Message;
+            Snackbar.Add(_loadError, Severity.Error);
+            return new TableData<StockCountDto> { Items = Array.Empty<StockCountDto>(), TotalItems = 0 };
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OnSearch(string text)
+    {
+        _searchString = text;
+        _table?.ReloadServerData();
+    }
+
+    private void OnStatusFilterChanged(string? value)
+    {
+        _statusFilter = value;
+        _table?.ReloadServerData();
+    }
+
+    private void ApplyDateFilter()
+    {
+        _table?.ReloadServerData();
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var options = new DialogOptions 
+        { 
+            CloseOnEscapeKey = true,
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true
+        };
+        
+        var dialog = await DialogService.ShowAsync<CreateStockCountDialog>("Nova Contagem", options);
+        var result = await dialog.Result;
+        
+        if (!result.Canceled && result.Data is StockCountDto count)
+        {
+            Navigation.NavigateTo($"/inventory/counts/{count.Id}/edit");
+        }
+    }
+
+    private async Task ApproveCount(StockCountDto count)
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Confirmar Aprovação",
+            $"Deseja aprovar a contagem {count.CountNumber} e aplicar os ajustes de estoque?",
+            yesText: "Aprovar", cancelText: "Cancelar");
+
+        if (confirmed == true)
+        {
+            try
+            {
+                var dto = new ApproveStockCountDto
+                {
+                    StockCountId = count.Id,
+                    ApplyAdjustments = true
+                };
+                
+                await ApiService.PostAsync<object>($"/api/inventory/counts/{count.Id}/approve", dto);
+                Snackbar.Add("Contagem aprovada com sucesso!", Severity.Success);
+                _table?.ReloadServerData();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Erro ao aprovar contagem");
+                Snackbar.Add($"Erro ao aprovar contagem: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task CancelCount(StockCountDto count)
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Confirmar Cancelamento",
+            $"Deseja cancelar a contagem {count.CountNumber}?",
+            yesText: "Cancelar Contagem", cancelText: "Voltar");
+
+        if (confirmed == true)
+        {
+            try
+            {
+                await ApiService.DeleteAsync($"/api/inventory/counts/{count.Id}");
+                Snackbar.Add("Contagem cancelada com sucesso!", Severity.Success);
+                _table?.ReloadServerData();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Erro ao cancelar contagem");
+                Snackbar.Add($"Erro ao cancelar contagem: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private Color GetStatusColor(string status)
+    {
+        return status switch
+        {
+            "Pendente" => Color.Default,
+            "Em Contagem" => Color.Info,
+            "Finalizada" => Color.Success,
+            "Cancelada" => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    private string GetDifferenceStyle(decimal value)
+    {
+        if (value > 0)
+            return "color: var(--mud-palette-success); font-weight: 600;";
+        if (value < 0)
+            return "color: var(--mud-palette-error); font-weight: 600;";
+        return "";
+    }
+    
+    public class PaginatedResponse<T>
+    {
+        public List<T> Items { get; set; } = new();
+        public int TotalItems { get; set; }
+        public int Page { get; set; }
+        public int PageSize { get; set; }
+        public int TotalPages => (int)Math.Ceiling((double)TotalItems / PageSize);
+    }
+}
