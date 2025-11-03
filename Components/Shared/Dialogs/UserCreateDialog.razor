@@ -85,6 +85,85 @@
                                       Adornment="Adornment.Start"
                                       AdornmentIcon="@Icons.Material.Filled.Phone"/>
                     </MudItem>
+                    
+                    <MudItem xs="12" md="6">
+                        <MudTextField T="string" 
+                                      Label="CPF" 
+                                      Variant="Variant.Outlined"
+                                      Placeholder="000.000.000-00"
+                                      Mask="@(new PatternMask("000.000.000-00"))"
+                                      @bind-Value="_newUser.Cpf"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Badge"/>
+                    </MudItem>
+                    
+                    <MudItem xs="12" md="6">
+                        <MudDatePicker T="DateTime?" 
+                                       Label="Data de Nascimento"
+                                       @bind-Date="_newUser.DateOfBirth"
+                                       Variant="Variant.Outlined"
+                                       Adornment="Adornment.Start"
+                                       AdornmentIcon="@Icons.Material.Filled.Cake"/>
+                    </MudItem>
+                </MudGrid>
+
+                <MudDivider Class="my-4" />
+
+                <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.Work" Size="MudBlazor.Size.Small" Class="mr-1" />
+                    Informações Profissionais
+                </MudText>
+
+                <MudGrid Spacing="3">
+                    <MudItem xs="12" md="6">
+                        <MudSelect T="int?" 
+                                   @bind-Value="_newUser.DepartmentId"
+                                   Label="Departamento"
+                                   Variant="Variant.Outlined"
+                                   Clearable="true"
+                                   Adornment="Adornment.Start"
+                                   AdornmentIcon="@Icons.Material.Filled.BusinessCenter">
+                            @foreach (var dept in _departmentsList)
+                            {
+                                <MudSelectItem T="int?" Value="@dept.Id">@dept.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    
+                    <MudItem xs="12" md="6">
+                        <MudSelect T="int?" 
+                                   @bind-Value="_newUser.PositionId"
+                                   Label="Cargo"
+                                   Variant="Variant.Outlined"
+                                   Clearable="true"
+                                   Adornment="Adornment.Start"
+                                   AdornmentIcon="@Icons.Material.Filled.WorkOutline">
+                            @foreach (var pos in _positionsList)
+                            {
+                                <MudSelectItem T="int?" Value="@pos.Id">@pos.Title</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    
+                    <MudItem xs="12" md="6">
+                        <MudDatePicker T="DateTime?" 
+                                       Label="Data de Admissão"
+                                       @bind-Date="_newUser.HireDate"
+                                       Variant="Variant.Outlined"
+                                       Adornment="Adornment.Start"
+                                       AdornmentIcon="@Icons.Material.Filled.Event"/>
+                    </MudItem>
+                    
+                    <MudItem xs="12" md="6">
+                        <MudNumericField T="decimal?" 
+                                         Label="Salário"
+                                         @bind-Value="_newUser.Salary"
+                                         Variant="Variant.Outlined"
+                                         Format="C2"
+                                         Culture="@(new System.Globalization.CultureInfo("pt-BR"))"
+                                         Adornment="Adornment.Start"
+                                         AdornmentIcon="@Icons.Material.Filled.AttachMoney"/>
+                    </MudItem>
                 </MudGrid>
 
                 <MudDivider Class="my-4" />
@@ -181,6 +260,8 @@
     private CreateUserDto _newUser = new() { RoleIds = new List<int>() };
     private IEnumerable<RoleDto> _selectedRoles = new List<RoleDto>();
     private List<RoleDto> _rolesList = new List<RoleDto>();
+    private List<DepartmentDto> _departmentsList = new List<DepartmentDto>();
+    private List<PositionDto> _positionsList = new List<PositionDto>();
     
     private bool _loading = true;
     private bool _submitting = false;
@@ -215,7 +296,11 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadRolesAsync();
+        await Task.WhenAll(
+            LoadRolesAsync(),
+            LoadDepartmentsAsync(),
+            LoadPositionsAsync()
+        );
         _loading = false;
     }
     
@@ -394,6 +479,44 @@
         {
             Logger.LogError($"Erro ao buscar funções: {ex.Message}");
             _loadError = "Erro ao carregar funções. Tente novamente.";
+        }
+    }
+
+    private async Task LoadDepartmentsAsync()
+    {
+        try
+        {
+            var response = await ApiService.GetAsync("api/departments");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var departments = await response.Content.ReadFromJsonAsync<List<DepartmentDto>>();
+                _departmentsList = departments?.Where(d => d.IsActive).ToList() ?? new List<DepartmentDto>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Erro ao buscar departamentos: {ex.Message}");
+            // Não bloqueia o formulário se departamentos não carregarem
+        }
+    }
+
+    private async Task LoadPositionsAsync()
+    {
+        try
+        {
+            var response = await ApiService.GetAsync("api/positions");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var positions = await response.Content.ReadFromJsonAsync<List<PositionDto>>();
+                _positionsList = positions?.Where(p => p.IsActive).ToList() ?? new List<PositionDto>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Erro ao buscar cargos: {ex.Message}");
+            // Não bloqueia o formulário se cargos não carregarem
         }
     }
 

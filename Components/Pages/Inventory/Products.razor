@@ -1,6 +1,7 @@
 @page "/inventory/products"
 @using erp.DTOs.Inventory
 @using erp.Services
+@using erp.Components.Shared.Dialogs.Inventory
 @using MudBlazor
 @using Size = MudBlazor.Size
 @using Color = MudBlazor.Color
@@ -18,7 +19,7 @@
     <MudButton Color="Color.Primary" 
                Variant="Variant.Filled" 
                StartIcon="@Icons.Material.Filled.Add"
-               Href="/inventory/products/create">
+               OnClick="OpenCreateProductDialog">
         Adicionar Produto
     </MudButton>
 </MudStack>
@@ -179,6 +180,24 @@
     {
         _statusFilter = status;
         _table?.ReloadServerData();
+    }
+
+    private async Task OpenCreateProductDialog()
+    {
+        var options = new DialogOptions 
+        { 
+            CloseOnEscapeKey = true,
+            MaxWidth = MaxWidth.ExtraLarge,
+            FullWidth = true
+        };
+        
+        var dialog = await DialogService.ShowAsync<CreateProductDialog>("Adicionar Produto", options);
+        var result = await dialog.Result;
+        
+        if (!result.Canceled)
+        {
+            _table?.ReloadServerData();
+        }
     }
 
     private async Task DeleteProduct(ProductDto product)

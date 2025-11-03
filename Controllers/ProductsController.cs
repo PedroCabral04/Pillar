@@ -336,4 +336,159 @@ public class ProductsController : ControllerBase
             return StatusCode(500, new { message = "Erro ao obter produtos", error = ex.Message });
         }
     }
+
+    #region Categories
+
+    /// <summary>
+    /// Lista categorias com paginação e filtros
+    /// </summary>
+    [HttpGet("categories")]
+    public async Task<ActionResult> GetCategories(
+        [FromQuery] string? search = null,
+        [FromQuery] int? parentCategoryId = null,
+        [FromQuery] bool? isActive = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        try
+        {
+            var (categories, totalCount) = await _inventoryService.GetCategoriesAsync(
+                search, parentCategoryId, isActive, page, pageSize);
+            
+            var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+            
+            return Ok(new
+            {
+                items = categories,
+                totalItems = totalCount,
+                page,
+                pageSize,
+                totalPages,
+                hasNextPage = page < totalPages,
+                hasPreviousPage = page > 1
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao listar categorias");
+            return StatusCode(500, new { message = "Erro ao listar categorias", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Busca categoria por ID
+    /// </summary>
+    [HttpGet("categories/{id:int}")]
+    public async Task<ActionResult<ProductCategoryDto>> GetCategoryById(int id)
+    {
+        try
+        {
+            var category = await _inventoryService.GetCategoryByIdAsync(id);
+            
+            if (category == null)
+            {
+                return NotFound(new { message = $"Categoria com ID {id} não encontrada" });
+            }
+
+            return Ok(category);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao buscar categoria {CategoryId}", id);
+            return StatusCode(500, new { message = "Erro ao buscar categoria", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Cria uma nova categoria
+    /// </summary>
+    [HttpPost("categories")]
+    public async Task<ActionResult<ProductCategoryDto>> CreateCategory([FromBody] CreateProductCategoryDto createDto)
+    {
+        try
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var category = await _inventoryService.CreateCategoryAsync(createDto);
+            
+            return CreatedAtAction(nameof(GetCategoryById), new { id = category.Id }, category);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Erro de validação ao criar categoria");
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao criar categoria");
+            return StatusCode(500, new { message = "Erro ao criar categoria", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Atualiza uma categoria existente
+    /// </summary>
+    [HttpPut("categories/{id:int}")]
+    public async Task<ActionResult<ProductCategoryDto>> UpdateCategory(int id, [FromBody] UpdateProductCategoryDto updateDto)
+    {
+        try
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            if (id != updateDto.Id)
+            {
+                return BadRequest(new { message = "ID da URL não corresponde ao ID da categoria" });
+            }
+
+            var category = await _inventoryService.UpdateCategoryAsync(updateDto);
+            return Ok(category);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Erro de validação ao atualizar categoria {CategoryId}", id);
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao atualizar categoria {CategoryId}", id);
+            return StatusCode(500, new { message = "Erro ao atualizar categoria", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Deleta uma categoria
+    /// </summary>
+    [HttpDelete("categories/{id:int}")]
+    public async Task<ActionResult> DeleteCategory(int id)
+    {
+        try
+        {
+            var success = await _inventoryService.DeleteCategoryAsync(id);
+            
+            if (!success)
+            {
+                return NotFound(new { message = $"Categoria com ID {id} não encontrada" });
+            }
+
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Erro ao deletar categoria {CategoryId}", id);
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao deletar categoria {CategoryId}", id);
+            return StatusCode(500, new { message = "Erro ao deletar categoria", error = ex.Message });
+        }
+    }
+
+    #endregion
 }
