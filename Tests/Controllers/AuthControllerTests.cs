@@ -1,7 +1,9 @@
 using erp.Controllers;
 using erp.DTOs.Auth;
 using erp.Models.Identity;
+using erp.Services.Email;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Logging;
 
 namespace erp.Tests.Controllers;
 
@@ -12,6 +14,8 @@ public class AuthControllerTests
 {
     private readonly Mock<SignInManager<ApplicationUser>> _mockSignInManager;
     private readonly Mock<UserManager<ApplicationUser>> _mockUserManager;
+    private readonly Mock<IEmailService> _mockEmailService;
+    private readonly Mock<ILogger<AuthController>> _mockLogger;
     private readonly AuthController _controller;
 
     public AuthControllerTests()
@@ -29,7 +33,14 @@ public class AuthControllerTests
             claimsFactory.Object,
             null, null, null, null);
 
-        _controller = new AuthController(_mockSignInManager.Object, _mockUserManager.Object);
+        _mockEmailService = new Mock<IEmailService>();
+        _mockLogger = new Mock<ILogger<AuthController>>();
+
+        _controller = new AuthController(
+            _mockSignInManager.Object, 
+            _mockUserManager.Object,
+            _mockEmailService.Object,
+            _mockLogger.Object);
     }
 
     #region Login Tests
