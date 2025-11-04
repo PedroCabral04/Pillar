@@ -14,10 +14,27 @@
         <MudStack Row Spacing="2" AlignItems="AlignItems.Center">
             <MudIcon Icon="@Icons.Material.Filled.ViewKanban" Size="MudBlazor.Size.Large" />
             <MudText Typo="Typo.h5">Meu Kanban</MudText>
+            @if (_columns?.Count > 3)
+            {
+                <MudChip T="string" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Info" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.SwipeRight">
+                    @_columns.Count colunas - role →
+                </MudChip>
+            }
             <MudSpacer />
             @if (_isLoading)
             {
                 <MudProgressCircular Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Primary" Indeterminate="true"/>
+            }
+            @if (_columns?.Count > 3)
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" 
+                              Color="MudBlazor.Color.Default" 
+                              OnClick="ScrollLeft"
+                              Title="Rolar para esquerda" />
+                <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" 
+                              Color="MudBlazor.Color.Default" 
+                              OnClick="ScrollRight"
+                              Title="Rolar para direita" />
             }
             <MudButton Color="MudBlazor.Color.Primary" 
                        Variant="Variant.Filled" 
@@ -424,7 +441,21 @@
         }
     }
 
-    
+    private async Task ScrollLeft()
+    {
+        await JS.InvokeVoidAsync("eval", @"
+            var container = document.querySelector('.kanban-scroll');
+            if (container) container.scrollBy({ left: -350, behavior: 'smooth' });
+        ");
+    }
+
+    private async Task ScrollRight()
+    {
+        await JS.InvokeVoidAsync("eval", @"
+            var container = document.querySelector('.kanban-scroll');
+            if (container) container.scrollBy({ left: 350, behavior: 'smooth' });
+        ");
+    }
 
     // Simple JS prompt bridge
     [Inject] IJSRuntime JS { get; set; } = default!;
@@ -460,6 +491,41 @@
     overflow-x: auto; 
     overflow-y: hidden;
     padding: 16px;
+    position: relative;
+    scroll-behavior: smooth; /* smooth scrolling */
+}
+
+/* Gradient hint when there are more columns to scroll */
+.kanban-scroll::before,
+.kanban-scroll::after {
+    content: '';
+    position: sticky;
+    top: 0;
+    width: 60px;
+    height: 100%;
+    pointer-events: none;
+    z-index: 2;
+    opacity: 0;
+    transition: opacity 300ms ease;
+}
+
+.kanban-scroll::before {
+    left: 0;
+    background: linear-gradient(to right, var(--mud-palette-background) 0%, transparent 100%);
+}
+
+.kanban-scroll::after {
+    right: 0;
+    background: linear-gradient(to left, var(--mud-palette-background) 0%, transparent 100%);
+}
+
+/* Show gradients when scrollable (JS can add this class or CSS hack) */
+.kanban-scroll.has-scroll::before {
+    opacity: 0.8;
+}
+
+.kanban-scroll.has-scroll::after {
+    opacity: 0.8;
 }
 
 .kanban-loading,
@@ -482,18 +548,23 @@
 }
 
 .kanban-column { 
-    width: 320px; 
-    min-width: 320px; 
+    width: 300px; 
+    min-width: 300px; 
+    max-width: 340px;
     background: var(--mud-palette-surface);
     border-radius: 12px;
     min-height: 100px;
     display: flex;
     flex-direction: column;
-    transition: box-shadow 200ms ease;
+    transition: box-shadow 200ms ease, transform 150ms ease;
+    flex-shrink: 0; /* prevent columns from shrinking */
 }
+
+/* Subtle lift on hover for better depth perception */
 
 .kanban-column:hover {
     box-shadow: var(--mud-elevation-8);
+    transform: translateY(-2px);
 }
 
 .kanban-column .column-header {
@@ -584,23 +655,33 @@
     opacity: 0.8;
 }
 
-/* Scroll customization */
+/* Scroll customization - more prominent */
 .kanban-scroll::-webkit-scrollbar {
-    height: 12px;
+    height: 14px;
 }
 
 .kanban-scroll::-webkit-scrollbar-track {
-    background: var(--mud-palette-background);
+    background: rgba(0,0,0,0.05);
     border-radius: 10px;
+    margin: 0 8px;
 }
 
 .kanban-scroll::-webkit-scrollbar-thumb {
-    background: var(--mud-palette-divider);
+    background: rgba(0,0,0,0.2);
     border-radius: 10px;
+    border: 3px solid transparent;
+    background-clip: padding-box;
+    transition: background 200ms ease;
 }
 
 .kanban-scroll::-webkit-scrollbar-thumb:hover {
-    background: var(--mud-palette-text-secondary);
+    background: rgba(0,0,0,0.35);
+    background-clip: padding-box;
+}
+
+.kanban-scroll::-webkit-scrollbar-thumb:active {
+    background: var(--mud-palette-primary);
+    background-clip: padding-box;
 }
 
 /* Animation for new items */
@@ -677,5 +758,25 @@
         if (el) document.body.classList.add('kanban-dragging');
     });
     document.addEventListener('mouseup', onEnd);
+
+    // Check if kanban-scroll has horizontal overflow and add visual hint class
+    function checkScrollable() {
+        var scrollContainer = document.querySelector('.kanban-scroll');
+        if (!scrollContainer) return;
+        
+        var hasHorizontalScroll = scrollContainer.scrollWidth > scrollContainer.clientWidth;
+        if (hasHorizontalScroll) {
+            scrollContainer.classList.add('has-scroll');
+        } else {
+            scrollContainer.classList.remove('has-scroll');
+        }
+    }
+
+    // Check on load and when window resizes
+    window.addEventListener('load', checkScrollable);
+    window.addEventListener('resize', checkScrollable);
+    
+    // Re-check periodically (for dynamic content changes via Blazor)
+    setInterval(checkScrollable, 1000);
 })();
 </script>
