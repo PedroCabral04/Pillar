@@ -202,6 +202,10 @@ builder.Services.AddScoped<erp.Services.Sales.ISalesService, erp.Services.Sales.
 // Chatbot services
 builder.Services.AddScoped<erp.Services.Chatbot.IChatbotService, erp.Services.Chatbot.ChatbotService>();
 
+// Email services
+builder.Services.Configure<erp.Services.Email.EmailSettings>(builder.Configuration.GetSection("Email"));
+builder.Services.AddScoped<erp.Services.Email.IEmailService, erp.Services.Email.EmailService>();
+
 // ------- REGISTRO DO MAPPERLY -------
 builder.Services.AddScoped<UserMapper, UserMapper>();
 builder.Services.AddScoped<ProductMapper, ProductMapper>();

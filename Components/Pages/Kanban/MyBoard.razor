@@ -701,15 +701,24 @@
 }
 
 .kanban-delete-zone {
-    height: 56px;
+    /* Start hidden with zero height for smooth slide-down/up */
+    max-height: 0;
+    overflow: hidden;
     border-radius: 8px;
     background: #fff7f7;
-    border: 2px dashed rgba(176,0,32,0.15);
-    display: none; /* hidden by default - only visible while dragging */
+    border: 2px dashed rgba(176,0,32,0.10);
+    display: block;
     align-items: center;
     justify-content: center;
     margin-bottom: 8px;
-    transition: background-color 150ms ease, border-color 150ms ease, transform 120ms ease, opacity 120ms ease;
+    padding: 0 12px; /* collapsed when hidden */
+    opacity: 0;
+    transform: translateY(6px) scale(0.995);
+    transition: max-height 220ms cubic-bezier(0.2,0,0,1),
+                opacity 180ms ease,
+                transform 180ms cubic-bezier(0.2,0,0,1),
+                border-color 150ms ease,
+                background-color 150ms ease;
 }
 
 .kanban-delete-zone .delete-zone-content {
@@ -720,17 +729,31 @@
     font-weight: 600;
 }
 
-/* Show delete zone while dragging */
+/* Show delete zone while dragging: expand and fade in */
 .kanban-dragging .kanban-delete-zone {
-    display: flex;
+    max-height: 72px; /* enough for content */
+    padding: 10px 12px;
     opacity: 1;
+    transform: translateY(0) scale(1);
 }
 
+/* Gentle pop animation on drag-enter */
 .kanban-delete-zone.mud-drop-zone-drag-enter {
     background: #ffecec;
     border-color: #b00020;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(176,0,32,0.12);
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 8px 20px rgba(176,0,32,0.12);
+}
+
+/* Subtle pulse to attract attention when active */
+@@keyframes deletePulse {
+    0% { box-shadow: 0 6px 16px rgba(176,0,32,0.06); }
+    50% { box-shadow: 0 10px 28px rgba(176,0,32,0.10); }
+    100% { box-shadow: 0 6px 16px rgba(176,0,32,0.06); }
+}
+
+.kanban-delete-zone.mud-drop-zone-drag-enter .delete-zone-content {
+    animation: deletePulse 900ms ease-in-out 1;
 }
 </style>
 
