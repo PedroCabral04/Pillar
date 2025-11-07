@@ -1,8 +1,9 @@
 using System.ComponentModel.DataAnnotations;
+using erp.Models.Audit;
 
 namespace erp.Models.Identity;
 
-public class Department
+public class Department : IAuditable
 {
     public int Id { get; set; }
     

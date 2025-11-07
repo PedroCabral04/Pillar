@@ -199,6 +199,9 @@ builder.Services.AddScoped<erp.Services.Inventory.IStockCountService, erp.Servic
 builder.Services.AddScoped<erp.Services.Sales.ICustomerService, erp.Services.Sales.CustomerService>();
 builder.Services.AddScoped<erp.Services.Sales.ISalesService, erp.Services.Sales.SalesService>();
 
+// Audit services
+builder.Services.AddScoped<erp.Services.Audit.IAuditService, erp.Services.Audit.AuditService>();
+
 // Chatbot services
 builder.Services.AddScoped<erp.Services.Chatbot.IChatbotService, erp.Services.Chatbot.ChatbotService>();
 

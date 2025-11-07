@@ -1,11 +1,12 @@
 using System.ComponentModel.DataAnnotations;
+using erp.Models.Audit;
 
 namespace erp.Models.Sales;
 
 /// <summary>
 /// Represents a customer in the sales system
 /// </summary>
-public class Customer
+public class Customer : IAuditable
 {
     public int Id { get; set; }
     
