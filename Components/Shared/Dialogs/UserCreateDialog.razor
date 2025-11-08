@@ -253,6 +253,8 @@
     }
 </style>
 
+@implements IDisposable
+
 @code {
     [CascadingParameter]
     private IMudDialogInstance MudDialog { get; set; } = null!;
@@ -278,6 +280,9 @@
     
     private System.Threading.CancellationTokenSource? _usernameValidationCts;
     private System.Threading.CancellationTokenSource? _emailValidationCts;
+    private System.Threading.Timer? _usernameDebounceTimer;
+    private System.Threading.Timer? _emailDebounceTimer;
+    private const int DebounceDelayMs = 500;
 
     // Regras de validação do formulário (client-side)
     private Func<string, string?> _required(string fieldName) =>
@@ -307,7 +312,7 @@
     private void Cancel() => MudDialog.Cancel();
 
     /// <summary>
-    /// Validação assíncrona do username com feedback visual
+    /// Validação assíncrona do username com feedback visual e debounce
     /// </summary>
     private async Task<string?> ValidateUsernameAsync(string username)
     {
@@ -336,26 +341,47 @@
             return "Nome não pode exceder 50 caracteres";
         }
 
-        // Cancela validação anterior
+        // Cancela validação anterior e timer de debounce
         _usernameValidationCts?.Cancel();
+        _usernameDebounceTimer?.Dispose();
+        
         _usernameValidationCts = new System.Threading.CancellationTokenSource();
+        var localCts = _usernameValidationCts;
+
+        // Cria TaskCompletionSource para aguardar o timer de debounce
+        var tcs = new TaskCompletionSource<bool>();
+
+        _usernameDebounceTimer = new System.Threading.Timer(_ =>
+        {
+            tcs.TrySetResult(true);
+        }, null, DebounceDelayMs, System.Threading.Timeout.Infinite);
 
         try
         {
+            // Aguarda o debounce
+            await tcs.Task;
+
+            // Verifica se foi cancelado durante o debounce
+            if (localCts.IsCancellationRequested)
+                return null;
+
             // Feedback visual de carregamento
             _usernameHelperText = "Verificando disponibilidade...";
             _usernameIcon = Icons.Material.Filled.HourglassEmpty;
             _usernameAdornmentColor = MudBlazor.Color.Info;
-            StateHasChanged();
+            await InvokeAsync(StateHasChanged);
 
             var isAvailable = await ValidationService.IsUsernameAvailableAsync(username);
+
+            if (localCts.IsCancellationRequested)
+                return null;
 
             if (isAvailable)
             {
                 _usernameHelperText = "✓ Nome disponível";
                 _usernameIcon = Icons.Material.Filled.CheckCircle;
                 _usernameAdornmentColor = MudBlazor.Color.Success;
-                StateHasChanged();
+                await InvokeAsync(StateHasChanged);
                 return null; // Válido
             }
             else
@@ -363,7 +389,7 @@
                 _usernameHelperText = "Este nome já está em uso";
                 _usernameIcon = Icons.Material.Filled.Error;
                 _usernameAdornmentColor = MudBlazor.Color.Error;
-                StateHasChanged();
+                await InvokeAsync(StateHasChanged);
                 return "Este nome já está em uso";
             }
         }
@@ -378,13 +404,13 @@
             _usernameHelperText = "Erro ao verificar disponibilidade";
             _usernameIcon = Icons.Material.Filled.Warning;
             _usernameAdornmentColor = MudBlazor.Color.Warning;
-            StateHasChanged();
+            await InvokeAsync(StateHasChanged);
             return null; // Não bloqueia em caso de erro
         }
     }
 
     /// <summary>
-    /// Validação assíncrona do email com feedback visual
+    /// Validação assíncrona do email com feedback visual e debounce
     /// </summary>
     private async Task<string?> ValidateEmailAsync(string email)
     {
@@ -405,26 +431,47 @@
             return "Email inválido";
         }
 
-        // Cancela validação anterior
+        // Cancela validação anterior e timer de debounce
         _emailValidationCts?.Cancel();
+        _emailDebounceTimer?.Dispose();
+        
         _emailValidationCts = new System.Threading.CancellationTokenSource();
+        var localCts = _emailValidationCts;
+
+        // Cria TaskCompletionSource para aguardar o timer de debounce
+        var tcs = new TaskCompletionSource<bool>();
+
+        _emailDebounceTimer = new System.Threading.Timer(_ =>
+        {
+            tcs.TrySetResult(true);
+        }, null, DebounceDelayMs, System.Threading.Timeout.Infinite);
 
         try
         {
+            // Aguarda o debounce
+            await tcs.Task;
+
+            // Verifica se foi cancelado durante o debounce
+            if (localCts.IsCancellationRequested)
+                return null;
+
             // Feedback visual de carregamento
             _emailHelperText = "Verificando disponibilidade...";
             _emailIcon = Icons.Material.Filled.HourglassEmpty;
             _emailAdornmentColor = MudBlazor.Color.Info;
-            StateHasChanged();
+            await InvokeAsync(StateHasChanged);
 
             var isAvailable = await ValidationService.IsEmailAvailableAsync(email);
+
+            if (localCts.IsCancellationRequested)
+                return null;
 
             if (isAvailable)
             {
                 _emailHelperText = "✓ Email disponível";
                 _emailIcon = Icons.Material.Filled.CheckCircle;
                 _emailAdornmentColor = MudBlazor.Color.Success;
-                StateHasChanged();
+                await InvokeAsync(StateHasChanged);
                 return null; // Válido
             }
             else
@@ -432,7 +479,7 @@
                 _emailHelperText = "Este email já está em uso";
                 _emailIcon = Icons.Material.Filled.Error;
                 _emailAdornmentColor = MudBlazor.Color.Error;
-                StateHasChanged();
+                await InvokeAsync(StateHasChanged);
                 return "Este email já está em uso";
             }
         }
@@ -447,7 +494,7 @@
             _emailHelperText = "Erro ao verificar disponibilidade";
             _emailIcon = Icons.Material.Filled.Warning;
             _emailAdornmentColor = MudBlazor.Color.Warning;
-            StateHasChanged();
+            await InvokeAsync(StateHasChanged);
             return null; // Não bloqueia em caso de erro
         }
     }
@@ -594,5 +641,15 @@
             "vendedor" => "Registro de vendas e atendimento",
             _ => "Usuário comum"
         };
+    }
+
+    public void Dispose()
+    {
+        _usernameValidationCts?.Cancel();
+        _usernameValidationCts?.Dispose();
+        _emailValidationCts?.Cancel();
+        _emailValidationCts?.Dispose();
+        _usernameDebounceTimer?.Dispose();
+        _emailDebounceTimer?.Dispose();
     }
 }

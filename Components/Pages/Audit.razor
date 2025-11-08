@@ -6,6 +6,7 @@
 @using MudSize = MudBlazor.Size
 @inject IApiService ApiService
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 @attribute [Authorize]
 
 <PageTitle>Auditoria</PageTitle>
@@ -206,12 +207,12 @@
         await SearchLogs();
     }
 
-    private void ClearFilters()
+    private async Task ClearFilters()
     {
         _filter = new AuditLogFilterDto { PageNumber = 1, PageSize = 50 };
         _startDate = null;
         _endDate = null;
-        _ = LoadRecentLogs();
+        await LoadRecentLogs();
     }
 
     private async Task LoadStatistics()
@@ -254,10 +255,23 @@
 
     private async Task ShowDetails(AuditLogDto log)
     {
-        var message = $"Entidade: {log.EntityName} (ID: {log.EntityId}) | Ação: {GetActionText(log.Action)} | Usuário: {log.UserName ?? "Sistema"} | Data: {log.Timestamp.ToLocalTime():dd/MM/yyyy HH:mm:ss}";
+        var parameters = new DialogParameters<Components.Shared.Dialogs.AuditDetailsDialog>
+        {
+            { x => x.AuditLog, log }
+        };
 
-        await Task.CompletedTask;
-        Snackbar.Add(message, Severity.Info);
+        var options = new DialogOptions 
+        { 
+            MaxWidth = MaxWidth.Large, 
+            FullWidth = true,
+            CloseButton = true,
+            BackdropClick = true
+        };
+
+        await DialogService.ShowAsync<Components.Shared.Dialogs.AuditDetailsDialog>(
+            $"Detalhes da Auditoria", 
+            parameters, 
+            options);
     }
 
     private MudColor GetActionColor(string action) => action switch

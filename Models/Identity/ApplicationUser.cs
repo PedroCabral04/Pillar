@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace erp.Models.Identity;
 
-public class ApplicationUser : IdentityUser<int>
+public class ApplicationUser : IdentityUser<int>, erp.Models.Audit.IAuditable
 {
     public bool IsActive { get; set; } = true;
     public string? PreferencesJson { get; set; }

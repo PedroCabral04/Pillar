@@ -59,18 +59,65 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     protected override void OnConfiguring(DbContextOptionsBuilder options)
         => options.UseNpgsql("Host=localhost;Database=erp;Username=postgres;Password=123");
 
-    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
         SetAuditProperties();
-        CaptureAuditLogs();
-        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        
+        // Captura snapshots (apenas dados serializados, não referências)
+        var auditSnapshots = CaptureAuditSnapshots();
+        
+        // Salva as mudanças E os logs de auditoria em uma única transação
+        if (auditSnapshots.Any())
+        {
+            // Adiciona os logs ao contexto ANTES de salvar
+            foreach (var snapshot in auditSnapshots)
+            {
+                AuditLogs.Add(snapshot.ToAuditLog());
+            }
+        }
+        
+        // Salva tudo de uma vez (transacional)
+        var result = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        
+        // Atualiza EntityId nos logs criados (apenas se necessário)
+        if (auditSnapshots.Any(s => s.NeedsIdUpdate))
+        {
+            foreach (var snapshot in auditSnapshots.Where(s => s.NeedsIdUpdate))
+            {
+                snapshot.UpdateEntityId();
+            }
+            await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+        
+        return result;
     }
 
     public override int SaveChanges()
     {
         SetAuditProperties();
-        CaptureAuditLogs();
-        return base.SaveChanges();
+        
+        var auditSnapshots = CaptureAuditSnapshots();
+        
+        if (auditSnapshots.Any())
+        {
+            foreach (var snapshot in auditSnapshots)
+            {
+                AuditLogs.Add(snapshot.ToAuditLog());
+            }
+        }
+        
+        var result = base.SaveChanges();
+        
+        if (auditSnapshots.Any(s => s.NeedsIdUpdate))
+        {
+            foreach (var snapshot in auditSnapshots.Where(s => s.NeedsIdUpdate))
+            {
+                snapshot.UpdateEntityId();
+            }
+            base.SaveChanges();
+        }
+        
+        return result;
     }
 
     private void SetAuditProperties()
@@ -96,105 +143,144 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     }
     
     /// <summary>
-    /// Captura mudanças em entidades auditáveis e cria registros de auditoria
+    /// Captura snapshots de auditoria (apenas dados serializados, não referências)
     /// </summary>
-    private void CaptureAuditLogs()
+    private List<AuditSnapshot> CaptureAuditSnapshots()
     {
+        var snapshots = new List<AuditSnapshot>();
+        
         var auditableEntries = ChangeTracker.Entries()
-            .Where(e => e.Entity is IAuditable && 
+            .Where(e => (e.Entity is IAuditable || e.Entity is ApplicationUser) && 
                        e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
             .ToList();
 
         if (!auditableEntries.Any())
-            return;
+            return snapshots;
 
         var userId = GetCurrentUserId();
         var userName = GetCurrentUserName();
         var ipAddress = GetCurrentIpAddress();
         var userAgent = GetCurrentUserAgent();
+        var timestamp = DateTime.UtcNow;
 
         foreach (var entry in auditableEntries)
         {
-            var auditLog = CreateAuditLog(entry, userId, userName, ipAddress, userAgent);
-            if (auditLog != null)
+            var action = entry.State switch
             {
-                AuditLogs.Add(auditLog);
+                EntityState.Added => AuditAction.Create,
+                EntityState.Modified => AuditAction.Update,
+                EntityState.Deleted => AuditAction.Delete,
+                _ => (AuditAction?)null
+            };
+
+            if (!action.HasValue)
+                continue;
+
+            var snapshot = new AuditSnapshot
+            {
+                EntityName = entry.Entity.GetType().Name,
+                Action = action.Value,
+                UserId = userId,
+                UserName = userName,
+                IpAddress = ipAddress,
+                UserAgent = userAgent,
+                Timestamp = timestamp,
+                NeedsIdUpdate = entry.State == EntityState.Added
+            };
+
+            // Captura EntityId (pode ser temporário para Added)
+            var keyProperties = entry.Properties.Where(p => p.Metadata.IsPrimaryKey()).ToList();
+            if (keyProperties.Any())
+            {
+                var keyValue = keyProperties[0].CurrentValue;
+                snapshot.EntityId = keyValue?.ToString();
+                
+                // Para entidades novas, guardamos referência para atualizar depois
+                if (snapshot.NeedsIdUpdate)
+                {
+                    snapshot.EntityReference = entry.Entity;
+                    snapshot.KeyPropertyName = keyProperties[0].Metadata.Name;
+                }
+            }
+
+            // Serializa valores conforme a operação
+            if (entry.State == EntityState.Modified)
+            {
+                snapshot.OldValues = SerializeOriginalValues(entry);
+                snapshot.NewValues = SerializeCurrentValues(entry);
+                snapshot.ChangedProperties = SerializeChangedProperties(entry);
+            }
+            else if (entry.State == EntityState.Deleted)
+            {
+                snapshot.OldValues = SerializeOriginalValues(entry);
+            }
+            else if (entry.State == EntityState.Added)
+            {
+                snapshot.NewValues = SerializeCurrentValues(entry);
+            }
+
+            snapshots.Add(snapshot);
+        }
+        
+        return snapshots;
+    }
+    
+    /// <summary>
+    /// Classe auxiliar para snapshot de auditoria (sem manter EntityEntry)
+    /// </summary>
+    private class AuditSnapshot
+    {
+        public string EntityName { get; set; } = string.Empty;
+        public string? EntityId { get; set; }
+        public AuditAction Action { get; set; }
+        public int? UserId { get; set; }
+        public string? UserName { get; set; }
+        public string? IpAddress { get; set; }
+        public string? UserAgent { get; set; }
+        public DateTime Timestamp { get; set; }
+        public string? OldValues { get; set; }
+        public string? NewValues { get; set; }
+        public string? ChangedProperties { get; set; }
+        
+        // Para atualizar ID após inserção
+        public bool NeedsIdUpdate { get; set; }
+        public object? EntityReference { get; set; }
+        public string? KeyPropertyName { get; set; }
+        
+        private AuditLog? _auditLog;
+
+        public AuditLog ToAuditLog()
+        {
+            _auditLog = new AuditLog
+            {
+                EntityName = EntityName,
+                EntityId = EntityId ?? "0",
+                Action = Action,
+                UserId = UserId,
+                UserName = UserName,
+                IpAddress = IpAddress,
+                UserAgent = UserAgent,
+                Timestamp = Timestamp,
+                OldValues = OldValues,
+                NewValues = NewValues,
+                ChangedProperties = ChangedProperties
+            };
+            return _auditLog;
+        }
+
+        public void UpdateEntityId()
+        {
+            if (_auditLog != null && EntityReference != null && !string.IsNullOrEmpty(KeyPropertyName))
+            {
+                var entityType = EntityReference.GetType();
+                var keyProperty = entityType.GetProperty(KeyPropertyName);
+                if (keyProperty != null)
+                {
+                    var newId = keyProperty.GetValue(EntityReference);
+                    _auditLog.EntityId = newId?.ToString() ?? "0";
+                }
             }
         }
-    }
-    
-    /// <summary>
-    /// Cria um registro de auditoria para uma mudança específica
-    /// </summary>
-    private AuditLog? CreateAuditLog(EntityEntry entry, int? userId, string? userName, string? ipAddress, string? userAgent)
-    {
-        var entityName = entry.Entity.GetType().Name;
-        var entityId = GetEntityId(entry);
-        
-        if (string.IsNullOrEmpty(entityId))
-            return null;
-
-        var action = entry.State switch
-        {
-            EntityState.Added => AuditAction.Create,
-            EntityState.Modified => AuditAction.Update,
-            EntityState.Deleted => AuditAction.Delete,
-            _ => (AuditAction?)null
-        };
-
-        if (!action.HasValue)
-            return null;
-
-        var auditLog = new AuditLog
-        {
-            EntityName = entityName,
-            EntityId = entityId,
-            Action = action.Value,
-            UserId = userId,
-            UserName = userName,
-            IpAddress = ipAddress,
-            UserAgent = userAgent,
-            Timestamp = DateTime.UtcNow
-        };
-
-        // Serializar valores antigos e novos
-        if (entry.State == EntityState.Modified)
-        {
-            auditLog.OldValues = SerializeOriginalValues(entry);
-            auditLog.NewValues = SerializeCurrentValues(entry);
-            auditLog.ChangedProperties = SerializeChangedProperties(entry);
-        }
-        else if (entry.State == EntityState.Added)
-        {
-            auditLog.NewValues = SerializeCurrentValues(entry);
-        }
-        else if (entry.State == EntityState.Deleted)
-        {
-            auditLog.OldValues = SerializeOriginalValues(entry);
-        }
-
-        return auditLog;
-    }
-    
-    /// <summary>
-    /// Obtém o ID da entidade como string
-    /// </summary>
-    private string? GetEntityId(EntityEntry entry)
-    {
-        var keyProperties = entry.Properties
-            .Where(p => p.Metadata.IsPrimaryKey())
-            .ToList();
-
-        if (!keyProperties.Any())
-            return null;
-
-        if (keyProperties.Count == 1)
-        {
-            return keyProperties[0].CurrentValue?.ToString();
-        }
-
-        // Composite key
-        return string.Join("|", keyProperties.Select(p => p.CurrentValue?.ToString() ?? "null"));
     }
     
     /// <summary>
@@ -772,12 +858,22 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             a.Property(x => x.NewValues).HasColumnType("jsonb");
             a.Property(x => x.ChangedProperties).HasColumnType("jsonb");
             
-            // Índices para otimizar consultas
-            a.HasIndex(x => x.EntityName);
-            a.HasIndex(x => new { x.EntityName, x.EntityId });
-            a.HasIndex(x => x.UserId);
-            a.HasIndex(x => x.Timestamp);
-            a.HasIndex(x => x.Action);
+            // Índices compostos otimizados para queries comuns
+            // Índice para histórico de entidade (timeline de uma entidade específica)
+            a.HasIndex(x => new { x.EntityName, x.EntityId, x.Timestamp })
+                .HasDatabaseName("idx_audit_entity_timeline");
+            
+            // Índice para atividade de usuário (timeline de um usuário específico)
+            a.HasIndex(x => new { x.UserId, x.Timestamp })
+                .HasDatabaseName("idx_audit_user_timeline");
+            
+            // Índice para busca por tipo de ação em período
+            a.HasIndex(x => new { x.Action, x.Timestamp })
+                .HasDatabaseName("idx_audit_action_timeline");
+            
+            // Índice para busca geral por entidade e tipo de ação
+            a.HasIndex(x => new { x.EntityName, x.Action, x.Timestamp })
+                .HasDatabaseName("idx_audit_entity_action_timeline");
         });
     }
 }

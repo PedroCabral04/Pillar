@@ -203,7 +203,9 @@
                     Responsibilities = _model.Responsibilities,
                     IsActive = _model.IsActive
                 };
-                await ApiService.PutAsync<PositionDto>($"api/positions/{PositionId}", updateDto);
+                // PUT retorna NoContent (204), então usamos PutAsJsonAsync
+                var response = await ApiService.PutAsJsonAsync($"api/positions/{PositionId}", updateDto);
+                response.EnsureSuccessStatusCode();
             }
             else
             {
