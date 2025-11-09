@@ -2,6 +2,7 @@ using erp.DTOs.Audit;
 using erp.Services.Audit;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using erp.Models.Audit;
 
 namespace erp.Controllers;
 
@@ -165,6 +166,62 @@ public class AuditController : ControllerBase
         {
             _logger.LogError(ex, "Erro ao buscar logs por período");
             return StatusCode(500, new { message = "Erro ao buscar logs por período" });
+        }
+    }
+
+    /// <summary>
+    /// Obtém relatório de acesso a dados sensíveis para compliance LGPD/GDPR
+    /// </summary>
+    /// <param name="startDate">Data inicial (opcional)</param>
+    /// <param name="endDate">Data final (opcional)</param>
+    /// <param name="minSensitivity">Nível mínimo de sensibilidade (opcional)</param>
+    [HttpGet("sensitive-data-access")]
+    [ProducesResponseType(typeof(List<DataAccessReportDto>), 200)]
+    [Authorize(Roles = "Administrador")] // Apenas admins podem ver relatórios de acesso
+    public async Task<IActionResult> GetSensitiveDataAccessReport(
+        [FromQuery] DateTime? startDate = null,
+        [FromQuery] DateTime? endDate = null,
+        [FromQuery] DataSensitivity? minSensitivity = null)
+    {
+        try
+        {
+            // Converte datas para UTC se necessário (PostgreSQL exige UTC)
+            DateTime? utcStart = startDate.HasValue && startDate.Value.Kind != DateTimeKind.Utc
+                ? DateTime.SpecifyKind(startDate.Value, DateTimeKind.Utc)
+                : startDate;
+                
+            DateTime? utcEnd = endDate.HasValue && endDate.Value.Kind != DateTimeKind.Utc
+                ? DateTime.SpecifyKind(endDate.Value, DateTimeKind.Utc)
+                : endDate;
+            
+            var report = await _auditService.GetSensitiveDataAccessReportAsync(utcStart, utcEnd, minSensitivity);
+            return Ok(report);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao gerar relatório de acesso a dados sensíveis");
+            return StatusCode(500, new { message = "Erro ao gerar relatório de acesso" });
+        }
+    }
+
+    /// <summary>
+    /// Obtém histórico de quem acessou uma entidade específica
+    /// </summary>
+    /// <param name="entityName">Nome da entidade</param>
+    /// <param name="entityId">ID da entidade</param>
+    [HttpGet("entity-access/{entityName}/{entityId}")]
+    [ProducesResponseType(typeof(List<AuditLogDto>), 200)]
+    public async Task<IActionResult> GetEntityAccessHistory(string entityName, string entityId)
+    {
+        try
+        {
+            var history = await _auditService.GetEntityAccessHistoryAsync(entityName, entityId);
+            return Ok(history);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao buscar histórico de acesso da entidade {EntityName} ID {EntityId}", entityName, entityId);
+            return StatusCode(500, new { message = "Erro ao buscar histórico de acesso" });
         }
     }
 }

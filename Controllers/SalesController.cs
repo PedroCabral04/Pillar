@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using erp.DTOs.Sales;
 using erp.Services.Sales;
+using erp.Models.Audit;
 
 namespace erp.Controllers;
 
@@ -51,6 +52,7 @@ public class SalesController : ControllerBase
     }
 
     [HttpGet("customers/{id:int}")]
+    [AuditRead("Customer", DataSensitivity.High, Description = "Visualização de dados do cliente (CPF/CNPJ, contatos)")]
     public async Task<ActionResult<CustomerDto>> GetCustomerById(int id)
     {
         try
@@ -166,6 +168,7 @@ public class SalesController : ControllerBase
     }
 
     [HttpGet("{id:int}")]
+    [AuditRead("Sale", DataSensitivity.Medium, Description = "Visualização de dados da venda (valores, cliente)")]
     public async Task<ActionResult<SaleDto>> GetSaleById(int id)
     {
         try

@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Identity;
 using erp.Models.Identity;
 using Microsoft.EntityFrameworkCore;
 using erp.Data;
+using erp.Models.Audit;
 
 namespace erp.Controllers
 {
@@ -98,6 +99,7 @@ namespace erp.Controllers
         [HttpGet("{id}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [AuditRead("ApplicationUser", DataSensitivity.High, Description = "Visualização de dados pessoais do usuário (CPF, RG, dados bancários)")]
         public async Task<ActionResult<UserDto>> GetUserById(int id)
         {
             var user = await _users.Users

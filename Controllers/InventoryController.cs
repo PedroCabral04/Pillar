@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using erp.Services.Inventory;
 using erp.DTOs.Inventory;
+using erp.Models.Audit;
 
 namespace erp.Controllers;
 
@@ -95,6 +96,7 @@ public class InventoryController : ControllerBase
     /// Busca contagem de estoque por ID
     /// </summary>
     [HttpGet("stock-counts/{id:int}")]
+    [AuditRead("StockCount", DataSensitivity.Medium, Description = "Visualização de contagem de estoque física")]
     public async Task<ActionResult<StockCountDto>> GetStockCountById(int id)
     {
         try

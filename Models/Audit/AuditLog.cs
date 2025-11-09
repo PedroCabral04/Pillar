@@ -93,5 +93,6 @@ public enum AuditAction
 {
     Create,
     Update,
-    Delete
+    Delete,
+    Read  // Auditoria de leitura (LGPD/GDPR compliance)
 }

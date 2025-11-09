@@ -1,4 +1,5 @@
 using erp.DTOs.Audit;
+using erp.Models.Audit;
 
 namespace erp.Services.Audit;
 
@@ -38,6 +39,16 @@ public interface IAuditService
     /// Obtém logs de um período específico
     /// </summary>
     Task<List<AuditLogDto>> GetLogsByDateRangeAsync(DateTime startDate, DateTime endDate);
+    
+    /// <summary>
+    /// Obtém relatório de acesso a dados sensíveis (LGPD/GDPR compliance)
+    /// </summary>
+    Task<List<DataAccessReportDto>> GetSensitiveDataAccessReportAsync(DateTime? startDate = null, DateTime? endDate = null, DataSensitivity? minSensitivity = null);
+    
+    /// <summary>
+    /// Obtém todos os acessos a uma entidade específica
+    /// </summary>
+    Task<List<AuditLogDto>> GetEntityAccessHistoryAsync(string entityName, string entityId);
 }
 
 public class AuditStatisticsDto

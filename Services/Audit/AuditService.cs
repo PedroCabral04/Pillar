@@ -2,6 +2,7 @@ using erp.Data;
 using erp.DTOs.Audit;
 using erp.Models.Audit;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace erp.Services.Audit;
 
@@ -168,6 +169,94 @@ public class AuditService : IAuditService
     {
         return await _context.AuditLogs
             .Where(a => a.Timestamp >= startDate && a.Timestamp <= endDate)
+            .OrderByDescending(a => a.Timestamp)
+            .Select(a => MapToDto(a))
+            .ToListAsync();
+    }
+
+    public async Task<List<DataAccessReportDto>> GetSensitiveDataAccessReportAsync(
+        DateTime? startDate = null, 
+        DateTime? endDate = null, 
+        DataSensitivity? minSensitivity = null)
+    {
+        var query = _context.AuditLogs
+            .Where(a => a.Action == AuditAction.Read);
+
+        if (startDate.HasValue)
+            query = query.Where(a => a.Timestamp >= startDate.Value);
+
+        if (endDate.HasValue)
+            query = query.Where(a => a.Timestamp <= endDate.Value);
+
+        var logs = await query
+            .OrderByDescending(a => a.Timestamp)
+            .ToListAsync();
+
+        // Filtra por sensibilidade e mapeia
+        var result = new List<DataAccessReportDto>();
+        
+        foreach (var log in logs)
+        {
+            // Parse AdditionalInfo para extrair sensibilidade
+            DataSensitivity sensitivity = DataSensitivity.Low;
+            string? description = null;
+            string? parameters = null;
+
+            if (!string.IsNullOrEmpty(log.AdditionalInfo))
+            {
+                try
+                {
+                    var info = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(log.AdditionalInfo);
+                    if (info != null)
+                    {
+                        if (info.TryGetValue("Sensitivity", out var sensValue))
+                        {
+                            Enum.TryParse(sensValue.GetString(), out sensitivity);
+                        }
+                        if (info.TryGetValue("Description", out var descValue))
+                        {
+                            description = descValue.GetString();
+                        }
+                        if (info.TryGetValue("Parameters", out var paramsValue))
+                        {
+                            parameters = paramsValue.GetString();
+                        }
+                    }
+                }
+                catch
+                {
+                    // Se falhar ao parsear, ignora
+                }
+            }
+
+            // Aplica filtro de sensibilidade mínima
+            if (minSensitivity.HasValue && sensitivity < minSensitivity.Value)
+                continue;
+
+            result.Add(new DataAccessReportDto
+            {
+                Id = log.Id,
+                EntityName = log.EntityName,
+                EntityId = log.EntityId,
+                Sensitivity = sensitivity,
+                Description = description,
+                UserId = log.UserId,
+                UserName = log.UserName,
+                IpAddress = log.IpAddress,
+                Timestamp = log.Timestamp,
+                Parameters = parameters
+            });
+        }
+
+        return result;
+    }
+
+    public async Task<List<AuditLogDto>> GetEntityAccessHistoryAsync(string entityName, string entityId)
+    {
+        return await _context.AuditLogs
+            .Where(a => a.EntityName == entityName && 
+                       a.EntityId == entityId && 
+                       a.Action == AuditAction.Read)
             .OrderByDescending(a => a.Timestamp)
             .Select(a => MapToDto(a))
             .ToListAsync();

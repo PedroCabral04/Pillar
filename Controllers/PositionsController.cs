@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using erp.Data;
 using erp.Models.Identity;
+using erp.Models.Audit;
 
 namespace erp.Controllers;
 
@@ -52,6 +53,7 @@ public class PositionsController : ControllerBase
     [HttpGet("{id}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [AuditRead("Position", DataSensitivity.High, Description = "Visualização de cargo e faixas salariais")]
     public async Task<ActionResult<PositionDto>> GetPositionById(int id)
     {
         var position = await _context.Positions

@@ -106,7 +106,15 @@ builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
         return Task.CompletedTask;
     };
     });
-builder.Services.AddControllers();
+
+// Registra o filtro de auditoria de leitura
+builder.Services.AddScoped<erp.Security.AuditReadActionFilter>();
+
+builder.Services.AddControllers(options =>
+{
+    // Adiciona o filtro globalmente para interceptar [AuditRead]
+    options.Filters.AddService<erp.Security.AuditReadActionFilter>();
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddHttpContextAccessor();
