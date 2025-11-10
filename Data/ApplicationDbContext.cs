@@ -2,6 +2,7 @@ using erp.Models;
 using erp.Models.Identity;
 using erp.Models.Audit;
 using erp.Models.TimeTracking;
+using erp.Models.Financial;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
@@ -37,6 +38,13 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Models.Sales.Customer> Customers { get; set; } = null!;
     public DbSet<Models.Sales.Sale> Sales { get; set; } = null!;
     public DbSet<Models.Sales.SaleItem> SaleItems { get; set; } = null!;
+    
+    // Financial
+    public DbSet<Supplier> Suppliers { get; set; } = null!;
+    public DbSet<AccountReceivable> AccountsReceivable { get; set; } = null!;
+    public DbSet<AccountPayable> AccountsPayable { get; set; } = null!;
+    public DbSet<FinancialCategory> FinancialCategories { get; set; } = null!;
+    public DbSet<CostCenter> CostCenters { get; set; } = null!;
     
     // HR Management
     public DbSet<Department> Departments { get; set; } = null!;
@@ -494,6 +502,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         // Sales model configuration
         ConfigureSalesModels(modelBuilder);
         
+        // Financial model configuration
+        ConfigureFinancialModels(modelBuilder);
+        
         // HR Management model configuration
         ConfigureHRModels(modelBuilder);
         
@@ -769,6 +780,214 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             i.HasOne(x => x.Product)
                 .WithMany()
                 .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+    
+    private void ConfigureFinancialModels(ModelBuilder modelBuilder)
+    {
+        // Supplier
+        modelBuilder.Entity<Supplier>(s =>
+        {
+            s.ToTable("Suppliers");
+            s.HasKey(x => x.Id);
+            s.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            s.Property(x => x.TradeName).HasMaxLength(200);
+            s.Property(x => x.TaxId).HasMaxLength(14).IsRequired();
+            s.Property(x => x.StateRegistration).HasMaxLength(20);
+            s.Property(x => x.MunicipalRegistration).HasMaxLength(20);
+            s.Property(x => x.ZipCode).HasMaxLength(10);
+            s.Property(x => x.Street).HasMaxLength(200);
+            s.Property(x => x.Number).HasMaxLength(10);
+            s.Property(x => x.Complement).HasMaxLength(100);
+            s.Property(x => x.District).HasMaxLength(100);
+            s.Property(x => x.City).HasMaxLength(100);
+            s.Property(x => x.State).HasMaxLength(2);
+            s.Property(x => x.Country).HasMaxLength(100);
+            s.Property(x => x.Phone).HasMaxLength(20);
+            s.Property(x => x.MobilePhone).HasMaxLength(20);
+            s.Property(x => x.Email).HasMaxLength(200);
+            s.Property(x => x.Website).HasMaxLength(200);
+            s.Property(x => x.Category).HasMaxLength(100);
+            s.Property(x => x.PaymentMethod).HasMaxLength(50);
+            
+            s.HasIndex(x => x.TaxId).IsUnique();
+            s.HasIndex(x => x.Name);
+            s.HasIndex(x => x.Email);
+            s.HasIndex(x => x.IsActive);
+            
+            s.HasOne(x => x.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        
+        // AccountReceivable
+        modelBuilder.Entity<AccountReceivable>(ar =>
+        {
+            ar.ToTable("AccountsReceivable");
+            ar.HasKey(x => x.Id);
+            ar.Property(x => x.InvoiceNumber).HasMaxLength(50);
+            ar.Property(x => x.BankSlipNumber).HasMaxLength(100);
+            ar.Property(x => x.PixKey).HasMaxLength(100);
+            ar.Property(x => x.OriginalAmount).HasPrecision(18, 2);
+            ar.Property(x => x.DiscountAmount).HasPrecision(18, 2);
+            ar.Property(x => x.InterestAmount).HasPrecision(18, 2);
+            ar.Property(x => x.FineAmount).HasPrecision(18, 2);
+            ar.Property(x => x.PaidAmount).HasPrecision(18, 2);
+            
+            ar.HasIndex(x => x.CustomerId);
+            ar.HasIndex(x => x.DueDate);
+            ar.HasIndex(x => x.Status);
+            ar.HasIndex(x => x.CategoryId);
+            ar.HasIndex(x => x.CostCenterId);
+            ar.HasIndex(x => new { x.Status, x.DueDate });
+            
+            ar.HasOne(x => x.Customer)
+                .WithMany(x => x.AccountsReceivable)
+                .HasForeignKey(x => x.CustomerId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            ar.HasOne(x => x.Category)
+                .WithMany(x => x.AccountsReceivable)
+                .HasForeignKey(x => x.CategoryId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            ar.HasOne(x => x.CostCenter)
+                .WithMany(x => x.AccountsReceivable)
+                .HasForeignKey(x => x.CostCenterId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            ar.HasOne(x => x.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            ar.HasOne(x => x.ReceivedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.ReceivedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            ar.HasOne(x => x.ParentAccount)
+                .WithMany(x => x.Installments)
+                .HasForeignKey(x => x.ParentAccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        
+        // AccountPayable
+        modelBuilder.Entity<AccountPayable>(ap =>
+        {
+            ap.ToTable("AccountsPayable");
+            ap.HasKey(x => x.Id);
+            ap.Property(x => x.InvoiceNumber).HasMaxLength(50);
+            ap.Property(x => x.BankSlipNumber).HasMaxLength(100);
+            ap.Property(x => x.PixKey).HasMaxLength(100);
+            ap.Property(x => x.OriginalAmount).HasPrecision(18, 2);
+            ap.Property(x => x.DiscountAmount).HasPrecision(18, 2);
+            ap.Property(x => x.InterestAmount).HasPrecision(18, 2);
+            ap.Property(x => x.FineAmount).HasPrecision(18, 2);
+            ap.Property(x => x.PaidAmount).HasPrecision(18, 2);
+            ap.Property(x => x.InvoiceAttachmentUrl).HasMaxLength(500);
+            ap.Property(x => x.ProofOfPaymentUrl).HasMaxLength(500);
+            
+            ap.HasIndex(x => x.SupplierId);
+            ap.HasIndex(x => x.DueDate);
+            ap.HasIndex(x => x.Status);
+            ap.HasIndex(x => x.CategoryId);
+            ap.HasIndex(x => x.CostCenterId);
+            ap.HasIndex(x => x.RequiresApproval);
+            ap.HasIndex(x => new { x.Status, x.DueDate });
+            ap.HasIndex(x => new { x.RequiresApproval, x.ApprovalDate });
+            
+            ap.HasOne(x => x.Supplier)
+                .WithMany(x => x.AccountsPayable)
+                .HasForeignKey(x => x.SupplierId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            ap.HasOne(x => x.Category)
+                .WithMany(x => x.AccountsPayable)
+                .HasForeignKey(x => x.CategoryId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            ap.HasOne(x => x.CostCenter)
+                .WithMany(x => x.AccountsPayable)
+                .HasForeignKey(x => x.CostCenterId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            ap.HasOne(x => x.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            ap.HasOne(x => x.PaidByUser)
+                .WithMany()
+                .HasForeignKey(x => x.PaidByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            ap.HasOne(x => x.ApprovedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.ApprovedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            ap.HasOne(x => x.ParentAccount)
+                .WithMany(x => x.Installments)
+                .HasForeignKey(x => x.ParentAccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        
+        // FinancialCategory
+        modelBuilder.Entity<FinancialCategory>(fc =>
+        {
+            fc.ToTable("FinancialCategories");
+            fc.HasKey(x => x.Id);
+            fc.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            fc.Property(x => x.Code).HasMaxLength(20).IsRequired();
+            fc.Property(x => x.Description).HasMaxLength(500);
+            
+            fc.HasIndex(x => x.Code).IsUnique();
+            fc.HasIndex(x => x.Type);
+            fc.HasIndex(x => x.ParentCategoryId);
+            
+            fc.HasOne(x => x.ParentCategory)
+                .WithMany(x => x.SubCategories)
+                .HasForeignKey(x => x.ParentCategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        
+        // CostCenter
+        modelBuilder.Entity<CostCenter>(cc =>
+        {
+            cc.ToTable("CostCenters");
+            cc.HasKey(x => x.Id);
+            cc.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            cc.Property(x => x.Code).HasMaxLength(20).IsRequired();
+            cc.Property(x => x.Description).HasMaxLength(500);
+            cc.Property(x => x.MonthlyBudget).HasPrecision(18, 2);
+            
+            cc.HasIndex(x => x.Code).IsUnique();
+            cc.HasIndex(x => x.ManagerUserId);
+            cc.HasIndex(x => x.IsActive);
+            
+            cc.HasOne(x => x.Manager)
+                .WithMany()
+                .HasForeignKey(x => x.ManagerUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+        
+        // Update Customer with new fields
+        modelBuilder.Entity<Models.Sales.Customer>(c =>
+        {
+            c.Property(x => x.TradeName).HasMaxLength(200);
+            c.Property(x => x.StateRegistration).HasMaxLength(20);
+            c.Property(x => x.MunicipalRegistration).HasMaxLength(20);
+            c.Property(x => x.Country).HasMaxLength(100);
+            c.Property(x => x.Website).HasMaxLength(200);
+            c.Property(x => x.CreditLimit).HasPrecision(18, 2);
+            c.Property(x => x.PaymentMethod).HasMaxLength(50);
+            
+            c.HasOne(x => x.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.CreatedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }
