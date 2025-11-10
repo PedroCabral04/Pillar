@@ -1,0 +1,390 @@
+@page "/time-tracking/payroll"
+@using erp.DTOs.TimeTracking
+@using erp.Services
+@using Color = MudBlazor.Color
+@using Size = MudBlazor.Size
+@using System.Threading
+@using System.Threading.Tasks
+@implements IDisposable
+@attribute [Authorize(Roles = "Administrador,Gerente")]
+
+@inject IApiService ApiService
+@inject ILogger<Payroll> Logger
+@inject ISnackbar Snackbar
+
+<PageTitle>Apontamento de Horas</PageTitle>
+
+<MudPaper Class="pa-4 mb-4" Elevation="2">
+    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.End">
+        <MudSelect T="int" Label="Mês" @bind-Value="_selectedMonth" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 160px;">
+            @foreach (var month in _months)
+            {
+                <MudSelectItem T="int" Value="@month.Value">@month.Label</MudSelectItem>
+            }
+        </MudSelect>
+        <MudNumericField T="int" Label="Ano" @bind-Value="_selectedYear" Variant="Variant.Outlined" Margin="Margin.Dense" Min="2000" Max="2100" Style="width: 120px;" Immediate="false" />
+        <MudSpacer />
+        <MudButton Variant="Variant.Text" Color="Color.Primary" Disabled="_loading" OnClick="LoadPeriodAsync" StartIcon="@Icons.Material.Filled.Search">
+            Carregar apontamento
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_loading" OnClick="CreatePeriodAsync" StartIcon="@Icons.Material.Filled.Add">
+            Gerar planilha
+        </MudButton>
+    </MudStack>
+</MudPaper>
+
+@if (!string.IsNullOrWhiteSpace(_errorMessage))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-3">@_errorMessage</MudAlert>
+}
+
+@if (_loading)
+{
+    <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="my-6">
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+        <MudText Class="mt-2">Carregando dados do apontamento...</MudText>
+    </MudStack>
+}
+else if (_currentPeriod is null)
+{
+    <MudAlert Severity="Severity.Info">
+        Selecione um mês e gere ou carregue o apontamento de horas do período desejado.
+    </MudAlert>
+}
+else
+{
+    <MudPaper Class="pa-4" Elevation="2">
+        <MudStack Row="true" Spacing="3" AlignItems="AlignItems.Center" Class="mb-4">
+            <MudText Typo="Typo.h5">Competência: @_currentPeriod.ReferenceMonth.ToString("D2")/@_currentPeriod.ReferenceYear</MudText>
+            <MudChip T="string" Color="_currentPeriod.Status == 0 ? Color.Info : Color.Success" Variant="Variant.Filled" Size="Size.Small">
+                @_currentPeriod.StatusName
+            </MudChip>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                Última atualização: @(_currentPeriod.UpdatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "não informado")
+            </MudText>
+        </MudStack>
+
+        <MudTable T="PayrollEntryDto" Items="_currentPeriod.Entries" Dense="true" Hover="true" Bordered="false">
+            <HeaderContent>
+                <MudTh>Funcionário</MudTh>
+                <MudTh Class="text-center">Faltas (dias)</MudTh>
+                <MudTh Class="text-center">Abonos (dias)</MudTh>
+                <MudTh Class="text-center">Horas Extras</MudTh>
+                <MudTh Class="text-center">Atrasos (horas)</MudTh>
+                <MudTh>Observações</MudTh>
+                <MudTh Class="text-center">Status</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Funcionário">
+                    <MudText Typo="Typo.subtitle2">@context.EmployeeName</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@context.EmployeeEmail</MudText>
+                </MudTd>
+                <MudTd DataLabel="Faltas" Class="text-center">
+                    <MudNumericField T="decimal?"
+                                      Value="context.Faltas"
+                                      ValueChanged="value => OnNumericChanged(context, value, nameof(context.Faltas))"
+                                      ValueExpression="@(() => context.Faltas)"
+                                      Immediate="true"
+                                      DebounceInterval="600"
+                                      Step="0.5m"
+                                      Min="@((decimal?)0)"
+                                      Max="@((decimal?)31)"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      Adornment="Adornment.None"
+                                      Class="mx-auto"
+                                      Style="width:110px" />
+                </MudTd>
+                <MudTd DataLabel="Abonos" Class="text-center">
+                    <MudNumericField T="decimal?"
+                                      Value="context.Abonos"
+                                      ValueChanged="value => OnNumericChanged(context, value, nameof(context.Abonos))"
+                                      ValueExpression="@(() => context.Abonos)"
+                                      Immediate="true"
+                                      DebounceInterval="600"
+                                      Step="0.5m"
+                                      Min="@((decimal?)0)"
+                                      Max="@((decimal?)31)"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      Class="mx-auto"
+                                      Style="width:110px" />
+                </MudTd>
+                <MudTd DataLabel="Horas Extras" Class="text-center">
+                    <MudNumericField T="decimal?"
+                                      Value="context.HorasExtras"
+                                      ValueChanged="value => OnNumericChanged(context, value, nameof(context.HorasExtras))"
+                                      ValueExpression="@(() => context.HorasExtras)"
+                                      Immediate="true"
+                                      DebounceInterval="600"
+                                      Step="0.5m"
+                                      Min="@((decimal?)0)"
+                                      Max="@((decimal?)300)"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      Class="mx-auto"
+                                      Style="width:110px" />
+                </MudTd>
+                <MudTd DataLabel="Atrasos" Class="text-center">
+                    <MudNumericField T="decimal?"
+                                      Value="context.Atrasos"
+                                      ValueChanged="value => OnNumericChanged(context, value, nameof(context.Atrasos))"
+                                      ValueExpression="@(() => context.Atrasos)"
+                                      Immediate="true"
+                                      DebounceInterval="600"
+                                      Step="0.25m"
+                                      Min="@((decimal?)0)"
+                                      Max="@((decimal?)100)"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      Class="mx-auto"
+                                      Style="width:110px" />
+                </MudTd>
+                <MudTd DataLabel="Observações">
+                    <MudTextField T="string"
+                                   Value="context.Observacoes"
+                                   ValueChanged="value => OnObservacoesChanged(context, value)"
+                                   ValueExpression="@(() => context.Observacoes)"
+                                   Variant="Variant.Outlined"
+                                   Margin="Margin.Dense"
+                                   Lines="2"
+                                   Immediate="true"
+                                   DebounceInterval="800"
+                                   Placeholder="Anotações do RH" />
+                </MudTd>
+                <MudTd DataLabel="Status" Class="text-center">
+                    @if (_savingEntries.Contains(context.Id))
+                    {
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                    }
+                    else if (context.UpdatedAt.HasValue)
+                    {
+                        <MudTooltip Text="@($"Atualizado em {context.UpdatedAt.Value.ToLocalTime():dd/MM/yyyy HH:mm}")">
+                            <MudChip T="string" Color="Color.Success" Variant="Variant.Filled" Size="Size.Small">Sincronizado</MudChip>
+                        </MudTooltip>
+                    }
+                    else
+                    {
+                        <MudChip T="string" Color="Color.Default" Variant="Variant.Text" Size="Size.Small">Pendente</MudChip>
+                    }
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText>Não há colaboradores cadastrados para este período.</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </MudPaper>
+}
+
+@code {
+    private readonly List<(int Value, string Label)> _months = new()
+    {
+        (1, "Janeiro"), (2, "Fevereiro"), (3, "Março"), (4, "Abril"), (5, "Maio"), (6, "Junho"),
+        (7, "Julho"), (8, "Agosto"), (9, "Setembro"), (10, "Outubro"), (11, "Novembro"), (12, "Dezembro")
+    };
+
+    private int _selectedMonth = DateTime.Now.Month;
+    private int _selectedYear = DateTime.Now.Year;
+    private PayrollPeriodDetailDto? _currentPeriod;
+    private string? _errorMessage;
+    private bool _loading;
+    private readonly HashSet<int> _savingEntries = new();
+    private readonly Dictionary<int, CancellationTokenSource> _saveDebouncers = new();
+    private const int SaveDebounceMilliseconds = 700;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPeriodAsync();
+    }
+
+    private async Task LoadPeriodAsync()
+    {
+        _errorMessage = null;
+        _loading = true;
+        try
+        {
+            CancelPendingSaves();
+            var period = await ApiService.GetAsync<PayrollPeriodDetailDto>($"/api/time-tracking/periods/by-reference?month={_selectedMonth}&year={_selectedYear}");
+            if (period == null)
+            {
+                _currentPeriod = null;
+                Snackbar.Add("Nenhum apontamento encontrado para o período selecionado.", Severity.Info);
+            }
+            else
+            {
+                _currentPeriod = period;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar apontamento {Month}/{Year}", _selectedMonth, _selectedYear);
+            _errorMessage = $"Erro ao carregar apontamento: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CreatePeriodAsync()
+    {
+        _errorMessage = null;
+        _loading = true;
+        try
+        {
+            CancelPendingSaves();
+            var payload = new CreatePayrollPeriodDto
+            {
+                ReferenceMonth = _selectedMonth,
+                ReferenceYear = _selectedYear
+            };
+
+            var period = await ApiService.PostAsync<PayrollPeriodDetailDto>("/api/time-tracking/periods", payload);
+            if (period != null)
+            {
+                _currentPeriod = period;
+                Snackbar.Add("Planilha criada com sucesso.", Severity.Success);
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            Logger.LogWarning(ex, "Erro de requisição ao criar apontamento {Month}/{Year}", _selectedMonth, _selectedYear);
+            _errorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro inesperado ao criar apontamento {Month}/{Year}", _selectedMonth, _selectedYear);
+            _errorMessage = "Não foi possível gerar o apontamento. Tente novamente.";
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SaveEntryAsync(PayrollEntryDto entry)
+    {
+        if (_currentPeriod == null || _savingEntries.Contains(entry.Id))
+        {
+            return;
+        }
+
+        _savingEntries.Add(entry.Id);
+        try
+        {
+            var payload = new UpdatePayrollEntryDto
+            {
+                Faltas = entry.Faltas,
+                Abonos = entry.Abonos,
+                HorasExtras = entry.HorasExtras,
+                Atrasos = entry.Atrasos,
+                Observacoes = entry.Observacoes
+            };
+
+            var updated = await ApiService.PutAsync<PayrollEntryDto>($"/api/time-tracking/entries/{entry.Id}", payload);
+            if (updated != null)
+            {
+                entry.Faltas = updated.Faltas;
+                entry.Abonos = updated.Abonos;
+                entry.HorasExtras = updated.HorasExtras;
+                entry.Atrasos = updated.Atrasos;
+                entry.Observacoes = updated.Observacoes;
+                entry.UpdatedAt = updated.UpdatedAt;
+                entry.UpdatedById = updated.UpdatedById;
+                entry.CreatedAt = updated.CreatedAt;
+                Snackbar.Add("Apontamento salvo.", Severity.Success);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao salvar apontamento do colaborador {EmployeeId}", entry.EmployeeId);
+            Snackbar.Add($"Erro ao salvar apontamento: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _savingEntries.Remove(entry.Id);
+            StateHasChanged();
+        }
+    }
+
+    private void OnNumericChanged(PayrollEntryDto entry, decimal? value, string propertyName)
+    {
+        switch (propertyName)
+        {
+            case nameof(PayrollEntryDto.Faltas):
+                entry.Faltas = value;
+                break;
+            case nameof(PayrollEntryDto.Abonos):
+                entry.Abonos = value;
+                break;
+            case nameof(PayrollEntryDto.HorasExtras):
+                entry.HorasExtras = value;
+                break;
+            case nameof(PayrollEntryDto.Atrasos):
+                entry.Atrasos = value;
+                break;
+        }
+
+        ScheduleSave(entry);
+    }
+
+    private void OnObservacoesChanged(PayrollEntryDto entry, string value)
+    {
+        entry.Observacoes = string.IsNullOrWhiteSpace(value) ? null : value;
+        ScheduleSave(entry);
+    }
+
+    private void ScheduleSave(PayrollEntryDto entry)
+    {
+        if (entry.Id == 0)
+        {
+            return;
+        }
+
+        if (_saveDebouncers.TryGetValue(entry.Id, out var existing))
+        {
+            existing.Cancel();
+            existing.Dispose();
+        }
+
+        var cts = new CancellationTokenSource();
+        _saveDebouncers[entry.Id] = cts;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(SaveDebounceMilliseconds, cts.Token);
+                await InvokeAsync(async () => await SaveEntryAsync(entry));
+            }
+            catch (TaskCanceledException)
+            {
+            }
+            finally
+            {
+                if (_saveDebouncers.TryGetValue(entry.Id, out var current) && current == cts)
+                {
+                    _saveDebouncers.Remove(entry.Id);
+                }
+                cts.Dispose();
+            }
+        });
+    }
+
+    private void CancelPendingSaves()
+    {
+        foreach (var kvp in _saveDebouncers.Values)
+        {
+            kvp.Cancel();
+            kvp.Dispose();
+        }
+        _saveDebouncers.Clear();
+    }
+
+    public void Dispose()
+    {
+        CancelPendingSaves();
+    }
+}

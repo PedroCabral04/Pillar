@@ -207,6 +207,9 @@ builder.Services.AddScoped<erp.Services.Inventory.IStockCountService, erp.Servic
 builder.Services.AddScoped<erp.Services.Sales.ICustomerService, erp.Services.Sales.CustomerService>();
 builder.Services.AddScoped<erp.Services.Sales.ISalesService, erp.Services.Sales.SalesService>();
 
+// Time tracking services
+builder.Services.AddScoped<erp.Services.TimeTracking.ITimeTrackingService, erp.Services.TimeTracking.TimeTrackingService>();
+
 // Audit services
 builder.Services.AddScoped<erp.Services.Audit.IAuditService, erp.Services.Audit.AuditService>();
 
@@ -223,6 +226,7 @@ builder.Services.AddScoped<ProductMapper, ProductMapper>();
 builder.Services.AddScoped<StockMovementMapper, StockMovementMapper>();
 builder.Services.AddScoped<StockCountMapper, StockCountMapper>();
 builder.Services.AddScoped<SalesMapper, SalesMapper>();
+builder.Services.AddScoped<TimeTrackingMapper, TimeTrackingMapper>();
 
 // --- Constrói a aplicação ---
 var app = builder.Build();

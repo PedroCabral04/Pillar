@@ -1,6 +1,7 @@
 using erp.Models;
 using erp.Models.Identity;
 using erp.Models.Audit;
+using erp.Models.TimeTracking;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
@@ -43,6 +44,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     
     // Audit
     public DbSet<AuditLog> AuditLogs { get; set; } = null!;
+    public DbSet<PayrollPeriod> PayrollPeriods { get; set; } = null!;
+    public DbSet<PayrollEntry> PayrollEntries { get; set; } = null!;
     
     // Serviços injetados para auditoria
     private readonly IHttpContextAccessor? _httpContextAccessor;
@@ -496,6 +499,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         
         // Audit model configuration
         ConfigureAuditModels(modelBuilder);
+
+        // Time tracking / payroll configuration
+        ConfigureTimeTrackingModels(modelBuilder);
     }
 
     private void ConfigureInventoryModels(ModelBuilder modelBuilder)
@@ -874,6 +880,62 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             // Índice para busca geral por entidade e tipo de ação
             a.HasIndex(x => new { x.EntityName, x.Action, x.Timestamp })
                 .HasDatabaseName("idx_audit_entity_action_timeline");
+        });
+    }
+
+    private void ConfigureTimeTrackingModels(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PayrollPeriod>(p =>
+        {
+            p.ToTable("PayrollPeriods");
+            p.HasKey(x => x.Id);
+            p.Property(x => x.ReferenceMonth).IsRequired();
+            p.Property(x => x.ReferenceYear).IsRequired();
+            p.Property(x => x.Status)
+                .HasConversion<int>();
+            p.Property(x => x.CreatedAt).IsRequired();
+            p.Property(x => x.UpdatedAt);
+
+            p.HasIndex(x => new { x.ReferenceYear, x.ReferenceMonth }).IsUnique();
+
+            p.HasOne(x => x.CreatedBy)
+                .WithMany()
+                .HasForeignKey(x => x.CreatedById)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            p.HasOne(x => x.UpdatedBy)
+                .WithMany()
+                .HasForeignKey(x => x.UpdatedById)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<PayrollEntry>(e =>
+        {
+            e.ToTable("PayrollEntries");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Faltas).HasColumnType("decimal(5,2)");
+            e.Property(x => x.Abonos).HasColumnType("decimal(5,2)");
+            e.Property(x => x.HorasExtras).HasColumnType("decimal(5,2)");
+            e.Property(x => x.Atrasos).HasColumnType("decimal(5,2)");
+            e.Property(x => x.Observacoes).HasMaxLength(1000);
+            e.Property(x => x.CreatedAt).IsRequired();
+
+            e.HasIndex(x => new { x.PayrollPeriodId, x.EmployeeId }).IsUnique();
+
+            e.HasOne(x => x.PayrollPeriod)
+                .WithMany(x => x.Entries)
+                .HasForeignKey(x => x.PayrollPeriodId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(x => x.Employee)
+                .WithMany()
+                .HasForeignKey(x => x.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(x => x.UpdatedBy)
+                .WithMany()
+                .HasForeignKey(x => x.UpdatedById)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }
