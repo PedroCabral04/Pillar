@@ -1,0 +1,122 @@
+@page "/financial/costcenters"
+@using erp.DTOs.Financial
+@attribute [Authorize]
+
+<PageTitle>Centros de Custo - Pillar ERP</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-4">
+        <MudIcon Icon="@Icons.Material.Filled.AccountBalanceWallet" Class="mr-2" />
+        Centros de Custo
+    </MudText>
+
+    <MudPaper Class="pa-4 mb-4">
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudTextField @bind-Value="searchTerm" 
+                         Placeholder="Buscar centros de custo..." 
+                         Adornment="Adornment.Start" 
+                         AdornmentIcon="@Icons.Material.Filled.Search"
+                         Class="flex-grow-1" />
+            
+            <MudButton Variant="Variant.Filled" 
+                      Color="Color.Primary" 
+                      StartIcon="@Icons.Material.Filled.Add"
+                      OnClick="@(() => Snackbar.Add("Criar centro de custo - em desenvolvimento", Severity.Info))">
+                Novo Centro de Custo
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+
+    <MudGrid>
+        @foreach (var costCenter in costCenters)
+        {
+            <MudItem xs="12" sm="6" md="4">
+                <MudCard>
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudIcon Icon="@Icons.Material.Filled.AccountBalanceWallet" Color="Color.Primary" />
+                                <MudText Typo="Typo.h6">@costCenter.Name</MudText>
+                            </MudStack>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Código: @costCenter.Code</MudText>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            <MudChip T="string" Size="Size.Small" 
+                                    Color="@(costCenter.IsActive ? Color.Success : Color.Default)">
+                                @(costCenter.IsActive ? "Ativo" : "Inativo")
+                            </MudChip>
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        @if (!string.IsNullOrWhiteSpace(costCenter.Description))
+                        {
+                            <MudText Typo="Typo.body2" Class="mb-3">@costCenter.Description</MudText>
+                        }
+                        
+                        @if (costCenter.ManagerUserId.HasValue && costCenter.ManagerName != null)
+                        {
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="mb-2">
+                                <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" Color="Color.Info" />
+                                <MudText Typo="Typo.body2">Gerente: @costCenter.ManagerName</MudText>
+                            </MudStack>
+                        }
+                        
+                        @if (costCenter.MonthlyBudget.HasValue)
+                        {
+                            <MudStack Spacing="1" Class="mt-3">
+                                <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                    <MudText Typo="Typo.body2">Orçamento Mensal:</MudText>
+                                    <MudText Typo="Typo.body2" Style="font-weight: 600;">
+                                        @costCenter.MonthlyBudget.Value.ToString("C")
+                                    </MudText>
+                                </MudStack>
+                            </MudStack>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+
+    @if (!costCenters.Any() && !isLoading)
+    {
+        <MudPaper Class="pa-8 mt-4" Elevation="0">
+            <MudStack AlignItems="AlignItems.Center" Spacing="3">
+                <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Secondary" />
+                <MudText Typo="Typo.h6" Color="Color.Secondary">Nenhum centro de custo encontrado</MudText>
+            </MudStack>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    [Inject] private IApiService ApiService { get; set; } = null!;
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
+
+    private List<CostCenterDto> costCenters = new();
+    private bool isLoading = false;
+    private string searchTerm = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCostCenters();
+    }
+
+    private async Task LoadCostCenters()
+    {
+        isLoading = true;
+        try
+        {
+            costCenters = await ApiService.GetAsync<List<CostCenterDto>>("api/cost-centers") ?? new();
+            Snackbar.Add($"{costCenters.Count} centros de custo carregados", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar centros de custo: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

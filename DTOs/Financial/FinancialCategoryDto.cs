@@ -37,6 +37,10 @@ public class FinancialCategoryDto
     public string? ParentCategoryName { get; set; }
     public bool IsActive { get; set; }
     public DateTime CreatedAt { get; set; }
+    
+    // Properties for tree view
+    public HashSet<FinancialCategoryDto>? SubCategories { get; set; }
+    public bool Expanded { get; set; }
 }
 
 /// <summary>

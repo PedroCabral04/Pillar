@@ -1,0 +1,27 @@
+@page "/financial/receivables"
+@attribute [Authorize]
+
+<PageTitle>Contas a Receber - Pillar ERP</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-4">
+        <MudIcon Icon="@Icons.Material.Filled.CallReceived" Class="mr-2" />
+        Contas a Receber
+    </MudText>
+
+    <MudPaper Class="pa-4">
+        <MudAlert Severity="Severity.Info">
+            Esta funcionalidade está em desenvolvimento. Em breve você poderá:
+            <MudList T="string" Dense="true">
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Add">Cadastrar contas a receber</MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Payment">Registrar recebimentos</MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Splitscreen">Criar parcelamentos</MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.FilterList">Filtrar por status e período</MudListItem>
+            </MudList>
+        </MudAlert>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    // Implementation coming soon
+}
