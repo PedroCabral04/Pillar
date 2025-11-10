@@ -54,7 +54,7 @@
                 <ApexChart TItem="DataPoint" Height="280">
                     @foreach (var s in _seriesData)
                     {
-                        <ApexPointSeries TItem="DataPoint" Items="@s.Items" Name="@s.Name" SeriesType="SeriesType.Bar" XValue="e => e.Category" YValue="e => e.Value" />
+                        <ApexPointSeries TItem="DataPoint" Items="@s.Items" Name="@s.Name" SeriesType="SeriesType.Pie" XValue="e => e.Category" YValue="e => e.Value" />
                     }
                 </ApexChart>
                 break;

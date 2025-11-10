@@ -26,6 +26,7 @@ public class InventoryDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Pie,
             Icon = "mdi-package-variant",
             Unit = "produtos"
+            , RequiredRoles = new[] { "Estoque", "Administrador" }
         },
         new DashboardWidgetDefinition
         {
@@ -36,6 +37,7 @@ public class InventoryDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Bar,
             Icon = "mdi-alert",
             Unit = "unidades"
+            , RequiredRoles = new[] { "Estoque", "Compras", "Administrador" }
         },
         new DashboardWidgetDefinition
         {
@@ -46,6 +48,7 @@ public class InventoryDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Line,
             Icon = "mdi-swap-horizontal",
             Unit = "movimentações"
+            , RequiredRoles = new[] { "Estoque", "Administrador" }
         },
         new DashboardWidgetDefinition
         {
@@ -56,6 +59,7 @@ public class InventoryDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Bar,
             Icon = "mdi-currency-usd",
             Unit = "R$"
+            , RequiredRoles = new[] { "Estoque", "Financeiro", "Administrador" }
         }
     };
 

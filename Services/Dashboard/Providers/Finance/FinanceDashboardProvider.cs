@@ -18,6 +18,7 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Area,
             Icon = "mdi-cash",
             Unit = "R$"
+            , RequiredRoles = new[] { "Financeiro", "Administrador" }
         }
     };
 

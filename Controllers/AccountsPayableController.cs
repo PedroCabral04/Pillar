@@ -7,6 +7,9 @@ using System.Security.Claims;
 
 namespace erp.Controllers;
 
+/// <summary>
+/// Controller para gerenciamento de contas a pagar (fornecedores)
+/// </summary>
 [ApiController]
 [Route("api/accounts-payable")]
 [Authorize]
@@ -24,9 +27,35 @@ public class AccountsPayableController : ControllerBase
     }
 
     /// <summary>
-    /// Get paginated accounts payable with filters
+    /// Lista contas a pagar com paginação e filtros avançados
     /// </summary>
+    /// <param name="page">Número da página (padrão: 1)</param>
+    /// <param name="pageSize">Itens por página (padrão: 20)</param>
+    /// <param name="supplierId">Filtro por fornecedor</param>
+    /// <param name="status">Filtro por status (Pending, Paid, Overdue, Cancelled)</param>
+    /// <param name="requiresApproval">Filtro por contas que requerem aprovação</param>
+    /// <param name="pendingApproval">Filtro por contas pendentes de aprovação</param>
+    /// <param name="dueDateFrom">Data de vencimento inicial</param>
+    /// <param name="dueDateTo">Data de vencimento final</param>
+    /// <param name="categoryId">Filtro por categoria financeira</param>
+    /// <param name="costCenterId">Filtro por centro de custo</param>
+    /// <param name="sortBy">Campo para ordenação</param>
+    /// <param name="sortDescending">Ordenação descendente</param>
+    /// <returns>Resultado paginado de contas a pagar</returns>
+    /// <response code="200">Contas listadas com sucesso</response>
+    /// <response code="401">Usuário não autenticado</response>
+    /// <response code="500">Erro interno</response>
+    /// <remarks>
+    /// Status disponíveis:
+    /// - **Pending**: Aguardando pagamento (dentro do prazo)
+    /// - **Paid**: Pago
+    /// - **Overdue**: Vencido (não pago após data de vencimento)
+    /// - **Cancelled**: Cancelado
+    /// </remarks>
     [HttpGet]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> GetPaged(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,

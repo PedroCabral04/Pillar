@@ -984,6 +984,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             c.Property(x => x.Website).HasMaxLength(200);
             c.Property(x => x.CreditLimit).HasPrecision(18, 2);
             c.Property(x => x.PaymentMethod).HasMaxLength(50);
+            c.Property(x => x.CreatedByUserId).IsRequired(false); // Nullable for backward compatibility with existing data
             
             c.HasOne(x => x.CreatedByUser)
                 .WithMany()

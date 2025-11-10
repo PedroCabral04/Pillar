@@ -86,7 +86,7 @@ public class Customer : IAuditable
     
     public DateTime? UpdatedAt { get; set; }
     
-    public int CreatedByUserId { get; set; }
+    public int? CreatedByUserId { get; set; }
     
     // Navigation properties
     public virtual ApplicationUser? CreatedByUser { get; set; }

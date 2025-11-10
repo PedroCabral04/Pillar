@@ -2,6 +2,7 @@ using erp.DTOs.Dashboard;
 using erp.Services.Dashboard;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace erp.Controllers;
 
@@ -19,7 +20,12 @@ public class DashboardController : ControllerBase
 
     [HttpGet("widgets")]
     public ActionResult<IEnumerable<DashboardWidgetDefinition>> GetWidgets()
-        => Ok(_registry.ListAll());
+    {
+        var userRoles = User.FindAll(ClaimTypes.Role).Select(c => c.Value).ToArray();
+        var defs = _registry.ListAll()
+            .Where(d => d.RequiredRoles == null || d.RequiredRoles.Length == 0 || d.RequiredRoles.Intersect(userRoles).Any());
+        return Ok(defs);
+    }
 
     [HttpGet("widgets/{providerKey}")]
     public ActionResult<IEnumerable<DashboardWidgetDefinition>> GetWidgetsByProvider(string providerKey)

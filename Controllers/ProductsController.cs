@@ -6,6 +6,9 @@ using erp.Models.Audit;
 
 namespace erp.Controllers;
 
+/// <summary>
+/// Controller para gerenciamento de produtos e inventário
+/// </summary>
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
@@ -23,9 +26,42 @@ public class ProductsController : ControllerBase
     }
 
     /// <summary>
-    /// Busca produtos com filtros, ordenação e paginação
+    /// Busca produtos com filtros avançados, ordenação e paginação
     /// </summary>
+    /// <param name="searchDto">Critérios de busca incluindo termo, categoria, filtros, ordenação e paginação</param>
+    /// <returns>Lista paginada de produtos correspondentes aos critérios</returns>
+    /// <response code="200">Produtos encontrados com sucesso</response>
+    /// <response code="401">Usuário não autenticado</response>
+    /// <response code="500">Erro interno ao processar busca</response>
+    /// <remarks>
+    /// Permite buscar produtos por diversos critérios:
+    /// - Termo de busca (nome, SKU, código de barras)
+    /// - Categoria
+    /// - Status (ativo/inativo)
+    /// - Faixa de preço
+    /// - Nível de estoque
+    /// 
+    /// Suporta ordenação por nome, SKU, preço, estoque, etc.
+    /// 
+    /// Exemplo de requisição:
+    /// 
+    ///     POST /api/products/search
+    ///     {
+    ///         "searchTerm": "notebook",
+    ///         "categoryId": 5,
+    ///         "minPrice": 1000,
+    ///         "maxPrice": 5000,
+    ///         "onlyActive": true,
+    ///         "sortBy": "Name",
+    ///         "sortDescending": false,
+    ///         "page": 1,
+    ///         "pageSize": 20
+    ///     }
+    /// </remarks>
     [HttpPost("search")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> SearchProducts([FromBody] ProductSearchDto searchDto)
     {
         try
@@ -53,9 +89,27 @@ public class ProductsController : ControllerBase
     }
 
     /// <summary>
-    /// Lista produtos (simplificado - usa search internamente)
+    /// Lista produtos de forma simplificada (wrapper para busca)
     /// </summary>
+    /// <param name="search">Termo de busca opcional</param>
+    /// <param name="page">Número da página (inicia em 1)</param>
+    /// <param name="pageSize">Quantidade de itens por página (padrão: 20)</param>
+    /// <returns>Lista paginada de produtos</returns>
+    /// <response code="200">Produtos listados com sucesso</response>
+    /// <response code="401">Usuário não autenticado</response>
+    /// <response code="500">Erro interno ao processar requisição</response>
+    /// <remarks>
+    /// Endpoint simplificado para listagem de produtos com busca básica por texto.
+    /// Para filtros avançados, use POST /api/products/search
+    /// 
+    /// Exemplo de uso:
+    /// 
+    ///     GET /api/products?search=notebook&amp;page=1&amp;pageSize=20
+    /// </remarks>
     [HttpGet]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> GetProducts(
         [FromQuery] string? search = null,
         [FromQuery] int page = 1,

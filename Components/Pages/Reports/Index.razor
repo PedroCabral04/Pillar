@@ -1,0 +1,107 @@
+@page "/reports"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using Color = MudBlazor.Color
+@using Size = MudBlazor.Size
+
+<PageTitle>Relatórios - Pillar ERP</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h4" GutterBottom="true">
+        <MudIcon Icon="@Icons.Material.Filled.Assessment" Class="mr-2" />
+        Relatórios e Análises
+    </MudText>
+    <MudText Typo="Typo.body1" Class="mb-6">
+        Acesse relatórios detalhados de vendas, finanças, estoque e recursos humanos com exportação em PDF e Excel.
+    </MudText>
+
+    <MudGrid>
+        <!-- Sales Reports -->
+        <MudItem xs="12" sm="6" md="4">
+            <MudCard Elevation="3" Class="pa-4">
+                <MudCardContent>
+                    <div class="d-flex align-center mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.ShoppingCart" Size="Size.Large" Color="Color.Primary" Class="mr-3" />
+                        <MudText Typo="Typo.h6">Relatórios de Vendas</MudText>
+                    </div>
+                    <MudText Typo="Typo.body2" Color="Color.Dark" Class="mb-3">
+                        Análise detalhada de vendas por período, cliente, produto e vendedor. Inclui resumos e métricas de desempenho.
+                    </MudText>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Href="/reports/sales">
+                        Acessar
+                    </MudButton>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <!-- Financial Reports -->
+        <MudItem xs="12" sm="6" md="4">
+            <MudCard Elevation="3" Class="pa-4">
+                <MudCardContent>
+                    <div class="d-flex align-center mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Size="Size.Large" Color="Color.Success" Class="mr-3" />
+                        <MudText Typo="Typo.h6">Relatórios Financeiros</MudText>
+                    </div>
+                    <MudText Typo="Typo.body2" Color="Color.Dark" Class="mb-3">
+                        Fluxo de caixa, DRE (Demonstrativo de Resultados) e balanço patrimonial para análise financeira completa.
+                    </MudText>
+                    <MudButton Variant="Variant.Filled" Color="Color.Success" FullWidth="true" Href="/reports/financial">
+                        Acessar
+                    </MudButton>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <!-- Inventory Reports -->
+        <MudItem xs="12" sm="6" md="4">
+            <MudCard Elevation="3" Class="pa-4">
+                <MudCardContent>
+                    <div class="d-flex align-center mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Inventory" Size="Size.Large" Color="Color.Warning" Class="mr-3" />
+                        <MudText Typo="Typo.h6">Relatórios de Estoque</MudText>
+                    </div>
+                    <MudText Typo="Typo.body2" Color="Color.Dark" Class="mb-3">
+                        Níveis de estoque, movimentações, avaliação de inventário e alertas de estoque baixo ou zerado.
+                    </MudText>
+                    <MudButton Variant="Variant.Filled" Color="Color.Warning" FullWidth="true" Href="/reports/inventory">
+                        Acessar
+                    </MudButton>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <!-- HR Reports -->
+        <MudItem xs="12" sm="6" md="4">
+            <MudCard Elevation="3" Class="pa-4">
+                <MudCardContent>
+                    <div class="d-flex align-center mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Large" Color="Color.Info" Class="mr-3" />
+                        <MudText Typo="Typo.h6">Relatórios de RH</MudText>
+                    </div>
+                    <MudText Typo="Typo.body2" Color="Color.Dark" Class="mb-3">
+                        Presença, turnover, headcount e análises de recursos humanos por departamento, cargo e tipo de contrato.
+                    </MudText>
+                    <MudButton Variant="Variant.Filled" Color="Color.Info" FullWidth="true" Href="/reports/hr">
+                        Acessar
+                    </MudButton>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <MudPaper Class="pa-4 mt-6" Elevation="2">
+        <MudText Typo="Typo.h6" GutterBottom="true">
+            <MudIcon Icon="@Icons.Material.Filled.Info" Class="mr-2" />
+            Sobre os Relatórios
+        </MudText>
+        <MudText Typo="Typo.body2">
+            <strong>Exportação:</strong> Todos os relatórios podem ser exportados em formato PDF para impressão ou Excel para análise adicional.
+        </MudText>
+        <MudText Typo="Typo.body2" Class="mt-2">
+            <strong>Filtros:</strong> Utilize os filtros disponíveis em cada relatório para personalizar a análise por período, categoria, departamento e outros critérios.
+        </MudText>
+        <MudText Typo="Typo.body2" Class="mt-2">
+            <strong>Atualizações:</strong> Os dados dos relatórios são atualizados em tempo real, refletindo as informações mais recentes do sistema.
+        </MudText>
+    </MudPaper>
+</MudContainer>

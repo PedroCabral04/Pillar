@@ -13,6 +13,9 @@ using erp.Models.Audit;
 
 namespace erp.Controllers
 {
+    /// <summary>
+    /// Controller para gerenciamento de usuários do sistema
+    /// </summary>
     [ApiController]
     [Route("api/users")]
     [Authorize]
@@ -29,9 +32,20 @@ namespace erp.Controllers
             _context = context;
         }
 
+        /// <summary>
+        /// Retorna a lista de todos os usuários do sistema
+        /// </summary>
+        /// <returns>Lista completa de usuários com suas informações básicas e de RH</returns>
+        /// <response code="200">Lista de usuários retornada com sucesso</response>
+        /// <response code="401">Usuário não autenticado</response>
+        /// <remarks>
+        /// Retorna todos os usuários incluindo informações de departamento, cargo, dados pessoais e bancários.
+        /// A resposta não é cacheada para garantir dados sempre atualizados.
+        /// </remarks>
         [HttpGet]
         [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         public async Task<ActionResult<IEnumerable<UserDto>>> GetAllUsers()
         {
             // Força uma nova consulta ao banco usando ToListAsync para garantir dados atualizados
@@ -96,9 +110,22 @@ namespace erp.Controllers
             return Ok(userDtos);
         }
 
+        /// <summary>
+        /// Busca um usuário específico por ID
+        /// </summary>
+        /// <param name="id">ID do usuário</param>
+        /// <returns>Dados completos do usuário incluindo informações sensíveis</returns>
+        /// <response code="200">Usuário encontrado e retornado com sucesso</response>
+        /// <response code="404">Usuário não encontrado</response>
+        /// <response code="401">Usuário não autenticado</response>
+        /// <remarks>
+        /// **ATENÇÃO:** Este endpoint retorna dados sensíveis (CPF, RG, dados bancários) e é auditado.
+        /// Toda consulta é registrada no log de auditoria com nível de sensibilidade ALTO.
+        /// </remarks>
         [HttpGet("{id}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [AuditRead("ApplicationUser", DataSensitivity.High, Description = "Visualização de dados pessoais do usuário (CPF, RG, dados bancários)")]
         public async Task<ActionResult<UserDto>> GetUserById(int id)
         {
@@ -161,9 +188,37 @@ namespace erp.Controllers
             return Ok(userDto);
         }
 
+        /// <summary>
+        /// Cria um novo usuário no sistema
+        /// </summary>
+        /// <param name="createUserDto">Dados do novo usuário incluindo informações pessoais, de RH e roles</param>
+        /// <returns>Usuário criado com ID gerado</returns>
+        /// <response code="201">Usuário criado com sucesso</response>
+        /// <response code="400">Dados inválidos ou erro ao criar usuário</response>
+        /// <response code="401">Usuário não autenticado</response>
+        /// <remarks>
+        /// Cria um novo usuário com senha padrão "User@123!" se não fornecida.
+        /// É obrigatório informar pelo menos uma role/permissão.
+        /// 
+        /// Exemplo de requisição:
+        /// 
+        ///     POST /api/users
+        ///     {
+        ///         "username": "joao.silva",
+        ///         "email": "joao.silva@empresa.com",
+        ///         "fullName": "João Silva",
+        ///         "cpf": "123.456.789-00",
+        ///         "phone": "+55 11 98765-4321",
+        ///         "roleIds": [1, 2],
+        ///         "departmentId": 5,
+        ///         "positionId": 3,
+        ///         "password": "SenhaSegura123!"
+        ///     }
+        /// </remarks>
         [HttpPost]
         [ProducesResponseType(StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         public async Task<ActionResult<UserDto>> CreateUser([FromBody] CreateUserDto createUserDto)
         {
             if (createUserDto.RoleIds == null || createUserDto.RoleIds.Count == 0)
@@ -244,10 +299,34 @@ namespace erp.Controllers
             return CreatedAtAction(nameof(GetUserById), new { id = dto.Id }, dto);
         }
 
+        /// <summary>
+        /// Atualiza um usuário existente
+        /// </summary>
+        /// <param name="id">ID do usuário a ser atualizado</param>
+        /// <param name="updateUserDto">Dados atualizados do usuário</param>
+        /// <returns>Sem conteúdo em caso de sucesso</returns>
+        /// <response code="204">Usuário atualizado com sucesso</response>
+        /// <response code="400">Dados inválidos ou erro ao atualizar</response>
+        /// <response code="404">Usuário não encontrado</response>
+        /// <response code="401">Usuário não autenticado</response>
+        /// <remarks>
+        /// Permite atualizar todos os campos do usuário incluindo:
+        /// - Informações básicas (nome, email, telefone)
+        /// - Dados pessoais (CPF, RG, data de nascimento)
+        /// - Endereço completo
+        /// - Informações de RH (departamento, cargo, salário, datas)
+        /// - Dados bancários
+        /// - Contato de emergência
+        /// - Senha (se fornecida)
+        /// - Roles/permissões
+        /// 
+        /// **Nota:** Se uma nova senha for fornecida, ela será aplicada imediatamente.
+        /// </remarks>
         [HttpPut("{id}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         public async Task<IActionResult> UpdateUser(int id, [FromBody] UpdateUserDto updateUserDto)
         {
             var user = await _users.FindByIdAsync(id.ToString());
@@ -335,9 +414,25 @@ namespace erp.Controllers
             return NoContent();
         }
 
+        /// <summary>
+        /// Exclui permanentemente um usuário do sistema
+        /// </summary>
+        /// <param name="id">ID do usuário a ser excluído</param>
+        /// <returns>Sem conteúdo em caso de sucesso</returns>
+        /// <response code="204">Usuário excluído com sucesso</response>
+        /// <response code="404">Usuário não encontrado</response>
+        /// <response code="400">Erro ao excluir usuário (ex: violação de integridade referencial)</response>
+        /// <response code="401">Usuário não autenticado</response>
+        /// <remarks>
+        /// **ATENÇÃO:** Esta operação é irreversível e exclui permanentemente o usuário.
+        /// Pode falhar se houver registros relacionados (vendas, movimentações, etc.).
+        /// Considere desativar o usuário (IsActive=false) ao invés de excluir.
+        /// </remarks>
         [HttpDelete("{id}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         public async Task<IActionResult> DeleteUser(int id)
         {
             var user = await _users.FindByIdAsync(id.ToString());
@@ -354,9 +449,25 @@ namespace erp.Controllers
         /// <summary>
         /// Valida se um email está disponível para uso
         /// </summary>
+        /// <param name="email">Email a ser validado</param>
+        /// <param name="excludeUserId">ID do usuário a ser excluído da validação (útil para edição)</param>
+        /// <returns>Indica se o email está disponível</returns>
+        /// <response code="200">Email disponível</response>
+        /// <response code="409">Email já está em uso</response>
+        /// <response code="400">Email não fornecido</response>
+        /// <remarks>
+        /// Útil para validação em tempo real durante cadastro ou edição de usuários.
+        /// Ao editar um usuário, passe o excludeUserId para permitir manter o email atual.
+        /// 
+        /// Exemplo de uso:
+        /// 
+        ///     GET /api/users/validate/email?email=teste@exemplo.com
+        ///     GET /api/users/validate/email?email=teste@exemplo.com&amp;excludeUserId=5
+        /// </remarks>
         [HttpGet("validate/email")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status409Conflict)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<ActionResult<ValidationResponse>> ValidateEmail([FromQuery] string email, [FromQuery] int? excludeUserId = null)
         {
             if (string.IsNullOrWhiteSpace(email))
@@ -374,11 +485,27 @@ namespace erp.Controllers
         }
 
         /// <summary>
-        /// Valida se um username está disponível para uso
+        /// Valida se um nome de usuário (username) está disponível para uso
         /// </summary>
+        /// <param name="username">Nome de usuário a ser validado</param>
+        /// <param name="excludeUserId">ID do usuário a ser excluído da validação (útil para edição)</param>
+        /// <returns>Indica se o username está disponível</returns>
+        /// <response code="200">Username disponível</response>
+        /// <response code="409">Username já está em uso</response>
+        /// <response code="400">Username não fornecido</response>
+        /// <remarks>
+        /// Útil para validação em tempo real durante cadastro ou edição de usuários.
+        /// Ao editar um usuário, passe o excludeUserId para permitir manter o username atual.
+        /// 
+        /// Exemplo de uso:
+        /// 
+        ///     GET /api/users/validate/username?username=joao.silva
+        ///     GET /api/users/validate/username?username=joao.silva&amp;excludeUserId=5
+        /// </remarks>
         [HttpGet("validate/username")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status409Conflict)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<ActionResult<ValidationResponse>> ValidateUsername([FromQuery] string username, [FromQuery] int? excludeUserId = null)
         {
             if (string.IsNullOrWhiteSpace(username))

@@ -1,0 +1,284 @@
+@page "/reports/sales"
+@attribute [Authorize]
+@using erp.DTOs.Reports
+@using erp.Services
+@using Microsoft.AspNetCore.Authorization
+@using Color = MudBlazor.Color
+@using Size = MudBlazor.Size
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+<PageTitle>Relatórios de Vendas - Pillar ERP</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudBreadcrumbs Items="_breadcrumbItems" Class="mb-4" />
+    
+    <MudText Typo="Typo.h4" GutterBottom="true">
+        <MudIcon Icon="@Icons.Material.Filled.ShoppingCart" Class="mr-2" />
+        Relatório de Vendas
+    </MudText>
+
+    <!-- Filters Card -->
+    <MudCard Elevation="3" Class="mb-4">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">Filtros</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudGrid>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudDatePicker Label="Data Início" @bind-Date="_filter.StartDate" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudDatePicker Label="Data Fim" @bind-Date="_filter.EndDate" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudSelect T="string" Label="Status" @bind-Value="_filter.Status" Clearable="true">
+                        <MudSelectItem Value="@("Pendente")">Pendente</MudSelectItem>
+                        <MudSelectItem Value="@("Finalizada")">Finalizada</MudSelectItem>
+                        <MudSelectItem Value="@("Cancelada")">Cancelada</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudSelect T="string" Label="Forma de Pagamento" @bind-Value="_filter.PaymentMethod" Clearable="true">
+                        <MudSelectItem Value="@("Dinheiro")">Dinheiro</MudSelectItem>
+                        <MudSelectItem Value="@("Cartão de Crédito")">Cartão de Crédito</MudSelectItem>
+                        <MudSelectItem Value="@("Cartão de Débito")">Cartão de Débito</MudSelectItem>
+                        <MudSelectItem Value="@("PIX")">PIX</MudSelectItem>
+                        <MudSelectItem Value="@("Boleto")">Boleto</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+        </MudCardContent>
+        <MudCardActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadReport" StartIcon="@Icons.Material.Filled.Search">
+                Gerar Relatório
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" OnClick="ClearFilters" StartIcon="@Icons.Material.Filled.Clear">
+                Limpar Filtros
+            </MudButton>
+        </MudCardActions>
+    </MudCard>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+    }
+
+    @if (_report != null && !_loading)
+    {
+        <!-- Summary Card -->
+        <MudCard Elevation="3" Class="mb-4">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Resumo do Período</MudText>
+                </CardHeaderContent>
+                <CardHeaderActions>
+                    <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small">
+                        <MudButton StartIcon="@Icons.Material.Filled.PictureAsPdf" OnClick='() => ExportReport("pdf")' Color="Color.Error">
+                            Exportar PDF
+                        </MudButton>
+                        <MudButton StartIcon="@Icons.Material.Filled.TableChart" OnClick='() => ExportReport("excel")' Color="Color.Success">
+                            Exportar Excel
+                        </MudButton>
+                    </MudButtonGroup>
+                </CardHeaderActions>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudGrid>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-4" Elevation="0">
+                            <MudText Typo="Typo.subtitle2" Color="Color.Primary">Total de Vendas</MudText>
+                            <MudText Typo="Typo.h5">@_report.Summary.TotalSales</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-4" Elevation="0">
+                            <MudText Typo="Typo.subtitle2" Color="Color.Success">Receita Total</MudText>
+                            <MudText Typo="Typo.h5">@_report.Summary.TotalRevenue.ToString("C2")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-4" Elevation="0">
+                            <MudText Typo="Typo.subtitle2" Color="Color.Warning">Descontos</MudText>
+                            <MudText Typo="Typo.h5">@_report.Summary.TotalDiscounts.ToString("C2")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-4" Elevation="0">
+                            <MudText Typo="Typo.subtitle2" Color="Color.Info">Receita Líquida</MudText>
+                            <MudText Typo="Typo.h5">@_report.Summary.NetRevenue.ToString("C2")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudPaper Class="pa-4" Elevation="0">
+                            <MudText Typo="Typo.subtitle2">Ticket Médio</MudText>
+                            <MudText Typo="Typo.h6">@_report.Summary.AverageTicket.ToString("C2")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudPaper Class="pa-4" Elevation="0">
+                            <MudText Typo="Typo.subtitle2">Total de Itens Vendidos</MudText>
+                            <MudText Typo="Typo.h6">@_report.Summary.TotalItemsSold</MudText>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </MudCardContent>
+        </MudCard>
+
+        <!-- Sales Table -->
+        <MudCard Elevation="3">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Detalhamento das Vendas (@_report.Items.Count vendas)</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudTable Items="@_report.Items" Hover="true" Striped="true" Dense="true" Filter="new Func<SalesReportItemDto, bool>(FilterFunc)">
+                    <ToolBarContent>
+                        <MudTextField @bind-Value="_searchString" Placeholder="Buscar..." Adornment="Adornment.Start" 
+                                      AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0" Immediate="true" />
+                    </ToolBarContent>
+                    <HeaderContent>
+                        <MudTh>Número</MudTh>
+                        <MudTh>Data</MudTh>
+                        <MudTh>Cliente</MudTh>
+                        <MudTh>Vendedor</MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<SalesReportItemDto, object>(x => x.TotalAmount)">Total</MudTableSortLabel></MudTh>
+                        <MudTh>Desconto</MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<SalesReportItemDto, object>(x => x.NetAmount)">Líquido</MudTableSortLabel></MudTh>
+                        <MudTh>Status</MudTh>
+                        <MudTh>Pagamento</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Número">@context.SaleNumber</MudTd>
+                        <MudTd DataLabel="Data">@context.SaleDate.ToString("dd/MM/yyyy")</MudTd>
+                        <MudTd DataLabel="Cliente">@context.CustomerName</MudTd>
+                        <MudTd DataLabel="Vendedor">@context.SalespersonName</MudTd>
+                        <MudTd DataLabel="Total">@context.TotalAmount.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Desconto">@context.DiscountAmount.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Líquido"><strong>@context.NetAmount.ToString("C2")</strong></MudTd>
+                        <MudTd DataLabel="Status">
+                            <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">@context.Status</MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Pagamento">@context.PaymentMethod</MudTd>
+                    </RowTemplate>
+                    <PagerContent>
+                        <MudTablePager PageSizeOptions="new int[]{10, 25, 50, 100}" />
+                    </PagerContent>
+                </MudTable>
+            </MudCardContent>
+        </MudCard>
+    }
+</MudContainer>
+
+@code {
+    private List<BreadcrumbItem> _breadcrumbItems = new()
+    {
+        new BreadcrumbItem("Início", href: "/"),
+        new BreadcrumbItem("Relatórios", href: "/reports"),
+        new BreadcrumbItem("Vendas", href: null, disabled: true)
+    };
+
+    private SalesReportFilterDto _filter = new()
+    {
+        StartDate = DateTime.Today.AddMonths(-1),
+        EndDate = DateTime.Today
+    };
+
+    private SalesReportResultDto? _report;
+    private bool _loading = false;
+    private string _searchString = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReport();
+    }
+
+    private async Task LoadReport()
+    {
+        try
+        {
+            _loading = true;
+            var response = await ApiService.PostAsync<SalesReportResultDto>("/api/reports/sales", _filter);
+            
+            if (response != null)
+            {
+                _report = response;
+                Snackbar.Add("Relatório gerado com sucesso!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Erro ao gerar relatório", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ExportReport(string format)
+    {
+        try
+        {
+            _loading = true;
+            _filter.ExportFormat = format;
+            
+            // For file downloads, we need to use the browser's download mechanism
+            var url = $"/api/reports/sales/export?StartDate={_filter.StartDate:yyyy-MM-dd}&EndDate={_filter.EndDate:yyyy-MM-dd}&ExportFormat={format}";
+            if (_filter.CustomerId.HasValue)
+                url += $"&CustomerId={_filter.CustomerId}";
+            if (!string.IsNullOrEmpty(_filter.PaymentMethod))
+                url += $"&PaymentMethod={_filter.PaymentMethod}";
+            if (!string.IsNullOrEmpty(_filter.Status))
+                url += $"&Status={_filter.Status}";
+            
+            await JS.InvokeVoidAsync("open", url, "_blank");
+            Snackbar.Add($"Relatório exportado em {format.ToUpper()}!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void ClearFilters()
+    {
+        _filter = new()
+        {
+            StartDate = DateTime.Today.AddMonths(-1),
+            EndDate = DateTime.Today
+        };
+        _report = null;
+        _searchString = "";
+    }
+
+    private bool FilterFunc(SalesReportItemDto item)
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+        
+        return item.SaleNumber.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+               item.CustomerName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+               item.SalespersonName.Contains(_searchString, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private MudBlazor.Color GetStatusColor(string status) => status switch
+    {
+        "Finalizada" => MudBlazor.Color.Success,
+        "Pendente" => MudBlazor.Color.Warning,
+        "Cancelada" => MudBlazor.Color.Error,
+        _ => MudBlazor.Color.Default
+    };
+}

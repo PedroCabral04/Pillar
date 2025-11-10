@@ -6,6 +6,9 @@ using erp.Models.Audit;
 
 namespace erp.Controllers;
 
+/// <summary>
+/// Controller para gerenciamento de vendas e clientes
+/// </summary>
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
@@ -27,7 +30,37 @@ public class SalesController : ControllerBase
 
     #region Customers
 
+    /// <summary>
+    /// Cria um novo cliente no sistema
+    /// </summary>
+    /// <param name="dto">Dados do cliente incluindo informações fiscais (CPF/CNPJ) e de contato</param>
+    /// <returns>Cliente criado com ID gerado</returns>
+    /// <response code="201">Cliente criado com sucesso</response>
+    /// <response code="400">Dados inválidos ou CPF/CNPJ já cadastrado</response>
+    /// <response code="401">Usuário não autenticado</response>
+    /// <response code="500">Erro interno ao criar cliente</response>
+    /// <remarks>
+    /// Valida automaticamente CPF/CNPJ brasileiro.
+    /// Nome e documento (CPF/CNPJ) são obrigatórios.
+    /// 
+    /// Exemplo de requisição:
+    /// 
+    ///     POST /api/sales/customers
+    ///     {
+    ///         "name": "João Silva",
+    ///         "document": "123.456.789-00",
+    ///         "email": "joao@exemplo.com",
+    ///         "phone": "+55 11 98765-4321",
+    ///         "address": "Rua Exemplo, 123",
+    ///         "city": "São Paulo",
+    ///         "state": "SP"
+    ///     }
+    /// </remarks>
     [HttpPost("customers")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<CustomerDto>> CreateCustomer([FromBody] CreateCustomerDto dto)
     {
         try
@@ -51,7 +84,24 @@ public class SalesController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Busca um cliente específico por ID
+    /// </summary>
+    /// <param name="id">ID do cliente</param>
+    /// <returns>Dados completos do cliente</returns>
+    /// <response code="200">Cliente encontrado</response>
+    /// <response code="404">Cliente não encontrado</response>
+    /// <response code="401">Usuário não autenticado</response>
+    /// <response code="500">Erro interno</response>
+    /// <remarks>
+    /// **ATENÇÃO:** Este endpoint retorna dados sensíveis (CPF/CNPJ) e é auditado.
+    /// Toda consulta é registrada no log de auditoria com nível de sensibilidade ALTO.
+    /// </remarks>
     [HttpGet("customers/{id:int}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [AuditRead("Customer", DataSensitivity.High, Description = "Visualização de dados do cliente (CPF/CNPJ, contatos)")]
     public async Task<ActionResult<CustomerDto>> GetCustomerById(int id)
     {
@@ -71,7 +121,28 @@ public class SalesController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Busca clientes com filtros e paginação
+    /// </summary>
+    /// <param name="search">Termo de busca (nome, documento, email)</param>
+    /// <param name="isActive">Filtro por status ativo/inativo</param>
+    /// <param name="page">Número da página (padrão: 1)</param>
+    /// <param name="pageSize">Itens por página (padrão: 10)</param>
+    /// <returns>Lista paginada de clientes</returns>
+    /// <response code="200">Clientes encontrados</response>
+    /// <response code="401">Usuário não autenticado</response>
+    /// <response code="500">Erro interno</response>
+    /// <remarks>
+    /// Busca por nome, CPF/CNPJ ou email do cliente.
+    /// 
+    /// Exemplo de uso:
+    /// 
+    ///     GET /api/sales/customers?search=João&amp;isActive=true&amp;page=1&amp;pageSize=10
+    /// </remarks>
     [HttpGet("customers")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> SearchCustomers(
         [FromQuery] string? search,
         [FromQuery] bool? isActive,
@@ -90,7 +161,23 @@ public class SalesController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Atualiza dados de um cliente existente
+    /// </summary>
+    /// <param name="id">ID do cliente</param>
+    /// <param name="dto">Dados atualizados do cliente</param>
+    /// <returns>Cliente atualizado</returns>
+    /// <response code="200">Cliente atualizado com sucesso</response>
+    /// <response code="400">Dados inválidos</response>
+    /// <response code="404">Cliente não encontrado</response>
+    /// <response code="401">Usuário não autenticado</response>
+    /// <response code="500">Erro interno</response>
     [HttpPut("customers/{id:int}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<CustomerDto>> UpdateCustomer(int id, [FromBody] UpdateCustomerDto dto)
     {
         try
@@ -114,7 +201,24 @@ public class SalesController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Inativa um cliente (soft delete)
+    /// </summary>
+    /// <param name="id">ID do cliente</param>
+    /// <returns>Confirmação de inativação</returns>
+    /// <response code="200">Cliente inativado com sucesso</response>
+    /// <response code="404">Cliente não encontrado</response>
+    /// <response code="401">Usuário não autenticado</response>
+    /// <response code="500">Erro interno</response>
+    /// <remarks>
+    /// **Nota:** Este endpoint realiza soft delete, mantendo o registro no banco mas marcando como inativo.
+    /// O cliente não será excluído permanentemente e pode ser reativado posteriormente.
+    /// </remarks>
     [HttpDelete("customers/{id:int}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> DeleteCustomer(int id)
     {
         try
@@ -137,7 +241,42 @@ public class SalesController : ControllerBase
 
     #region Sales
 
+    /// <summary>
+    /// Cria uma nova venda no sistema
+    /// </summary>
+    /// <param name="dto">Dados da venda incluindo cliente, itens, valores e forma de pagamento</param>
+    /// <returns>Venda criada com ID gerado</returns>
+    /// <response code="201">Venda criada com sucesso</response>
+    /// <response code="400">Dados inválidos ou estoque insuficiente</response>
+    /// <response code="401">Usuário não autenticado</response>
+    /// <response code="500">Erro interno</response>
+    /// <remarks>
+    /// Cria uma venda vinculada ao usuário autenticado como vendedor.
+    /// Valida disponibilidade de estoque para todos os produtos.
+    /// Calcula automaticamente subtotal, descontos e total.
+    /// 
+    /// Exemplo de requisição:
+    /// 
+    ///     POST /api/sales
+    ///     {
+    ///         "customerId": 5,
+    ///         "saleDate": "2025-11-10T10:30:00Z",
+    ///         "paymentMethod": "Cartão de Crédito",
+    ///         "discount": 50.00,
+    ///         "items": [
+    ///             {
+    ///                 "productId": 10,
+    ///                 "quantity": 2,
+    ///                 "unitPrice": 150.00
+    ///             }
+    ///         ]
+    ///     }
+    /// </remarks>
     [HttpPost]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<SaleDto>> CreateSale([FromBody] CreateSaleDto dto)
     {
         try
@@ -167,7 +306,24 @@ public class SalesController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Busca uma venda específica por ID
+    /// </summary>
+    /// <param name="id">ID da venda</param>
+    /// <returns>Dados completos da venda incluindo itens e cliente</returns>
+    /// <response code="200">Venda encontrada</response>
+    /// <response code="404">Venda não encontrada</response>
+    /// <response code="401">Usuário não autenticado</response>
+    /// <response code="500">Erro interno</response>
+    /// <remarks>
+    /// **ATENÇÃO:** Este endpoint retorna dados sensíveis da venda e é auditado.
+    /// Registra a visualização no log de auditoria com nível de sensibilidade MÉDIO.
+    /// </remarks>
     [HttpGet("{id:int}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [AuditRead("Sale", DataSensitivity.Medium, Description = "Visualização de dados da venda (valores, cliente)")]
     public async Task<ActionResult<SaleDto>> GetSaleById(int id)
     {
@@ -187,7 +343,38 @@ public class SalesController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Busca vendas com filtros avançados e paginação
+    /// </summary>
+    /// <param name="search">Termo de busca (número da venda, nome do cliente)</param>
+    /// <param name="status">Filtro por status (Draft, Confirmed, Shipped, Completed, Cancelled)</param>
+    /// <param name="startDate">Data inicial do período</param>
+    /// <param name="endDate">Data final do período</param>
+    /// <param name="customerId">Filtro por cliente específico</param>
+    /// <param name="page">Número da página (padrão: 1)</param>
+    /// <param name="pageSize">Itens por página (padrão: 10)</param>
+    /// <returns>Lista paginada de vendas</returns>
+    /// <response code="200">Vendas encontradas</response>
+    /// <response code="401">Usuário não autenticado</response>
+    /// <response code="500">Erro interno</response>
+    /// <remarks>
+    /// Permite filtrar vendas por múltiplos critérios simultaneamente.
+    /// 
+    /// Status disponíveis:
+    /// - **Draft**: Rascunho (ainda não confirmada)
+    /// - **Confirmed**: Confirmada (aguardando envio)
+    /// - **Shipped**: Enviada (em transporte)
+    /// - **Completed**: Concluída (entregue)
+    /// - **Cancelled**: Cancelada
+    /// 
+    /// Exemplo de uso:
+    /// 
+    ///     GET /api/sales?status=Completed&amp;startDate=2025-01-01&amp;endDate=2025-12-31&amp;page=1
+    /// </remarks>
     [HttpGet]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> SearchSales(
         [FromQuery] string? search,
         [FromQuery] string? status,
@@ -210,7 +397,28 @@ public class SalesController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Atualiza dados de uma venda existente
+    /// </summary>
+    /// <param name="id">ID da venda</param>
+    /// <param name="dto">Dados atualizados da venda</param>
+    /// <returns>Venda atualizada</returns>
+    /// <response code="200">Venda atualizada com sucesso</response>
+    /// <response code="400">Dados inválidos ou operação não permitida (venda finalizada/cancelada)</response>
+    /// <response code="404">Venda não encontrada</response>
+    /// <response code="401">Usuário não autenticado</response>
+    /// <response code="500">Erro interno</response>
+    /// <remarks>
+    /// **Restrições:**
+    /// - Não é possível atualizar vendas com status "Completed" ou "Cancelled"
+    /// - Alterações em itens podem afetar o estoque
+    /// </remarks>
     [HttpPut("{id:int}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<SaleDto>> UpdateSale(int id, [FromBody] UpdateSaleDto dto)
     {
         try
@@ -238,7 +446,27 @@ public class SalesController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Cancela uma venda
+    /// </summary>
+    /// <param name="id">ID da venda</param>
+    /// <returns>Confirmação de cancelamento</returns>
+    /// <response code="200">Venda cancelada com sucesso</response>
+    /// <response code="400">Operação não permitida (venda já finalizada)</response>
+    /// <response code="404">Venda não encontrada</response>
+    /// <response code="401">Usuário não autenticado</response>
+    /// <response code="500">Erro interno</response>
+    /// <remarks>
+    /// Altera o status da venda para "Cancelled".
+    /// **Importante:** O estoque dos produtos é restaurado automaticamente.
+    /// Não é possível cancelar vendas já completadas.
+    /// </remarks>
     [HttpPost("{id:int}/cancel")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> CancelSale(int id)
     {
         try
@@ -261,7 +489,27 @@ public class SalesController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Finaliza uma venda marcando como concluída
+    /// </summary>
+    /// <param name="id">ID da venda</param>
+    /// <returns>Venda finalizada</returns>
+    /// <response code="200">Venda finalizada com sucesso</response>
+    /// <response code="400">Operação não permitida (venda cancelada ou já finalizada)</response>
+    /// <response code="404">Venda não encontrada</response>
+    /// <response code="401">Usuário não autenticado</response>
+    /// <response code="500">Erro interno</response>
+    /// <remarks>
+    /// Altera o status da venda para "Completed".
+    /// **Após finalizar, a venda não pode mais ser editada ou cancelada.**
+    /// Use este endpoint apenas quando a entrega for confirmada.
+    /// </remarks>
     [HttpPost("{id:int}/finalize")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<SaleDto>> FinalizeSale(int id)
     {
         try

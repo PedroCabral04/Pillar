@@ -1,0 +1,433 @@
+@page "/reports/inventory"
+@attribute [Authorize]
+@using erp.DTOs.Reports
+@using erp.Services
+@using Microsoft.AspNetCore.Authorization
+@using Color = MudBlazor.Color
+@using Size = MudBlazor.Size
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+<PageTitle>Relatórios de Estoque - Pillar ERP</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h4" GutterBottom="true">
+        <MudIcon Icon="@Icons.Material.Filled.Inventory" Class="mr-2" />
+        Relatórios de Estoque
+    </MudText>
+    <MudText Typo="Typo.body1" Class="mb-6">
+        Análise completa de níveis de estoque, movimentações e avaliação de inventário.
+    </MudText>
+
+    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
+        <!-- Stock Levels Tab -->
+        <MudTabPanel Text="Níveis de Estoque" Icon="@Icons.Material.Filled.Inventory2">
+            <MudCard Elevation="3" Class="mb-4">
+                <MudCardContent>
+                    <MudGrid>
+                        <MudItem xs="12" md="4">
+                            <MudCheckBox T="bool" @bind-Checked="_stockLevelsFilter.OnlyLowStock" Label="Apenas estoque baixo" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadStockLevelsReport" StartIcon="@Icons.Material.Filled.Search">
+                                Gerar Relatório
+                            </MudButton>
+                        </MudItem>
+                    </MudGrid>
+                </MudCardContent>
+            </MudCard>
+
+            @if (_loadingStockLevels)
+            {
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+            }
+
+            @if (_stockLevelsReport != null)
+            {
+                <MudCard Elevation="3" Class="mb-4">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Níveis de Estoque</MudText>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small">
+                                <MudButton StartIcon="@Icons.Material.Filled.PictureAsPdf" OnClick='() => ExportReport("stock-levels", "pdf")' Color="Color.Error">
+                                    Exportar PDF
+                                </MudButton>
+                                <MudButton StartIcon="@Icons.Material.Filled.TableChart" OnClick='() => ExportReport("stock-levels", "excel")' Color="Color.Success">
+                                    Exportar Excel
+                                </MudButton>
+                            </MudButtonGroup>
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudGrid>
+                            <MudItem xs="12" sm="3">
+                                <MudPaper Class="pa-4" Elevation="0">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">Total de Produtos</MudText>
+                                    <MudText Typo="Typo.h5">@_stockLevelsReport.Summary.TotalProducts</MudText>
+                                </MudPaper>
+                            </MudItem>
+                            <MudItem xs="12" sm="3">
+                                <MudPaper Class="pa-4" Elevation="0">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Success">Em Estoque</MudText>
+                                    <MudText Typo="Typo.h5">@_stockLevelsReport.Summary.ProductsInStock</MudText>
+                                </MudPaper>
+                            </MudItem>
+                            <MudItem xs="12" sm="3">
+                                <MudPaper Class="pa-4" Elevation="0">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Warning">Estoque Baixo</MudText>
+                                    <MudText Typo="Typo.h5">@_stockLevelsReport.Summary.ProductsLowStock</MudText>
+                                </MudPaper>
+                            </MudItem>
+                            <MudItem xs="12" sm="3">
+                                <MudPaper Class="pa-4" Elevation="0">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Error">Sem Estoque</MudText>
+                                    <MudText Typo="Typo.h5">@_stockLevelsReport.Summary.ProductsOutOfStock</MudText>
+                                </MudPaper>
+                            </MudItem>
+                        </MudGrid>
+
+                        <MudTable Items="_stockLevelsReport.Items" Class="mt-4" Hover="true" Striped="true" Dense="true" Filter="new Func<StockLevelItemDto, bool>(FilterStockItems)">
+                            <ToolBarContent>
+                                <MudTextField @bind-Value="_searchString" Placeholder="Buscar produtos" Adornment="Adornment.Start"
+                                              AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0" Immediate="true" />
+                            </ToolBarContent>
+                            <HeaderContent>
+                                <MudTh>SKU</MudTh>
+                                <MudTh>Produto</MudTh>
+                                <MudTh>Categoria</MudTh>
+                                <MudTh>Estoque Atual</MudTh>
+                                <MudTh>Estoque Mínimo</MudTh>
+                                <MudTh>Valor Total</MudTh>
+                                <MudTh>Status</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="SKU">@context.Sku</MudTd>
+                                <MudTd DataLabel="Produto">@context.ProductName</MudTd>
+                                <MudTd DataLabel="Categoria">@context.Category</MudTd>
+                                <MudTd DataLabel="Estoque Atual">@context.CurrentStock @context.Unit</MudTd>
+                                <MudTd DataLabel="Estoque Mínimo">@context.MinimumStock @context.Unit</MudTd>
+                                <MudTd DataLabel="Valor Total">@context.TotalValue.ToString("C2")</MudTd>
+                                <MudTd DataLabel="Status">
+                                    <MudChip T="string" Size="Size.Small" Color="@GetStockStatusColor(context.Status)">@context.Status</MudChip>
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    </MudCardContent>
+                </MudCard>
+            }
+        </MudTabPanel>
+
+        <!-- Stock Movement Tab -->
+        <MudTabPanel Text="Movimentações" Icon="@Icons.Material.Filled.SwapHoriz">
+            <MudCard Elevation="3" Class="mb-4">
+                <MudCardContent>
+                    <MudGrid>
+                        <MudItem xs="12" md="6">
+                            <MudDatePicker Label="Data Início" @bind-Date="_stockMovementFilter.StartDate" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudDatePicker Label="Data Fim" @bind-Date="_stockMovementFilter.EndDate" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadStockMovementReport" StartIcon="@Icons.Material.Filled.Search">
+                                Gerar Relatório
+                            </MudButton>
+                        </MudItem>
+                    </MudGrid>
+                </MudCardContent>
+            </MudCard>
+
+            @if (_loadingStockMovement)
+            {
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+            }
+
+            @if (_stockMovementReport != null)
+            {
+                <MudCard Elevation="3" Class="mb-4">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Movimentações de Estoque</MudText>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small">
+                                <MudButton StartIcon="@Icons.Material.Filled.PictureAsPdf" OnClick='() => ExportReport("movement-history", "pdf")' Color="Color.Error">
+                                    Exportar PDF
+                                </MudButton>
+                                <MudButton StartIcon="@Icons.Material.Filled.TableChart" OnClick='() => ExportReport("movement-history", "excel")' Color="Color.Success">
+                                    Exportar Excel
+                                </MudButton>
+                            </MudButtonGroup>
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudGrid Class="mb-4">
+                            <MudItem xs="12" sm="6">
+                                <MudPaper Class="pa-4" Elevation="0">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">Total de Movimentações</MudText>
+                                    <MudText Typo="Typo.h5">@_stockMovementReport.Summary.TotalMovements</MudText>
+                                </MudPaper>
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudPaper Class="pa-4" Elevation="0">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Info">Valor Total Movimentado</MudText>
+                                    <MudText Typo="Typo.h5">@_stockMovementReport.Summary.TotalValueMovements.ToString("C2")</MudText>
+                                </MudPaper>
+                            </MudItem>
+                        </MudGrid>
+
+                        <MudTable Items="_stockMovementReport.Items" Class="mt-4" Hover="true" Striped="true" Dense="true">
+                            <HeaderContent>
+                                <MudTh>Data</MudTh>
+                                <MudTh>Produto</MudTh>
+                                <MudTh>Tipo</MudTh>
+                                <MudTh>Quantidade</MudTh>
+                                <MudTh>Custo Unitário</MudTh>
+                                <MudTh>Custo Total</MudTh>
+                                <MudTh>Usuário</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Data">@context.Date.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                                <MudTd DataLabel="Produto">@context.ProductName</MudTd>
+                                <MudTd DataLabel="Tipo">@context.Type</MudTd>
+                                <MudTd DataLabel="Quantidade">@context.Quantity @context.Unit</MudTd>
+                                <MudTd DataLabel="Custo Unitário">@context.UnitCost.ToString("C2")</MudTd>
+                                <MudTd DataLabel="Custo Total">@context.TotalCost.ToString("C2")</MudTd>
+                                <MudTd DataLabel="Usuário">@context.UserName</MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    </MudCardContent>
+                </MudCard>
+            }
+        </MudTabPanel>
+
+        <!-- Valuation Tab -->
+        <MudTabPanel Text="Avaliação" Icon="@Icons.Material.Filled.Assessment">
+            <MudCard Elevation="3" Class="mb-4">
+                <MudCardContent>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadValuationReport" StartIcon="@Icons.Material.Filled.Search">
+                        Gerar Relatório
+                    </MudButton>
+                </MudCardContent>
+            </MudCard>
+
+            @if (_loadingValuation)
+            {
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+            }
+
+            @if (_valuationReport != null)
+            {
+                <MudCard Elevation="3" Class="mb-4">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Avaliação de Inventário</MudText>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small">
+                                <MudButton StartIcon="@Icons.Material.Filled.PictureAsPdf" OnClick='() => ExportReport("valuation", "pdf")' Color="Color.Error">
+                                    Exportar PDF
+                                </MudButton>
+                                <MudButton StartIcon="@Icons.Material.Filled.TableChart" OnClick='() => ExportReport("valuation", "excel")' Color="Color.Success">
+                                    Exportar Excel
+                                </MudButton>
+                            </MudButtonGroup>
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudGrid Class="mb-4">
+                            <MudItem xs="12" sm="4">
+                                <MudPaper Class="pa-4" Elevation="0">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">Valor de Custo</MudText>
+                                    <MudText Typo="Typo.h5">@_valuationReport.Summary.TotalCostValue.ToString("C2")</MudText>
+                                </MudPaper>
+                            </MudItem>
+                            <MudItem xs="12" sm="4">
+                                <MudPaper Class="pa-4" Elevation="0">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Success">Valor de Venda</MudText>
+                                    <MudText Typo="Typo.h5">@_valuationReport.Summary.TotalSaleValue.ToString("C2")</MudText>
+                                </MudPaper>
+                            </MudItem>
+                            <MudItem xs="12" sm="4">
+                                <MudPaper Class="pa-4" Elevation="0">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Info">Lucro Potencial</MudText>
+                                    <MudText Typo="Typo.h5">@_valuationReport.Summary.TotalPotentialProfit.ToString("C2")</MudText>
+                                </MudPaper>
+                            </MudItem>
+                        </MudGrid>
+
+                        <MudTable Items="_valuationReport.Items" Class="mt-4" Hover="true" Striped="true" Dense="true">
+                            <HeaderContent>
+                                <MudTh>Categoria</MudTh>
+                                <MudTh>Produtos</MudTh>
+                                <MudTh>Quantidade Total</MudTh>
+                                <MudTh>Valor de Custo</MudTh>
+                                <MudTh>Valor de Venda</MudTh>
+                                <MudTh>Lucro Potencial</MudTh>
+                                <MudTh>Margem</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Categoria">@context.Category</MudTd>
+                                <MudTd DataLabel="Produtos">@context.ProductCount</MudTd>
+                                <MudTd DataLabel="Quantidade Total">@context.TotalQuantity.ToString("N2")</MudTd>
+                                <MudTd DataLabel="Valor de Custo">@context.TotalCostValue.ToString("C2")</MudTd>
+                                <MudTd DataLabel="Valor de Venda">@context.TotalSaleValue.ToString("C2")</MudTd>
+                                <MudTd DataLabel="Lucro Potencial"><MudText Color="Color.Success">@context.PotentialProfit.ToString("C2")</MudText></MudTd>
+                                <MudTd DataLabel="Margem">@context.ProfitMargin.ToString("P2")</MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    </MudCardContent>
+                </MudCard>
+            }
+        </MudTabPanel>
+    </MudTabs>
+</MudContainer>
+
+@code {
+    private InventoryReportFilterDto _stockLevelsFilter = new() { OnlyLowStock = false };
+    private InventoryReportFilterDto _stockMovementFilter = new() { StartDate = DateTime.Now.AddMonths(-1), EndDate = DateTime.Now };
+    private InventoryReportFilterDto _valuationFilter = new();
+    
+    private StockLevelsReportDto? _stockLevelsReport;
+    private StockMovementReportDto? _stockMovementReport;
+    private InventoryValuationReportDto? _valuationReport;
+    
+    private bool _loadingStockLevels;
+    private bool _loadingStockMovement;
+    private bool _loadingValuation;
+
+    private string _searchString = "";
+
+    private async Task LoadStockLevelsReport()
+    {
+        try
+        {
+            _loadingStockLevels = true;
+            _stockLevelsFilter.ReportType = "stock-levels";
+            var response = await ApiService.PostAsync<StockLevelsReportDto>("/api/reports/inventory/stock-levels", _stockLevelsFilter);
+            
+            if (response != null)
+            {
+                _stockLevelsReport = response;
+                Snackbar.Add("Relatório de níveis de estoque gerado com sucesso!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Erro ao gerar relatório", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingStockLevels = false;
+        }
+    }
+
+    private async Task LoadStockMovementReport()
+    {
+        try
+        {
+            _loadingStockMovement = true;
+            _stockMovementFilter.ReportType = "movement-history";
+            var response = await ApiService.PostAsync<StockMovementReportDto>("/api/reports/inventory/movement-history", _stockMovementFilter);
+            
+            if (response != null)
+            {
+                _stockMovementReport = response;
+                Snackbar.Add("Relatório de movimentações gerado com sucesso!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Erro ao gerar relatório", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingStockMovement = false;
+        }
+    }
+
+    private async Task LoadValuationReport()
+    {
+        try
+        {
+            _loadingValuation = true;
+            _valuationFilter.ReportType = "valuation";
+            var response = await ApiService.PostAsync<InventoryValuationReportDto>("/api/reports/inventory/valuation", _valuationFilter);
+            
+            if (response != null)
+            {
+                _valuationReport = response;
+                Snackbar.Add("Relatório de avaliação gerado com sucesso!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Erro ao gerar relatório", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingValuation = false;
+        }
+    }
+
+    private async Task ExportReport(string reportType, string format)
+    {
+        try
+        {
+            var url = $"/api/reports/inventory/{reportType}/export?ExportFormat={format}";
+            
+            switch (reportType)
+            {
+                case "stock-levels":
+                    url += $"&OnlyLowStock={_stockLevelsFilter.OnlyLowStock}";
+                    break;
+                case "movement-history":
+                    url += $"&StartDate={_stockMovementFilter.StartDate:yyyy-MM-dd}&EndDate={_stockMovementFilter.EndDate:yyyy-MM-dd}";
+                    break;
+            }
+            
+            await JS.InvokeVoidAsync("open", url, "_blank");
+            Snackbar.Add($"Relatório exportado em {format.ToUpper()}!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private bool FilterStockItems(StockLevelItemDto item)
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+        if (item.ProductName.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (item.Sku.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (item.Category.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        return false;
+    }
+
+    private Color GetStockStatusColor(string status) => status switch
+    {
+        "OK" => Color.Success,
+        "Baixo" => Color.Warning,
+        "Crítico" => Color.Error,
+        _ => Color.Default
+    };
+}

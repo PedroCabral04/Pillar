@@ -12,6 +12,12 @@ public class ApplicationUser : IdentityUser<int>, erp.Models.Audit.IAuditable
     // Informações Pessoais
     [MaxLength(200)]
     public string? FullName { get; set; }
+
+    // Backwards compatibility: older code/tests may reference 'Name'
+    // Map transparently to FullName without creating a new column
+    [NotMapped]
+    [Obsolete("Use FullName instead of Name.")]
+    public string? Name { get => FullName; set => FullName = value; }
     
     [MaxLength(14)]
     public string? Cpf { get; set; }

@@ -1,0 +1,139 @@
+@page "/admin/widget-roles"
+@using erp.DTOs.Dashboard
+@using erp.Services
+@using MudBlazor
+@using MudBlazor.Services
+@using Color = MudBlazor.Color
+@inject IApiService Api
+@inject ISnackbar Snackbar
+
+<MudPaper Class="pa-4">
+    <MudText Typo="Typo.h5">Gerenciar papéis por widget</MudText>
+    <MudDivider Class="my-2" />
+
+    @if (_catalog is null)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else
+    {
+        <MudTable T="WidgetCatalogItem" Items="_catalog" Hover="true" Dense="true">
+            <HeaderContent>
+                <MudTh>Widget</MudTh>
+                <MudTh>Descrição</MudTh>
+                <MudTh>Roles</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate Context="item">
+                <MudTd>@item.Title (@item.ProviderKey / @item.WidgetKey)</MudTd>
+                <MudTd>@item.Description</MudTd>
+                <MudTd>
+                    @{
+                        var key = GetKey(item);
+                    }
+                    <MudSelect T="string" SelectedValues="@GetSelectedRoles(key)" SelectedValuesChanged="@(vals => UpdateSelectedRoles(key, vals))" MultiSelection="true" Variant="Variant.Outlined" Dense="true">
+                        @if (_allRoles != null)
+                        {
+                            @foreach (var r in _allRoles)
+                            {
+                                <MudSelectItem T="string" Value="@r.Name">@r.Name</MudSelectItem>
+                            }
+                        }
+                    </MudSelect>
+                </MudTd>
+                <MudTd>
+                    <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="() => SaveRoles(item)">Salvar</MudButton>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private List<WidgetCatalogItem>? _catalog;
+    private List<RoleDto>? _allRoles;
+    private Dictionary<string, List<string>> _selectedRoles = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRolesAsync();
+        await LoadCatalogAsync();
+    }
+
+    private string GetKey(WidgetCatalogItem item) => $"{item.ProviderKey}__{item.WidgetKey}";
+
+    private async Task LoadRolesAsync()
+    {
+        try
+        {
+            _allRoles = await Api.GetAsync<List<RoleDto>>("api/roles");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+    }
+
+    private async Task LoadCatalogAsync()
+    {
+        try
+        {
+            var catalog = await Api.GetAsync<List<WidgetCatalogItem>>("api/dashboard/layout/catalog");
+            _catalog = catalog ?? new();
+
+            // Initialize selected roles map from catalog
+            foreach (var item in _catalog)
+            {
+                var key = GetKey(item);
+                var list = new List<string>(item.RequiredRoles ?? Array.Empty<string>());
+                _selectedRoles[key] = list;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            _catalog = new();
+        }
+    }
+
+    private async Task SaveRoles(WidgetCatalogItem item)
+    {
+        try
+        {
+            var key = GetKey(item);
+            var roles = _selectedRoles.ContainsKey(key) ? _selectedRoles[key].ToArray() : Array.Empty<string>();
+            var resp = await Api.PostAsJsonAsync($"api/dashboard/layout/widgets/{item.ProviderKey}/{item.WidgetKey}/roles", roles);
+            if (resp.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Roles atualizados", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Falha ao atualizar roles", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+    }
+
+    // Minimal RoleDto to avoid importing extra namespace here
+    private record RoleDto(int Id, string Name, string Abbreviation);
+
+    private IEnumerable<string> GetSelectedRoles(string key)
+    {
+        if (!_selectedRoles.TryGetValue(key, out var list))
+        {
+            list = new List<string>();
+            _selectedRoles[key] = list;
+        }
+        return list;
+    }
+
+    private Task UpdateSelectedRoles(string key, IEnumerable<string>? values)
+    {
+        _selectedRoles[key] = values?.ToList() ?? new List<string>();
+        return Task.CompletedTask;
+    }
+}

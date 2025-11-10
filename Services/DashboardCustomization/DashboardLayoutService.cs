@@ -14,16 +14,25 @@ public interface IDashboardLayoutService
     Task<bool> ReorderWidgetsAsync(string userId, List<string> widgetOrder);
     Task ResetToDefaultAsync(string userId);
     List<WidgetCatalogItem> GetAvailableWidgets(string[] userRoles);
+    Task<string[]?> GetWidgetRolesAsync(string providerKey, string widgetKey);
+    Task SetWidgetRolesAsync(string providerKey, string widgetKey, string[]? roles);
 }
 
 public class DashboardLayoutService : IDashboardLayoutService
 {
     private readonly IDashboardRegistry _registry;
     private readonly Dictionary<string, DashboardLayout> _layoutCache = new();
+    private readonly Dictionary<string, string[]?> _widgetRoleOverrides = new(StringComparer.OrdinalIgnoreCase);
+    private readonly string _overridesFilePath;
+    private readonly object _fileLock = new();
 
     public DashboardLayoutService(IDashboardRegistry registry)
     {
         _registry = registry;
+        // Persist role overrides to a simple JSON file next to the app base directory
+        var baseDir = AppContext.BaseDirectory ?? Directory.GetCurrentDirectory();
+        _overridesFilePath = Path.Combine(baseDir, "widgetRoleOverrides.json");
+        LoadOverridesFromFile();
     }
 
     public Task<DashboardLayout> GetUserLayoutAsync(string userId)
@@ -150,6 +159,10 @@ public class DashboardLayoutService : IDashboardLayoutService
 
         foreach (var def in definitions)
         {
+            // Apply overrides if present
+            var key = GetOverrideKey(def.ProviderKey, def.WidgetKey);
+            var overridden = _widgetRoleOverrides.TryGetValue(key, out var oroles) ? oroles : def.RequiredRoles;
+
             catalog.Add(new WidgetCatalogItem
             {
                 ProviderKey = def.ProviderKey,
@@ -159,11 +172,80 @@ public class DashboardLayoutService : IDashboardLayoutService
                 Icon = def.Icon,
                 Category = def.ProviderKey, // Use provider key as category
                 RequiresConfiguration = false,
-                RequiredRoles = null // TODO: Implement role-based widgets
+                RequiredRoles = overridden
             });
         }
 
         return catalog;
+    }
+
+    public Task<string[]?> GetWidgetRolesAsync(string providerKey, string widgetKey)
+    {
+        var key = GetOverrideKey(providerKey, widgetKey);
+        if (_widgetRoleOverrides.TryGetValue(key, out var roles))
+            return Task.FromResult(roles);
+
+        var def = _registry.Find(providerKey, widgetKey);
+        return Task.FromResult(def?.RequiredRoles);
+    }
+
+    public Task SetWidgetRolesAsync(string providerKey, string widgetKey, string[]? roles)
+    {
+        var key = GetOverrideKey(providerKey, widgetKey);
+        if (roles == null || roles.Length == 0)
+        {
+            // Remove override to fall back to provider default
+            if (_widgetRoleOverrides.ContainsKey(key))
+            {
+                _widgetRoleOverrides.Remove(key);
+                SaveOverridesToFile();
+            }
+            return Task.CompletedTask;
+        }
+
+        _widgetRoleOverrides[key] = roles;
+        SaveOverridesToFile();
+        return Task.CompletedTask;
+    }
+
+    private string GetOverrideKey(string provider, string widget) => $"{provider}__{widget}";
+
+    private void LoadOverridesFromFile()
+    {
+        try
+        {
+            if (!File.Exists(_overridesFilePath)) return;
+            lock (_fileLock)
+            {
+                var json = File.ReadAllText(_overridesFilePath);
+                var dict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string[]?>>(json, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (dict != null)
+                {
+                    foreach (var kv in dict)
+                        _widgetRoleOverrides[kv.Key] = kv.Value;
+                }
+            }
+        }
+        catch
+        {
+            // ignore file errors; fall back to defaults
+        }
+    }
+
+    private void SaveOverridesToFile()
+    {
+        try
+        {
+            lock (_fileLock)
+            {
+                var json = System.Text.Json.JsonSerializer.Serialize(_widgetRoleOverrides, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(_overridesFilePath, json);
+            }
+        }
+        catch
+        {
+            // ignore persistence errors for now
+        }
     }
 
     private DashboardLayout CreateDefaultLayout(string userId)
