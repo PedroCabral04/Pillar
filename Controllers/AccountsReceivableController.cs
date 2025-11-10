@@ -1,0 +1,366 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using erp.DTOs.Financial;
+using erp.Services.Financial;
+using erp.Models.Financial;
+using System.Security.Claims;
+
+namespace erp.Controllers;
+
+[ApiController]
+[Route("api/accounts-receivable")]
+[Authorize]
+public class AccountsReceivableController : ControllerBase
+{
+    private readonly IAccountReceivableService _accountReceivableService;
+    private readonly ILogger<AccountsReceivableController> _logger;
+
+    public AccountsReceivableController(
+        IAccountReceivableService accountReceivableService,
+        ILogger<AccountsReceivableController> logger)
+    {
+        _accountReceivableService = accountReceivableService;
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// Get paginated accounts receivable with filters
+    /// </summary>
+    [HttpGet]
+    public async Task<ActionResult> GetPaged(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] int? customerId = null,
+        [FromQuery] AccountStatus? status = null,
+        [FromQuery] DateTime? dueDateFrom = null,
+        [FromQuery] DateTime? dueDateTo = null,
+        [FromQuery] int? categoryId = null,
+        [FromQuery] int? costCenterId = null,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] bool sortDescending = false)
+    {
+        try
+        {
+            var result = await _accountReceivableService.GetPagedAsync(
+                page, pageSize, customerId, status, dueDateFrom, dueDateTo,
+                categoryId, costCenterId, sortBy, sortDescending);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting accounts receivable");
+            return StatusCode(500, "Erro ao buscar contas a receber");
+        }
+    }
+
+    /// <summary>
+    /// Get account receivable by ID
+    /// </summary>
+    [HttpGet("{id}")]
+    public async Task<ActionResult<AccountReceivableDto>> GetById(int id)
+    {
+        try
+        {
+            var account = await _accountReceivableService.GetByIdAsync(id);
+            if (account == null)
+            {
+                return NotFound($"Conta a receber com ID {id} não encontrada");
+            }
+            return Ok(account);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting account receivable {AccountId}", id);
+            return StatusCode(500, "Erro ao buscar conta a receber");
+        }
+    }
+
+    /// <summary>
+    /// Get overdue accounts receivable
+    /// </summary>
+    [HttpGet("overdue")]
+    public async Task<ActionResult<List<AccountReceivableDto>>> GetOverdue()
+    {
+        try
+        {
+            var accounts = await _accountReceivableService.GetOverdueAsync();
+            return Ok(accounts);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting overdue accounts");
+            return StatusCode(500, "Erro ao buscar contas vencidas");
+        }
+    }
+
+    /// <summary>
+    /// Get accounts receivable due soon (within days)
+    /// </summary>
+    [HttpGet("due-soon")]
+    public async Task<ActionResult<List<AccountReceivableDto>>> GetDueSoon([FromQuery] int days = 7)
+    {
+        try
+        {
+            var accounts = await _accountReceivableService.GetDueSoonAsync(days);
+            return Ok(accounts);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting accounts due soon");
+            return StatusCode(500, "Erro ao buscar contas a vencer");
+        }
+    }
+
+    /// <summary>
+    /// Get total amounts by status
+    /// </summary>
+    [HttpGet("totals/by-status/{status}")]
+    public async Task<ActionResult<decimal>> GetTotalByStatus(AccountStatus status)
+    {
+        try
+        {
+            var total = await _accountReceivableService.GetTotalByStatusAsync(status);
+            return Ok(total);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting totals by status");
+            return StatusCode(500, "Erro ao calcular totais por status");
+        }
+    }
+
+    /// <summary>
+    /// Get total amounts by customer
+    /// </summary>
+    [HttpGet("totals/by-customer/{customerId}")]
+    public async Task<ActionResult<decimal>> GetTotalByCustomer(int customerId)
+    {
+        try
+        {
+            var total = await _accountReceivableService.GetTotalByCustomerAsync(customerId);
+            return Ok(total);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting totals for customer {CustomerId}", customerId);
+            return StatusCode(500, "Erro ao calcular totais do cliente");
+        }
+    }
+
+    /// <summary>
+    /// Get installments of a parent account
+    /// </summary>
+    [HttpGet("{parentId}/installments")]
+    public async Task<ActionResult<List<AccountReceivableDto>>> GetInstallments(int parentId)
+    {
+        try
+        {
+            var installments = await _accountReceivableService.GetInstallmentsAsync(parentId);
+            return Ok(installments);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting installments for account {ParentId}", parentId);
+            return StatusCode(500, "Erro ao buscar parcelas");
+        }
+    }
+
+    /// <summary>
+    /// Create new account receivable
+    /// </summary>
+    [HttpPost]
+    public async Task<ActionResult<AccountReceivableDto>> Create([FromBody] CreateAccountReceivableDto dto)
+    {
+        try
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId) || !int.TryParse(userId, out int currentUserId))
+            {
+                return Unauthorized();
+            }
+
+            var account = await _accountReceivableService.CreateAsync(dto, currentUserId);
+            return CreatedAtAction(nameof(GetById), new { id = account.Id }, account);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating account receivable");
+            return StatusCode(500, "Erro ao criar conta a receber");
+        }
+    }
+
+    /// <summary>
+    /// Update existing account receivable
+    /// </summary>
+    [HttpPut("{id}")]
+    public async Task<ActionResult<AccountReceivableDto>> Update(int id, [FromBody] UpdateAccountReceivableDto dto)
+    {
+        try
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId) || !int.TryParse(userId, out int currentUserId))
+            {
+                return Unauthorized();
+            }
+
+            var account = await _accountReceivableService.UpdateAsync(id, dto, currentUserId);
+            if (account == null)
+            {
+                return NotFound($"Conta a receber com ID {id} não encontrada");
+            }
+            return Ok(account);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating account receivable {AccountId}", id);
+            return StatusCode(500, "Erro ao atualizar conta a receber");
+        }
+    }
+
+    /// <summary>
+    /// Delete account receivable
+    /// </summary>
+    [HttpDelete("{id}")]
+    public async Task<ActionResult> Delete(int id)
+    {
+        try
+        {
+            await _accountReceivableService.DeleteAsync(id);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting account receivable {AccountId}", id);
+            return StatusCode(500, "Erro ao excluir conta a receber");
+        }
+    }
+
+    /// <summary>
+    /// Receive payment for an account
+    /// </summary>
+    [HttpPost("{id}/receive")]
+    public async Task<ActionResult<AccountReceivableDto>> ReceivePayment(
+        int id,
+        [FromBody] PayAccountReceivableDto dto)
+    {
+        try
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId) || !int.TryParse(userId, out int currentUserId))
+            {
+                return Unauthorized();
+            }
+
+            // Get the existing account to use its payment method
+            var existing = await _accountReceivableService.GetByIdAsync(id);
+            if (existing == null)
+            {
+                return NotFound($"Conta a receber com ID {id} não encontrada");
+            }
+
+            var account = await _accountReceivableService.ReceivePaymentAsync(
+                id, dto.PaidAmount, existing.PaymentMethod, dto.PaymentDate, currentUserId,
+                existing.BankSlipNumber, existing.PixKey);
+            
+            return Ok(account);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error receiving payment for account {AccountId}", id);
+            return StatusCode(500, "Erro ao receber pagamento");
+        }
+    }
+
+    /// <summary>
+    /// Create installments from a base account
+    /// </summary>
+    [HttpPost("{id}/installments")]
+    public async Task<ActionResult<List<AccountReceivableDto>>> CreateInstallments(
+        int id,
+        [FromBody] CreateInstallmentsDto dto)
+    {
+        try
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId) || !int.TryParse(userId, out int currentUserId))
+            {
+                return Unauthorized();
+            }
+
+            // Get the existing account to use as base
+            var existing = await _accountReceivableService.GetByIdAsync(id);
+            if (existing == null)
+            {
+                return NotFound($"Conta a receber com ID {id} não encontrada");
+            }
+
+            // Convert to CreateAccountReceivableDto
+            var baseDto = new CreateAccountReceivableDto
+            {
+                CustomerId = existing.CustomerId,
+                InvoiceNumber = existing.InvoiceNumber,
+                OriginalAmount = existing.OriginalAmount,
+                DiscountAmount = existing.DiscountAmount,
+                InterestAmount = existing.InterestAmount,
+                FineAmount = existing.FineAmount,
+                IssueDate = existing.IssueDate,
+                DueDate = existing.DueDate,
+                PaymentMethod = existing.PaymentMethod,
+                BankSlipNumber = existing.BankSlipNumber,
+                PixKey = existing.PixKey,
+                CategoryId = existing.CategoryId,
+                CostCenterId = existing.CostCenterId,
+                Notes = existing.Notes,
+                InternalNotes = existing.InternalNotes
+            };
+
+            var installments = await _accountReceivableService.CreateInstallmentsAsync(
+                baseDto, dto.NumberOfInstallments, currentUserId, dto.InterestRate);
+            
+            return Ok(installments);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating installments for account {AccountId}", id);
+            return StatusCode(500, "Erro ao criar parcelas");
+        }
+    }
+
+    /// <summary>
+    /// Update overdue status for all accounts (batch operation)
+    /// </summary>
+    [HttpPost("update-overdue-status")]
+    public async Task<ActionResult> UpdateOverdueStatus()
+    {
+        try
+        {
+            await _accountReceivableService.UpdateOverdueStatusAsync();
+            return Ok("Status de contas vencidas atualizado com sucesso");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating overdue status");
+            return StatusCode(500, "Erro ao atualizar status de vencimento");
+        }
+    }
+}

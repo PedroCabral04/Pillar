@@ -207,6 +207,25 @@ builder.Services.AddScoped<erp.Services.Inventory.IStockCountService, erp.Servic
 builder.Services.AddScoped<erp.Services.Sales.ICustomerService, erp.Services.Sales.CustomerService>();
 builder.Services.AddScoped<erp.Services.Sales.ISalesService, erp.Services.Sales.SalesService>();
 
+// Financial services
+builder.Services.AddScoped<erp.Services.Financial.IAccountingService, erp.Services.Financial.AccountingService>();
+builder.Services.AddScoped<erp.Services.Financial.ISupplierService, erp.Services.Financial.SupplierService>();
+builder.Services.AddScoped<erp.Services.Financial.IFinancialCategoryService, erp.Services.Financial.FinancialCategoryService>();
+builder.Services.AddScoped<erp.Services.Financial.ICostCenterService, erp.Services.Financial.CostCenterService>();
+builder.Services.AddScoped<erp.Services.Financial.IAccountReceivableService, erp.Services.Financial.AccountReceivableService>();
+builder.Services.AddScoped<erp.Services.Financial.IAccountPayableService, erp.Services.Financial.AccountPayableService>();
+
+// Financial DAOs
+builder.Services.AddScoped<erp.DAOs.Financial.ISupplierDao, erp.DAOs.Financial.SupplierDao>();
+builder.Services.AddScoped<erp.DAOs.Financial.IFinancialCategoryDao, erp.DAOs.Financial.FinancialCategoryDao>();
+builder.Services.AddScoped<erp.DAOs.Financial.ICostCenterDao, erp.DAOs.Financial.CostCenterDao>();
+builder.Services.AddScoped<erp.DAOs.Financial.IAccountReceivableDao, erp.DAOs.Financial.AccountReceivableDao>();
+builder.Services.AddScoped<erp.DAOs.Financial.IAccountPayableDao, erp.DAOs.Financial.AccountPayableDao>();
+
+// Financial validation services (BrazilianDocumentValidator is static, no DI needed)
+builder.Services.AddHttpClient<erp.Services.Financial.Validation.IViaCepService, erp.Services.Financial.Validation.ViaCepService>();
+builder.Services.AddHttpClient<erp.Services.Financial.Validation.IReceitaWsService, erp.Services.Financial.Validation.ReceitaWsService>();
+
 // Time tracking services
 builder.Services.AddScoped<erp.Services.TimeTracking.ITimeTrackingService, erp.Services.TimeTracking.TimeTrackingService>();
 
@@ -227,6 +246,7 @@ builder.Services.AddScoped<StockMovementMapper, StockMovementMapper>();
 builder.Services.AddScoped<StockCountMapper, StockCountMapper>();
 builder.Services.AddScoped<SalesMapper, SalesMapper>();
 builder.Services.AddScoped<TimeTrackingMapper, TimeTrackingMapper>();
+builder.Services.AddScoped<erp.Mappings.FinancialMapper, erp.Mappings.FinancialMapper>();
 
 // --- Constrói a aplicação ---
 var app = builder.Build();

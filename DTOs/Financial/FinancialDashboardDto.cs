@@ -88,3 +88,18 @@ public class FinancialSummaryByCostCenterDto
     public decimal BudgetUsagePercentage => Budget > 0 ? (TotalAmount / Budget) * 100 : 0;
     public int TransactionCount { get; set; }
 }
+
+/// <summary>
+/// DTO for cost center budget usage summary
+/// </summary>
+public class CostCenterSummaryDto
+{
+    public int CostCenterId { get; set; }
+    public string CostCenterName { get; set; } = string.Empty;
+    public decimal MonthlyBudget { get; set; }
+    public decimal TotalSpent { get; set; }
+    public decimal Remaining { get; set; }
+    public decimal PercentUsed { get; set; }
+    public DateTime PeriodStart { get; set; }
+    public DateTime PeriodEnd { get; set; }
+}
