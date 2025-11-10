@@ -13,6 +13,7 @@ public class ChatbotService : IChatbotService
     private readonly ILogger<ChatbotService> _logger;
     private readonly IConfiguration _configuration;
     private readonly string _aiProvider;
+    private readonly bool _aiConfigured;
 
     public ChatbotService(
         ILogger<ChatbotService> logger,
@@ -64,12 +65,50 @@ public class ChatbotService : IChatbotService
                 _logger.LogInformation("Chatbot configurado com Google AI (modelo: {Model})", googleModel);
             }
         }
+        // Configurar Custom OpenAI-compatible endpoint (LMStudio, Ollama, LocalAI, etc.)
+        else if (aiProvider == "custom" || aiProvider == "openai-compatible")
+        {
+            var customEndpoint = configuration["CustomAI:Endpoint"];
+            var customApiKey = configuration["CustomAI:ApiKey"];
+            var customModel = configuration["CustomAI:Model"] ?? "local-model";
+
+            if (!string.IsNullOrEmpty(customEndpoint))
+            {
+                // Validar URL do endpoint
+                if (!Uri.TryCreate(customEndpoint, UriKind.Absolute, out var endpointUri) ||
+                    (endpointUri.Scheme != "http" && endpointUri.Scheme != "https"))
+                {
+                    _logger.LogError("Custom AI Endpoint inválido: {Endpoint}. Deve ser uma URL HTTP/HTTPS válida.", customEndpoint);
+                }
+                else
+                {
+                    // Usar chave de API se fornecida, caso contrário usar placeholder (para endpoints locais)
+                    var apiKey = string.IsNullOrEmpty(customApiKey) ? "not-needed" : customApiKey;
+                    
+                    builder.AddOpenAIChatCompletion(
+                        modelId: customModel,
+                        apiKey: apiKey,
+                        endpoint: endpointUri);
+                    
+                    aiConfigured = true;
+                    _aiProvider = "custom";
+                    _logger.LogInformation("Chatbot configurado com Custom OpenAI-compatible endpoint: {Endpoint} (modelo: {Model})", 
+                        customEndpoint, customModel);
+                }
+            }
+            else
+            {
+                _logger.LogWarning("Custom AI Provider selecionado mas endpoint não configurado em CustomAI:Endpoint");
+            }
+        }
 
         if (!aiConfigured)
         {
             // Modo fallback sem IA - apenas responde com templates
-            _logger.LogWarning("Nenhuma API Key configurada (OpenAI ou Google AI). Chatbot funcionará em modo limitado.");
+            _logger.LogWarning("Nenhuma API Key ou endpoint configurado (OpenAI, Google AI ou Custom). Chatbot funcionará em modo limitado.");
         }
+
+        _aiConfigured = aiConfigured;
 
         // Registrar plugins com DI
         builder.Services.AddSingleton(serviceProvider);
@@ -95,13 +134,8 @@ public class ChatbotService : IChatbotService
     {
         try
         {
-            // Verificar se há alguma API configurada
-            var openAiKey = _configuration["OpenAI:ApiKey"];
-            var googleApiKey = _configuration["GoogleAI:ApiKey"];
-            var hasApiKey = !string.IsNullOrEmpty(openAiKey) || !string.IsNullOrEmpty(googleApiKey);
-
-            // Se não tem chave de API, usar modo fallback
-            if (!hasApiKey)
+            // Se não tem IA configurada, usar modo fallback
+            if (!_aiConfigured)
             {
                 return ProcessFallbackMode(message);
             }
@@ -144,7 +178,7 @@ Responda em português brasileiro de forma clara e amigável.");
                     MaxTokens = 1000
                 };
             }
-            else
+            else // openai or custom (both use OpenAI-compatible format)
             {
                 executionSettings = new OpenAIPromptExecutionSettings
                 {
@@ -234,8 +268,23 @@ Para habilitar todas as funcionalidades do chatbot, configure uma chave de API:
 }
 ```
 
+**Opção 3 - Custom OpenAI-Compatible (LMStudio, Ollama, LocalAI):**
+```json
+{
+  ""AI"": { ""Provider"": ""custom"" },
+  ""CustomAI"": {
+    ""Endpoint"": ""http://localhost:1234/v1"",
+    ""ApiKey"": """",
+    ""Model"": ""local-model""
+  }
+}
+```
+
 🎁 **Recomendado:** Google AI oferece tier gratuito generoso!
 Obtenha sua chave em: https://ai.google.dev/
+
+💻 **Local:** Use LMStudio para rodar modelos localmente sem custo!
+Download: https://lmstudio.ai/
 
 No momento, posso apenas fornecer informações básicas.
 Digite 'ajuda' para ver o que posso fazer quando configurado corretamente.",
