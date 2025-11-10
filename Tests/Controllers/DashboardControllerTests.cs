@@ -1,6 +1,9 @@
 using erp.Controllers;
 using erp.DTOs.Dashboard;
 using erp.Services.Dashboard;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 
 namespace erp.Tests.Controllers;
 
@@ -70,6 +73,101 @@ public class DashboardControllerTests
         var returnedWidgets = okResult.Value as List<DashboardWidgetDefinition>;
         returnedWidgets.Should().NotBeNull();
         returnedWidgets.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void GetWidgets_FiltersWidgets_BasedOnUserRoles()
+    {
+        // Arrange
+        var widgets = new List<DashboardWidgetDefinition>
+        {
+            new DashboardWidgetDefinition
+            {
+                ProviderKey = "sales",
+                WidgetKey = "public-widget",
+                Title = "Public",
+                Description = "Available to all",
+                RequiredRoles = null
+            },
+            new DashboardWidgetDefinition
+            {
+                ProviderKey = "sales",
+                WidgetKey = "sales-widget",
+                Title = "Sales",
+                Description = "Only for sales",
+                RequiredRoles = new[] { "Vendas" }
+            },
+            new DashboardWidgetDefinition
+            {
+                ProviderKey = "finance",
+                WidgetKey = "finance-widget",
+                Title = "Finance",
+                Description = "Only for finance",
+                RequiredRoles = new[] { "Financeiro" }
+            }
+        };
+
+        _mockRegistry.Setup(x => x.ListAll()).Returns(widgets);
+
+        // User with role 'Vendas'
+        var claims = new[] { new Claim(ClaimTypes.NameIdentifier, "1"), new Claim(ClaimTypes.Role, "Vendas") };
+        var identity = new ClaimsIdentity(claims, "TestAuth");
+        var principal = new ClaimsPrincipal(identity);
+        _controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = principal } };
+
+        // Act
+        var result = _controller.GetWidgets();
+
+        // Assert
+        var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var returned = okResult.Value as IEnumerable<DashboardWidgetDefinition>;
+        returned.Should().NotBeNull();
+        // Should include public and sales, but not finance
+        returned!.Select(w => w.WidgetKey).Should().Contain(new[] { "public-widget", "sales-widget" });
+        returned.Select(w => w.WidgetKey).Should().NotContain("finance-widget");
+    }
+
+    [Fact]
+    public void GetWidgets_WithoutRoles_ReturnsOnlyUnrestrictedWidgets()
+    {
+        // Arrange
+        var widgets = new List<DashboardWidgetDefinition>
+        {
+            new DashboardWidgetDefinition
+            {
+                ProviderKey = "sales",
+                WidgetKey = "public-widget",
+                Title = "Public",
+                Description = "Available to all",
+                RequiredRoles = null
+            },
+            new DashboardWidgetDefinition
+            {
+                ProviderKey = "sales",
+                WidgetKey = "sales-widget",
+                Title = "Sales",
+                Description = "Only for sales",
+                RequiredRoles = new[] { "Vendas" }
+            }
+        };
+
+        _mockRegistry.Setup(x => x.ListAll()).Returns(widgets);
+
+        // User with no roles
+        var claims = new[] { new Claim(ClaimTypes.NameIdentifier, "2") };
+        var identity = new ClaimsIdentity(claims, "TestAuth");
+        var principal = new ClaimsPrincipal(identity);
+        _controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = principal } };
+
+        // Act
+        var result = _controller.GetWidgets();
+
+        // Assert
+        var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var returned = okResult.Value as IEnumerable<DashboardWidgetDefinition>;
+        returned.Should().NotBeNull();
+        returned!.Should().HaveCount(1);
+        returned.First().WidgetKey.Should().Be("public-widget");
     }
 
     #endregion

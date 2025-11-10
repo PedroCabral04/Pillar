@@ -20,6 +20,7 @@ using erp.Services.Dashboard.Providers.Sales;
 using erp.Services.Dashboard.Providers.Finance;
 using erp.Services.Dashboard.Providers.Inventory;
 using erp.Services.Sales;
+using System.Reflection;
 // using ApexCharts; // TODO: Instalar pacote ApexCharts se necessário
 
 // Prefer using DotNetEnv to load .env into environment variables in dev.
@@ -57,10 +58,15 @@ builder.Services
         options.Lockout.MaxFailedAccessAttempts = 5;
         options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(30);
         options.User.RequireUniqueEmail = true;
+        
+        // Configurações de Two-Factor Authentication (2FA)
+        options.Tokens.AuthenticatorTokenProvider = TokenOptions.DefaultAuthenticatorProvider;
+        options.SignIn.RequireConfirmedAccount = false; // Set to true if you want email confirmation
     })
     .AddRoles<ApplicationRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>()
-    .AddSignInManager();
+    .AddSignInManager()
+    .AddDefaultTokenProviders(); // Adiciona provedores de token padrão incluindo authenticator
 
 builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
     .AddCookie(IdentityConstants.ApplicationScheme, options =>
@@ -105,6 +111,17 @@ builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
         context.Response.Redirect(context.RedirectUri);
         return Task.CompletedTask;
     };
+    })
+    // Adicionar esquemas de cookie para 2FA
+    .AddCookie(IdentityConstants.TwoFactorUserIdScheme, options =>
+    {
+        options.Cookie.Name = IdentityConstants.TwoFactorUserIdScheme;
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(5);
+    })
+    .AddCookie(IdentityConstants.TwoFactorRememberMeScheme, options =>
+    {
+        options.Cookie.Name = IdentityConstants.TwoFactorRememberMeScheme;
+        options.ExpireTimeSpan = TimeSpan.FromDays(30);
     });
 
 // Registra o filtro de auditoria de leitura
@@ -116,7 +133,56 @@ builder.Services.AddControllers(options =>
     options.Filters.AddService<erp.Security.AuditReadActionFilter>();
 });
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+    {
+        Version = "v1",
+        Title = "Pillar ERP API",
+        Description = "Sistema ERP modular desenvolvido com Blazor Server e ASP.NET Core",
+        Contact = new Microsoft.OpenApi.Models.OpenApiContact
+        {
+            Name = "Suporte Pillar ERP",
+            Email = "suporte@pillar-erp.com"
+        }
+    });
+    
+    // Resolve naming conflicts by using fully qualified type names for schema IDs
+    options.CustomSchemaIds(type => type.FullName?.Replace("+", "."));
+    
+    // Configura Swagger para usar XML comments
+    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    if (File.Exists(xmlPath))
+    {
+        options.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
+    }
+    
+    // Adiciona suporte para autenticação JWT/Cookie no Swagger
+    options.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Description = "Cookie de autenticação do ASP.NET Core Identity",
+        Name = "Cookie",
+        In = Microsoft.OpenApi.Models.ParameterLocation.Cookie,
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
+        Scheme = "Bearer"
+    });
+    
+    options.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    {
+        {
+            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            {
+                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                {
+                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped(sp => {
     var navigationManager = sp.GetRequiredService<NavigationManager>();
@@ -207,6 +273,28 @@ builder.Services.AddScoped<erp.Services.Inventory.IStockCountService, erp.Servic
 builder.Services.AddScoped<erp.Services.Sales.ICustomerService, erp.Services.Sales.CustomerService>();
 builder.Services.AddScoped<erp.Services.Sales.ISalesService, erp.Services.Sales.SalesService>();
 
+// Financial services
+builder.Services.AddScoped<erp.Services.Financial.IAccountingService, erp.Services.Financial.AccountingService>();
+builder.Services.AddScoped<erp.Services.Financial.ISupplierService, erp.Services.Financial.SupplierService>();
+builder.Services.AddScoped<erp.Services.Financial.IFinancialCategoryService, erp.Services.Financial.FinancialCategoryService>();
+builder.Services.AddScoped<erp.Services.Financial.ICostCenterService, erp.Services.Financial.CostCenterService>();
+builder.Services.AddScoped<erp.Services.Financial.IAccountReceivableService, erp.Services.Financial.AccountReceivableService>();
+builder.Services.AddScoped<erp.Services.Financial.IAccountPayableService, erp.Services.Financial.AccountPayableService>();
+
+// Financial DAOs
+builder.Services.AddScoped<erp.DAOs.Financial.ISupplierDao, erp.DAOs.Financial.SupplierDao>();
+builder.Services.AddScoped<erp.DAOs.Financial.IFinancialCategoryDao, erp.DAOs.Financial.FinancialCategoryDao>();
+builder.Services.AddScoped<erp.DAOs.Financial.ICostCenterDao, erp.DAOs.Financial.CostCenterDao>();
+builder.Services.AddScoped<erp.DAOs.Financial.IAccountReceivableDao, erp.DAOs.Financial.AccountReceivableDao>();
+builder.Services.AddScoped<erp.DAOs.Financial.IAccountPayableDao, erp.DAOs.Financial.AccountPayableDao>();
+
+// Financial validation services (BrazilianDocumentValidator is static, no DI needed)
+builder.Services.AddHttpClient<erp.Services.Financial.Validation.IViaCepService, erp.Services.Financial.Validation.ViaCepService>();
+builder.Services.AddHttpClient<erp.Services.Financial.Validation.IReceitaWsService, erp.Services.Financial.Validation.ReceitaWsService>();
+
+// Time tracking services
+builder.Services.AddScoped<erp.Services.TimeTracking.ITimeTrackingService, erp.Services.TimeTracking.TimeTrackingService>();
+
 // Audit services
 builder.Services.AddScoped<erp.Services.Audit.IAuditService, erp.Services.Audit.AuditService>();
 
@@ -217,12 +305,22 @@ builder.Services.AddScoped<erp.Services.Chatbot.IChatbotService, erp.Services.Ch
 builder.Services.Configure<erp.Services.Email.EmailSettings>(builder.Configuration.GetSection("Email"));
 builder.Services.AddScoped<erp.Services.Email.IEmailService, erp.Services.Email.EmailService>();
 
+// Report services
+builder.Services.AddScoped<erp.Services.Reports.ISalesReportService, erp.Services.Reports.SalesReportService>();
+builder.Services.AddScoped<erp.Services.Reports.IFinancialReportService, erp.Services.Reports.FinancialReportService>();
+builder.Services.AddScoped<erp.Services.Reports.IInventoryReportService, erp.Services.Reports.InventoryReportService>();
+builder.Services.AddScoped<erp.Services.Reports.IHRReportService, erp.Services.Reports.HRReportService>();
+builder.Services.AddScoped<erp.Services.Reports.IPdfExportService, erp.Services.Reports.PdfExportService>();
+builder.Services.AddScoped<erp.Services.Reports.IExcelExportService, erp.Services.Reports.ExcelExportService>();
+
 // ------- REGISTRO DO MAPPERLY -------
 builder.Services.AddScoped<UserMapper, UserMapper>();
 builder.Services.AddScoped<ProductMapper, ProductMapper>();
 builder.Services.AddScoped<StockMovementMapper, StockMovementMapper>();
 builder.Services.AddScoped<StockCountMapper, StockCountMapper>();
 builder.Services.AddScoped<SalesMapper, SalesMapper>();
+builder.Services.AddScoped<TimeTrackingMapper, TimeTrackingMapper>();
+builder.Services.AddScoped<erp.Mappings.FinancialMapper, erp.Mappings.FinancialMapper>();
 
 // --- Constrói a aplicação ---
 var app = builder.Build();
@@ -325,3 +423,6 @@ using (var scope = app.Services.CreateScope())
 
 // --- Executa a aplicação ---
 app.Run(); // Inicia o servidor e começa a ouvir requisições
+
+// Tornar o Program visível para testes de integração com WebApplicationFactory
+public partial class Program { }

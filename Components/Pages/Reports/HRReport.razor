@@ -1,0 +1,446 @@
+@page "/reports/hr"
+@attribute [Authorize]
+@using erp.DTOs.Reports
+@using erp.Services
+@using Microsoft.AspNetCore.Authorization
+@using Color = MudBlazor.Color
+@using Size = MudBlazor.Size
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+<PageTitle>Relatórios de RH - Pillar ERP</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h4" GutterBottom="true">
+        <MudIcon Icon="@Icons.Material.Filled.People" Class="mr-2" />
+        Relatórios de Recursos Humanos
+    </MudText>
+    <MudText Typo="Typo.body1" Class="mb-6">
+        Análise completa de presença, turnover e headcount da equipe.
+    </MudText>
+
+    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
+        <!-- Attendance Tab -->
+        <MudTabPanel Text="Presença" Icon="@Icons.Material.Filled.CalendarToday">
+            <MudCard Elevation="3" Class="mb-4">
+                <MudCardContent>
+                    <MudGrid>
+                        <MudItem xs="12" md="6">
+                            <MudDatePicker Label="Data Início" @bind-Date="_attendanceFilter.StartDate" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudDatePicker Label="Data Fim" @bind-Date="_attendanceFilter.EndDate" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadAttendanceReport" StartIcon="@Icons.Material.Filled.Search">
+                                Gerar Relatório
+                            </MudButton>
+                        </MudItem>
+                    </MudGrid>
+                </MudCardContent>
+            </MudCard>
+
+            @if (_loadingAttendance)
+            {
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+            }
+
+            @if (_attendanceReport != null)
+            {
+                <MudCard Elevation="3" Class="mb-4">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Relatório de Presença</MudText>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small">
+                                <MudButton StartIcon="@Icons.Material.Filled.PictureAsPdf" OnClick='() => ExportReport("attendance", "pdf")' Color="Color.Error">
+                                    Exportar PDF
+                                </MudButton>
+                                <MudButton StartIcon="@Icons.Material.Filled.TableChart" OnClick='() => ExportReport("attendance", "excel")' Color="Color.Success">
+                                    Exportar Excel
+                                </MudButton>
+                            </MudButtonGroup>
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudGrid>
+                            <MudItem xs="12" sm="3">
+                                <MudPaper Class="pa-4" Elevation="0">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">Total de Funcionários</MudText>
+                                    <MudText Typo="Typo.h5">@_attendanceReport.Summary.TotalEmployees</MudText>
+                                </MudPaper>
+                            </MudItem>
+                            <MudItem xs="12" sm="3">
+                                <MudPaper Class="pa-4" Elevation="0">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Success">Taxa de Presença Média</MudText>
+                                    <MudText Typo="Typo.h5">@_attendanceReport.Summary.AverageAttendanceRate.ToString("N2")%</MudText>
+                                </MudPaper>
+                            </MudItem>
+                            <MudItem xs="12" sm="3">
+                                <MudPaper Class="pa-4" Elevation="0">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Warning">Total de Faltas</MudText>
+                                    <MudText Typo="Typo.h5">@_attendanceReport.Summary.TotalAbsences</MudText>
+                                </MudPaper>
+                            </MudItem>
+                            <MudItem xs="12" sm="3">
+                                <MudPaper Class="pa-4" Elevation="0">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Error">Total de Atrasos</MudText>
+                                    <MudText Typo="Typo.h5">@_attendanceReport.Summary.TotalLateArrivals</MudText>
+                                </MudPaper>
+                            </MudItem>
+                        </MudGrid>
+
+                        <MudTable Items="_attendanceReport.Items" Class="mt-4" Hover="true" Striped="true" Dense="true">
+                            <HeaderContent>
+                                <MudTh>Funcionário</MudTh>
+                                <MudTh>Departamento</MudTh>
+                                <MudTh>Cargo</MudTh>
+                                <MudTh>Dias de Trabalho</MudTh>
+                                <MudTh>Dias Presentes</MudTh>
+                                <MudTh>Faltas</MudTh>
+                                <MudTh>Atrasos</MudTh>
+                                <MudTh>Taxa de Presença</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Funcionário">@context.EmployeeName</MudTd>
+                                <MudTd DataLabel="Departamento">@context.Department</MudTd>
+                                <MudTd DataLabel="Cargo">@context.Position</MudTd>
+                                <MudTd DataLabel="Dias de Trabalho">@context.WorkDays</MudTd>
+                                <MudTd DataLabel="Dias Presentes"><MudText Color="Color.Success">@context.PresentDays</MudText></MudTd>
+                                <MudTd DataLabel="Faltas"><MudText Color="Color.Warning">@context.AbsentDays</MudText></MudTd>
+                                <MudTd DataLabel="Atrasos"><MudText Color="Color.Error">@context.LateDays</MudText></MudTd>
+                                <MudTd DataLabel="Taxa de Presença">@context.AttendanceRate.ToString("N2")%</MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    </MudCardContent>
+                </MudCard>
+            }
+        </MudTabPanel>
+
+        <!-- Turnover Tab -->
+        <MudTabPanel Text="Turnover" Icon="@Icons.Material.Filled.TrendingUp">
+            <MudCard Elevation="3" Class="mb-4">
+                <MudCardContent>
+                    <MudGrid>
+                        <MudItem xs="12" md="6">
+                            <MudDatePicker Label="Data Início" @bind-Date="_turnoverFilter.StartDate" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudDatePicker Label="Data Fim" @bind-Date="_turnoverFilter.EndDate" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadTurnoverReport" StartIcon="@Icons.Material.Filled.Search">
+                                Gerar Relatório
+                            </MudButton>
+                        </MudItem>
+                    </MudGrid>
+                </MudCardContent>
+            </MudCard>
+
+            @if (_loadingTurnover)
+            {
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+            }
+
+            @if (_turnoverReport != null)
+            {
+                <MudCard Elevation="3" Class="mb-4">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Relatório de Turnover</MudText>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small">
+                                <MudButton StartIcon="@Icons.Material.Filled.PictureAsPdf" OnClick='() => ExportReport("turnover", "pdf")' Color="Color.Error">
+                                    Exportar PDF
+                                </MudButton>
+                                <MudButton StartIcon="@Icons.Material.Filled.TableChart" OnClick='() => ExportReport("turnover", "excel")' Color="Color.Success">
+                                    Exportar Excel
+                                </MudButton>
+                            </MudButtonGroup>
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudGrid Class="mb-4">
+                            <MudItem xs="12" sm="3">
+                                <MudPaper Class="pa-4" Elevation="0">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">Headcount Atual</MudText>
+                                    <MudText Typo="Typo.h5">@_turnoverReport.Summary.CurrentHeadcount</MudText>
+                                </MudPaper>
+                            </MudItem>
+                            <MudItem xs="12" sm="3">
+                                <MudPaper Class="pa-4" Elevation="0">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Success">Total de Contratações</MudText>
+                                    <MudText Typo="Typo.h5">@_turnoverReport.Summary.TotalHires</MudText>
+                                </MudPaper>
+                            </MudItem>
+                            <MudItem xs="12" sm="3">
+                                <MudPaper Class="pa-4" Elevation="0">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Error">Total de Desligamentos</MudText>
+                                    <MudText Typo="Typo.h5">@_turnoverReport.Summary.TotalTerminations</MudText>
+                                </MudPaper>
+                            </MudItem>
+                            <MudItem xs="12" sm="3">
+                                <MudPaper Class="pa-4" Elevation="0">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Warning">Taxa Média de Turnover</MudText>
+                                    <MudText Typo="Typo.h5">@_turnoverReport.Summary.AverageTurnoverRate.ToString("N2")%</MudText>
+                                </MudPaper>
+                            </MudItem>
+                        </MudGrid>
+
+                        <MudTable Items="_turnoverReport.Items" Class="mt-4" Hover="true" Striped="true" Dense="true">
+                            <HeaderContent>
+                                <MudTh>Período</MudTh>
+                                <MudTh>Funcionários Inicial</MudTh>
+                                <MudTh>Contratações</MudTh>
+                                <MudTh>Desligamentos</MudTh>
+                                <MudTh>Funcionários Final</MudTh>
+                                <MudTh>Taxa de Turnover</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Período">@context.Period</MudTd>
+                                <MudTd DataLabel="Funcionários Inicial">@context.EmployeesAtStart</MudTd>
+                                <MudTd DataLabel="Contratações"><MudText Color="Color.Success">@context.NewHires</MudText></MudTd>
+                                <MudTd DataLabel="Desligamentos"><MudText Color="Color.Error">@context.Terminations</MudText></MudTd>
+                                <MudTd DataLabel="Funcionários Final">@context.EmployeesAtEnd</MudTd>
+                                <MudTd DataLabel="Taxa de Turnover">@context.TurnoverRate.ToString("N2")%</MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    </MudCardContent>
+                </MudCard>
+            }
+        </MudTabPanel>
+
+        <!-- Headcount Tab -->
+        <MudTabPanel Text="Headcount" Icon="@Icons.Material.Filled.Group">
+            <MudCard Elevation="3" Class="mb-4">
+                <MudCardContent>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadHeadcountReport" StartIcon="@Icons.Material.Filled.Search">
+                        Gerar Relatório
+                    </MudButton>
+                </MudCardContent>
+            </MudCard>
+
+            @if (_loadingHeadcount)
+            {
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+            }
+
+            @if (_headcountReport != null)
+            {
+                <MudCard Elevation="3" Class="mb-4">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Relatório de Headcount</MudText>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small">
+                                <MudButton StartIcon="@Icons.Material.Filled.PictureAsPdf" OnClick='() => ExportReport("headcount", "pdf")' Color="Color.Error">
+                                    Exportar PDF
+                                </MudButton>
+                                <MudButton StartIcon="@Icons.Material.Filled.TableChart" OnClick='() => ExportReport("headcount", "excel")' Color="Color.Success">
+                                    Exportar Excel
+                                </MudButton>
+                            </MudButtonGroup>
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudGrid Class="mb-4">
+                            <MudItem xs="12" sm="4">
+                                <MudPaper Class="pa-4" Elevation="0">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">Total de Funcionários</MudText>
+                                    <MudText Typo="Typo.h5">@_headcountReport.Summary.TotalEmployees</MudText>
+                                </MudPaper>
+                            </MudItem>
+                            <MudItem xs="12" sm="4">
+                                <MudPaper Class="pa-4" Elevation="0">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Success">Departamentos</MudText>
+                                    <MudText Typo="Typo.h5">@_headcountReport.Summary.TotalDepartments</MudText>
+                                </MudPaper>
+                            </MudItem>
+                            <MudItem xs="12" sm="4">
+                                <MudPaper Class="pa-4" Elevation="0">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Info">Tempo Médio (anos)</MudText>
+                                    <MudText Typo="Typo.h5">@_headcountReport.Summary.AverageTenure.ToString("N1")</MudText>
+                                </MudPaper>
+                            </MudItem>
+                        </MudGrid>
+
+                        <MudGrid>
+                            <MudItem xs="12" md="4">
+                                <MudText Typo="Typo.h6" Class="mb-3">Por Departamento</MudText>
+                                <MudTable Items="_headcountReport.ByDepartment" Hover="true" Striped="true" Dense="true">
+                                    <HeaderContent>
+                                        <MudTh>Departamento</MudTh>
+                                        <MudTh>Funcionários</MudTh>
+                                        <MudTh>%</MudTh>
+                                    </HeaderContent>
+                                    <RowTemplate>
+                                        <MudTd DataLabel="Departamento">@context.Department</MudTd>
+                                        <MudTd DataLabel="Funcionários">@context.EmployeeCount</MudTd>
+                                        <MudTd DataLabel="%">@context.Percentage.ToString("N1")%</MudTd>
+                                    </RowTemplate>
+                                </MudTable>
+                            </MudItem>
+                            <MudItem xs="12" md="4">
+                                <MudText Typo="Typo.h6" Class="mb-3">Por Cargo</MudText>
+                                <MudTable Items="_headcountReport.ByPosition" Hover="true" Striped="true" Dense="true">
+                                    <HeaderContent>
+                                        <MudTh>Cargo</MudTh>
+                                        <MudTh>Funcionários</MudTh>
+                                        <MudTh>%</MudTh>
+                                    </HeaderContent>
+                                    <RowTemplate>
+                                        <MudTd DataLabel="Cargo">@context.Position</MudTd>
+                                        <MudTd DataLabel="Funcionários">@context.EmployeeCount</MudTd>
+                                        <MudTd DataLabel="%">@context.Percentage.ToString("N1")%</MudTd>
+                                    </RowTemplate>
+                                </MudTable>
+                            </MudItem>
+                            <MudItem xs="12" md="4">
+                                <MudText Typo="Typo.h6" Class="mb-3">Por Tipo de Contrato</MudText>
+                                <MudTable Items="_headcountReport.ByContractType" Hover="true" Striped="true" Dense="true">
+                                    <HeaderContent>
+                                        <MudTh>Tipo</MudTh>
+                                        <MudTh>Funcionários</MudTh>
+                                        <MudTh>%</MudTh>
+                                    </HeaderContent>
+                                    <RowTemplate>
+                                        <MudTd DataLabel="Tipo">@context.ContractType</MudTd>
+                                        <MudTd DataLabel="Funcionários">@context.EmployeeCount</MudTd>
+                                        <MudTd DataLabel="%">@context.Percentage.ToString("N1")%</MudTd>
+                                    </RowTemplate>
+                                </MudTable>
+                            </MudItem>
+                        </MudGrid>
+                    </MudCardContent>
+                </MudCard>
+            }
+        </MudTabPanel>
+    </MudTabs>
+</MudContainer>
+
+@code {
+    private HRReportFilterDto _attendanceFilter = new() { StartDate = DateTime.Now.AddMonths(-1), EndDate = DateTime.Now };
+    private HRReportFilterDto _turnoverFilter = new() { StartDate = DateTime.Now.AddYears(-1), EndDate = DateTime.Now };
+    private HRReportFilterDto _headcountFilter = new();
+    
+    private AttendanceReportDto? _attendanceReport;
+    private TurnoverReportDto? _turnoverReport;
+    private HeadcountReportDto? _headcountReport;
+    
+    private bool _loadingAttendance;
+    private bool _loadingTurnover;
+    private bool _loadingHeadcount;
+
+    private async Task LoadAttendanceReport()
+    {
+        try
+        {
+            _loadingAttendance = true;
+            _attendanceFilter.ReportType = "attendance";
+            var response = await ApiService.PostAsync<AttendanceReportDto>("/api/reports/hr/attendance", _attendanceFilter);
+            
+            if (response != null)
+            {
+                _attendanceReport = response;
+                Snackbar.Add("Relatório de presença gerado com sucesso!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Erro ao gerar relatório", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingAttendance = false;
+        }
+    }
+
+    private async Task LoadTurnoverReport()
+    {
+        try
+        {
+            _loadingTurnover = true;
+            _turnoverFilter.ReportType = "turnover";
+            var response = await ApiService.PostAsync<TurnoverReportDto>("/api/reports/hr/turnover", _turnoverFilter);
+            
+            if (response != null)
+            {
+                _turnoverReport = response;
+                Snackbar.Add("Relatório de turnover gerado com sucesso!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Erro ao gerar relatório", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingTurnover = false;
+        }
+    }
+
+    private async Task LoadHeadcountReport()
+    {
+        try
+        {
+            _loadingHeadcount = true;
+            _headcountFilter.ReportType = "headcount";
+            var response = await ApiService.PostAsync<HeadcountReportDto>("/api/reports/hr/headcount", _headcountFilter);
+            
+            if (response != null)
+            {
+                _headcountReport = response;
+                Snackbar.Add("Relatório de headcount gerado com sucesso!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Erro ao gerar relatório", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingHeadcount = false;
+        }
+    }
+
+    private async Task ExportReport(string reportType, string format)
+    {
+        try
+        {
+            var url = $"/api/reports/hr/{reportType}/export?ExportFormat={format}";
+            
+            switch (reportType)
+            {
+                case "attendance":
+                    url += $"&StartDate={_attendanceFilter.StartDate:yyyy-MM-dd}&EndDate={_attendanceFilter.EndDate:yyyy-MM-dd}";
+                    break;
+                case "turnover":
+                    url += $"&StartDate={_turnoverFilter.StartDate:yyyy-MM-dd}&EndDate={_turnoverFilter.EndDate:yyyy-MM-dd}";
+                    break;
+            }
+            
+            await JS.InvokeVoidAsync("open", url, "_blank");
+            Snackbar.Add($"Relatório exportado em {format.ToUpper()}!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+    }
+}

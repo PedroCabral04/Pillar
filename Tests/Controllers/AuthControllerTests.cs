@@ -4,6 +4,13 @@ using erp.Models.Identity;
 using erp.Services.Email;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Mvc;
+using Moq;
+using Xunit;
+using FluentAssertions;
 
 namespace erp.Tests.Controllers;
 
@@ -20,18 +27,45 @@ public class AuthControllerTests
 
     public AuthControllerTests()
     {
+        // Required collaborators for UserManager
         var userStore = new Mock<IUserStore<ApplicationUser>>();
-        _mockUserManager = new Mock<UserManager<ApplicationUser>>(
-            userStore.Object, null, null, null, null, null, null, null, null);
+        var identityOptions = new Mock<IOptions<IdentityOptions>>();
+        identityOptions.Setup(o => o.Value).Returns(new IdentityOptions());
+        var passwordHasher = new Mock<IPasswordHasher<ApplicationUser>>();
+        var userValidators = new List<IUserValidator<ApplicationUser>>();
+        var passwordValidators = new List<IPasswordValidator<ApplicationUser>>();
+        var keyNormalizer = new Mock<ILookupNormalizer>();
+        var errors = new IdentityErrorDescriber();
+        var services = new Mock<IServiceProvider>();
+        var userLogger = new Mock<ILogger<UserManager<ApplicationUser>>>();
 
-        var contextAccessor = new Mock<Microsoft.AspNetCore.Http.IHttpContextAccessor>();
+        _mockUserManager = new Mock<UserManager<ApplicationUser>>(
+            userStore.Object,
+            identityOptions.Object,
+            passwordHasher.Object,
+            userValidators,
+            passwordValidators,
+            keyNormalizer.Object,
+            errors,
+            services.Object,
+            userLogger.Object);
+
+        // Required collaborators for SignInManager
+        var contextAccessor = new Mock<IHttpContextAccessor>();
         var claimsFactory = new Mock<IUserClaimsPrincipalFactory<ApplicationUser>>();
+        var signInOptions = identityOptions; // reuse
+        var signInLogger = new Mock<ILogger<SignInManager<ApplicationUser>>>();
+        var schemes = new Mock<IAuthenticationSchemeProvider>();
+        var confirmation = new Mock<IUserConfirmation<ApplicationUser>>();
 
         _mockSignInManager = new Mock<SignInManager<ApplicationUser>>(
             _mockUserManager.Object,
             contextAccessor.Object,
             claimsFactory.Object,
-            null, null, null, null);
+            signInOptions.Object,
+            signInLogger.Object,
+            schemes.Object,
+            confirmation.Object);
 
         _mockEmailService = new Mock<IEmailService>();
         _mockLogger = new Mock<ILogger<AuthController>>();

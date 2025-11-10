@@ -1,0 +1,413 @@
+@page "/reports/financial"
+@attribute [Authorize]
+@using erp.DTOs.Reports
+@using erp.Services
+@using Microsoft.AspNetCore.Authorization
+@using Color = MudBlazor.Color
+@using Size = MudBlazor.Size
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+<PageTitle>Relatórios Financeiros - Pillar ERP</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h4" GutterBottom="true">
+        <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Class="mr-2" />
+        Relatórios Financeiros
+    </MudText>
+    <MudText Typo="Typo.body1" Class="mb-6">
+        Análise financeira completa com fluxo de caixa, DRE e balanço patrimonial.
+    </MudText>
+
+    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
+        <!-- Cash Flow Tab -->
+        <MudTabPanel Text="Fluxo de Caixa" Icon="@Icons.Material.Filled.TrendingUp">
+            <MudCard Elevation="3" Class="mb-4">
+                <MudCardContent>
+                    <MudGrid>
+                        <MudItem xs="12" md="6">
+                            <MudDatePicker Label="Data Início" @bind-Date="_cashFlowFilter.StartDate" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudDatePicker Label="Data Fim" @bind-Date="_cashFlowFilter.EndDate" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadCashFlowReport" StartIcon="@Icons.Material.Filled.Search">
+                                Gerar Relatório
+                            </MudButton>
+                        </MudItem>
+                    </MudGrid>
+                </MudCardContent>
+            </MudCard>
+
+            @if (_loadingCashFlow)
+            {
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+            }
+
+            @if (_cashFlowReport != null)
+            {
+                <MudCard Elevation="3" Class="mb-4">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Fluxo de Caixa</MudText>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small">
+                                <MudButton StartIcon="@Icons.Material.Filled.PictureAsPdf" OnClick='() => ExportReport("cash-flow", "pdf")' Color="Color.Error">
+                                    Exportar PDF
+                                </MudButton>
+                                <MudButton StartIcon="@Icons.Material.Filled.TableChart" OnClick='() => ExportReport("cash-flow", "excel")' Color="Color.Success">
+                                    Exportar Excel
+                                </MudButton>
+                            </MudButtonGroup>
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudGrid>
+                            <MudItem xs="12" sm="4">
+                                <MudPaper Class="pa-4" Elevation="0">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Success">Total Receitas</MudText>
+                                    <MudText Typo="Typo.h5">@_cashFlowReport.Summary.TotalRevenue.ToString("C2")</MudText>
+                                </MudPaper>
+                            </MudItem>
+                            <MudItem xs="12" sm="4">
+                                <MudPaper Class="pa-4" Elevation="0">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Error">Total Despesas</MudText>
+                                    <MudText Typo="Typo.h5">@_cashFlowReport.Summary.TotalExpenses.ToString("C2")</MudText>
+                                </MudPaper>
+                            </MudItem>
+                            <MudItem xs="12" sm="4">
+                                <MudPaper Class="pa-4" Elevation="0">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Info">Fluxo de Caixa Líquido</MudText>
+                                    <MudText Typo="Typo.h5">@_cashFlowReport.Summary.NetCashFlow.ToString("C2")</MudText>
+                                </MudPaper>
+                            </MudItem>
+                        </MudGrid>
+
+                        <MudTable Items="_cashFlowReport.Items" Class="mt-4" Hover="true" Striped="true" Dense="true">
+                            <HeaderContent>
+                                <MudTh>Data</MudTh>
+                                <MudTh>Descrição</MudTh>
+                                <MudTh>Tipo</MudTh>
+                                <MudTh>Categoria</MudTh>
+                                <MudTh>Valor</MudTh>
+                                <MudTh>Status</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Data">@context.Date.ToString("dd/MM/yyyy")</MudTd>
+                                <MudTd DataLabel="Descrição">@context.Description</MudTd>
+                                <MudTd DataLabel="Tipo">@context.Type</MudTd>
+                                <MudTd DataLabel="Categoria">@context.Category</MudTd>
+                                <MudTd DataLabel="Valor">
+                                    <MudText Color="@(context.Type == "Receita" ? Color.Success : Color.Error)">
+                                        @context.Amount.ToString("C2")
+                                    </MudText>
+                                </MudTd>
+                                <MudTd DataLabel="Status">@context.Status</MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    </MudCardContent>
+                </MudCard>
+            }
+        </MudTabPanel>
+
+        <!-- P&L Tab -->
+        <MudTabPanel Text="DRE (P&L)" Icon="@Icons.Material.Filled.Receipt">
+            <MudCard Elevation="3" Class="mb-4">
+                <MudCardContent>
+                    <MudGrid>
+                        <MudItem xs="12" md="6">
+                            <MudDatePicker Label="Data Início" @bind-Date="_profitLossFilter.StartDate" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudDatePicker Label="Data Fim" @bind-Date="_profitLossFilter.EndDate" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadProfitLossReport" StartIcon="@Icons.Material.Filled.Search">
+                                Gerar Relatório
+                            </MudButton>
+                        </MudItem>
+                    </MudGrid>
+                </MudCardContent>
+            </MudCard>
+
+            @if (_loadingProfitLoss)
+            {
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+            }
+
+            @if (_profitLossReport != null)
+            {
+                <MudCard Elevation="3" Class="mb-4">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Demonstrativo de Resultados (DRE)</MudText>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small">
+                                <MudButton StartIcon="@Icons.Material.Filled.PictureAsPdf" OnClick='() => ExportReport("profit-loss", "pdf")' Color="Color.Error">
+                                    Exportar PDF
+                                </MudButton>
+                                <MudButton StartIcon="@Icons.Material.Filled.TableChart" OnClick='() => ExportReport("profit-loss", "excel")' Color="Color.Success">
+                                    Exportar Excel
+                                </MudButton>
+                            </MudButtonGroup>
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudSimpleTable Striped="true" Hover="true" Dense="true">
+                            <tbody>
+                                <tr>
+                                    <td><strong>Receitas Operacionais</strong></td>
+                                    <td class="text-end"><strong>@_profitLossReport.TotalRevenue.ToString("C2")</strong></td>
+                                </tr>
+                                <tr>
+                                    <td class="pl-4">Receita de Vendas</td>
+                                    <td class="text-end">@_profitLossReport.TotalRevenue.ToString("C2")</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Custos e Despesas</strong></td>
+                                    <td class="text-end"><strong>@_profitLossReport.OperatingExpenses.ToString("C2")</strong></td>
+                                </tr>
+                                @foreach (var category in _profitLossReport.ExpensesByCategory)
+                                {
+                                    <tr>
+                                        <td class="pl-4">@category.Category</td>
+                                        <td class="text-end">@category.Amount.ToString("C2")</td>
+                                    </tr>
+                                }
+                                <tr style="border-top: 2px solid;">
+                                    <td><strong>Lucro Líquido</strong></td>
+                                    <td class="text-end">
+                                        <MudText Color="@(_profitLossReport.NetIncome >= 0 ? Color.Success : Color.Error)" Typo="Typo.h6">
+                                            <strong>@_profitLossReport.NetIncome.ToString("C2")</strong>
+                                        </MudText>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Margem Líquida</strong></td>
+                                    <td class="text-end"><strong>@_profitLossReport.NetProfitMargin.ToString("P2")</strong></td>
+                                </tr>
+                            </tbody>
+                        </MudSimpleTable>
+                    </MudCardContent>
+                </MudCard>
+            }
+        </MudTabPanel>
+
+        <!-- Balance Sheet Tab -->
+        <MudTabPanel Text="Balanço Patrimonial" Icon="@Icons.Material.Filled.Balance">
+            <MudCard Elevation="3" Class="mb-4">
+                <MudCardContent>
+                    <MudGrid>
+                        <MudItem xs="12" md="12">
+                            <MudDatePicker Label="Data de Referência" @bind-Date="_balanceSheetFilter.StartDate" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadBalanceSheetReport" StartIcon="@Icons.Material.Filled.Search">
+                                Gerar Relatório
+                            </MudButton>
+                        </MudItem>
+                    </MudGrid>
+                </MudCardContent>
+            </MudCard>
+
+            @if (_loadingBalanceSheet)
+            {
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+            }
+
+            @if (_balanceSheetReport != null)
+            {
+                <MudCard Elevation="3" Class="mb-4">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Balanço Patrimonial</MudText>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small">
+                                <MudButton StartIcon="@Icons.Material.Filled.PictureAsPdf" OnClick='() => ExportReport("balance-sheet", "pdf")' Color="Color.Error">
+                                    Exportar PDF
+                                </MudButton>
+                                <MudButton StartIcon="@Icons.Material.Filled.TableChart" OnClick='() => ExportReport("balance-sheet", "excel")' Color="Color.Success">
+                                    Exportar Excel
+                                </MudButton>
+                            </MudButtonGroup>
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudGrid>
+                            <MudItem xs="12" md="6">
+                                <MudText Typo="Typo.h6" Class="mb-3">Ativos</MudText>
+                                <MudSimpleTable Striped="true" Dense="true">
+                                    <tbody>
+                                        <tr>
+                                            <td><strong>Total Ativos</strong></td>
+                                            <td class="text-end"><strong>@_balanceSheetReport.TotalAssets.ToString("C2")</strong></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="pl-4">Ativos Circulantes</td>
+                                            <td class="text-end">@_balanceSheetReport.CurrentAssets.ToString("C2")</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="pl-4">Ativos Fixos</td>
+                                            <td class="text-end">@_balanceSheetReport.FixedAssets.ToString("C2")</td>
+                                        </tr>
+                                    </tbody>
+                                </MudSimpleTable>
+                            </MudItem>
+                            <MudItem xs="12" md="6">
+                                <MudText Typo="Typo.h6" Class="mb-3">Passivos e Patrimônio</MudText>
+                                <MudSimpleTable Striped="true" Dense="true">
+                                    <tbody>
+                                        <tr>
+                                            <td><strong>Total Passivos</strong></td>
+                                            <td class="text-end"><strong>@_balanceSheetReport.TotalLiabilities.ToString("C2")</strong></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="pl-4">Passivos Circulantes</td>
+                                            <td class="text-end">@_balanceSheetReport.CurrentLiabilities.ToString("C2")</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="pl-4">Passivos de Longo Prazo</td>
+                                            <td class="text-end">@_balanceSheetReport.LongTermLiabilities.ToString("C2")</td>
+                                        </tr>
+                                        <tr style="border-top: 2px solid;">
+                                            <td><strong>Patrimônio Líquido</strong></td>
+                                            <td class="text-end"><strong>@_balanceSheetReport.Equity.ToString("C2")</strong></td>
+                                        </tr>
+                                    </tbody>
+                                </MudSimpleTable>
+                            </MudItem>
+                        </MudGrid>
+                    </MudCardContent>
+                </MudCard>
+            }
+        </MudTabPanel>
+    </MudTabs>
+</MudContainer>
+
+@code {
+    private FinancialReportFilterDto _cashFlowFilter = new() { StartDate = DateTime.Now.AddMonths(-3), EndDate = DateTime.Now };
+    private FinancialReportFilterDto _profitLossFilter = new() { StartDate = DateTime.Now.AddMonths(-3), EndDate = DateTime.Now };
+    private FinancialReportFilterDto _balanceSheetFilter = new() { StartDate = DateTime.Now };
+    
+    private CashFlowReportDto? _cashFlowReport;
+    private ProfitLossReportDto? _profitLossReport;
+    private BalanceSheetReportDto? _balanceSheetReport;
+    
+    private bool _loadingCashFlow;
+    private bool _loadingProfitLoss;
+    private bool _loadingBalanceSheet;
+
+    private async Task LoadCashFlowReport()
+    {
+        try
+        {
+            _loadingCashFlow = true;
+            var response = await ApiService.PostAsync<CashFlowReportDto>("/api/reports/financial/cash-flow", _cashFlowFilter);
+            
+            if (response != null)
+            {
+                _cashFlowReport = response;
+                Snackbar.Add("Relatório de fluxo de caixa gerado com sucesso!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Erro ao gerar relatório", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingCashFlow = false;
+        }
+    }
+
+    private async Task LoadProfitLossReport()
+    {
+        try
+        {
+            _loadingProfitLoss = true;
+            var response = await ApiService.PostAsync<ProfitLossReportDto>("/api/reports/financial/profit-loss", _profitLossFilter);
+            
+            if (response != null)
+            {
+                _profitLossReport = response;
+                Snackbar.Add("Relatório DRE gerado com sucesso!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Erro ao gerar relatório", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingProfitLoss = false;
+        }
+    }
+
+    private async Task LoadBalanceSheetReport()
+    {
+        try
+        {
+            _loadingBalanceSheet = true;
+            var response = await ApiService.PostAsync<BalanceSheetReportDto>("/api/reports/financial/balance-sheet", _balanceSheetFilter);
+            
+            if (response != null)
+            {
+                _balanceSheetReport = response;
+                Snackbar.Add("Balanço patrimonial gerado com sucesso!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Erro ao gerar relatório", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingBalanceSheet = false;
+        }
+    }
+
+    private async Task ExportReport(string reportType, string format)
+    {
+        try
+        {
+            var url = $"/api/reports/financial/{reportType}/export?ExportFormat={format}";
+            
+            switch (reportType)
+            {
+                case "cash-flow":
+                    url += $"&StartDate={_cashFlowFilter.StartDate:yyyy-MM-dd}&EndDate={_cashFlowFilter.EndDate:yyyy-MM-dd}";
+                    break;
+                case "profit-loss":
+                    url += $"&StartDate={_profitLossFilter.StartDate:yyyy-MM-dd}&EndDate={_profitLossFilter.EndDate:yyyy-MM-dd}";
+                    break;
+                case "balance-sheet":
+                    url += $"&StartDate={_balanceSheetFilter.StartDate:yyyy-MM-dd}";
+                    break;
+            }
+            
+            await JS.InvokeVoidAsync("open", url, "_blank");
+            Snackbar.Add($"Relatório exportado em {format.ToUpper()}!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+    }
+}
