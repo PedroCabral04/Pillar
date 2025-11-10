@@ -1,9 +1,10 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using erp.Models.Audit;
 
 namespace erp.Models.Identity;
 
-public class Position
+public class Position : IAuditable
 {
     public int Id { get; set; }
     

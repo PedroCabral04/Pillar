@@ -177,7 +177,9 @@
                     CostCenter = _model.CostCenter,
                     IsActive = _model.IsActive
                 };
-                await ApiService.PutAsync<DepartmentDto>($"api/departments/{DepartmentId}", updateDto);
+                // PUT retorna NoContent (204), então usamos PutAsJsonAsync
+                var response = await ApiService.PutAsJsonAsync($"api/departments/{DepartmentId}", updateDto);
+                response.EnsureSuccessStatusCode();
             }
             else
             {

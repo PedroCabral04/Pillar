@@ -1,13 +1,14 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
 using erp.Models.Identity;
+using erp.Models.Audit;
 
 namespace erp.Models.Sales;
 
 /// <summary>
 /// Represents a sale transaction
 /// </summary>
-public class Sale
+public class Sale : IAuditable
 {
     public int Id { get; set; }
     

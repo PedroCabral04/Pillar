@@ -106,7 +106,15 @@ builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
         return Task.CompletedTask;
     };
     });
-builder.Services.AddControllers();
+
+// Registra o filtro de auditoria de leitura
+builder.Services.AddScoped<erp.Security.AuditReadActionFilter>();
+
+builder.Services.AddControllers(options =>
+{
+    // Adiciona o filtro globalmente para interceptar [AuditRead]
+    options.Filters.AddService<erp.Security.AuditReadActionFilter>();
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddHttpContextAccessor();
@@ -198,6 +206,9 @@ builder.Services.AddScoped<erp.Services.Inventory.IStockCountService, erp.Servic
 // Sales services
 builder.Services.AddScoped<erp.Services.Sales.ICustomerService, erp.Services.Sales.CustomerService>();
 builder.Services.AddScoped<erp.Services.Sales.ISalesService, erp.Services.Sales.SalesService>();
+
+// Audit services
+builder.Services.AddScoped<erp.Services.Audit.IAuditService, erp.Services.Audit.AuditService>();
 
 // Chatbot services
 builder.Services.AddScoped<erp.Services.Chatbot.IChatbotService, erp.Services.Chatbot.ChatbotService>();

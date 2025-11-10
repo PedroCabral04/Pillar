@@ -1,0 +1,292 @@
+@page "/audit"
+@using erp.DTOs.Audit
+@using erp.Services
+@using erp.Services.Audit
+@using MudColor = MudBlazor.Color
+@using MudSize = MudBlazor.Size
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@attribute [Authorize]
+
+<PageTitle>Auditoria</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-4">
+        <MudIcon Icon="@Icons.Material.Filled.History" Class="mr-2" />
+        Sistema de Auditoria
+    </MudText>
+
+    <MudCard Class="mb-4">
+        <MudCardContent>
+            <MudGrid>
+                <MudItem xs="12" md="3">
+                    <MudTextField @bind-Value="_filter.EntityName" 
+                                  Label="Nome da Entidade" 
+                                  Variant="Variant.Outlined"
+                                  Placeholder="Ex: Product, Customer"
+                                  Clearable="true" />
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudTextField @bind-Value="_filter.EntityId" 
+                                  Label="ID da Entidade" 
+                                  Variant="Variant.Outlined"
+                                  Clearable="true" />
+                </MudItem>
+                <MudItem xs="12" md="2">
+                    <MudSelect @bind-Value="_filter.Action" 
+                               Label="Ação" 
+                               Variant="Variant.Outlined"
+                               Clearable="true">
+                        <MudSelectItem Value="@("Create")">Criar</MudSelectItem>
+                        <MudSelectItem Value="@("Update")">Atualizar</MudSelectItem>
+                        <MudSelectItem Value="@("Delete")">Deletar</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="2">
+                    <MudDatePicker @bind-Date="_startDate" 
+                                   Label="Data Inicial" 
+                                   Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" md="2">
+                    <MudDatePicker @bind-Date="_endDate" 
+                                   Label="Data Final" 
+                                   Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" Class="d-flex gap-2">
+                    <MudButton Variant="Variant.Filled" 
+                               Color="MudColor.Primary" 
+                               OnClick="SearchLogs"
+                               StartIcon="@Icons.Material.Filled.Search">
+                        Buscar
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" 
+                               Color="MudColor.Secondary" 
+                               OnClick="ClearFilters"
+                               StartIcon="@Icons.Material.Filled.Clear">
+                        Limpar
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" 
+                               Color="MudColor.Info" 
+                               OnClick="LoadStatistics"
+                               StartIcon="@Icons.Material.Filled.Analytics">
+                        Estatísticas
+                    </MudButton>
+                </MudItem>
+            </MudGrid>
+        </MudCardContent>
+    </MudCard>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Color="MudColor.Primary" Indeterminate="true" />
+    }
+
+    <MudCard>
+        <MudCardContent>
+            <MudTable Items="_logs" 
+                      Dense="true" 
+                      Hover="true" 
+                      Loading="_loading"
+                      LoadingProgressColor="MudColor.Primary">
+                <HeaderContent>
+                    <MudTh>Data/Hora</MudTh>
+                    <MudTh>Entidade</MudTh>
+                    <MudTh>ID</MudTh>
+                    <MudTh>Ação</MudTh>
+                    <MudTh>Usuário</MudTh>
+                    <MudTh>IP</MudTh>
+                    <MudTh>Ações</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Data/Hora">
+                        @context.Timestamp.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")
+                    </MudTd>
+                    <MudTd DataLabel="Entidade">
+                        <MudChip T="string" Size="MudSize.Small" Color="MudColor.Info">@context.EntityName</MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="ID">@context.EntityId</MudTd>
+                    <MudTd DataLabel="Ação">
+                        <MudChip T="string" Size="MudSize.Small" Color="@GetActionColor(context.Action)">
+                            @GetActionText(context.Action)
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Usuário">
+                        @(context.UserName ?? "Sistema")
+                    </MudTd>
+                    <MudTd DataLabel="IP">@context.IpAddress</MudTd>
+                    <MudTd DataLabel="Ações">
+                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
+                                       Size="MudSize.Small" 
+                                       Color="MudColor.Primary"
+                                       OnClick="@(() => ShowDetails(context))" />
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText>Nenhum registro de auditoria encontrado</MudText>
+                </NoRecordsContent>
+            </MudTable>
+            
+            @if (_pagedResult != null && _pagedResult.TotalPages > 1)
+            {
+                <MudPagination Class="mt-4" 
+                               Count="_pagedResult.TotalPages" 
+                               Selected="_filter.PageNumber"
+                               SelectedChanged="OnPageChanged"
+                               ShowFirstButton="true"
+                               ShowLastButton="true" />
+            }
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+@code {
+    private AuditLogFilterDto _filter = new();
+    private List<AuditLogDto> _logs = new();
+    private AuditLogPagedResultDto? _pagedResult;
+    private bool _loading;
+    private DateTime? _startDate;
+    private DateTime? _endDate;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRecentLogs();
+    }
+
+    private async Task LoadRecentLogs()
+    {
+        _loading = true;
+        try
+        {
+            var response = await ApiService.GetAsync<List<AuditLogDto>>("api/audit/recent?limit=50");
+            if (response != null)
+            {
+                _logs = response;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar logs: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SearchLogs()
+    {
+        _loading = true;
+        try
+        {
+            _filter.StartDate = _startDate;
+            _filter.EndDate = _endDate;
+            
+            var response = await ApiService.PostAsync<AuditLogPagedResultDto>(
+                "api/audit/search", _filter);
+            
+            if (response != null)
+            {
+                _pagedResult = response;
+                _logs = response.Items;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao buscar logs: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OnPageChanged(int page)
+    {
+        _filter.PageNumber = page;
+        await SearchLogs();
+    }
+
+    private async Task ClearFilters()
+    {
+        _filter = new AuditLogFilterDto { PageNumber = 1, PageSize = 50 };
+        _startDate = null;
+        _endDate = null;
+        await LoadRecentLogs();
+    }
+
+    private async Task LoadStatistics()
+    {
+        _loading = true;
+        try
+        {
+            var queryParams = "";
+            if (_startDate.HasValue)
+                queryParams += $"?startDate={_startDate.Value:yyyy-MM-dd}";
+            if (_endDate.HasValue)
+                queryParams += $"{(queryParams.Length > 0 ? "&" : "?")}endDate={_endDate.Value:yyyy-MM-dd}";
+                
+            var response = await ApiService.GetAsync<AuditStatisticsDto>($"api/audit/statistics{queryParams}");
+            if (response != null)
+            {
+                await ShowStatisticsDialog(response);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar estatísticas: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ShowStatisticsDialog(AuditStatisticsDto stats)
+    {
+        var topEntities = string.Join(", ", stats.TopEntities.Take(5).Select(e => $"{e.EntityName}: {e.ActivityCount}"));
+        var topUsers = string.Join(", ", stats.TopUsers.Take(5).Select(u => $"{u.UserName}: {u.ActivityCount}"));
+        
+        var message = $"Total: {stats.TotalLogs} | Criações: {stats.TotalCreates} | Atualizações: {stats.TotalUpdates} | Exclusões: {stats.TotalDeletes}";
+
+        await Task.CompletedTask;
+        Snackbar.Add(message, Severity.Info);
+    }
+
+    private async Task ShowDetails(AuditLogDto log)
+    {
+        var parameters = new DialogParameters<Components.Shared.Dialogs.AuditDetailsDialog>
+        {
+            { x => x.AuditLog, log }
+        };
+
+        var options = new DialogOptions 
+        { 
+            MaxWidth = MaxWidth.Large, 
+            FullWidth = true,
+            CloseButton = true,
+            BackdropClick = true
+        };
+
+        await DialogService.ShowAsync<Components.Shared.Dialogs.AuditDetailsDialog>(
+            $"Detalhes da Auditoria", 
+            parameters, 
+            options);
+    }
+
+    private MudColor GetActionColor(string action) => action switch
+    {
+        "Create" => MudColor.Success,
+        "Update" => MudColor.Info,
+        "Delete" => MudColor.Error,
+        _ => MudColor.Default
+    };
+
+    private string GetActionText(string action) => action switch
+    {
+        "Create" => "Criação",
+        "Update" => "Atualização",
+        "Delete" => "Exclusão",
+        _ => action
+    };
+}

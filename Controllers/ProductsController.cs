@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using erp.Services.Inventory;
 using erp.DTOs.Inventory;
+using erp.Models.Audit;
 
 namespace erp.Controllers;
 
@@ -84,6 +85,7 @@ public class ProductsController : ControllerBase
     /// Busca produto por ID
     /// </summary>
     [HttpGet("{id:int}")]
+    [AuditRead("Product", DataSensitivity.Low, Description = "Visualização de detalhes do produto (preços, estoque)")]
     public async Task<ActionResult<ProductDto>> GetProductById(int id)
     {
         try

@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Identity;
 using erp.Models.Identity;
 using Microsoft.EntityFrameworkCore;
 using erp.Data;
+using erp.Models.Audit;
 
 namespace erp.Controllers
 {
@@ -98,6 +99,7 @@ namespace erp.Controllers
         [HttpGet("{id}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [AuditRead("ApplicationUser", DataSensitivity.High, Description = "Visualização de dados pessoais do usuário (CPF, RG, dados bancários)")]
         public async Task<ActionResult<UserDto>> GetUserById(int id)
         {
             var user = await _users.Users
@@ -178,7 +180,9 @@ namespace erp.Controllers
                 FullName = createUserDto.FullName,
                 Cpf = createUserDto.Cpf,
                 Rg = createUserDto.Rg,
-                DateOfBirth = createUserDto.DateOfBirth,
+                DateOfBirth = createUserDto.DateOfBirth.HasValue 
+                    ? DateTime.SpecifyKind(createUserDto.DateOfBirth.Value, DateTimeKind.Utc)
+                    : null,
                 Gender = createUserDto.Gender,
                 MaritalStatus = createUserDto.MaritalStatus,
                 PostalCode = createUserDto.PostalCode,
@@ -192,7 +196,9 @@ namespace erp.Controllers
                 DepartmentId = createUserDto.DepartmentId,
                 PositionId = createUserDto.PositionId,
                 Salary = createUserDto.Salary,
-                HireDate = createUserDto.HireDate,
+                HireDate = createUserDto.HireDate.HasValue
+                    ? DateTime.SpecifyKind(createUserDto.HireDate.Value, DateTimeKind.Utc)
+                    : null,
                 ContractType = createUserDto.ContractType,
                 EmploymentStatus = createUserDto.EmploymentStatus ?? "Ativo",
                 BankCode = createUserDto.BankCode,
@@ -255,7 +261,9 @@ namespace erp.Controllers
             user.FullName = updateUserDto.FullName;
             user.Cpf = updateUserDto.Cpf;
             user.Rg = updateUserDto.Rg;
-            user.DateOfBirth = updateUserDto.DateOfBirth;
+            user.DateOfBirth = updateUserDto.DateOfBirth.HasValue 
+                ? DateTime.SpecifyKind(updateUserDto.DateOfBirth.Value, DateTimeKind.Utc)
+                : null;
             user.Gender = updateUserDto.Gender;
             user.MaritalStatus = updateUserDto.MaritalStatus;
             user.ProfilePhotoUrl = updateUserDto.ProfilePhotoUrl;
@@ -270,8 +278,12 @@ namespace erp.Controllers
             user.DepartmentId = updateUserDto.DepartmentId;
             user.PositionId = updateUserDto.PositionId;
             user.Salary = updateUserDto.Salary;
-            user.HireDate = updateUserDto.HireDate;
-            user.TerminationDate = updateUserDto.TerminationDate;
+            user.HireDate = updateUserDto.HireDate.HasValue
+                ? DateTime.SpecifyKind(updateUserDto.HireDate.Value, DateTimeKind.Utc)
+                : null;
+            user.TerminationDate = updateUserDto.TerminationDate.HasValue
+                ? DateTime.SpecifyKind(updateUserDto.TerminationDate.Value, DateTimeKind.Utc)
+                : null;
             user.ContractType = updateUserDto.ContractType;
             user.EmploymentStatus = updateUserDto.EmploymentStatus;
             user.BankCode = updateUserDto.BankCode;

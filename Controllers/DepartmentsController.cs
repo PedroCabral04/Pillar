@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using erp.Data;
 using erp.Models.Identity;
+using erp.Models.Audit;
 
 namespace erp.Controllers;
 
@@ -51,6 +52,7 @@ public class DepartmentsController : ControllerBase
     [HttpGet("{id}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [AuditRead("Department", DataSensitivity.Medium, Description = "Visualização de informações do departamento e funcionários")]
     public async Task<ActionResult<DepartmentDto>> GetDepartmentById(int id)
     {
         var department = await _context.Departments
