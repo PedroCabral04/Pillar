@@ -39,6 +39,22 @@ public interface IAssetDao
     Task<AssetCategory> CreateCategoryAsync(AssetCategory category);
     Task<AssetCategory> UpdateCategoryAsync(AssetCategory category);
     Task DeleteCategoryAsync(int id);
+    
+    // Document methods
+    Task<AssetDocument?> GetDocumentByIdAsync(int id);
+    Task<List<AssetDocument>> GetDocumentsByAssetIdAsync(int assetId);
+    Task<List<AssetDocument>> GetDocumentsByTypeAsync(int assetId, AssetDocumentType type);
+    Task<AssetDocument> CreateDocumentAsync(AssetDocument document);
+    Task<AssetDocument> UpdateDocumentAsync(AssetDocument document);
+    Task DeleteDocumentAsync(int id);
+    
+    // Transfer methods
+    Task<AssetTransfer?> GetTransferByIdAsync(int id);
+    Task<List<AssetTransfer>> GetTransferHistoryForAssetAsync(int assetId);
+    Task<List<AssetTransfer>> GetPendingTransfersAsync();
+    Task<List<AssetTransfer>> GetTransfersByStatusAsync(TransferStatus status);
+    Task<AssetTransfer> CreateTransferAsync(AssetTransfer transfer);
+    Task<AssetTransfer> UpdateTransferAsync(AssetTransfer transfer);
 }
 
 public class AssetDao : IAssetDao
@@ -298,5 +314,128 @@ public class AssetDao : IAssetDao
             category.IsActive = false;
             await _context.SaveChangesAsync();
         }
+    }
+    
+    // ============= Document Methods =============
+    
+    public async Task<AssetDocument?> GetDocumentByIdAsync(int id)
+    {
+        return await _context.AssetDocuments
+            .Include(d => d.Asset)
+            .Include(d => d.UploadedByUser)
+            .FirstOrDefaultAsync(d => d.Id == id);
+    }
+    
+    public async Task<List<AssetDocument>> GetDocumentsByAssetIdAsync(int assetId)
+    {
+        return await _context.AssetDocuments
+            .Include(d => d.UploadedByUser)
+            .Where(d => d.AssetId == assetId)
+            .OrderByDescending(d => d.CreatedAt)
+            .ToListAsync();
+    }
+    
+    public async Task<List<AssetDocument>> GetDocumentsByTypeAsync(int assetId, AssetDocumentType type)
+    {
+        return await _context.AssetDocuments
+            .Include(d => d.UploadedByUser)
+            .Where(d => d.AssetId == assetId && d.Type == type)
+            .OrderByDescending(d => d.CreatedAt)
+            .ToListAsync();
+    }
+    
+    public async Task<AssetDocument> CreateDocumentAsync(AssetDocument document)
+    {
+        _context.AssetDocuments.Add(document);
+        await _context.SaveChangesAsync();
+        return document;
+    }
+    
+    public async Task<AssetDocument> UpdateDocumentAsync(AssetDocument document)
+    {
+        document.UpdatedAt = DateTime.UtcNow;
+        _context.AssetDocuments.Update(document);
+        await _context.SaveChangesAsync();
+        return document;
+    }
+    
+    public async Task DeleteDocumentAsync(int id)
+    {
+        var document = await _context.AssetDocuments.FindAsync(id);
+        if (document != null)
+        {
+            _context.AssetDocuments.Remove(document);
+            await _context.SaveChangesAsync();
+        }
+    }
+    
+    // ============= Transfer Methods =============
+    
+    public async Task<AssetTransfer?> GetTransferByIdAsync(int id)
+    {
+        return await _context.AssetTransfers
+            .Include(t => t.Asset)
+            .Include(t => t.FromDepartment)
+            .Include(t => t.ToDepartment)
+            .Include(t => t.RequestedByUser)
+            .Include(t => t.ApprovedByUser)
+            .Include(t => t.CompletedByUser)
+            .FirstOrDefaultAsync(t => t.Id == id);
+    }
+    
+    public async Task<List<AssetTransfer>> GetTransferHistoryForAssetAsync(int assetId)
+    {
+        return await _context.AssetTransfers
+            .Include(t => t.FromDepartment)
+            .Include(t => t.ToDepartment)
+            .Include(t => t.RequestedByUser)
+            .Include(t => t.ApprovedByUser)
+            .Include(t => t.CompletedByUser)
+            .Where(t => t.AssetId == assetId)
+            .OrderByDescending(t => t.TransferDate)
+            .ToListAsync();
+    }
+    
+    public async Task<List<AssetTransfer>> GetPendingTransfersAsync()
+    {
+        return await _context.AssetTransfers
+            .Include(t => t.Asset)
+                .ThenInclude(a => a.Category)
+            .Include(t => t.FromDepartment)
+            .Include(t => t.ToDepartment)
+            .Include(t => t.RequestedByUser)
+            .Where(t => t.Status == TransferStatus.Pending)
+            .OrderBy(t => t.TransferDate)
+            .ToListAsync();
+    }
+    
+    public async Task<List<AssetTransfer>> GetTransfersByStatusAsync(TransferStatus status)
+    {
+        return await _context.AssetTransfers
+            .Include(t => t.Asset)
+                .ThenInclude(a => a.Category)
+            .Include(t => t.FromDepartment)
+            .Include(t => t.ToDepartment)
+            .Include(t => t.RequestedByUser)
+            .Include(t => t.ApprovedByUser)
+            .Include(t => t.CompletedByUser)
+            .Where(t => t.Status == status)
+            .OrderByDescending(t => t.TransferDate)
+            .ToListAsync();
+    }
+    
+    public async Task<AssetTransfer> CreateTransferAsync(AssetTransfer transfer)
+    {
+        _context.AssetTransfers.Add(transfer);
+        await _context.SaveChangesAsync();
+        return transfer;
+    }
+    
+    public async Task<AssetTransfer> UpdateTransferAsync(AssetTransfer transfer)
+    {
+        transfer.UpdatedAt = DateTime.UtcNow;
+        _context.AssetTransfers.Update(transfer);
+        await _context.SaveChangesAsync();
+        return transfer;
     }
 }

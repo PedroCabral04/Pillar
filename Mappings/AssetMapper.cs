@@ -46,4 +46,27 @@ public partial class AssetMapper
     public partial AssetMaintenance CreateDtoToMaintenance(CreateAssetMaintenanceDto dto);
     
     public partial void UpdateMaintenanceFromDto(UpdateAssetMaintenanceDto dto, AssetMaintenance maintenance);
+    
+    // ============= Document Mappings =============
+    
+    [MapProperty(nameof(AssetDocument.Asset.Name), nameof(AssetDocumentDto.AssetName))]
+    [MapProperty(nameof(AssetDocument.UploadedByUser.FullName), nameof(AssetDocumentDto.UploadedByUserName))]
+    public partial AssetDocumentDto DocumentToDto(AssetDocument document);
+    
+    public partial AssetDocument CreateDtoToDocument(CreateAssetDocumentDto dto);
+    
+    public partial void UpdateDocumentFromDto(UpdateAssetDocumentDto dto, AssetDocument document);
+    
+    // ============= Transfer Mappings =============
+    
+    [MapProperty(nameof(AssetTransfer.Asset.Name), nameof(AssetTransferDto.AssetName))]
+    [MapProperty(nameof(AssetTransfer.Asset.AssetCode), nameof(AssetTransferDto.AssetCode))]
+    [MapProperty(nameof(AssetTransfer.FromDepartment.Name), nameof(AssetTransferDto.FromDepartmentName))]
+    [MapProperty(nameof(AssetTransfer.ToDepartment.Name), nameof(AssetTransferDto.ToDepartmentName))]
+    [MapProperty(nameof(AssetTransfer.RequestedByUser.FullName), nameof(AssetTransferDto.RequestedByUserName))]
+    [MapProperty(nameof(AssetTransfer.ApprovedByUser.FullName), nameof(AssetTransferDto.ApprovedByUserName))]
+    [MapProperty(nameof(AssetTransfer.CompletedByUser.FullName), nameof(AssetTransferDto.CompletedByUserName))]
+    public partial AssetTransferDto TransferToDto(AssetTransfer transfer);
+    
+    public partial AssetTransfer CreateDtoToTransfer(CreateAssetTransferDto dto);
 }

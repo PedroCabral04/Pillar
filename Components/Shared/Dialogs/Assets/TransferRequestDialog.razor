@@ -1,0 +1,230 @@
+@using erp.DTOs.Assets
+@using erp.Services
+@using erp.Models
+@using MudBlazor
+@using Size = MudBlazor.Size
+@using Color = MudBlazor.Color
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+@inject ILogger<TransferRequestDialog> Logger
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" Model="@_model" Validation="@(new Func<object, string, Task<IEnumerable<string>>>(ValidateValue))">
+            <MudGrid>
+                <MudItem xs="12">
+                    <MudText Typo="Typo.h6" Class="mb-2">Solicitar Transferência de Ativo</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                        Preencha os dados para solicitar a transferência de <strong>@AssetName</strong>
+                    </MudText>
+                </MudItem>
+
+                @if (_currentAsset != null)
+                {
+                    <MudItem xs="12">
+                        <MudAlert Severity="Severity.Info" Dense="true">
+                            <MudText Typo="Typo.body2">
+                                <strong>Localização Atual:</strong> @_currentAsset.Location
+                            </MudText>
+                        </MudAlert>
+                    </MudItem>
+                }
+
+                <!-- New Location -->
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_model.ToLocation" 
+                                  Label="Nova Localização" 
+                                  Required="true"
+                                  Immediate="true"
+                                  Variant="Variant.Outlined"
+                                  Placeholder="Ex: Sala 201, Andar 3"/>
+                </MudItem>
+
+                <!-- Department (Optional) -->
+                <MudItem xs="12" md="6">
+                    <MudSelect @bind-Value="_model.ToDepartmentId" 
+                               Label="Departamento (Opcional)"
+                               Variant="Variant.Outlined"
+                               Clearable="true">
+                        @foreach (var dept in _departments)
+                        {
+                            <MudSelectItem Value="@dept.Id">@dept.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <!-- Transfer Date -->
+                <MudItem xs="12" md="6">
+                    <MudDatePicker @bind-Date="_transferDate" 
+                                   Label="Data da Transferência" 
+                                   Required="true"
+                                   MinDate="@DateTime.Today"
+                                   Variant="Variant.Outlined"
+                                   DateFormat="dd/MM/yyyy"/>
+                </MudItem>
+
+                <!-- Asset Condition -->
+                <MudItem xs="12" md="6">
+                    <MudSelect @bind-Value="_model.Condition" 
+                               Label="Condição do Ativo" 
+                               Required="true"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem Value="@AssetCondition.Excellent">Excelente</MudSelectItem>
+                        <MudSelectItem Value="@AssetCondition.Good">Bom</MudSelectItem>
+                        <MudSelectItem Value="@AssetCondition.Fair">Regular</MudSelectItem>
+                        <MudSelectItem Value="@AssetCondition.Poor">Ruim</MudSelectItem>
+                        <MudSelectItem Value="@AssetCondition.Damaged">Danificado</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                <!-- Reason -->
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_model.Reason" 
+                                  Label="Motivo da Transferência"
+                                  Lines="2"
+                                  Variant="Variant.Outlined"
+                                  Placeholder="Ex: Realocação de equipe, mudança de departamento..."/>
+                </MudItem>
+
+                <!-- Notes -->
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_model.Notes" 
+                                  Label="Observações"
+                                  Lines="3"
+                                  Variant="Variant.Outlined"
+                                  Placeholder="Informações adicionais sobre a transferência..."/>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudAlert Severity="Severity.Warning" Dense="true">
+                        Esta solicitação será enviada para aprovação. O ativo será transferido somente após aprovação.
+                    </MudAlert>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="@_processing">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" 
+                   Variant="Variant.Filled" 
+                   OnClick="Submit" 
+                   Disabled="@_processing">
+            @if (_processing)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true"/>
+            }
+            else
+            {
+                <MudIcon Icon="@Icons.Material.Filled.Send" Class="mr-1"/>
+                <text>Solicitar Transferência</text>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int AssetId { get; set; }
+    [Parameter] public string AssetName { get; set; } = string.Empty;
+
+    private MudForm? _form;
+    private CreateAssetTransferDto _model = new();
+    private AssetDto? _currentAsset;
+    private List<DepartmentDto> _departments = new();
+    private bool _processing = false;
+    private DateTime? _transferDate = DateTime.Today;
+
+    public class DepartmentDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _model.AssetId = AssetId;
+        _model.Condition = AssetCondition.Good;
+        await LoadAssetDetails();
+        await LoadDepartments();
+    }
+
+    private async Task LoadAssetDetails()
+    {
+        try
+        {
+            _currentAsset = await ApiService.GetAsync<AssetDto>($"/api/assets/{AssetId}");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar detalhes do ativo {AssetId}", AssetId);
+        }
+    }
+
+    private async Task LoadDepartments()
+    {
+        try
+        {
+            _departments = await ApiService.GetAsync<List<DepartmentDto>>("/api/departments") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar departamentos");
+            // Not critical, can continue without departments
+        }
+    }
+
+    private async Task Submit()
+    {
+        await _form!.Validate();
+        if (!_form.IsValid)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_model.ToLocation))
+        {
+            Snackbar.Add("Por favor, informe a nova localização", Severity.Warning);
+            return;
+        }
+
+        _processing = true;
+        try
+        {
+            // Set the transfer date
+            if (_transferDate.HasValue)
+            {
+                _model.TransferDate = _transferDate.Value;
+            }
+
+            var transfer = await ApiService.PostAsync<AssetTransferDto>("/api/assets/transfers", _model);
+            Snackbar.Add("Solicitação de transferência enviada com sucesso", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(transfer));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao criar solicitação de transferência");
+            Snackbar.Add($"Erro ao criar solicitação: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _processing = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private Task<IEnumerable<string>> ValidateValue(object model, string propertyName)
+    {
+        var errors = new List<string>();
+
+        if (propertyName == nameof(_model.ToLocation))
+        {
+            if (string.IsNullOrWhiteSpace(_model.ToLocation))
+            {
+                errors.Add("A nova localização é obrigatória");
+            }
+        }
+
+        return Task.FromResult<IEnumerable<string>>(errors);
+    }
+}

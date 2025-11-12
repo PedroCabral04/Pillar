@@ -45,17 +45,49 @@ public interface IAssetService
     
     // Statistics
     Task<AssetStatisticsDto> GetAssetStatisticsAsync();
+    
+    // Document Management
+    Task<AssetDocumentDto?> GetDocumentByIdAsync(int id);
+    Task<List<AssetDocumentDto>> GetDocumentsByAssetIdAsync(int assetId);
+    Task<List<AssetDocumentDto>> GetDocumentsByTypeAsync(int assetId, AssetDocumentType type);
+    Task<AssetDocumentDto> CreateDocumentAsync(CreateAssetDocumentDto dto, Stream fileStream, int uploadedByUserId);
+    Task<AssetDocumentDto> UpdateDocumentAsync(int id, UpdateAssetDocumentDto dto);
+    Task DeleteDocumentAsync(int id);
+    Task<Stream> DownloadDocumentAsync(int id);
+    
+    // Transfer Management
+    Task<AssetTransferDto?> GetTransferByIdAsync(int id);
+    Task<List<AssetTransferDto>> GetTransferHistoryForAssetAsync(int assetId);
+    Task<List<AssetTransferDto>> GetPendingTransfersAsync();
+    Task<List<AssetTransferDto>> GetTransfersByStatusAsync(TransferStatus status);
+    Task<AssetTransferDto> CreateTransferAsync(CreateAssetTransferDto dto, int requestedByUserId);
+    Task<AssetTransferDto> ApproveTransferAsync(int id, int approvedByUserId);
+    Task<AssetTransferDto> RejectTransferAsync(int id, int rejectedByUserId, string reason);
+    Task<AssetTransferDto> CompleteTransferAsync(int id, int completedByUserId);
+    Task<AssetTransferDto> CancelTransferAsync(int id, int cancelledByUserId, string reason);
+    
+    // QR Code Generation
+    Task<byte[]> GenerateAssetQRCodeAsync(int assetId);
+    Task<string> GenerateAssetQRCodeBase64Async(int assetId);
 }
 
 public class AssetService : IAssetService
 {
     private readonly IAssetDao _assetDao;
     private readonly AssetMapper _mapper;
+    private readonly IFileStorageService _fileStorage;
+    private readonly IQRCodeService _qrCodeService;
 
-    public AssetService(IAssetDao assetDao, AssetMapper mapper)
+    public AssetService(
+        IAssetDao assetDao, 
+        AssetMapper mapper,
+        IFileStorageService fileStorage,
+        IQRCodeService qrCodeService)
     {
         _assetDao = assetDao;
         _mapper = mapper;
+        _fileStorage = fileStorage;
+        _qrCodeService = qrCodeService;
     }
 
     // ============= Asset Management =============
@@ -455,5 +487,276 @@ public class AssetService : IAssetService
                 .GroupBy(a => a.Condition.ToString())
                 .ToDictionary(g => g.Key, g => g.Count())
         };
+    }
+    
+    // ============= Document Management =============
+    
+    public async Task<AssetDocumentDto?> GetDocumentByIdAsync(int id)
+    {
+        var document = await _assetDao.GetDocumentByIdAsync(id);
+        return document != null ? _mapper.DocumentToDto(document) : null;
+    }
+    
+    public async Task<List<AssetDocumentDto>> GetDocumentsByAssetIdAsync(int assetId)
+    {
+        var documents = await _assetDao.GetDocumentsByAssetIdAsync(assetId);
+        return documents.Select(d => _mapper.DocumentToDto(d)).ToList();
+    }
+    
+    public async Task<List<AssetDocumentDto>> GetDocumentsByTypeAsync(int assetId, AssetDocumentType type)
+    {
+        var documents = await _assetDao.GetDocumentsByTypeAsync(assetId, type);
+        return documents.Select(d => _mapper.DocumentToDto(d)).ToList();
+    }
+    
+    public async Task<AssetDocumentDto> CreateDocumentAsync(CreateAssetDocumentDto dto, Stream fileStream, int uploadedByUserId)
+    {
+        // Verifica se o ativo existe
+        var asset = await _assetDao.GetAssetByIdAsync(dto.AssetId);
+        if (asset == null)
+        {
+            throw new InvalidOperationException("Ativo não encontrado");
+        }
+        
+        // Determina o nome do arquivo baseado no tipo
+        var fileName = $"{dto.Type}_{DateTime.UtcNow:yyyyMMddHHmmss}.pdf";
+        var subfolder = $"asset_{dto.AssetId}";
+        var filePath = await _fileStorage.SaveFileAsync(fileStream, fileName, subfolder);
+        
+        // Obtém o tamanho do arquivo
+        fileStream.Position = 0;
+        var fileSize = fileStream.Length;
+        
+        // Cria o documento
+        var document = _mapper.CreateDtoToDocument(dto);
+        document.FileName = fileName;
+        document.OriginalFileName = fileName;
+        document.FilePath = filePath;
+        document.FileSize = fileSize;
+        document.ContentType = "application/pdf"; // Default, pode ser melhorado
+        document.UploadedByUserId = uploadedByUserId;
+        document.CreatedAt = DateTime.UtcNow;
+        
+        var created = await _assetDao.CreateDocumentAsync(document);
+        return _mapper.DocumentToDto(created);
+    }
+    
+    public async Task<AssetDocumentDto> UpdateDocumentAsync(int id, UpdateAssetDocumentDto dto)
+    {
+        var document = await _assetDao.GetDocumentByIdAsync(id);
+        if (document == null)
+        {
+            throw new InvalidOperationException("Documento não encontrado");
+        }
+        
+        _mapper.UpdateDocumentFromDto(dto, document);
+        
+        var updated = await _assetDao.UpdateDocumentAsync(document);
+        return _mapper.DocumentToDto(updated);
+    }
+    
+    public async Task DeleteDocumentAsync(int id)
+    {
+        var document = await _assetDao.GetDocumentByIdAsync(id);
+        if (document == null)
+        {
+            throw new InvalidOperationException("Documento não encontrado");
+        }
+        
+        // Exclui o arquivo físico
+        await _fileStorage.DeleteFileAsync(document.FilePath);
+        
+        // Exclui o registro do documento
+        await _assetDao.DeleteDocumentAsync(id);
+    }
+    
+    public async Task<Stream> DownloadDocumentAsync(int id)
+    {
+        var document = await _assetDao.GetDocumentByIdAsync(id);
+        if (document == null)
+        {
+            throw new InvalidOperationException("Documento não encontrado");
+        }
+        
+        return await _fileStorage.GetFileAsync(document.FilePath);
+    }
+    
+    // ============= Transfer Management =============
+    
+    public async Task<AssetTransferDto?> GetTransferByIdAsync(int id)
+    {
+        var transfer = await _assetDao.GetTransferByIdAsync(id);
+        return transfer != null ? _mapper.TransferToDto(transfer) : null;
+    }
+    
+    public async Task<List<AssetTransferDto>> GetTransferHistoryForAssetAsync(int assetId)
+    {
+        var transfers = await _assetDao.GetTransferHistoryForAssetAsync(assetId);
+        return transfers.Select(t => _mapper.TransferToDto(t)).ToList();
+    }
+    
+    public async Task<List<AssetTransferDto>> GetPendingTransfersAsync()
+    {
+        var transfers = await _assetDao.GetPendingTransfersAsync();
+        return transfers.Select(t => _mapper.TransferToDto(t)).ToList();
+    }
+    
+    public async Task<List<AssetTransferDto>> GetTransfersByStatusAsync(TransferStatus status)
+    {
+        var transfers = await _assetDao.GetTransfersByStatusAsync(status);
+        return transfers.Select(t => _mapper.TransferToDto(t)).ToList();
+    }
+    
+    public async Task<AssetTransferDto> CreateTransferAsync(CreateAssetTransferDto dto, int requestedByUserId)
+    {
+        // Verifica se o ativo existe
+        var asset = await _assetDao.GetAssetByIdAsync(dto.AssetId);
+        if (asset == null)
+        {
+            throw new InvalidOperationException("Ativo não encontrado");
+        }
+        
+        // Verifica se já existe uma transferência pendente para este ativo
+        var pendingTransfers = await _assetDao.GetPendingTransfersAsync();
+        if (pendingTransfers.Any(t => t.AssetId == dto.AssetId))
+        {
+            throw new InvalidOperationException("Já existe uma transferência pendente para este ativo");
+        }
+        
+        var transfer = _mapper.CreateDtoToTransfer(dto);
+        transfer.RequestedByUserId = requestedByUserId;
+        transfer.Status = TransferStatus.Pending;
+        transfer.FromLocation = asset.Location ?? "";
+        transfer.CreatedAt = DateTime.UtcNow;
+        
+        var created = await _assetDao.CreateTransferAsync(transfer);
+        return _mapper.TransferToDto(created);
+    }
+    
+    public async Task<AssetTransferDto> ApproveTransferAsync(int id, int approvedByUserId)
+    {
+        var transfer = await _assetDao.GetTransferByIdAsync(id);
+        if (transfer == null)
+        {
+            throw new InvalidOperationException("Transferência não encontrada");
+        }
+        
+        if (transfer.Status != TransferStatus.Pending)
+        {
+            throw new InvalidOperationException("Apenas transferências pendentes podem ser aprovadas");
+        }
+        
+        transfer.Status = TransferStatus.InTransit;
+        transfer.ApprovedByUserId = approvedByUserId;
+        transfer.ApprovedDate = DateTime.UtcNow;
+        
+        var updated = await _assetDao.UpdateTransferAsync(transfer);
+        return _mapper.TransferToDto(updated);
+    }
+    
+    public async Task<AssetTransferDto> RejectTransferAsync(int id, int rejectedByUserId, string reason)
+    {
+        var transfer = await _assetDao.GetTransferByIdAsync(id);
+        if (transfer == null)
+        {
+            throw new InvalidOperationException("Transferência não encontrada");
+        }
+        
+        if (transfer.Status != TransferStatus.Pending)
+        {
+            throw new InvalidOperationException("Apenas transferências pendentes podem ser rejeitadas");
+        }
+        
+        transfer.Status = TransferStatus.Cancelled;
+        transfer.ApprovedByUserId = rejectedByUserId;
+        transfer.ApprovedDate = DateTime.UtcNow;
+        transfer.Notes = $"Rejeitada: {reason}";
+        
+        var updated = await _assetDao.UpdateTransferAsync(transfer);
+        return _mapper.TransferToDto(updated);
+    }
+    
+    public async Task<AssetTransferDto> CompleteTransferAsync(int id, int completedByUserId)
+    {
+        var transfer = await _assetDao.GetTransferByIdAsync(id);
+        if (transfer == null)
+        {
+            throw new InvalidOperationException("Transferência não encontrada");
+        }
+        
+        if (transfer.Status != TransferStatus.InTransit)
+        {
+            throw new InvalidOperationException("Apenas transferências em trânsito podem ser concluídas");
+        }
+        
+        transfer.Status = TransferStatus.Completed;
+        transfer.CompletedByUserId = completedByUserId;
+        transfer.CompletedDate = DateTime.UtcNow;
+        
+        // Atualiza a localização do ativo
+        var asset = await _assetDao.GetAssetByIdAsync(transfer.AssetId);
+        if (asset != null)
+        {
+            asset.Location = transfer.ToLocation;
+            await _assetDao.UpdateAssetAsync(asset);
+        }
+        
+        var updated = await _assetDao.UpdateTransferAsync(transfer);
+        return _mapper.TransferToDto(updated);
+    }
+    
+    public async Task<AssetTransferDto> CancelTransferAsync(int id, int cancelledByUserId, string reason)
+    {
+        var transfer = await _assetDao.GetTransferByIdAsync(id);
+        if (transfer == null)
+        {
+            throw new InvalidOperationException("Transferência não encontrada");
+        }
+        
+        if (transfer.Status == TransferStatus.Completed)
+        {
+            throw new InvalidOperationException("Não é possível cancelar uma transferência concluída");
+        }
+        
+        if (transfer.Status == TransferStatus.Cancelled)
+        {
+            throw new InvalidOperationException("Esta transferência já está cancelada");
+        }
+        
+        transfer.Status = TransferStatus.Cancelled;
+        transfer.Notes = $"Cancelada: {reason}";
+        
+        var updated = await _assetDao.UpdateTransferAsync(transfer);
+        return _mapper.TransferToDto(updated);
+    }
+    
+    // ============= QR Code Generation =============
+    
+    public async Task<byte[]> GenerateAssetQRCodeAsync(int assetId)
+    {
+        var asset = await _assetDao.GetAssetByIdAsync(assetId);
+        if (asset == null)
+        {
+            throw new InvalidOperationException("Ativo não encontrado");
+        }
+        
+        // Gera um texto com informações do ativo
+        var qrContent = $"ASSET:{asset.AssetCode}|{asset.Name}|{asset.Id}";
+        
+        return _qrCodeService.GenerateQRCode(qrContent);
+    }
+    
+    public async Task<string> GenerateAssetQRCodeBase64Async(int assetId)
+    {
+        var asset = await _assetDao.GetAssetByIdAsync(assetId);
+        if (asset == null)
+        {
+            throw new InvalidOperationException("Ativo não encontrado");
+        }
+        
+        // Gera um texto com informações do ativo
+        var qrContent = $"ASSET:{asset.AssetCode}|{asset.Name}|{asset.Id}";
+        
+        return _qrCodeService.GenerateQRCodeBase64(qrContent);
     }
 }

@@ -1,0 +1,262 @@
+@using erp.DTOs.Assets
+@using erp.Services
+@using erp.Models
+@using MudBlazor
+@using System.Net.Http.Headers
+@using Size = MudBlazor.Size
+@using Color = MudBlazor.Color
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+@inject ILogger<DocumentUploadDialog> Logger
+@inject HttpClient HttpClient
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" Model="@_model">
+            <MudGrid>
+                <MudItem xs="12">
+                    <MudText Typo="Typo.h6" Class="mb-3">Upload de Documento</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                        Faça upload de documentos relacionados ao ativo: nota fiscal, manual, certificados, etc.
+                    </MudText>
+                </MudItem>
+
+                <!-- File Upload -->
+                <MudItem xs="12">
+                    <MudFileUpload T="IBrowserFile" 
+                                   @bind-Files="_selectedFile"
+                                   Accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xls,.xlsx"
+                                   MaximumFileCount="1"
+                                   OnFilesChanged="OnFileSelected">
+                        <ActivatorContent>
+                            <MudPaper Outlined="true" Class="pa-4" Style="cursor: pointer; border: 2px dashed #ccc">
+                                <MudStack AlignItems="AlignItems.Center" Spacing="2">
+                                    <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Large" Color="Color.Primary"/>
+                                    <MudText Typo="Typo.body1">
+                                        @if (_selectedFile != null)
+                                        {
+                                            <text>@_selectedFile.Name (@FormatFileSize(_selectedFile.Size))</text>
+                                        }
+                                        else
+                                        {
+                                            <text>Clique para selecionar um arquivo ou arraste aqui</text>
+                                        }
+                                    </MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        Formatos aceitos: PDF, DOC, DOCX, JPG, PNG, XLS, XLSX (Máx. 50MB)
+                                    </MudText>
+                                </MudStack>
+                            </MudPaper>
+                        </ActivatorContent>
+                    </MudFileUpload>
+                </MudItem>
+
+                @if (_fileSizeError)
+                {
+                    <MudItem xs="12">
+                        <MudAlert Severity="Severity.Error" Dense="true">
+                            Arquivo muito grande. Tamanho máximo: 50MB
+                        </MudAlert>
+                    </MudItem>
+                }
+
+                <!-- Document Type -->
+                <MudItem xs="12" md="6">
+                    <MudSelect @bind-Value="_model.Type" 
+                               Label="Tipo de Documento" 
+                               Required="true"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem Value="@AssetDocumentType.Invoice">Nota Fiscal</MudSelectItem>
+                        <MudSelectItem Value="@AssetDocumentType.Manual">Manual</MudSelectItem>
+                        <MudSelectItem Value="@AssetDocumentType.Warranty">Garantia</MudSelectItem>
+                        <MudSelectItem Value="@AssetDocumentType.Certificate">Certificado</MudSelectItem>
+                        <MudSelectItem Value="@AssetDocumentType.Photo">Foto</MudSelectItem>
+                        <MudSelectItem Value="@AssetDocumentType.Contract">Contrato</MudSelectItem>
+                        <MudSelectItem Value="@AssetDocumentType.Other">Outro</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                <!-- Document Number -->
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_model.DocumentNumber" 
+                                  Label="Número do Documento"
+                                  Variant="Variant.Outlined"
+                                  Placeholder="Ex: NF-123456"/>
+                </MudItem>
+
+                <!-- Document Date -->
+                <MudItem xs="12" md="6">
+                    <MudDatePicker @bind-Date="_documentDate" 
+                                   Label="Data do Documento"
+                                   Variant="Variant.Outlined"
+                                   DateFormat="dd/MM/yyyy"/>
+                </MudItem>
+
+                <!-- Expiry Date -->
+                <MudItem xs="12" md="6">
+                    <MudDatePicker @bind-Date="_expiryDate" 
+                                   Label="Data de Vencimento"
+                                   Variant="Variant.Outlined"
+                                   DateFormat="dd/MM/yyyy"/>
+                </MudItem>
+
+                <!-- Description -->
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_model.Description" 
+                                  Label="Descrição"
+                                  Lines="3"
+                                  Variant="Variant.Outlined"
+                                  Placeholder="Descreva o conteúdo do documento..."/>
+                </MudItem>
+
+                @if (_uploadProgress > 0 && _uploadProgress < 100)
+                {
+                    <MudItem xs="12">
+                        <MudProgressLinear Color="Color.Primary" Value="@_uploadProgress" Class="my-2"/>
+                        <MudText Typo="Typo.caption" Align="MudBlazor.Align.Center">Enviando... @_uploadProgress%</MudText>
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="@_processing">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" 
+                   Variant="Variant.Filled" 
+                   OnClick="Upload" 
+                   Disabled="@(_processing || _selectedFile == null)">
+            @if (_processing)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true"/>
+            }
+            else
+            {
+                <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Class="mr-1"/>
+                <text>Fazer Upload</text>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int AssetId { get; set; }
+
+    private MudForm? _form;
+    private CreateAssetDocumentDto _model = new();
+    private IBrowserFile? _selectedFile;
+    private bool _processing = false;
+    private bool _fileSizeError = false;
+    private int _uploadProgress = 0;
+    private DateTime? _documentDate;
+    private DateTime? _expiryDate;
+
+    private const long MaxFileSize = 50L * 1024 * 1024; // 50MB
+
+    protected override void OnInitialized()
+    {
+        _model.AssetId = AssetId;
+    }
+
+    private void OnFileSelected(InputFileChangeEventArgs e)
+    {
+        _selectedFile = e.File;
+        _fileSizeError = _selectedFile.Size > MaxFileSize;
+        StateHasChanged();
+    }
+
+    private async Task Upload()
+    {
+        if (_selectedFile == null) return;
+
+        await _form!.Validate();
+        if (!_form.IsValid)
+        {
+            return;
+        }
+
+        if (_fileSizeError)
+        {
+            Snackbar.Add("Arquivo muito grande. Tamanho máximo: 50MB", Severity.Error);
+            return;
+        }
+
+        _processing = true;
+        _uploadProgress = 0;
+
+        try
+        {
+            // Prepare multipart form data
+            using var content = new MultipartFormDataContent();
+
+            // Add file
+            var fileContent = new StreamContent(_selectedFile.OpenReadStream(MaxFileSize));
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(_selectedFile.ContentType);
+            content.Add(fileContent, "file", _selectedFile.Name);
+
+            // Add form fields
+            content.Add(new StringContent(_model.Type.ToString()), "type");
+            
+            if (!string.IsNullOrEmpty(_model.Description))
+                content.Add(new StringContent(_model.Description), "description");
+            
+            if (!string.IsNullOrEmpty(_model.DocumentNumber))
+                content.Add(new StringContent(_model.DocumentNumber), "documentNumber");
+            
+            if (_documentDate.HasValue)
+                content.Add(new StringContent(_documentDate.Value.ToString("o")), "documentDate");
+            
+            if (_expiryDate.HasValue)
+                content.Add(new StringContent(_expiryDate.Value.ToString("o")), "expiryDate");
+
+            // Upload with progress simulation (real progress tracking requires more complex setup)
+            _uploadProgress = 30;
+            StateHasChanged();
+            await Task.Delay(200);
+
+            var response = await HttpClient.PostAsync($"/api/assets/{AssetId}/documents", content);
+
+            _uploadProgress = 70;
+            StateHasChanged();
+            await Task.Delay(100);
+
+            if (response.IsSuccessStatusCode)
+            {
+                _uploadProgress = 100;
+                var document = await response.Content.ReadFromJsonAsync<AssetDocumentDto>();
+                Snackbar.Add("Documento enviado com sucesso", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(document));
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Erro ao enviar documento: {errorContent}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao fazer upload do documento");
+            Snackbar.Add($"Erro ao enviar documento: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _processing = false;
+            _uploadProgress = 0;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+}

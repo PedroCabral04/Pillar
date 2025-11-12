@@ -100,6 +100,10 @@ public class Asset
     public virtual ICollection<AssetAssignment> Assignments { get; set; } = new List<AssetAssignment>();
     
     public virtual ICollection<AssetMaintenance> MaintenanceRecords { get; set; } = new List<AssetMaintenance>();
+    
+    public virtual ICollection<AssetDocument> Documents { get; set; } = new List<AssetDocument>();
+    
+    public virtual ICollection<AssetTransfer> Transfers { get; set; } = new List<AssetTransfer>();
 }
 
 public enum AssetStatus

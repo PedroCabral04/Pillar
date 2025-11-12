@@ -295,6 +295,8 @@ builder.Services.AddHttpClient<erp.Services.Financial.Validation.IReceitaWsServi
 // Asset Management services
 builder.Services.AddScoped<erp.DAOs.Assets.IAssetDao, erp.DAOs.Assets.AssetDao>();
 builder.Services.AddScoped<erp.Services.Assets.IAssetService, erp.Services.Assets.AssetService>();
+builder.Services.AddScoped<erp.Services.Assets.IQRCodeService, erp.Services.Assets.QRCodeService>();
+builder.Services.AddScoped<erp.Services.Assets.IFileStorageService, erp.Services.Assets.LocalFileStorageService>();
 builder.Services.AddScoped<erp.Mappings.AssetMapper>();
 
 // Time tracking services

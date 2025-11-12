@@ -676,4 +676,479 @@ public class AssetsController : ControllerBase
             return StatusCode(500, new { message = "Erro ao buscar estatísticas", error = ex.Message });
         }
     }
+
+    // ============= Document Management =============
+
+    /// <summary>
+    /// Lista todos os documentos de um ativo
+    /// </summary>
+    [HttpGet("{id}/documents")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<List<AssetDocumentDto>>> GetAssetDocuments(int id)
+    {
+        try
+        {
+            var documents = await _assetService.GetDocumentsByAssetIdAsync(id);
+            return Ok(documents);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao buscar documentos do ativo {AssetId}", id);
+            return StatusCode(500, new { message = "Erro ao buscar documentos", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Lista documentos de um ativo por tipo
+    /// </summary>
+    [HttpGet("{id}/documents/type/{type}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<AssetDocumentDto>>> GetAssetDocumentsByType(int id, AssetDocumentType type)
+    {
+        try
+        {
+            var documents = await _assetService.GetDocumentsByTypeAsync(id, type);
+            return Ok(documents);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao buscar documentos do tipo {Type} do ativo {AssetId}", type, id);
+            return StatusCode(500, new { message = "Erro ao buscar documentos", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Busca documento por ID
+    /// </summary>
+    [HttpGet("documents/{docId}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<AssetDocumentDto>> GetDocumentById(int docId)
+    {
+        try
+        {
+            var document = await _assetService.GetDocumentByIdAsync(docId);
+            if (document == null)
+            {
+                return NotFound(new { message = "Documento não encontrado" });
+            }
+            return Ok(document);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao buscar documento {DocumentId}", docId);
+            return StatusCode(500, new { message = "Erro ao buscar documento", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Faz upload de um documento para um ativo
+    /// </summary>
+    [HttpPost("{id}/documents")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<AssetDocumentDto>> UploadDocument(
+        int id,
+        [FromForm] IFormFile file,
+        [FromForm] AssetDocumentType type,
+        [FromForm] string? description = null,
+        [FromForm] string? documentNumber = null,
+        [FromForm] DateTime? documentDate = null,
+        [FromForm] DateTime? expiryDate = null)
+    {
+        try
+        {
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest(new { message = "Arquivo não fornecido ou vazio" });
+            }
+
+            // Validação de tamanho (50MB max)
+            if (file.Length > 50 * 1024 * 1024)
+            {
+                return BadRequest(new { message = "Arquivo muito grande. Tamanho máximo: 50MB" });
+            }
+
+            var dto = new CreateAssetDocumentDto
+            {
+                AssetId = id,
+                Type = type,
+                Description = description,
+                DocumentNumber = documentNumber,
+                DocumentDate = documentDate,
+                ExpiryDate = expiryDate
+            };
+
+            using var stream = file.OpenReadStream();
+            var userId = GetCurrentUserId();
+            var document = await _assetService.CreateDocumentAsync(dto, stream, userId);
+            
+            return CreatedAtAction(
+                nameof(GetDocumentById),
+                new { docId = document.Id },
+                document);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao fazer upload de documento para ativo {AssetId}", id);
+            return StatusCode(500, new { message = "Erro ao fazer upload de documento", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Atualiza metadados de um documento
+    /// </summary>
+    [HttpPut("documents/{docId}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<AssetDocumentDto>> UpdateDocument(int docId, [FromBody] UpdateAssetDocumentDto dto)
+    {
+        try
+        {
+            var document = await _assetService.UpdateDocumentAsync(docId, dto);
+            return Ok(document);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao atualizar documento {DocumentId}", docId);
+            return StatusCode(500, new { message = "Erro ao atualizar documento", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Faz download de um documento
+    /// </summary>
+    [HttpGet("{id}/documents/{docId}/download")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> DownloadDocument(int id, int docId)
+    {
+        try
+        {
+            var document = await _assetService.GetDocumentByIdAsync(docId);
+            if (document == null)
+            {
+                return NotFound(new { message = "Documento não encontrado" });
+            }
+
+            if (document.AssetId != id)
+            {
+                return BadRequest(new { message = "Documento não pertence a este ativo" });
+            }
+
+            var stream = await _assetService.DownloadDocumentAsync(docId);
+            return File(stream, document.ContentType, document.OriginalFileName);
+        }
+        catch (FileNotFoundException)
+        {
+            return NotFound(new { message = "Arquivo não encontrado no servidor" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao fazer download do documento {DocumentId}", docId);
+            return StatusCode(500, new { message = "Erro ao fazer download do documento", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Exclui um documento
+    /// </summary>
+    [HttpDelete("documents/{docId}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> DeleteDocument(int docId)
+    {
+        try
+        {
+            await _assetService.DeleteDocumentAsync(docId);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao excluir documento {DocumentId}", docId);
+            return StatusCode(500, new { message = "Erro ao excluir documento", error = ex.Message });
+        }
+    }
+
+    // ============= Transfer Management =============
+
+    /// <summary>
+    /// Lista histórico de transferências de um ativo
+    /// </summary>
+    [HttpGet("{id}/transfers")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<AssetTransferDto>>> GetAssetTransfers(int id)
+    {
+        try
+        {
+            var transfers = await _assetService.GetTransferHistoryForAssetAsync(id);
+            return Ok(transfers);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao buscar transferências do ativo {AssetId}", id);
+            return StatusCode(500, new { message = "Erro ao buscar transferências", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Lista todas as transferências pendentes
+    /// </summary>
+    [HttpGet("transfers/pending")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<AssetTransferDto>>> GetPendingTransfers()
+    {
+        try
+        {
+            var transfers = await _assetService.GetPendingTransfersAsync();
+            return Ok(transfers);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao buscar transferências pendentes");
+            return StatusCode(500, new { message = "Erro ao buscar transferências pendentes", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Lista transferências por status
+    /// </summary>
+    [HttpGet("transfers/status/{status}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<AssetTransferDto>>> GetTransfersByStatus(TransferStatus status)
+    {
+        try
+        {
+            var transfers = await _assetService.GetTransfersByStatusAsync(status);
+            return Ok(transfers);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao buscar transferências com status {Status}", status);
+            return StatusCode(500, new { message = "Erro ao buscar transferências", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Busca transferência por ID
+    /// </summary>
+    [HttpGet("transfers/{transferId}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<AssetTransferDto>> GetTransferById(int transferId)
+    {
+        try
+        {
+            var transfer = await _assetService.GetTransferByIdAsync(transferId);
+            if (transfer == null)
+            {
+                return NotFound(new { message = "Transferência não encontrada" });
+            }
+            return Ok(transfer);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao buscar transferência {TransferId}", transferId);
+            return StatusCode(500, new { message = "Erro ao buscar transferência", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Cria uma nova solicitação de transferência
+    /// </summary>
+    [HttpPost("transfers")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<AssetTransferDto>> CreateTransfer([FromBody] CreateAssetTransferDto dto)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            var transfer = await _assetService.CreateTransferAsync(dto, userId);
+            
+            return CreatedAtAction(
+                nameof(GetTransferById),
+                new { transferId = transfer.Id },
+                transfer);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao criar transferência");
+            return StatusCode(500, new { message = "Erro ao criar transferência", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Aprova uma transferência pendente
+    /// </summary>
+    [HttpPut("transfers/{transferId}/approve")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<AssetTransferDto>> ApproveTransfer(int transferId)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            var transfer = await _assetService.ApproveTransferAsync(transferId, userId);
+            return Ok(transfer);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao aprovar transferência {TransferId}", transferId);
+            return StatusCode(500, new { message = "Erro ao aprovar transferência", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Rejeita uma transferência pendente
+    /// </summary>
+    [HttpPut("transfers/{transferId}/reject")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<AssetTransferDto>> RejectTransfer(int transferId, [FromBody] string reason)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            var transfer = await _assetService.RejectTransferAsync(transferId, userId, reason);
+            return Ok(transfer);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao rejeitar transferência {TransferId}", transferId);
+            return StatusCode(500, new { message = "Erro ao rejeitar transferência", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Completa uma transferência aprovada
+    /// </summary>
+    [HttpPut("transfers/{transferId}/complete")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<AssetTransferDto>> CompleteTransfer(int transferId)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            var transfer = await _assetService.CompleteTransferAsync(transferId, userId);
+            return Ok(transfer);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao completar transferência {TransferId}", transferId);
+            return StatusCode(500, new { message = "Erro ao completar transferência", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Cancela uma transferência
+    /// </summary>
+    [HttpPut("transfers/{transferId}/cancel")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<AssetTransferDto>> CancelTransfer(int transferId, [FromBody] string reason)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            var transfer = await _assetService.CancelTransferAsync(transferId, userId, reason);
+            return Ok(transfer);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao cancelar transferência {TransferId}", transferId);
+            return StatusCode(500, new { message = "Erro ao cancelar transferência", error = ex.Message });
+        }
+    }
+
+    // ============= QR Code Generation =============
+
+    /// <summary>
+    /// Gera QR code para um ativo (retorna imagem PNG)
+    /// </summary>
+    [HttpGet("{id}/qrcode")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> GenerateQRCode(int id)
+    {
+        try
+        {
+            var qrCodeBytes = await _assetService.GenerateAssetQRCodeAsync(id);
+            return File(qrCodeBytes, "image/png");
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao gerar QR code para ativo {AssetId}", id);
+            return StatusCode(500, new { message = "Erro ao gerar QR code", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Gera QR code para um ativo (retorna Base64 para exibição em HTML)
+    /// </summary>
+    [HttpGet("{id}/qrcode/base64")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<object>> GenerateQRCodeBase64(int id)
+    {
+        try
+        {
+            var qrCodeBase64 = await _assetService.GenerateAssetQRCodeBase64Async(id);
+            return Ok(new { qrCode = qrCodeBase64, mimeType = "image/png" });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao gerar QR code Base64 para ativo {AssetId}", id);
+            return StatusCode(500, new { message = "Erro ao gerar QR code", error = ex.Message });
+        }
+    }
 }

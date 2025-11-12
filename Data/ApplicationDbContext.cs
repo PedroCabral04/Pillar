@@ -55,6 +55,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Asset> Assets { get; set; } = null!;
     public DbSet<AssetAssignment> AssetAssignments { get; set; } = null!;
     public DbSet<AssetMaintenance> AssetMaintenances { get; set; } = null!;
+    public DbSet<AssetDocument> AssetDocuments { get; set; } = null!;
+    public DbSet<AssetTransfer> AssetTransfers { get; set; } = null!;
     
     // Audit
     public DbSet<AuditLog> AuditLogs { get; set; } = null!;
@@ -1182,6 +1184,83 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
                 .OnDelete(DeleteBehavior.Restrict);
                 
             am.HasOne<ApplicationUser>(x => x.CompletedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.CompletedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+        
+        // AssetDocument
+        modelBuilder.Entity<AssetDocument>(ad =>
+        {
+            ad.ToTable("AssetDocuments");
+            ad.HasKey(x => x.Id);
+            ad.Property(x => x.FileName).HasMaxLength(255).IsRequired();
+            ad.Property(x => x.OriginalFileName).HasMaxLength(255).IsRequired();
+            ad.Property(x => x.FilePath).HasMaxLength(1000).IsRequired();
+            ad.Property(x => x.ContentType).HasMaxLength(200).IsRequired();
+            ad.Property(x => x.Description).HasMaxLength(1000);
+            ad.Property(x => x.DocumentNumber).HasMaxLength(100);
+            
+            ad.HasIndex(x => x.AssetId);
+            ad.HasIndex(x => x.Type);
+            ad.HasIndex(x => x.DocumentDate);
+            ad.HasIndex(x => x.ExpiryDate);
+            ad.HasIndex(x => new { x.AssetId, x.Type });
+            
+            ad.HasOne(x => x.Asset)
+                .WithMany(x => x.Documents)
+                .HasForeignKey(x => x.AssetId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            ad.HasOne(x => x.UploadedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.UploadedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        
+        // AssetTransfer
+        modelBuilder.Entity<AssetTransfer>(at =>
+        {
+            at.ToTable("AssetTransfers");
+            at.HasKey(x => x.Id);
+            at.Property(x => x.FromLocation).HasMaxLength(200).IsRequired();
+            at.Property(x => x.ToLocation).HasMaxLength(200).IsRequired();
+            at.Property(x => x.Reason).HasMaxLength(1000);
+            at.Property(x => x.Notes).HasMaxLength(2000);
+            
+            at.HasIndex(x => x.AssetId);
+            at.HasIndex(x => x.FromDepartmentId);
+            at.HasIndex(x => x.ToDepartmentId);
+            at.HasIndex(x => x.TransferDate);
+            at.HasIndex(x => x.Status);
+            at.HasIndex(x => new { x.Status, x.TransferDate });
+            
+            at.HasOne(x => x.Asset)
+                .WithMany(x => x.Transfers)
+                .HasForeignKey(x => x.AssetId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            at.HasOne(x => x.FromDepartment)
+                .WithMany()
+                .HasForeignKey(x => x.FromDepartmentId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            at.HasOne(x => x.ToDepartment)
+                .WithMany()
+                .HasForeignKey(x => x.ToDepartmentId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            at.HasOne(x => x.RequestedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.RequestedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            at.HasOne<ApplicationUser>(x => x.ApprovedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.ApprovedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            at.HasOne<ApplicationUser>(x => x.CompletedByUser)
                 .WithMany()
                 .HasForeignKey(x => x.CompletedByUserId)
                 .OnDelete(DeleteBehavior.SetNull);

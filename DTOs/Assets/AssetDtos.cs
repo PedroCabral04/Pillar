@@ -220,3 +220,101 @@ public class AssetStatisticsDto
     public Dictionary<string, int> AssetsByStatus { get; set; } = new();
     public Dictionary<string, int> AssetsByCondition { get; set; } = new();
 }
+
+// ============= Document DTOs =============
+
+public class AssetDocumentDto
+{
+    public int Id { get; set; }
+    public int AssetId { get; set; }
+    public string AssetName { get; set; } = string.Empty;
+    public AssetDocumentType Type { get; set; }
+    public string FileName { get; set; } = string.Empty;
+    public string OriginalFileName { get; set; } = string.Empty;
+    public string FilePath { get; set; } = string.Empty;
+    public string ContentType { get; set; } = string.Empty;
+    public long FileSize { get; set; }
+    public string? Description { get; set; }
+    public string? DocumentNumber { get; set; }
+    public DateTime? DocumentDate { get; set; }
+    public DateTime? ExpiryDate { get; set; }
+    public int UploadedByUserId { get; set; }
+    public string UploadedByUserName { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+}
+
+public class CreateAssetDocumentDto
+{
+    public int AssetId { get; set; }
+    public AssetDocumentType Type { get; set; }
+    public string? Description { get; set; }
+    public string? DocumentNumber { get; set; }
+    public DateTime? DocumentDate { get; set; }
+    public DateTime? ExpiryDate { get; set; }
+}
+
+public class UpdateAssetDocumentDto
+{
+    public AssetDocumentType Type { get; set; }
+    public string? Description { get; set; }
+    public string? DocumentNumber { get; set; }
+    public DateTime? DocumentDate { get; set; }
+    public DateTime? ExpiryDate { get; set; }
+}
+
+// ============= Transfer DTOs =============
+
+public class AssetTransferDto
+{
+    public int Id { get; set; }
+    public int AssetId { get; set; }
+    public string AssetName { get; set; } = string.Empty;
+    public string AssetCode { get; set; } = string.Empty;
+    public string FromLocation { get; set; } = string.Empty;
+    public int? FromDepartmentId { get; set; }
+    public string? FromDepartmentName { get; set; }
+    public string ToLocation { get; set; } = string.Empty;
+    public int? ToDepartmentId { get; set; }
+    public string? ToDepartmentName { get; set; }
+    public DateTime TransferDate { get; set; }
+    public string? Reason { get; set; }
+    public AssetCondition Condition { get; set; }
+    public string? Notes { get; set; }
+    public TransferStatus Status { get; set; }
+    public int RequestedByUserId { get; set; }
+    public string RequestedByUserName { get; set; } = string.Empty;
+    public int? ApprovedByUserId { get; set; }
+    public string? ApprovedByUserName { get; set; }
+    public DateTime? ApprovedDate { get; set; }
+    public int? CompletedByUserId { get; set; }
+    public string? CompletedByUserName { get; set; }
+    public DateTime? CompletedDate { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+}
+
+public class CreateAssetTransferDto
+{
+    public int AssetId { get; set; }
+    public string ToLocation { get; set; } = string.Empty;
+    public int? ToDepartmentId { get; set; }
+    public DateTime TransferDate { get; set; } = DateTime.UtcNow;
+    public string? Reason { get; set; }
+    public AssetCondition Condition { get; set; }
+    public string? Notes { get; set; }
+}
+
+public class ApproveTransferDto
+{
+    public DateTime? ApprovedDate { get; set; } = DateTime.UtcNow;
+    public string? Notes { get; set; }
+}
+
+public class CompleteTransferDto
+{
+    public DateTime? CompletedDate { get; set; } = DateTime.UtcNow;
+    public AssetCondition? FinalCondition { get; set; }
+    public string? Notes { get; set; }
+}
+
