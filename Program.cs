@@ -292,6 +292,11 @@ builder.Services.AddScoped<erp.DAOs.Financial.IAccountPayableDao, erp.DAOs.Finan
 builder.Services.AddHttpClient<erp.Services.Financial.Validation.IViaCepService, erp.Services.Financial.Validation.ViaCepService>();
 builder.Services.AddHttpClient<erp.Services.Financial.Validation.IReceitaWsService, erp.Services.Financial.Validation.ReceitaWsService>();
 
+// Asset Management services
+builder.Services.AddScoped<erp.DAOs.Assets.IAssetDao, erp.DAOs.Assets.AssetDao>();
+builder.Services.AddScoped<erp.Services.Assets.IAssetService, erp.Services.Assets.AssetService>();
+builder.Services.AddScoped<erp.Mappings.AssetMapper>();
+
 // Time tracking services
 builder.Services.AddScoped<erp.Services.TimeTracking.ITimeTrackingService, erp.Services.TimeTracking.TimeTrackingService>();
 

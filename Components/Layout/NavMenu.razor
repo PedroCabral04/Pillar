@@ -66,6 +66,15 @@
     
     @if (IsOpen)
     {
+        <MudNavLink Href="assets" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Devices" Class="my-1">Ativos</MudNavLink>
+    }
+    else
+    {
+        <MudNavLink Href="assets" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Devices" Class="my-1" />
+    }
+    
+    @if (IsOpen)
+    {
         <MudNavLink Href="reports" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Assessment" Class="my-1">Relatórios</MudNavLink>
     }
     else

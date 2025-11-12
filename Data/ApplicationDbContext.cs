@@ -50,6 +50,12 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Department> Departments { get; set; } = null!;
     public DbSet<Position> Positions { get; set; } = null!;
     
+    // Asset Management
+    public DbSet<AssetCategory> AssetCategories { get; set; } = null!;
+    public DbSet<Asset> Assets { get; set; } = null!;
+    public DbSet<AssetAssignment> AssetAssignments { get; set; } = null!;
+    public DbSet<AssetMaintenance> AssetMaintenances { get; set; } = null!;
+    
     // Audit
     public DbSet<AuditLog> AuditLogs { get; set; } = null!;
     public DbSet<PayrollPeriod> PayrollPeriods { get; set; } = null!;
@@ -507,6 +513,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         
         // HR Management model configuration
         ConfigureHRModels(modelBuilder);
+        
+        // Asset Management model configuration
+        ConfigureAssetModels(modelBuilder);
         
         // Audit model configuration
         ConfigureAuditModels(modelBuilder);
@@ -1059,6 +1068,122 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             u.HasOne(x => x.Position)
                 .WithMany(x => x.Employees)
                 .HasForeignKey(x => x.PositionId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+    }
+    
+    private void ConfigureAssetModels(ModelBuilder modelBuilder)
+    {
+        // AssetCategory
+        modelBuilder.Entity<AssetCategory>(c =>
+        {
+            c.ToTable("AssetCategories");
+            c.HasKey(x => x.Id);
+            c.Property(x => x.Name).HasMaxLength(100).IsRequired();
+            c.Property(x => x.Description).HasMaxLength(500);
+            c.Property(x => x.Icon).HasMaxLength(50);
+            
+            c.HasIndex(x => x.Name);
+            c.HasIndex(x => x.IsActive);
+        });
+        
+        // Asset
+        modelBuilder.Entity<Asset>(a =>
+        {
+            a.ToTable("Assets");
+            a.HasKey(x => x.Id);
+            a.Property(x => x.AssetCode).HasMaxLength(50).IsRequired();
+            a.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            a.Property(x => x.Description).HasMaxLength(2000);
+            a.Property(x => x.SerialNumber).HasMaxLength(100);
+            a.Property(x => x.Manufacturer).HasMaxLength(100);
+            a.Property(x => x.Model).HasMaxLength(100);
+            a.Property(x => x.InvoiceNumber).HasMaxLength(50);
+            a.Property(x => x.Location).HasMaxLength(200);
+            a.Property(x => x.Notes).HasMaxLength(2000);
+            a.Property(x => x.ImageUrl).HasMaxLength(500);
+            a.Property(x => x.PurchaseValue).HasPrecision(18, 2);
+            
+            a.HasIndex(x => x.AssetCode).IsUnique();
+            a.HasIndex(x => x.SerialNumber);
+            a.HasIndex(x => x.CategoryId);
+            a.HasIndex(x => x.Status);
+            a.HasIndex(x => x.IsActive);
+            a.HasIndex(x => x.SupplierId);
+            
+            a.HasOne(x => x.Category)
+                .WithMany(x => x.Assets)
+                .HasForeignKey(x => x.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        
+        // AssetAssignment
+        modelBuilder.Entity<AssetAssignment>(aa =>
+        {
+            aa.ToTable("AssetAssignments");
+            aa.HasKey(x => x.Id);
+            aa.Property(x => x.AssignmentNotes).HasMaxLength(1000);
+            aa.Property(x => x.ReturnNotes).HasMaxLength(1000);
+            
+            aa.HasIndex(x => x.AssetId);
+            aa.HasIndex(x => x.AssignedToUserId);
+            aa.HasIndex(x => x.AssignedDate);
+            aa.HasIndex(x => x.ReturnedDate);
+            aa.HasIndex(x => new { x.AssetId, x.ReturnedDate });
+            
+            aa.HasOne(x => x.Asset)
+                .WithMany(x => x.Assignments)
+                .HasForeignKey(x => x.AssetId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            aa.HasOne(x => x.AssignedToUser)
+                .WithMany()
+                .HasForeignKey(x => x.AssignedToUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            aa.HasOne(x => x.AssignedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.AssignedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            aa.HasOne<ApplicationUser>(x => x.ReturnedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.ReturnedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+        
+        // AssetMaintenance
+        modelBuilder.Entity<AssetMaintenance>(am =>
+        {
+            am.ToTable("AssetMaintenances");
+            am.HasKey(x => x.Id);
+            am.Property(x => x.Description).HasMaxLength(1000).IsRequired();
+            am.Property(x => x.ServiceDetails).HasMaxLength(2000);
+            am.Property(x => x.ServiceProvider).HasMaxLength(200);
+            am.Property(x => x.InvoiceNumber).HasMaxLength(50);
+            am.Property(x => x.Notes).HasMaxLength(2000);
+            am.Property(x => x.Cost).HasPrecision(18, 2);
+            
+            am.HasIndex(x => x.AssetId);
+            am.HasIndex(x => x.Type);
+            am.HasIndex(x => x.Status);
+            am.HasIndex(x => x.ScheduledDate);
+            am.HasIndex(x => x.NextMaintenanceDate);
+            am.HasIndex(x => new { x.Status, x.ScheduledDate });
+            
+            am.HasOne(x => x.Asset)
+                .WithMany(x => x.MaintenanceRecords)
+                .HasForeignKey(x => x.AssetId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            am.HasOne(x => x.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            am.HasOne<ApplicationUser>(x => x.CompletedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.CompletedByUserId)
                 .OnDelete(DeleteBehavior.SetNull);
         });
     }
