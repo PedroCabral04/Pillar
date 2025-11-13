@@ -220,9 +220,15 @@ builder.Services.AddAntiforgery(o =>
     // HeaderName can be customized if you post forms via JS: o.HeaderName = "X-CSRF-TOKEN";
 });
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection"); 
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-                                                options.UseNpgsql(connectionString ?? "Host=localhost;Database=erp;Username=postgres;Password=123"));
+{
+    // Força a assembly de migrações explicitamente para evitar "No migrations were found" em publish
+    options.UseNpgsql(
+        connectionString ?? "Host=localhost;Database=erp;Username=postgres;Password=123",
+        npgsql => npgsql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)
+    );
+});
 
 // Registra DAOs e Serviços
 builder.Services.AddScoped<IUserDao, UserDao>();
