@@ -13,6 +13,33 @@ docs/
 *.nupkg
 *.nuspec
 *.props
+
+# Keep important markdown files
+!README.md
+!COOLIFY_DEPLOYMENT.md
+!roadmap.md
+!API_DOCUMENTATION_GUIDE.md
+!ASSET_MANAGEMENT_README.md
+!IMPLEMENTACAO_EMAIL.md
+
+# Exclude other markdown
 *.md
+
+# Environment files (sensitive data)
 .env
 .env.local
+.env.production
+
+# Docker volumes
+postgres_data/
+app_data/
+
+# VS Code
+.vscode/
+.vs/
+
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates

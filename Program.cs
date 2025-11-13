@@ -378,6 +378,30 @@ app.UseMiddleware<ApiKeyMiddleware>();
 
 // Mapeia os endpoints
 app.MapControllers(); // Mapeia rotas para os Controllers de API
+
+// Health check endpoint para Coolify/Docker/K8s
+app.MapGet("/health", async (ApplicationDbContext db) =>
+{
+    try
+    {
+        // Testa conexão com o banco
+        await db.Database.CanConnectAsync();
+        return Results.Ok(new { 
+            status = "healthy", 
+            timestamp = DateTime.UtcNow,
+            version = "1.0.0"
+        });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(
+            detail: ex.Message,
+            statusCode: 503,
+            title: "Database connection failed"
+        );
+    }
+}).AllowAnonymous();
+
 app.MapRazorComponents<App>() // Mapeia os componentes Blazor
     .AddInteractiveServerRenderMode();
 // Mapeie outros endpoints (Minimal APIs, etc.) aqui, se necessário
