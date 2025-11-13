@@ -10,6 +10,7 @@
 
 
     <ItemGroup>
+        <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.5.2" />
         <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
         <PackageReference Include="Blazor-ApexCharts" Version="6.0.2" />
         <PackageReference Include="Blazored.LocalStorage" Version="4.5.0" />
@@ -42,5 +43,8 @@
     <!-- Exclude unit test source files from the web project build. Tests should live in a separate test project. -->
     <ItemGroup>
       <Compile Remove="Tests\**\*.cs" />
+    </ItemGroup>
+    <ItemGroup>
+      <ProjectReference Include="Pillar.ServiceDefaults\Pillar.ServiceDefaults.csproj" />
     </ItemGroup>
 </Project>

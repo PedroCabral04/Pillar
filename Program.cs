@@ -39,6 +39,9 @@ catch
 
 var builder = WebApplication.CreateBuilder(args);
 
+// --- Aspire Service Defaults ---
+builder.AddServiceDefaults();
+
 // --- Configure Serviços ---
 
 builder.Services.AddRazorComponents()
