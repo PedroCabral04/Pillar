@@ -14,6 +14,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 using erp.Security;
 using erp.Models.Identity;
 using erp.Services.Dashboard;
@@ -450,10 +452,36 @@ using (var scope = app.Services.CreateScope())
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         // Prefer Migrate when migrations exist; allow forcing EnsureCreated via DB_BOOTSTRAP
         var anyModelMigrations = db.Database.GetMigrations().Any();
-        if (dbBootstrap)
+        var bootstrapMode = Environment.GetEnvironmentVariable("DB_BOOTSTRAP")?.Trim().ToLowerInvariant();
+        var bootstrapDropCreate = bootstrapMode == "dropcreate";
+        var bootstrapEnabled = bootstrapDropCreate || dbBootstrap;
+
+        if (bootstrapEnabled)
         {
-            Console.WriteLine("[DB] Bootstrap mode enabled -> EnsureCreated()");
-            db.Database.EnsureCreated();
+            if (bootstrapDropCreate)
+            {
+                Console.WriteLine("[DB] Bootstrap DROP+CREATE enabled -> EnsureDeleted() + EnsureCreated()");
+                try { db.Database.EnsureDeleted(); } catch (Exception ex) { Console.WriteLine($"[DB] EnsureDeleted warning: {ex.Message}"); }
+                db.Database.EnsureCreated();
+            }
+            else
+            {
+                Console.WriteLine("[DB] Bootstrap mode enabled -> EnsureCreated()/CreateTables()");
+                var created = db.Database.EnsureCreated();
+                if (!created)
+                {
+                    try
+                    {
+                        var databaseCreator = (RelationalDatabaseCreator)db.Database.GetService<IRelationalDatabaseCreator>();
+                        databaseCreator.CreateTables();
+                        Console.WriteLine("[DB] CreateTables executed successfully.");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[DB] CreateTables fallback failed: {ex.Message}");
+                    }
+                }
+            }
         }
         else if (anyModelMigrations)
         {
