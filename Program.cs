@@ -82,9 +82,9 @@ builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
     // Harden cookie
     options.Cookie.HttpOnly = true;
     options.Cookie.SameSite = SameSiteMode.Lax; // prevents CSRF on cross-site navigations, still works for same-site
-    options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
-        ? CookieSecurePolicy.SameAsRequest // allow HTTP in dev to avoid antiforgery/cookie issues
-        : CookieSecurePolicy.Always; // only over HTTPS in prod
+        // Use SameAsRequest to support TLS termination at the proxy (Coolify/nginx)
+        // and avoid antiforgery exceptions when the incoming connection to Kestrel is HTTP
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
     options.Cookie.Path = "/";
     options.Cookie.IsEssential = true; // ensure cookie not blocked by consent if used
     
@@ -336,10 +336,16 @@ builder.Services.AddScoped<erp.Mappings.FinancialMapper, erp.Mappings.FinancialM
 var app = builder.Build();
 
 // Enable forwarded headers so HTTPS scheme is honored behind reverse proxies
-app.UseForwardedHeaders(new ForwardedHeadersOptions
+// Enable forwarded headers so HTTPS scheme is honored behind reverse proxies
+var forwardedOptions = new ForwardedHeadersOptions
 {
     ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedFor
-});
+};
+// When running inside containers behind a proxy the proxy's IP may not be known
+// to the runtime. Clear known networks/proxies so the forwarded headers are accepted.
+forwardedOptions.KnownNetworks.Clear();
+forwardedOptions.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedOptions);
 
 // --- Configura o pipeline de requisições HTTP ---
 if (app.Environment.IsDevelopment())
@@ -364,9 +370,8 @@ app.UseStaticFiles(); // Permite servir arquivos estáticos como CSS, JS, imagen
 app.UseCookiePolicy(new CookiePolicyOptions
 {
     MinimumSameSitePolicy = SameSiteMode.Lax,
-    Secure = builder.Environment.IsDevelopment()
-        ? CookieSecurePolicy.SameAsRequest
-        : CookieSecurePolicy.Always
+    // Align Secure policy with antiforgery/cookies: prefer SameAsRequest so TLS termination works
+    Secure = CookieSecurePolicy.SameAsRequest
 });
 
 app.UseAntiforgery(); // Adiciona proteção contra CSRF
