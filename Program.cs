@@ -441,15 +441,28 @@ using (var scope = app.Services.CreateScope())
 {
     try
     {
+        // Bootstrap flag: forces EnsureCreated on first deploys when migrations aren't available
+        var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+        var bootstrapEnv = Environment.GetEnvironmentVariable("DB_BOOTSTRAP");
+        var bootstrapCfg = config.GetValue<bool>("Database:Bootstrap");
+        var dbBootstrap = bootstrapCfg || string.Equals(bootstrapEnv, "true", StringComparison.OrdinalIgnoreCase);
+
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        // Prefer Migrate when migrations exist; otherwise EnsureCreated to bootstrap first run
+        // Prefer Migrate when migrations exist; allow forcing EnsureCreated via DB_BOOTSTRAP
         var anyModelMigrations = db.Database.GetMigrations().Any();
-        if (anyModelMigrations)
+        if (dbBootstrap)
         {
+            Console.WriteLine("[DB] Bootstrap mode enabled -> EnsureCreated()");
+            db.Database.EnsureCreated();
+        }
+        else if (anyModelMigrations)
+        {
+            Console.WriteLine("[DB] Applying migrations -> Migrate()");
             db.Database.Migrate();
         }
         else
         {
+            Console.WriteLine("[DB] No migrations found -> EnsureCreated()");
             db.Database.EnsureCreated();
         }
 
