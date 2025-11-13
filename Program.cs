@@ -225,9 +225,9 @@ builder.Services.AddAntiforgery(o =>
 {
     o.Cookie.HttpOnly = true;
     o.Cookie.SameSite = SameSiteMode.Lax;
-    o.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
-        ? CookieSecurePolicy.SameAsRequest
-        : CookieSecurePolicy.Always;
+    // Use SameAsRequest even in production when behind a reverse proxy (Coolify/nginx)
+    // that terminates TLS and forwards HTTP internally with X-Forwarded-Proto
+    o.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
     o.Cookie.Name = "erp.csrf";
     // HeaderName can be customized if you post forms via JS: o.HeaderName = "X-CSRF-TOKEN";
 });
@@ -353,8 +353,10 @@ builder.Services.AddScoped<erp.Mappings.FinancialMapper, erp.Mappings.FinancialM
 // --- Constrói a aplicação ---
 var app = builder.Build();
 
-// Enable forwarded headers so HTTPS scheme is honored behind reverse proxies
-// Enable forwarded headers so HTTPS scheme is honored behind reverse proxies
+// --- Configura o pipeline de requisições HTTP ---
+
+// CRITICAL: UseForwardedHeaders MUST be first so X-Forwarded-Proto is processed
+// before any middleware that checks Request.Scheme (like antiforgery, HTTPS redirection)
 var forwardedOptions = new ForwardedHeadersOptions
 {
     ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedFor
@@ -364,8 +366,6 @@ var forwardedOptions = new ForwardedHeadersOptions
 forwardedOptions.KnownNetworks.Clear();
 forwardedOptions.KnownProxies.Clear();
 app.UseForwardedHeaders(forwardedOptions);
-
-// --- Configura o pipeline de requisições HTTP ---
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
