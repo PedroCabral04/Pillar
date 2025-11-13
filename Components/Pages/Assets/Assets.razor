@@ -1,6 +1,7 @@
 @page "/assets"
 @using erp.DTOs.Assets
 @using erp.Services
+@using erp.Components.Pages.Assets
 @using erp.Models
 @using MudBlazor
 @using Size = MudBlazor.Size
@@ -11,17 +12,18 @@
 @inject ILogger<Assets> Logger
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
+@inject IDialogService DialogService
 
 <PageTitle>Ativos</PageTitle>
 
 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
     <MudText Typo="Typo.h4">Gerenciar Ativos</MudText>
-    <MudButton Color="Color.Primary" 
-               Variant="Variant.Filled" 
-               StartIcon="@Icons.Material.Filled.Add"
-               Href="/assets/create">
-        Adicionar Ativo
-    </MudButton>
+        <MudButton Color="Color.Primary" 
+                   Variant="Variant.Filled" 
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenCreateDialog">
+            Adicionar Ativo
+        </MudButton>
 </MudStack>
 
 @if (_loadError != null)
@@ -181,7 +183,7 @@
                                Title="Ver detalhes"/>
                 <MudIconButton Icon="@Icons.Material.Filled.Edit" 
                                Size="Size.Small"
-                               Href="@($"/assets/{context.Id}/edit")"
+                               OnClick="@(() => OpenEditDialog(context.Id))"
                                Title="Editar"/>
                 <MudIconButton Icon="@Icons.Material.Filled.Delete" 
                                Size="Size.Small" 
@@ -203,6 +205,49 @@
     private string? _loadError;
     private string? _searchTerm;
     private AssetStatus? _statusFilter;
+
+    private async Task OpenCreateDialog()
+    {
+        var options = new DialogOptions
+        {
+            CloseOnEscapeKey = true,
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true
+        };
+
+        var dialog = await DialogService.ShowAsync<AssetForm>("Adicionar Ativo", options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadStatistics();
+            await LoadAssets();
+        }
+    }
+
+    private async Task OpenEditDialog(int assetId)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Id", assetId }
+        };
+
+        var options = new DialogOptions
+        {
+            CloseOnEscapeKey = true,
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true
+        };
+
+        var dialog = await DialogService.ShowAsync<AssetForm>("Editar Ativo", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadStatistics();
+            await LoadAssets();
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {

@@ -1,40 +1,31 @@
-@page "/assets/create"
-@page "/assets/{Id:int}/edit"
 @using erp.DTOs.Assets
 @using erp.Services
 @using erp.Models
 @using MudBlazor
 @using Size = MudBlazor.Size
 @using Color = MudBlazor.Color
-@attribute [Authorize]
 
 @inject IApiService ApiService
 @inject ILogger<AssetForm> Logger
 @inject ISnackbar Snackbar
-@inject NavigationManager Navigation
 
-<PageTitle>@(IsEditMode ? "Editar Ativo" : "Novo Ativo")</PageTitle>
-
-<MudPaper Elevation="4" Class="pa-4">
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
-        <MudText Typo="Typo.h5">@(IsEditMode ? "Editar Ativo" : "Cadastrar Novo Ativo")</MudText>
-        <MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/assets">
-            Voltar
-        </MudButton>
-    </MudStack>
-
-    @if (_loading)
-    {
-        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
-    }
-    else if (_loadError != null)
-    {
-        <MudAlert Severity="Severity.Error" Class="mb-4">@_loadError</MudAlert>
-    }
-    else
-    {
-        <MudForm @ref="_form" Model="_model">
-            <MudGrid>
+<MudDialog>
+    <DialogContent>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else if (_loadError != null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">@_loadError</MudAlert>
+        }
+        else
+        {
+            <MudForm @ref="_form" Model="_model">
+                <MudGrid>
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.h6" Class="mb-2">@(IsEditMode ? "Editar Ativo" : "Cadastrar Novo Ativo")</MudText>
+                    </MudItem>
                 <MudItem xs="12" md="4">
                     <MudTextField @bind-Value="_model.AssetCode"
                                   Label="Código do Ativo"
@@ -180,10 +171,12 @@
                 </MudItem>
             </MudGrid>
         </MudForm>
-    }
-</MudPaper>
+        }
+    </DialogContent>
+</MudDialog>
 
 @code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
     [Parameter] public int? Id { get; set; }
 
     private bool IsEditMode => Id.HasValue;
@@ -298,6 +291,8 @@
             _model.PurchaseDate = _purchaseDate;
             _model.WarrantyExpiryDate = _warrantyExpiryDate;
 
+            AssetDto result;
+
             if (IsEditMode)
             {
                 var updateDto = new UpdateAssetDto
@@ -323,18 +318,16 @@
                     IsActive = true
                 };
 
-                await ApiService.PutAsync<AssetDto>($"/api/assets/{Id}", updateDto);
+                result = await ApiService.PutAsync<AssetDto>($"/api/assets/{Id}", updateDto) ?? new AssetDto();
                 Snackbar.Add("Ativo atualizado com sucesso", Severity.Success);
             }
             else
             {
-                var created = await ApiService.PostAsync<AssetDto>("/api/assets", _model);
+                result = await ApiService.PostAsync<AssetDto>("/api/assets", _model) ?? new AssetDto();
                 Snackbar.Add("Ativo cadastrado com sucesso", Severity.Success);
-                Navigation.NavigateTo($"/assets/{created.Id}");
-                return;
             }
 
-            Navigation.NavigateTo("/assets");
+            MudDialog.Close(DialogResult.Ok(result));
         }
         catch (Exception ex)
         {
@@ -347,8 +340,5 @@
         }
     }
 
-    private void Cancel()
-    {
-        Navigation.NavigateTo("/assets");
-    }
+    private void Cancel() => MudDialog.Cancel();
 }
