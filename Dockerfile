@@ -6,26 +6,24 @@ WORKDIR /src
 COPY erp.csproj .
 RUN dotnet restore "erp.csproj"
 
-# Copy everything else and build
+# Copy everything else and publish directly
 COPY . .
-RUN dotnet build "erp.csproj" -c Release -o /app/build
-
-# Publish Stage
-FROM build AS publish
 RUN dotnet publish "erp.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
 # Runtime Stage
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
 WORKDIR /app
 
-# Install timezone data and set timezone
-RUN apt-get update && apt-get install -y tzdata && \
+# Install curl and timezone data
+RUN apt-get update && \
+    apt-get install -y curl tzdata && \
     ln -sf /usr/share/zoneinfo/America/Sao_Paulo /etc/localtime && \
     echo "America/Sao_Paulo" > /etc/timezone && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy published app
-COPY --from=publish /app/publish .
+COPY --from=build /app/publish .
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
