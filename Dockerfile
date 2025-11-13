@@ -1,35 +1,32 @@
-# Build
+# Build and run Pillar ERP (.NET 9 Blazor Server) in a container
+# ---------- Build stage ----------
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
-# Copy everything and restore + publish
-COPY . .
-RUN dotnet restore "erp.csproj" \
- && dotnet publish "erp.csproj" -c Release -o /app/out --no-restore
+# copy csproj and restore as distinct layers
+COPY erp.csproj ./
+COPY Pillar.ServiceDefaults/Pillar.ServiceDefaults.csproj Pillar.ServiceDefaults/
+RUN dotnet restore "erp.csproj"
 
-# Runtime
-FROM mcr.microsoft.com/dotnet/aspnet:9.0
+# copy everything else and build
+COPY . .
+RUN dotnet publish "erp.csproj" -c Release -o /app/publish --no-restore
+
+# ---------- Runtime stage ----------
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
 WORKDIR /app
 
-# Copy published output
-COPY --from=build /app/out ./
+# Optional: set timezone to UTC explicitly (app already uses UTC)
+ENV TZ=Etc/UTC \
+    ASPNETCORE_URLS=http://+:8080 \
+    ASPNETCORE_ENVIRONMENT=Production
 
-# (optional) install curl for HEALTHCHECK
-USER root
-RUN apt-get update \
- && apt-get install -y --no-install-recommends curl \
- && rm -rf /var/lib/apt/lists/*
-
-# Expose docs only; ingress decides what to publish
 EXPOSE 8080
-EXPOSE 8081
 
-# Docker health — checks INTERNAL mgmt port (not exposed publicly)
-HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
-    CMD curl -fsS http://127.0.0.1:8081/health || exit 1
+# Copy published output
+COPY --from=build /app/publish .
 
-# If you prefer non-root at runtime:
-# RUN useradd -m appuser && chown -R appuser:appuser /app
-# USER appuser
+# Default health probe (Coolify can use /health)
+# HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
 ENTRYPOINT ["dotnet", "erp.dll"]

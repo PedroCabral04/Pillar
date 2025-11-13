@@ -76,7 +76,13 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     }
 
     protected override void OnConfiguring(DbContextOptionsBuilder options)
-        => options.UseNpgsql("Host=localhost;Database=erp;Username=postgres;Password=123");
+    {
+        // Only configure here if no provider was configured via DI (AddDbContext)
+        if (!options.IsConfigured)
+        {
+            options.UseNpgsql("Host=localhost;Database=erp;Username=postgres;Password=123");
+        }
+    }
 
     public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {

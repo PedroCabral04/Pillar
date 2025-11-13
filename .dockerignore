@@ -21,9 +21,11 @@
 **/obj
 **/secrets.dev.yaml
 **/values.dev.yaml
-LICENSE
-README.md
-roadmap.md
-**/*.md
-**/Tests
-**/*.DotSettings.user
+**/.idea
+**/*.suo
+**/*.user
+**/*.userosscache
+**/*.sln.docstates
+**/*.nupkg
+**/*.cache
+**/publish-test
