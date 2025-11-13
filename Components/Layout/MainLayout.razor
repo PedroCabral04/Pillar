@@ -37,6 +37,12 @@
         </MudAppBar>
         
         <MudPaper Style="position: relative; height: 100vh;" >
+            <!-- Mobile Backdrop Overlay -->
+            @if (_drawerOpen && _isMobileView)
+            {
+                <div class="mobile-drawer-backdrop" @onclick="ToggleDrawer"></div>
+            }
+            
             <MudDrawerContainer Class="mud-height-full">
                 <!-- Desktop: Persistent/Mini Drawer | Mobile: Temporary (Modal) -->
                 <MudDrawer id="nav-drawer" 
@@ -64,26 +70,36 @@
             
             <!-- Mobile Bottom Navigation -->
             <MudPaper Class="mobile-bottom-nav d-md-none" Elevation="8">
-                <MudIconButton Icon="@Icons.Material.Filled.Home" 
-                              Color="@(IsCurrentPage("") ? MudBlazor.Color.Primary : MudBlazor.Color.Default)"
-                              Href="/"
-                              Size="MudBlazor.Size.Large" />
-                <MudIconButton Icon="@Icons.Material.Filled.Dashboard" 
-                              Color="@(IsCurrentPage("dashboard") ? MudBlazor.Color.Primary : MudBlazor.Color.Default)"
-                              Href="dashboard"
-                              Size="MudBlazor.Size.Large" />
-                <MudIconButton Icon="@Icons.Material.Filled.ShoppingCart" 
-                              Color="@(IsCurrentPage("sales") ? MudBlazor.Color.Primary : MudBlazor.Color.Default)"
-                              Href="sales"
-                              Size="MudBlazor.Size.Large" />
-                <MudIconButton Icon="@Icons.Material.Filled.Inventory" 
-                              Color="@(IsCurrentPage("inventory") ? MudBlazor.Color.Primary : MudBlazor.Color.Default)"
-                              Href="inventory/products"
-                              Size="MudBlazor.Size.Large" />
-                <MudIconButton Icon="@Icons.Material.Filled.MoreHoriz" 
-                              Color="MudBlazor.Color.Default"
-                              OnClick="@ToggleDrawer"
-                              Size="MudBlazor.Size.Large" />
+                <div class="bottom-nav-item" @onclick='() => NavigateTo("/")'>
+                    <MudIconButton Icon="@Icons.Material.Filled.Home" 
+                                  Color="@(IsCurrentPage("") ? MudBlazor.Color.Primary : MudBlazor.Color.Default)"
+                                  Size="MudBlazor.Size.Medium" />
+                    <MudText Typo="Typo.caption" Color="@(IsCurrentPage("") ? MudBlazor.Color.Primary : MudBlazor.Color.Default)" Class="bottom-nav-label">Home</MudText>
+                </div>
+                <div class="bottom-nav-item" @onclick='() => NavigateTo("/dashboard")'>
+                    <MudIconButton Icon="@Icons.Material.Filled.Dashboard" 
+                                  Color="@(IsCurrentPage("dashboard") ? MudBlazor.Color.Primary : MudBlazor.Color.Default)"
+                                  Size="MudBlazor.Size.Medium" />
+                    <MudText Typo="Typo.caption" Color="@(IsCurrentPage("dashboard") ? MudBlazor.Color.Primary : MudBlazor.Color.Default)" Class="bottom-nav-label">Dashboard</MudText>
+                </div>
+                <div class="bottom-nav-item" @onclick='() => NavigateTo("/sales")'>
+                    <MudIconButton Icon="@Icons.Material.Filled.ShoppingCart" 
+                                  Color="@(IsCurrentPage("sales") ? MudBlazor.Color.Primary : MudBlazor.Color.Default)"
+                                  Size="MudBlazor.Size.Medium" />
+                    <MudText Typo="Typo.caption" Color="@(IsCurrentPage("sales") ? MudBlazor.Color.Primary : MudBlazor.Color.Default)" Class="bottom-nav-label">Vendas</MudText>
+                </div>
+                <div class="bottom-nav-item" @onclick='() => NavigateTo("/inventory/products")'>
+                    <MudIconButton Icon="@Icons.Material.Filled.Inventory" 
+                                  Color="@(IsCurrentPage("inventory") ? MudBlazor.Color.Primary : MudBlazor.Color.Default)"
+                                  Size="MudBlazor.Size.Medium" />
+                    <MudText Typo="Typo.caption" Color="@(IsCurrentPage("inventory") ? MudBlazor.Color.Primary : MudBlazor.Color.Default)" Class="bottom-nav-label">Estoque</MudText>
+                </div>
+                <div class="bottom-nav-item" @onclick="@ToggleDrawer">
+                    <MudIconButton Icon="@Icons.Material.Filled.Menu" 
+                                  Color="MudBlazor.Color.Default"
+                                  Size="MudBlazor.Size.Medium" />
+                    <MudText Typo="Typo.caption" Color="MudBlazor.Color.Default" Class="bottom-nav-label">Menu</MudText>
+                </div>
             </MudPaper>
             
             <MudScrollToTop>
@@ -108,6 +124,7 @@
     private MudThemeProvider _mudThemeProvider = null!;
     public bool IsDarkMode;
     private string? _currentUrl;
+    private bool _isMobileView = false;
 
     [Inject] private NavigationManager NavigationManager { get; set; } = null!;
 
@@ -125,10 +142,17 @@
         NavigationManager.LocationChanged += OnLocationChanged;
     }
 
-    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    private async void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
         _currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
-        StateHasChanged();
+        
+        // Fecha o drawer no mobile ao navegar
+        if (_isMobileView && _drawerOpen)
+        {
+            _drawerOpen = false;
+        }
+        
+        await InvokeAsync(StateHasChanged);
     }
 
     private bool IsCurrentPage(string path)
@@ -140,10 +164,19 @@
         return _currentUrl?.StartsWith(path, StringComparison.OrdinalIgnoreCase) ?? false;
     }
 
+    private void NavigateTo(string url)
+    {
+        NavigationManager.NavigateTo(url);
+    }
+
     private DrawerVariant GetDrawerVariant()
     {
         // Mobile: sempre Temporary (modal/overlay)
         // Desktop: Persistent quando aberto, Mini quando fechado (empurra conteúdo)
+        if (_isMobileView)
+        {
+            return DrawerVariant.Temporary;
+        }
         return _drawerOpen ? DrawerVariant.Persistent : DrawerVariant.Mini;
     }
 
@@ -156,12 +189,6 @@
     {
         return "pa-2 pa-md-4 full-height-content main-content-responsive";
     }
-    
-    private bool IsMobileView()
-    {
-        // CSS media queries handle the responsive behavior
-        return false;
-    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -170,6 +197,16 @@
             await PreferenceService.InitializeAsync();
             ThemeService.InitializeTheme();
             PreferenceService.OnPreferenceChanged += OnPreferenceChanged;
+            
+            // Detecta se é mobile
+            _isMobileView = await JsRuntime.InvokeAsync<bool>("erpResponsive.isMobile");
+            
+            // Fecha o drawer por padrão no mobile
+            if (_isMobileView)
+            {
+                _drawerOpen = false;
+            }
+            
             StateHasChanged();
         }
     }

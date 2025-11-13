@@ -68,30 +68,69 @@ window.erpResponsive = {
     
     // Enable swipe to close drawer on mobile
     enableSwipeToClose: function(drawerId, closeCallback) {
-        if (!this.isMobile()) return;
+        if (!this.isMobile()) return () => {};
         
         const drawer = document.getElementById(drawerId);
-        if (!drawer) return;
+        if (!drawer) return () => {};
         
         let touchStartX = 0;
         let touchEndX = 0;
+        let touchStartY = 0;
+        let touchEndY = 0;
+        let isDragging = false;
         
         const handleSwipe = () => {
-            const swipeDistance = touchEndX - touchStartX;
-            // Swipe left to close (threshold: 50px)
-            if (swipeDistance < -50) {
-                closeCallback();
+            const swipeDistance = touchStartX - touchEndX;
+            const verticalDistance = Math.abs(touchStartY - touchEndY);
+            
+            // Swipe left to close (threshold: 50px), ignore if vertical swipe
+            if (swipeDistance > 50 && verticalDistance < 50) {
+                if (typeof closeCallback === 'function') {
+                    closeCallback();
+                } else {
+                    DotNet.invokeMethodAsync('erp', closeCallback);
+                }
             }
         };
         
-        drawer.addEventListener('touchstart', (e) => {
+        const touchStart = (e) => {
             touchStartX = e.changedTouches[0].screenX;
-        });
+            touchStartY = e.changedTouches[0].screenY;
+            isDragging = true;
+        };
         
-        drawer.addEventListener('touchend', (e) => {
+        const touchMove = (e) => {
+            if (!isDragging) return;
+            const currentX = e.changedTouches[0].screenX;
+            const diff = touchStartX - currentX;
+            
+            // Visual feedback during swipe
+            if (diff > 0) {
+                drawer.style.transform = `translateX(-${Math.min(diff, 280)}px)`;
+            }
+        };
+        
+        const touchEnd = (e) => {
+            if (!isDragging) return;
+            isDragging = false;
             touchEndX = e.changedTouches[0].screenX;
+            touchEndY = e.changedTouches[0].screenY;
+            
+            // Reset transform
+            drawer.style.transform = '';
+            
             handleSwipe();
-        });
+        };
+        
+        drawer.addEventListener('touchstart', touchStart, { passive: true });
+        drawer.addEventListener('touchmove', touchMove, { passive: true });
+        drawer.addEventListener('touchend', touchEnd, { passive: true });
+        
+        return () => {
+            drawer.removeEventListener('touchstart', touchStart);
+            drawer.removeEventListener('touchmove', touchMove);
+            drawer.removeEventListener('touchend', touchEnd);
+        };
     },
     
     // Adjust viewport height for mobile browsers (addresses URL bar)
@@ -160,10 +199,59 @@ window.erpResponsive = {
         const updateBreakpointClass = () => {
             document.body.className = document.body.className.replace(/breakpoint-\w+/g, '');
             document.body.classList.add(`breakpoint-${this.getBreakpoint()}`);
+            
+            // Add mobile/desktop class
+            if (this.isMobile()) {
+                document.body.classList.add('is-mobile');
+                document.body.classList.remove('is-desktop');
+            } else {
+                document.body.classList.add('is-desktop');
+                document.body.classList.remove('is-mobile');
+            }
         };
         
         updateBreakpointClass();
         window.addEventListener('resize', updateBreakpointClass);
+        
+        // Haptic feedback for touch devices
+        this.initHapticFeedback();
+    },
+    
+    // Haptic feedback for buttons
+    initHapticFeedback: function() {
+        if (!this.isTouchDevice() || !('vibrate' in navigator)) return;
+        
+        document.addEventListener('touchstart', (e) => {
+            const target = e.target.closest('.mud-button-root, .mud-icon-button, .bottom-nav-item');
+            if (target) {
+                navigator.vibrate(10); // Light vibration
+            }
+        }, { passive: true });
+    },
+    
+    // Prevent overscroll (rubber band effect)
+    preventOverscroll: function(element) {
+        if (!element) return;
+        
+        let startY = 0;
+        
+        element.addEventListener('touchstart', (e) => {
+            startY = e.touches[0].pageY;
+        }, { passive: true });
+        
+        element.addEventListener('touchmove', (e) => {
+            const y = e.touches[0].pageY;
+            const scrollTop = element.scrollTop;
+            const scrollHeight = element.scrollHeight;
+            const offsetHeight = element.offsetHeight;
+            
+            const isAtTop = scrollTop <= 0;
+            const isAtBottom = scrollTop + offsetHeight >= scrollHeight;
+            
+            if ((isAtTop && y > startY) || (isAtBottom && y < startY)) {
+                e.preventDefault();
+            }
+        }, { passive: false });
     }
 };
 

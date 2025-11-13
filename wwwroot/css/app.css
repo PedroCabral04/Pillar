@@ -12,6 +12,38 @@
     min-height: 100vh;
 }
 
+/* Smooth scrolling */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Custom scrollbar for webkit browsers */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+/* Mobile: thinner scrollbar */
+@media (max-width: 959px) {
+    ::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+    }
+}
+
 /* Animações suaves */
 .mud-dialog {
     animation: fadeIn 0.2s ease-in-out;
@@ -171,6 +203,29 @@ input:focus-visible {
     right: 0;
     z-index: 1300;
     background: var(--mud-palette-appbar-background) !important;
+    height: 56px !important;
+}
+
+/* Mobile Backdrop Overlay */
+.mobile-drawer-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1299;
+    animation: fadeIn 0.3s ease;
+    backdrop-filter: blur(2px);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
 }
 
 /* Mobile Bottom Navigation */
@@ -179,7 +234,7 @@ input:focus-visible {
     bottom: 0;
     left: 0;
     right: 0;
-    height: 56px;
+    height: 64px;
     display: flex;
     align-items: center;
     justify-content: space-around;
@@ -187,25 +242,48 @@ input:focus-visible {
     border-top: 1px solid rgba(0, 0, 0, 0.12);
     z-index: 1200;
     box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+    padding: 4px 8px;
 }
 
-.mobile-bottom-nav .mud-icon-button {
-    border-radius: 12px;
+.bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 64px;
+    padding: 4px;
+    cursor: pointer;
     transition: all 0.2s ease;
+    border-radius: 12px;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
-.mobile-bottom-nav .mud-icon-button:active {
+.bottom-nav-item:active {
     transform: scale(0.95);
+    background: rgba(103, 58, 183, 0.08);
+}
+
+.bottom-nav-label {
+    font-size: 0.7rem;
+    margin-top: 2px;
+    font-weight: 500;
+    line-height: 1;
+}
+
+.bottom-nav-item .mud-icon-button {
+    padding: 6px;
 }
 
 /* Main Content Adjustments for Mobile */
 @media (max-width: 959px) {
     /* Mobile: add padding for top bar and bottom nav */
     .main-content-responsive {
-        margin-top: 48px !important;
-        margin-bottom: 56px !important;
+        margin-top: 56px !important;
+        margin-bottom: 64px !important;
         margin-left: 0 !important;
-        padding: 12px !important;
+        padding: 16px 12px !important;
+        min-height: calc(100vh - 120px);
     }
     
     /* Drawer becomes full overlay on mobile */
@@ -217,11 +295,13 @@ input:focus-visible {
     /* Override drawer variant to be temporary on mobile */
     #nav-drawer {
         position: fixed !important;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
     
     #nav-drawer .mud-drawer-content {
         width: 280px !important;
         max-width: 85vw !important;
+        box-shadow: 2px 0 8px rgba(0, 0, 0, 0.3);
     }
     
     /* Add backdrop overlay on mobile when drawer is open */
@@ -233,43 +313,124 @@ input:focus-visible {
     .mud-table-container {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
+        border-radius: 8px;
+        margin: 0 -12px;
+        padding: 0 12px;
     }
     
     .mud-table {
         min-width: 600px;
     }
     
+    .mud-table-cell {
+        padding: 12px 8px !important;
+        font-size: 0.875rem;
+    }
+    
+    .mud-table-head .mud-table-cell {
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    
     /* Cards mais compactos */
     .mud-card {
         margin-bottom: 12px;
+        border-radius: 12px;
+    }
+    
+    .mud-card-header {
+        padding: 12px 16px !important;
     }
     
     .mud-card-content {
-        padding: 12px !important;
+        padding: 16px !important;
+    }
+    
+    .mud-card-actions {
+        padding: 8px 16px !important;
     }
     
     /* Formulários mobile-friendly */
     .mud-input-control {
-        margin-bottom: 12px;
+        margin-bottom: 16px;
+    }
+    
+    .mud-input,
+    .mud-select,
+    .mud-input-root input {
+        font-size: 16px !important; /* Prevents zoom on iOS */
+    }
+    
+    .mud-input-root {
+        min-height: 48px;
+    }
+    
+    /* Labels mais visíveis */
+    .mud-input-label,
+    .mud-input-label-inputcontrol {
+        font-size: 0.9rem !important;
+        font-weight: 500 !important;
     }
     
     /* Diálogos full-screen em mobile */
     .mud-dialog-container {
         align-items: flex-end;
+        padding: 0 !important;
     }
     
     .mud-dialog {
         margin: 0;
         width: 100%;
         max-width: 100% !important;
-        max-height: 90vh;
+        max-height: 95vh;
         border-radius: 16px 16px 0 0;
+        animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    @keyframes slideUp {
+        from {
+            transform: translateY(100%);
+        }
+        to {
+            transform: translateY(0);
+        }
+    }
+    
+    .mud-dialog-title {
+        padding: 20px 16px 16px !important;
+        font-size: 1.25rem !important;
+    }
+    
+    .mud-dialog-content {
+        padding: 16px !important;
+        max-height: calc(95vh - 140px);
+        overflow-y: auto;
+    }
+    
+    .mud-dialog-actions {
+        padding: 16px !important;
+        flex-direction: column-reverse !important;
+        gap: 8px;
+    }
+    
+    .mud-dialog-actions .mud-button-root {
+        width: 100% !important;
+        margin: 0 !important;
+        min-height: 48px !important;
     }
     
     /* Botões mais touch-friendly */
     .mud-button-root {
-        min-height: 44px;
-        padding: 8px 16px;
+        min-height: 48px;
+        padding: 10px 20px;
+        font-size: 1rem;
+        font-weight: 500;
+        border-radius: 8px;
+    }
+    
+    .mud-fab {
+        width: 56px;
+        height: 56px;
     }
     
     /* Grid responsivo */
@@ -279,7 +440,32 @@ input:focus-visible {
     
     /* Snackbar position adjustment */
     .mud-snackbar {
-        bottom: 70px !important;
+        bottom: 74px !important;
+        left: 8px !important;
+        right: 8px !important;
+        max-width: calc(100% - 16px) !important;
+    }
+    
+    /* Toolbar mobile */
+    .mud-toolbar {
+        flex-wrap: wrap;
+        min-height: 56px !important;
+        padding: 8px !important;
+    }
+    
+    .mud-toolbar .mud-button-root {
+        margin: 4px;
+    }
+    
+    /* Chips e badges */
+    .mud-chip {
+        height: 28px;
+        font-size: 0.8125rem;
+        padding: 0 10px;
+    }
+    
+    .mud-badge {
+        font-size: 0.7rem;
     }
 }
 
@@ -345,20 +531,27 @@ input:focus-visible {
     }
     
     .mud-list-item {
-        min-height: 48px;
+        min-height: 52px;
+        padding: 12px 16px;
     }
     
     /* Remove hover effects on touch devices */
     .mud-nav-link:hover,
     .mud-button-root:hover {
         transform: none;
+        box-shadow: none;
     }
     
     /* Add active states instead */
     .mud-nav-link:active,
     .mud-button-root:active {
-        transform: scale(0.98);
-        opacity: 0.8;
+        transform: scale(0.97);
+        opacity: 0.85;
+    }
+    
+    /* Better tap highlight */
+    * {
+        -webkit-tap-highlight-color: rgba(103, 58, 183, 0.2);
     }
 }
 
@@ -617,11 +810,48 @@ input:focus-visible {
     background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
     background-size: 200% 100%;
     animation: loading 1.5s infinite;
+    border-radius: 4px;
 }
 
 @keyframes loading {
     0% { background-position: 200% 0; }
     100% { background-position: -200% 0; }
+}
+
+/* Loading spinner melhorado */
+.mud-progress-circular {
+    animation: rotate 1.4s linear infinite;
+}
+
+@keyframes rotate {
+    100% { transform: rotate(360deg); }
+}
+
+/* Pulse animation for loading cards */
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.loading-card {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Shimmer effect */
+.shimmer {
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.3) 50%,
+        rgba(255, 255, 255, 0) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
 }
 
 /* Pull to refresh indicator */
