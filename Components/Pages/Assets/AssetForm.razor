@@ -1,0 +1,354 @@
+@page "/assets/create"
+@page "/assets/{Id:int}/edit"
+@using erp.DTOs.Assets
+@using erp.Services
+@using erp.Models
+@using MudBlazor
+@using Size = MudBlazor.Size
+@using Color = MudBlazor.Color
+@attribute [Authorize]
+
+@inject IApiService ApiService
+@inject ILogger<AssetForm> Logger
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>@(IsEditMode ? "Editar Ativo" : "Novo Ativo")</PageTitle>
+
+<MudPaper Elevation="4" Class="pa-4">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudText Typo="Typo.h5">@(IsEditMode ? "Editar Ativo" : "Cadastrar Novo Ativo")</MudText>
+        <MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/assets">
+            Voltar
+        </MudButton>
+    </MudStack>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_loadError != null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@_loadError</MudAlert>
+    }
+    else
+    {
+        <MudForm @ref="_form" Model="_model">
+            <MudGrid>
+                <MudItem xs="12" md="4">
+                    <MudTextField @bind-Value="_model.AssetCode"
+                                  Label="Código do Ativo"
+                                  Required="true"
+                                  Variant="Variant.Outlined"
+                                  Placeholder="Ex: COMP-001" />
+                </MudItem>
+
+                <MudItem xs="12" md="8">
+                    <MudTextField @bind-Value="_model.Name"
+                                  Label="Nome do Ativo"
+                                  Required="true"
+                                  Variant="Variant.Outlined"
+                                  Placeholder="Ex: Notebook Dell Latitude 5490" />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudSelect @bind-Value="_model.CategoryId"
+                               Label="Categoria"
+                               Required="true"
+                               Variant="Variant.Outlined">
+                        @foreach (var category in _categories)
+                        {
+                            <MudSelectItem Value="@category.Id">@category.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_model.Location"
+                                  Label="Localização"
+                                  Variant="Variant.Outlined"
+                                  Placeholder="Ex: Sala 201, Andar 3" />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_model.SerialNumber"
+                                  Label="Número de Série"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_model.Manufacturer"
+                                  Label="Fabricante"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_model.Model"
+                                  Label="Modelo"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12" md="3">
+                    <MudDatePicker @bind-Date="_purchaseDate"
+                                   Label="Data de Compra"
+                                   Variant="Variant.Outlined"
+                                   DateFormat="dd/MM/yyyy" />
+                </MudItem>
+
+                <MudItem xs="12" md="3">
+                    <MudNumericField @bind-Value="_model.PurchaseValue"
+                                     Label="Valor de Compra"
+                                     Variant="Variant.Outlined"
+                                     Adornment="Adornment.Start"
+                                     AdornmentText="R$"
+                                     Culture="@BrazilCulture" />
+                </MudItem>
+
+                <MudItem xs="12" md="4">
+                    <MudTextField @bind-Value="_model.InvoiceNumber"
+                                  Label="Nota Fiscal"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12" md="4">
+                    <MudSelect @bind-Value="_model.Status"
+                               Label="Status"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem Value="@AssetStatus.Available">Disponível</MudSelectItem>
+                        <MudSelectItem Value="@AssetStatus.InUse">Em Uso</MudSelectItem>
+                        <MudSelectItem Value="@AssetStatus.Maintenance">Manutenção</MudSelectItem>
+                        <MudSelectItem Value="@AssetStatus.Retired">Aposentado</MudSelectItem>
+                        <MudSelectItem Value="@AssetStatus.Lost">Perdido</MudSelectItem>
+                        <MudSelectItem Value="@AssetStatus.Sold">Vendido</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12" md="4">
+                    <MudSelect @bind-Value="_model.Condition"
+                               Label="Condição"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem Value="@AssetCondition.Excellent">Excelente</MudSelectItem>
+                        <MudSelectItem Value="@AssetCondition.Good">Bom</MudSelectItem>
+                        <MudSelectItem Value="@AssetCondition.Fair">Regular</MudSelectItem>
+                        <MudSelectItem Value="@AssetCondition.Poor">Ruim</MudSelectItem>
+                        <MudSelectItem Value="@AssetCondition.Damaged">Danificado</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12" md="4">
+                    <MudDatePicker @bind-Date="_warrantyExpiryDate"
+                                   Label="Garantia até"
+                                   Variant="Variant.Outlined"
+                                   DateFormat="dd/MM/yyyy" />
+                </MudItem>
+
+                <MudItem xs="12" md="4">
+                    <MudNumericField @bind-Value="_model.ExpectedLifespanMonths"
+                                     Label="Vida Útil (meses)"
+                                     Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_model.Description"
+                                  Label="Descrição"
+                                  Lines="3"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_model.Notes"
+                                  Label="Observações"
+                                  Lines="3"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12" Class="mt-4">
+                    <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2">
+                        <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="Cancel">Cancelar</MudButton>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="_saving">
+                            @if (_saving)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                            }
+                            else
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-1" />
+                                <text>@(IsEditMode ? "Salvar alterações" : "Cadastrar")</text>
+                            }
+                        </MudButton>
+                    </MudStack>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    }
+</MudPaper>
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private bool IsEditMode => Id.HasValue;
+    private MudForm? _form;
+    private CreateAssetDto _model = new();
+    private List<AssetCategoryDto> _categories = new();
+    private bool _loading = true;
+    private bool _saving = false;
+    private string? _loadError;
+
+    private DateTime? _purchaseDate;
+    private DateTime? _warrantyExpiryDate;
+    private System.Globalization.CultureInfo BrazilCulture { get; } = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCategories();
+
+        if (IsEditMode)
+        {
+            await LoadAsset();
+        }
+        else
+        {
+            // Defaults
+            _model.Status = AssetStatus.Available;
+            _model.Condition = AssetCondition.Good;
+            _loading = false;
+        }
+    }
+
+    private async Task LoadCategories()
+    {
+        try
+        {
+            _categories = await ApiService.GetAsync<List<AssetCategoryDto>>("/api/assets/categories") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar categorias de ativos");
+            _loadError = "Erro ao carregar categorias de ativos";
+        }
+    }
+
+    private async Task LoadAsset()
+    {
+        if (!Id.HasValue)
+        {
+            _loading = false;
+            return;
+        }
+
+        try
+        {
+            var asset = await ApiService.GetAsync<AssetDto>($"/api/assets/{Id.Value}");
+            if (asset == null)
+            {
+                _loadError = "Ativo não encontrado";
+            }
+            else
+            {
+                _model = new CreateAssetDto
+                {
+                    AssetCode = asset.AssetCode,
+                    Name = asset.Name,
+                    Description = asset.Description,
+                    CategoryId = asset.CategoryId,
+                    SerialNumber = asset.SerialNumber,
+                    Manufacturer = asset.Manufacturer,
+                    Model = asset.Model,
+                    PurchaseDate = asset.PurchaseDate,
+                    PurchaseValue = asset.PurchaseValue,
+                    SupplierId = asset.SupplierId,
+                    InvoiceNumber = asset.InvoiceNumber,
+                    Status = asset.Status,
+                    Location = asset.Location,
+                    Condition = asset.Condition,
+                    WarrantyExpiryDate = asset.WarrantyExpiryDate,
+                    ExpectedLifespanMonths = asset.ExpectedLifespanMonths,
+                    Notes = asset.Notes,
+                    ImageUrl = asset.ImageUrl
+                };
+
+                _purchaseDate = asset.PurchaseDate;
+                _warrantyExpiryDate = asset.WarrantyExpiryDate;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar ativo {AssetId}", Id);
+            _loadError = $"Erro ao carregar ativo: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task Save()
+    {
+        await _form!.Validate();
+        if (!_form.IsValid)
+        {
+            return;
+        }
+
+        _saving = true;
+
+        try
+        {
+            // Sync date pickers to model
+            _model.PurchaseDate = _purchaseDate;
+            _model.WarrantyExpiryDate = _warrantyExpiryDate;
+
+            if (IsEditMode)
+            {
+                var updateDto = new UpdateAssetDto
+                {
+                    AssetCode = _model.AssetCode,
+                    Name = _model.Name,
+                    Description = _model.Description,
+                    CategoryId = _model.CategoryId,
+                    SerialNumber = _model.SerialNumber,
+                    Manufacturer = _model.Manufacturer,
+                    Model = _model.Model,
+                    PurchaseDate = _model.PurchaseDate,
+                    PurchaseValue = _model.PurchaseValue,
+                    SupplierId = _model.SupplierId,
+                    InvoiceNumber = _model.InvoiceNumber,
+                    Status = _model.Status,
+                    Location = _model.Location,
+                    Condition = _model.Condition,
+                    WarrantyExpiryDate = _model.WarrantyExpiryDate,
+                    ExpectedLifespanMonths = _model.ExpectedLifespanMonths,
+                    Notes = _model.Notes,
+                    ImageUrl = _model.ImageUrl,
+                    IsActive = true
+                };
+
+                await ApiService.PutAsync<AssetDto>($"/api/assets/{Id}", updateDto);
+                Snackbar.Add("Ativo atualizado com sucesso", Severity.Success);
+            }
+            else
+            {
+                var created = await ApiService.PostAsync<AssetDto>("/api/assets", _model);
+                Snackbar.Add("Ativo cadastrado com sucesso", Severity.Success);
+                Navigation.NavigateTo($"/assets/{created.Id}");
+                return;
+            }
+
+            Navigation.NavigateTo("/assets");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao salvar ativo");
+            Snackbar.Add($"Erro ao salvar ativo: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        Navigation.NavigateTo("/assets");
+    }
+}
