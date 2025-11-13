@@ -13,6 +13,7 @@ docs/
 *.nupkg
 *.nuspec
 *.props
+/publish-test
 
 # Keep important markdown files
 !README.md
