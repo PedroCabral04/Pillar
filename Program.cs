@@ -387,15 +387,21 @@ app.UseMiddleware<ApiKeyMiddleware>();
 // Mapeia os endpoints
 app.MapControllers(); // Mapeia rotas para os Controllers de API
 
-// Health check endpoint para Coolify/Docker/K8s
-app.MapGet("/health", async (ApplicationDbContext db) =>
+// Liveness probe (não depende do banco) -> use em Coolify se quiser expor mesmo sem DB
+app.MapGet("/health", () => Results.Ok(new {
+    status = "healthy",
+    timestamp = DateTime.UtcNow,
+    version = "1.0.0"
+})).AllowAnonymous();
+
+// Readiness probe (verifica banco) -> use em Coolify somente se o app só deve expor quando o DB estiver OK
+app.MapGet("/ready", async (ApplicationDbContext db) =>
 {
     try
     {
-        // Testa conexão com o banco
         await db.Database.CanConnectAsync();
-        return Results.Ok(new { 
-            status = "healthy", 
+        return Results.Ok(new {
+            status = "ready",
             timestamp = DateTime.UtcNow,
             version = "1.0.0"
         });
