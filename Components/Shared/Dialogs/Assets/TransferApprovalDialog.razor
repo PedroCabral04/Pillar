@@ -1,0 +1,282 @@
+@using erp.DTOs.Assets
+@using erp.Services
+@using erp.Models
+@using MudBlazor
+@using Size = MudBlazor.Size
+@using Color = MudBlazor.Color
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+@inject ILogger<TransferApprovalDialog> Logger
+
+<MudDialog>
+    <DialogContent>
+        @if (_loading)
+        {
+            <MudProgressCircular Indeterminate="true" Size="Size.Large"/>
+        }
+        else if (_transfer != null)
+        {
+            <MudGrid>
+                <MudItem xs="12">
+                    <MudText Typo="Typo.h6" Class="mb-2">Aprovar Transferência de Ativo</MudText>
+                </MudItem>
+
+                <!-- Transfer Details Card -->
+                <MudItem xs="12">
+                    <MudCard Outlined="true">
+                        <MudCardContent>
+                            <MudGrid>
+                                <MudItem xs="12">
+                                    <MudText Typo="Typo.subtitle1" Color="Color.Primary">
+                                        <MudIcon Icon="@Icons.Material.Filled.Inventory" Size="Size.Small" Class="mr-2"/>
+                                        <strong>@_transfer.AssetName</strong> (@_transfer.AssetCode)
+                                    </MudText>
+                                </MudItem>
+
+                                <MudItem xs="12" md="6">
+                                    <MudStack Spacing="2">
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">DE</MudText>
+                                        <MudText Typo="Typo.body2">
+                                            <strong>Localização:</strong> @_transfer.FromLocation
+                                        </MudText>
+                                        @if (!string.IsNullOrEmpty(_transfer.FromDepartmentName))
+                                        {
+                                            <MudText Typo="Typo.body2">
+                                                <strong>Departamento:</strong> @_transfer.FromDepartmentName
+                                            </MudText>
+                                        }
+                                    </MudStack>
+                                </MudItem>
+
+                                <MudItem xs="12" md="6">
+                                    <MudStack Spacing="2">
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">PARA</MudText>
+                                        <MudText Typo="Typo.body2">
+                                            <strong>Localização:</strong> @_transfer.ToLocation
+                                        </MudText>
+                                        @if (!string.IsNullOrEmpty(_transfer.ToDepartmentName))
+                                        {
+                                            <MudText Typo="Typo.body2">
+                                                <strong>Departamento:</strong> @_transfer.ToDepartmentName
+                                            </MudText>
+                                        }
+                                    </MudStack>
+                                </MudItem>
+
+                                <MudItem xs="12">
+                                    <MudDivider/>
+                                </MudItem>
+
+                                <MudItem xs="12" md="6">
+                                    <MudText Typo="Typo.body2">
+                                        <strong>Data da Transferência:</strong> @_transfer.TransferDate.ToString("dd/MM/yyyy")
+                                    </MudText>
+                                </MudItem>
+
+                                <MudItem xs="12" md="6">
+                                    <MudText Typo="Typo.body2">
+                                        <strong>Condição:</strong> 
+                                        <MudChip T="string" Size="Size.Small" Color="@GetConditionColor(_transfer.Condition)">
+                                            @GetConditionText(_transfer.Condition)
+                                        </MudChip>
+                                    </MudText>
+                                </MudItem>
+
+                                @if (!string.IsNullOrEmpty(_transfer.Reason))
+                                {
+                                    <MudItem xs="12">
+                                        <MudText Typo="Typo.body2">
+                                            <strong>Motivo:</strong> @_transfer.Reason
+                                        </MudText>
+                                    </MudItem>
+                                }
+
+                                @if (!string.IsNullOrEmpty(_transfer.Notes))
+                                {
+                                    <MudItem xs="12">
+                                        <MudText Typo="Typo.body2">
+                                            <strong>Observações:</strong> @_transfer.Notes
+                                        </MudText>
+                                    </MudItem>
+                                }
+
+                                <MudItem xs="12">
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                        <strong>Solicitado por:</strong> @_transfer.RequestedByUserName em @_transfer.CreatedAt.ToString("dd/MM/yyyy HH:mm")
+                                    </MudText>
+                                </MudItem>
+                            </MudGrid>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+
+                <!-- Action Selection -->
+                <MudItem xs="12">
+                    <MudRadioGroup @bind-Value="_approvalAction">
+                        <MudRadio Value="@("approve")" Color="Color.Success">
+                            <MudText Typo="Typo.body1">
+                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Class="mr-1"/>
+                                Aprovar Transferência
+                            </MudText>
+                        </MudRadio>
+                        <MudRadio Value="@("reject")" Color="Color.Error">
+                            <MudText Typo="Typo.body1">
+                                <MudIcon Icon="@Icons.Material.Filled.Cancel" Size="Size.Small" Class="mr-1"/>
+                                Rejeitar Transferência
+                            </MudText>
+                        </MudRadio>
+                    </MudRadioGroup>
+                </MudItem>
+
+                @if (_approvalAction == "reject")
+                {
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_rejectionReason" 
+                                      Label="Motivo da Rejeição" 
+                                      Required="true"
+                                      Lines="3"
+                                      Variant="Variant.Outlined"
+                                      Placeholder="Explique o motivo da rejeição..."/>
+                    </MudItem>
+                }
+
+                @if (_approvalAction == "approve")
+                {
+                    <MudItem xs="12">
+                        <MudAlert Severity="Severity.Success" Dense="true">
+                            Ao aprovar, esta transferência poderá ser concluída pelo solicitante ou pelo responsável do ativo.
+                        </MudAlert>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="@_processing">Cancelar</MudButton>
+        <MudButton Color="@(_approvalAction == "approve" ? Color.Success : Color.Error)" 
+                   Variant="Variant.Filled" 
+                   OnClick="ProcessApproval" 
+                   Disabled="@(_processing || string.IsNullOrEmpty(_approvalAction))">
+            @if (_processing)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true"/>
+            }
+            else
+            {
+                @if (_approvalAction == "approve")
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-1"/>
+                    <text>Aprovar</text>
+                }
+                else if (_approvalAction == "reject")
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Cancel" Class="mr-1"/>
+                    <text>Rejeitar</text>
+                }
+                else
+                {
+                    <text>Processar</text>
+                }
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int TransferId { get; set; }
+
+    private AssetTransferDto? _transfer;
+    private bool _loading = false;
+    private bool _processing = false;
+    private string? _approvalAction;
+    private string? _rejectionReason;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTransferDetails();
+    }
+
+    private async Task LoadTransferDetails()
+    {
+        _loading = true;
+        try
+        {
+            _transfer = await ApiService.GetAsync<AssetTransferDto>($"/api/assets/transfers/{TransferId}");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar detalhes da transferência {TransferId}", TransferId);
+            Snackbar.Add("Erro ao carregar detalhes da transferência", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ProcessApproval()
+    {
+        if (string.IsNullOrEmpty(_approvalAction))
+        {
+            Snackbar.Add("Selecione uma ação", Severity.Warning);
+            return;
+        }
+
+        if (_approvalAction == "reject" && string.IsNullOrWhiteSpace(_rejectionReason))
+        {
+            Snackbar.Add("Informe o motivo da rejeição", Severity.Warning);
+            return;
+        }
+
+        _processing = true;
+        try
+        {
+            AssetTransferDto? result = null;
+
+            if (_approvalAction == "approve")
+            {
+                result = await ApiService.PutAsync<AssetTransferDto>($"/api/assets/transfers/{TransferId}/approve", null);
+                Snackbar.Add("Transferência aprovada com sucesso", Severity.Success);
+            }
+            else if (_approvalAction == "reject")
+            {
+                result = await ApiService.PutAsync<AssetTransferDto>($"/api/assets/transfers/{TransferId}/reject", _rejectionReason);
+                Snackbar.Add("Transferência rejeitada", Severity.Info);
+            }
+
+            MudDialog.Close(DialogResult.Ok(result));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao processar aprovação da transferência {TransferId}", TransferId);
+            Snackbar.Add($"Erro ao processar aprovação: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _processing = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private Color GetConditionColor(AssetCondition condition) => condition switch
+    {
+        AssetCondition.Excellent => Color.Success,
+        AssetCondition.Good => Color.Info,
+        AssetCondition.Fair => Color.Warning,
+        AssetCondition.Poor => Color.Error,
+        AssetCondition.Damaged => Color.Error,
+        _ => Color.Default
+    };
+
+    private string GetConditionText(AssetCondition condition) => condition switch
+    {
+        AssetCondition.Excellent => "Excelente",
+        AssetCondition.Good => "Bom",
+        AssetCondition.Fair => "Regular",
+        AssetCondition.Poor => "Ruim",
+        AssetCondition.Damaged => "Danificado",
+        _ => condition.ToString()
+    };
+}

@@ -1,0 +1,417 @@
+@page "/assets/{id:int}/details"
+@using erp.DTOs.Assets
+@using erp.Services
+@using erp.Models
+@using erp.Components.Shared.Dialogs.Assets
+@using MudBlazor
+@using Size = MudBlazor.Size
+@using Color = MudBlazor.Color
+@attribute [Authorize]
+
+@inject IApiService ApiService
+@inject ILogger<AssetDetails> Logger
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject IDialogService DialogService
+
+<PageTitle>Detalhes do Ativo - @(_asset?.Name ?? "Carregando...")</PageTitle>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary"/>
+}
+else if (_error != null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@_error</MudAlert>
+    <MudButton Color="Color.Primary" Variant="Variant.Filled" Href="/assets">
+        Voltar para Lista
+    </MudButton>
+}
+else if (_asset != null)
+{
+    <!-- Header -->
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+        <div>
+            <MudText Typo="Typo.h4">@_asset.Name</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Código: @_asset.AssetCode</MudText>
+        </div>
+        <MudStack Row="true" Spacing="2">
+            <MudButton Color="Color.Primary" 
+                       Variant="Variant.Outlined"
+                       StartIcon="@Icons.Material.Filled.Edit"
+                       Href="@($"/assets/{Id}/edit")">
+                Editar
+            </MudButton>
+            <MudButton Color="Color.Info" 
+                       Variant="Variant.Outlined"
+                       StartIcon="@Icons.Material.Filled.SwapHoriz"
+                       OnClick="OpenTransferDialog">
+                Solicitar Transferência
+            </MudButton>
+        </MudStack>
+    </MudStack>
+
+    <!-- Tabs -->
+    <MudTabs Elevation="4" Rounded="true" Color="Color.Primary" ApplyEffectsToContainer="true">
+        
+        <!-- General Info Tab -->
+        <MudTabPanel Text="Informações Gerais" Icon="@Icons.Material.Filled.Info">
+            <MudGrid Class="mt-4">
+                <MudItem xs="12" md="8">
+                    <MudPaper Elevation="2" Class="pa-4">
+                        <MudText Typo="Typo.h6" Class="mb-4">Detalhes do Ativo</MudText>
+                        <MudGrid>
+                            <MudItem xs="12" md="6">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Categoria</MudText>
+                                <MudText Typo="Typo.body1">@_asset.CategoryName</MudText>
+                            </MudItem>
+                            <MudItem xs="12" md="6">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText>
+                                <MudChip T="string" Color="@GetStatusColor(_asset.Status)">
+                                    @GetStatusText(_asset.Status)
+                                </MudChip>
+                            </MudItem>
+                            <MudItem xs="12" md="6">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Condição</MudText>
+                                <MudChip T="string" Color="@GetConditionColor(_asset.Condition)">
+                                    @GetConditionText(_asset.Condition)
+                                </MudChip>
+                            </MudItem>
+                            <MudItem xs="12" md="6">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Localização</MudText>
+                                <MudText Typo="Typo.body1">@(_asset.Location ?? "-")</MudText>
+                            </MudItem>
+                            @if (!string.IsNullOrEmpty(_asset.SerialNumber))
+                            {
+                                <MudItem xs="12" md="6">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Número de Série</MudText>
+                                    <MudText Typo="Typo.body1">@_asset.SerialNumber</MudText>
+                                </MudItem>
+                            }
+                            @if (!string.IsNullOrEmpty(_asset.Manufacturer))
+                            {
+                                <MudItem xs="12" md="6">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Fabricante</MudText>
+                                    <MudText Typo="Typo.body1">@_asset.Manufacturer</MudText>
+                                </MudItem>
+                            }
+                            @if (!string.IsNullOrEmpty(_asset.Model))
+                            {
+                                <MudItem xs="12" md="6">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Modelo</MudText>
+                                    <MudText Typo="Typo.body1">@_asset.Model</MudText>
+                                </MudItem>
+                            }
+                            @if (_asset.PurchaseDate.HasValue)
+                            {
+                                <MudItem xs="12" md="6">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Data de Compra</MudText>
+                                    <MudText Typo="Typo.body1">@_asset.PurchaseDate.Value.ToString("dd/MM/yyyy")</MudText>
+                                </MudItem>
+                            }
+                            @if (_asset.PurchaseValue.HasValue)
+                            {
+                                <MudItem xs="12" md="6">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Valor de Compra</MudText>
+                                    <MudText Typo="Typo.body1">@_asset.PurchaseValue.Value.ToString("C2")</MudText>
+                                </MudItem>
+                            }
+                            @if (!string.IsNullOrEmpty(_asset.Description))
+                            {
+                                <MudItem xs="12">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Descrição</MudText>
+                                    <MudText Typo="Typo.body1">@_asset.Description</MudText>
+                                </MudItem>
+                            }
+                        </MudGrid>
+                    </MudPaper>
+
+                    @if (!string.IsNullOrEmpty(_asset.CurrentAssignedToUserName))
+                    {
+                        <MudPaper Elevation="2" Class="pa-4 mt-4">
+                            <MudText Typo="Typo.h6" Class="mb-4">
+                                <MudIcon Icon="@Icons.Material.Filled.Person" Class="mr-2"/>
+                                Atribuição Atual
+                            </MudText>
+                            <MudGrid>
+                                <MudItem xs="12" md="6">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Atribuído a</MudText>
+                                    <MudText Typo="Typo.body1">@_asset.CurrentAssignedToUserName</MudText>
+                                </MudItem>
+                                <MudItem xs="12" md="6">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Data de Atribuição</MudText>
+                                    <MudText Typo="Typo.body1">
+                                        @_asset.CurrentAssignedDate?.ToString("dd/MM/yyyy")
+                                    </MudText>
+                                </MudItem>
+                            </MudGrid>
+                        </MudPaper>
+                    }
+                </MudItem>
+
+                <!-- QR Code -->
+                <MudItem xs="12" md="4">
+                    <QRCodeDisplayComponent AssetId="@Id"
+                                            AssetCode="@_asset.AssetCode"
+                                            AssetName="@_asset.Name"
+                                            Size="256"/>
+                </MudItem>
+            </MudGrid>
+        </MudTabPanel>
+
+        <!-- Documents Tab -->
+        <MudTabPanel Text="Documentos" Icon="@Icons.Material.Filled.Description">
+            <div class="mt-4">
+                <DocumentListComponent AssetId="@Id" 
+                                       OnDocumentChanged="@LoadAssetDetails"/>
+            </div>
+        </MudTabPanel>
+
+        <!-- Transfer History Tab -->
+        <MudTabPanel Text="Transferências" Icon="@Icons.Material.Filled.SwapHoriz">
+            <div class="mt-4">
+                <MudPaper Elevation="2" Class="pa-4">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+                        <MudText Typo="Typo.h6">Histórico de Transferências</MudText>
+                        <MudButton Color="Color.Primary" 
+                                   Variant="Variant.Filled" 
+                                   Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   OnClick="OpenTransferDialog">
+                            Nova Transferência
+                        </MudButton>
+                    </MudStack>
+
+                    @if (_loadingTransfers)
+                    {
+                        <MudProgressLinear Indeterminate="true" Color="Color.Primary"/>
+                    }
+                    else if (_transfers.Count == 0)
+                    {
+                        <MudAlert Severity="Severity.Info" Dense="true">
+                            Nenhuma transferência registrada para este ativo.
+                        </MudAlert>
+                    }
+                    else
+                    {
+                        <MudTable Items="@_transfers" Dense="true" Hover="true" Striped="true">
+                            <HeaderContent>
+                                <MudTh>Data</MudTh>
+                                <MudTh>De → Para</MudTh>
+                                <MudTh>Status</MudTh>
+                                <MudTh>Solicitado por</MudTh>
+                                <MudTh Style="text-align: center">Ações</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Data">@context.TransferDate.ToString("dd/MM/yyyy")</MudTd>
+                                <MudTd DataLabel="De → Para">
+                                    <MudText Typo="Typo.body2">@context.FromLocation → @context.ToLocation</MudText>
+                                </MudTd>
+                                <MudTd DataLabel="Status">
+                                    <MudChip T="string" Size="Size.Small" Color="@GetTransferStatusColor(context.Status)">
+                                        @GetTransferStatusText(context.Status)
+                                    </MudChip>
+                                </MudTd>
+                                <MudTd DataLabel="Solicitado por">@context.RequestedByUserName</MudTd>
+                                <MudTd DataLabel="Ações" Style="text-align: center">
+                                    @if (context.Status == TransferStatus.Pending)
+                                    {
+                                        <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" 
+                                                       Size="Size.Small"
+                                                       Color="Color.Success"
+                                                       OnClick="@(() => OpenApprovalDialog(context.Id))"
+                                                       Title="Aprovar/Rejeitar"/>
+                                    }
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    }
+                </MudPaper>
+            </div>
+        </MudTabPanel>
+
+        <!-- Maintenance Tab -->
+        <MudTabPanel Text="Manutenções" Icon="@Icons.Material.Filled.Build">
+            <div class="mt-4">
+                <MudPaper Elevation="2" Class="pa-4">
+                    <MudText Typo="Typo.h6">Histórico de Manutenções</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        (A ser implementado)
+                    </MudText>
+                </MudPaper>
+            </div>
+        </MudTabPanel>
+
+    </MudTabs>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private AssetDto? _asset;
+    private List<AssetTransferDto> _transfers = new();
+    private bool _loading = true;
+    private bool _loadingTransfers = false;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAssetDetails();
+        await LoadTransferHistory();
+    }
+
+    private async Task LoadAssetDetails()
+    {
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            _asset = await ApiService.GetAsync<AssetDto>($"/api/assets/{Id}");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar detalhes do ativo {AssetId}", Id);
+            _error = $"Erro ao carregar ativo: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadTransferHistory()
+    {
+        _loadingTransfers = true;
+
+        try
+        {
+            _transfers = await ApiService.GetAsync<List<AssetTransferDto>>($"/api/assets/{Id}/transfers") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar histórico de transferências");
+        }
+        finally
+        {
+            _loadingTransfers = false;
+        }
+    }
+
+    private async Task OpenTransferDialog()
+    {
+        if (_asset == null) return;
+
+        var parameters = new DialogParameters
+        {
+            { "AssetId", Id },
+            { "AssetName", _asset.Name }
+        };
+
+        var options = new DialogOptions 
+        { 
+            MaxWidth = MaxWidth.Medium, 
+            FullWidth = true 
+        };
+
+        var dialog = await DialogService.ShowAsync<TransferRequestDialog>(
+            "Solicitar Transferência", 
+            parameters, 
+            options
+        );
+
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            await LoadTransferHistory();
+            Snackbar.Add("Solicitação de transferência criada com sucesso", Severity.Success);
+        }
+    }
+
+    private async Task OpenApprovalDialog(int transferId)
+    {
+        var parameters = new DialogParameters
+        {
+            { "TransferId", transferId }
+        };
+
+        var options = new DialogOptions 
+        { 
+            MaxWidth = MaxWidth.Medium, 
+            FullWidth = true 
+        };
+
+        var dialog = await DialogService.ShowAsync<TransferApprovalDialog>(
+            "Aprovar Transferência", 
+            parameters, 
+            options
+        );
+
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            await LoadTransferHistory();
+            await LoadAssetDetails();
+        }
+    }
+
+    private Color GetStatusColor(AssetStatus status) => status switch
+    {
+        AssetStatus.Available => Color.Success,
+        AssetStatus.InUse => Color.Info,
+        AssetStatus.Maintenance => Color.Warning,
+        AssetStatus.Retired => Color.Default,
+        AssetStatus.Lost => Color.Error,
+        AssetStatus.Sold => Color.Secondary,
+        _ => Color.Default
+    };
+
+    private string GetStatusText(AssetStatus status) => status switch
+    {
+        AssetStatus.Available => "Disponível",
+        AssetStatus.InUse => "Em Uso",
+        AssetStatus.Maintenance => "Manutenção",
+        AssetStatus.Retired => "Aposentado",
+        AssetStatus.Lost => "Perdido",
+        AssetStatus.Sold => "Vendido",
+        _ => status.ToString()
+    };
+
+    private Color GetConditionColor(AssetCondition condition) => condition switch
+    {
+        AssetCondition.Excellent => Color.Success,
+        AssetCondition.Good => Color.Info,
+        AssetCondition.Fair => Color.Warning,
+        AssetCondition.Poor => Color.Error,
+        AssetCondition.Damaged => Color.Error,
+        _ => Color.Default
+    };
+
+    private string GetConditionText(AssetCondition condition) => condition switch
+    {
+        AssetCondition.Excellent => "Excelente",
+        AssetCondition.Good => "Bom",
+        AssetCondition.Fair => "Regular",
+        AssetCondition.Poor => "Ruim",
+        AssetCondition.Damaged => "Danificado",
+        _ => condition.ToString()
+    };
+
+    private Color GetTransferStatusColor(TransferStatus status) => status switch
+    {
+        TransferStatus.Pending => Color.Warning,
+        TransferStatus.InTransit => Color.Info,
+        TransferStatus.Completed => Color.Success,
+        TransferStatus.Cancelled => Color.Default,
+        _ => Color.Default
+    };
+
+    private string GetTransferStatusText(TransferStatus status) => status switch
+    {
+        TransferStatus.Pending => "Pendente",
+        TransferStatus.InTransit => "Em Trânsito",
+        TransferStatus.Completed => "Concluído",
+        TransferStatus.Cancelled => "Cancelado",
+        _ => status.ToString()
+    };
+}

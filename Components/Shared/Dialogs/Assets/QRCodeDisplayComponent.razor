@@ -1,0 +1,251 @@
+@using erp.Services
+@using MudBlazor
+@using Size = MudBlazor.Size
+@using Color = MudBlazor.Color
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+@inject ILogger<QRCodeDisplayComponent> Logger
+@inject IJSRuntime JSRuntime
+
+<MudPaper Elevation="2" Class="pa-4">
+    <MudStack Spacing="3">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+            <MudText Typo="Typo.h6">
+                <MudIcon Icon="@Icons.Material.Filled.QrCode" Class="mr-2"/>
+                Código QR do Ativo
+            </MudText>
+            @if (!string.IsNullOrEmpty(_qrCodeBase64))
+            {
+                <MudStack Row="true" Spacing="1">
+                    <MudIconButton Icon="@Icons.Material.Filled.Refresh" 
+                                   Size="@MudBlazor.Size.Small"
+                                   Color="Color.Primary"
+                                   OnClick="LoadQRCode"
+                                   Title="Atualizar QR Code"/>
+                    <MudIconButton Icon="@Icons.Material.Filled.Download" 
+                                   Size="@MudBlazor.Size.Small"
+                                   Color="Color.Success"
+                                   OnClick="DownloadQRCode"
+                                   Title="Baixar QR Code"/>
+                    <MudIconButton Icon="@Icons.Material.Filled.Print" 
+                                   Size="@MudBlazor.Size.Small"
+                                   Color="Color.Info"
+                                   OnClick="PrintQRCode"
+                                   Title="Imprimir QR Code"/>
+                </MudStack>
+            }
+        </MudStack>
+
+        @if (_loading)
+        {
+            <MudStack AlignItems="AlignItems.Center" Spacing="2" Class="py-6">
+                <MudProgressCircular Indeterminate="true" Size="@MudBlazor.Size.Large"/>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Gerando QR Code...</MudText>
+            </MudStack>
+        }
+        else if (_error != null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true">
+                @_error
+                <MudButton Color="Color.Error" 
+                           Size="@MudBlazor.Size.Small" 
+                           Variant="Variant.Text"
+                           OnClick="LoadQRCode"
+                           Class="ml-2">
+                    Tentar Novamente
+                </MudButton>
+            </MudAlert>
+        }
+        else if (!string.IsNullOrEmpty(_qrCodeBase64))
+        {
+            <MudStack AlignItems="AlignItems.Center" Spacing="2">
+                <!-- QR Code Image -->
+                <MudPaper Elevation="0" Class="pa-4" Style="background-color: white; border: 2px solid #e0e0e0;">
+                    <img id="qrCodeImage" 
+                         src="data:image/png;base64,@_qrCodeBase64" 
+                         alt="QR Code do Ativo @AssetCode"
+                         style="width: @(Size)px; height: @(Size)px; display: block;"/>
+                </MudPaper>
+
+                <!-- Asset Info -->
+                @if (ShowAssetInfo)
+                {
+                    <MudStack AlignItems="AlignItems.Center" Spacing="1" Class="mt-2">
+                        <MudText Typo="Typo.h6">@AssetName</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Style="font-family: monospace;">
+                            @AssetCode
+                        </MudText>
+                    </MudStack>
+                }
+
+                <!-- Instructions -->
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">
+                    <MudText Typo="Typo.caption">
+                        Escaneie este código QR para acessar rapidamente as informações deste ativo.
+                    </MudText>
+                </MudAlert>
+
+                <!-- Copy Link Option -->
+                @if (ShowCopyLink)
+                {
+                    <MudButton Color="Color.Primary" 
+                               Variant="Variant.Text" 
+                               Size="@MudBlazor.Size.Small"
+                               StartIcon="@Icons.Material.Filled.ContentCopy"
+                               OnClick="CopyAssetLink">
+                        Copiar Link do Ativo
+                    </MudButton>
+                }
+            </MudStack>
+        }
+    </MudStack>
+</MudPaper>
+
+@code {
+    [Parameter] public int AssetId { get; set; }
+    [Parameter] public string AssetCode { get; set; } = string.Empty;
+    [Parameter] public string AssetName { get; set; } = string.Empty;
+    [Parameter] public int Size { get; set; } = 256;
+    [Parameter] public bool ShowAssetInfo { get; set; } = true;
+    [Parameter] public bool ShowCopyLink { get; set; } = true;
+
+    private string? _qrCodeBase64;
+    private bool _loading = false;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadQRCode();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Reload if AssetId changes
+        if (AssetId > 0 && string.IsNullOrEmpty(_qrCodeBase64))
+        {
+            await LoadQRCode();
+        }
+    }
+
+    private async Task LoadQRCode()
+    {
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            var response = await ApiService.GetAsync<QRCodeResponse>($"/api/assets/{AssetId}/qrcode/base64");
+            
+            if (response != null && !string.IsNullOrEmpty(response.QrCode))
+            {
+                _qrCodeBase64 = response.QrCode;
+            }
+            else
+            {
+                _error = "Não foi possível gerar o QR Code";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar QR code do ativo {AssetId}", AssetId);
+            _error = $"Erro ao gerar QR Code: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task DownloadQRCode()
+    {
+        try
+        {
+            var url = $"/api/assets/{AssetId}/qrcode";
+            var fileName = $"qrcode-{AssetCode}.png";
+            
+            // Use JavaScript to download the file
+            await JSRuntime.InvokeVoidAsync("downloadFile", url, fileName);
+            Snackbar.Add("QR Code baixado com sucesso", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao baixar QR code");
+            Snackbar.Add("Erro ao baixar QR Code", Severity.Error);
+        }
+    }
+
+    private async Task PrintQRCode()
+    {
+        try
+        {
+            // Create a printable version with asset info
+            var printHtml = $@"
+                <html>
+                <head>
+                    <title>QR Code - {AssetCode}</title>
+                    <style>
+                        body {{ 
+                            display: flex; 
+                            flex-direction: column; 
+                            align-items: center; 
+                            justify-content: center; 
+                            min-height: 100vh; 
+                            font-family: Arial, sans-serif; 
+                            margin: 0;
+                            padding: 20px;
+                        }}
+                        .container {{
+                            text-align: center;
+                            border: 2px solid #333;
+                            padding: 30px;
+                            max-width: 400px;
+                        }}
+                        h1 {{ font-size: 24px; margin: 0 0 10px 0; }}
+                        .code {{ font-family: monospace; font-size: 18px; color: #666; margin: 0 0 20px 0; }}
+                        img {{ border: 2px solid #e0e0e0; padding: 10px; background: white; }}
+                        .footer {{ margin-top: 20px; font-size: 12px; color: #999; }}
+                    </style>
+                </head>
+                <body>
+                    <div class='container'>
+                        <h1>{AssetName}</h1>
+                        <p class='code'>{AssetCode}</p>
+                        <img src='data:image/png;base64,{_qrCodeBase64}' alt='QR Code' width='{Size}' height='{Size}'/>
+                        <p class='footer'>Escaneie para acessar informações do ativo</p>
+                    </div>
+                </body>
+                </html>
+            ";
+
+            await JSRuntime.InvokeVoidAsync("printHtml", printHtml);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao imprimir QR code");
+            Snackbar.Add("Erro ao imprimir QR Code", Severity.Error);
+        }
+    }
+
+    private async Task CopyAssetLink()
+    {
+        try
+        {
+            var baseUrl = await JSRuntime.InvokeAsync<string>("getBaseUrl");
+            var assetUrl = $"{baseUrl}/assets/{AssetId}";
+            
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", assetUrl);
+            Snackbar.Add("Link copiado para a área de transferência", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao copiar link do ativo");
+            Snackbar.Add("Erro ao copiar link", Severity.Error);
+        }
+    }
+
+    private class QRCodeResponse
+    {
+        public string QrCode { get; set; } = string.Empty;
+        public string MimeType { get; set; } = string.Empty;
+    }
+}
