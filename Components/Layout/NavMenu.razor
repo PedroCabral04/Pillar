@@ -4,16 +4,23 @@
 
 @inject NavigationManager NavigationManager
 
-<MudNavMenu Rounded="false" Class="py-2">
+<MudNavMenu Rounded="false" Class="py-2 responsive-nav-menu">
     @if (IsOpen)
     {
         <div class="d-flex align-center justify-space-between px-3 py-3 mb-2">
             <MudText Typo="Typo.h5" Style="font-weight: 600;">Pillar</MudText>
+            <MudIconButton Icon="@Icons.Material.Filled.Close" 
+                          Color="MudBlazor.Color.Inherit" 
+                          Size="MudBlazor.Size.Small"
+                          OnClick="OnToggleDrawer" 
+                          Title="Fechar menu"
+                          Class="d-md-none" />
             <MudIconButton Icon="@Icons.Material.Filled.MenuOpen" 
                           Color="MudBlazor.Color.Inherit" 
                           Size="MudBlazor.Size.Small"
                           OnClick="OnToggleDrawer" 
-                          Title="Fechar menu" />
+                          Title="Fechar menu"
+                          Class="d-none d-md-block" />
         </div>
     }
     else

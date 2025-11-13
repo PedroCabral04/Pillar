@@ -25,30 +25,69 @@
     }
     else
     {
-        <MudPaper Style="position: relative; height: 100vh; display: flex" >
+        <!-- Mobile Top Bar -->
+        <MudAppBar Elevation="2" Dense="true" Class="mobile-topbar d-md-none">
+            <MudIconButton Icon="@Icons.Material.Filled.Menu" 
+                          Color="MudBlazor.Color.Inherit" 
+                          Edge="Edge.Start"
+                          OnClick="@ToggleDrawer" />
+            <MudText Typo="Typo.h6" Style="font-weight: 600;">Pillar</MudText>
+            <MudSpacer />
+            <MudIconButton Icon="@Icons.Material.Filled.Notifications" Color="MudBlazor.Color.Inherit" Size="MudBlazor.Size.Small" />
+        </MudAppBar>
+        
+        <MudPaper Style="position: relative; height: 100vh;" >
             <MudDrawerContainer Class="mud-height-full">
+                <!-- Desktop: Persistent/Mini Drawer | Mobile: Temporary (Modal) -->
                 <MudDrawer id="nav-drawer" 
                            Fixed="false" 
-                           Variant="@(_drawerOpen ? DrawerVariant.Persistent : DrawerVariant.Mini)" 
+                           Variant="@GetDrawerVariant()" 
                            OpenMiniOnHover="false" 
                            @bind-Open="_drawerOpen" 
                            ClipMode="DrawerClipMode.Always" 
                            Elevation="2"
                            Width="240px"
-                           MiniWidth="56px">
+                           MiniWidth="56px"
+                           Class="@GetDrawerClass()">
                         <NavMenu IsOpen="_drawerOpen" OnToggleDrawer="@ToggleDrawer"/>
                 </MudDrawer>
+                
+                <MudMainContent 
+                    Class="@GetMainContentClass()" 
+                    Style="@MainContentStyle()">
+                    <div class="mb-4 d-none d-md-block">
+                        <erp.Components.Shared.Breadcrumbs />
+                    </div>
+                    @Body
+                </MudMainContent>
             </MudDrawerContainer>
-            <MudMainContent 
-                Class="pa-4 full-height-content" 
-                Style="@MainContentStyle()">
-                <div class="mb-4">
-                    <erp.Components.Shared.Breadcrumbs />
-                </div>
-                @Body
-            </MudMainContent>
+            
+            <!-- Mobile Bottom Navigation -->
+            <MudPaper Class="mobile-bottom-nav d-md-none" Elevation="8">
+                <MudIconButton Icon="@Icons.Material.Filled.Home" 
+                              Color="@(IsCurrentPage("") ? MudBlazor.Color.Primary : MudBlazor.Color.Default)"
+                              Href="/"
+                              Size="MudBlazor.Size.Large" />
+                <MudIconButton Icon="@Icons.Material.Filled.Dashboard" 
+                              Color="@(IsCurrentPage("dashboard") ? MudBlazor.Color.Primary : MudBlazor.Color.Default)"
+                              Href="dashboard"
+                              Size="MudBlazor.Size.Large" />
+                <MudIconButton Icon="@Icons.Material.Filled.ShoppingCart" 
+                              Color="@(IsCurrentPage("sales") ? MudBlazor.Color.Primary : MudBlazor.Color.Default)"
+                              Href="sales"
+                              Size="MudBlazor.Size.Large" />
+                <MudIconButton Icon="@Icons.Material.Filled.Inventory" 
+                              Color="@(IsCurrentPage("inventory") ? MudBlazor.Color.Primary : MudBlazor.Color.Default)"
+                              Href="inventory/products"
+                              Size="MudBlazor.Size.Large" />
+                <MudIconButton Icon="@Icons.Material.Filled.MoreHoriz" 
+                              Color="MudBlazor.Color.Default"
+                              OnClick="@ToggleDrawer"
+                              Size="MudBlazor.Size.Large" />
+            </MudPaper>
+            
             <MudScrollToTop>
-                <MudFab Color="MudBlazor.Color.Tertiary" StartIcon="@Icons.Material.Filled.ArrowCircleUp" />
+                <MudFab Color="MudBlazor.Color.Tertiary" StartIcon="@Icons.Material.Filled.ArrowCircleUp" Size="MudBlazor.Size.Small" Class="d-none d-md-flex" />
             </MudScrollToTop>
         </MudPaper>
     }
@@ -68,6 +107,9 @@
     private bool _drawerOpen = true;
     private MudThemeProvider _mudThemeProvider = null!;
     public bool IsDarkMode;
+    private string? _currentUrl;
+
+    [Inject] private NavigationManager NavigationManager { get; set; } = null!;
 
     private bool IsTopbarNavigation => 
         PreferenceService.CurrentPreferences?.Ui?.NavigationType == "topbar";
@@ -75,6 +117,50 @@
     private void ToggleDrawer()
     {
         _drawerOpen = !_drawerOpen;
+    }
+
+    protected override void OnInitialized()
+    {
+        _currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        NavigationManager.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        _currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
+        StateHasChanged();
+    }
+
+    private bool IsCurrentPage(string path)
+    {
+        if (string.IsNullOrEmpty(path))
+        {
+            return string.IsNullOrEmpty(_currentUrl) || _currentUrl == "/";
+        }
+        return _currentUrl?.StartsWith(path, StringComparison.OrdinalIgnoreCase) ?? false;
+    }
+
+    private DrawerVariant GetDrawerVariant()
+    {
+        // Mobile: sempre Temporary (modal/overlay)
+        // Desktop: Persistent quando aberto, Mini quando fechado (empurra conteúdo)
+        return _drawerOpen ? DrawerVariant.Persistent : DrawerVariant.Mini;
+    }
+
+    private string GetDrawerClass()
+    {
+        return "responsive-drawer";
+    }
+
+    private string GetMainContentClass()
+    {
+        return "pa-2 pa-md-4 full-height-content main-content-responsive";
+    }
+    
+    private bool IsMobileView()
+    {
+        // CSS media queries handle the responsive behavior
+        return false;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -161,7 +247,10 @@
 
     private string MainContentStyle()
     {
-        var style = $"{SetMarginForDrawer()} flex: 1 1 auto; min-height: 0; overflow-y: auto; transition: margin-left 0.3s ease;";
+        // No mobile, CSS media queries controlam o layout
+        // No desktop, MudDrawerContainer controla automaticamente
+        var style = "flex: 1 1 auto; min-height: 0; overflow-y: auto;";
+        
         if (PreferenceService.CurrentPreferences?.Ui?.FontSize == "small")
         {
             style += "font-size: 0.9rem;";

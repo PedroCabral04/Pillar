@@ -79,6 +79,26 @@ input:focus-visible {
     background-color: rgba(103, 58, 183, 0.08);
 }
 
+/* Mobile NavMenu adjustments */
+@media (max-width: 959px) {
+    .responsive-nav-menu .mud-nav-link {
+        padding: 14px 16px !important;
+        font-size: 1rem;
+        margin: 6px 12px;
+    }
+    
+    .responsive-nav-menu .mud-nav-group-header {
+        padding: 14px 16px !important;
+        font-size: 1rem;
+    }
+    
+    .responsive-nav-menu .mud-nav-link .mud-icon-root,
+    .responsive-nav-menu .mud-nav-group-header .mud-icon-root {
+        font-size: 1.5rem;
+        margin-right: 16px;
+    }
+}
+
 /* Topbar moderna */
 .mud-appbar {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
@@ -138,3 +158,488 @@ input:focus-visible {
 .mud-icon-button:hover {
     transform: scale(1.1);
 }
+
+/* ========================================
+   RESPONSIVE DESIGN - MOBILE FIRST
+   ======================================== */
+
+/* Mobile Top Bar */
+.mobile-topbar {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1300;
+    background: var(--mud-palette-appbar-background) !important;
+}
+
+/* Mobile Bottom Navigation */
+.mobile-bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    background: var(--mud-palette-surface);
+    border-top: 1px solid rgba(0, 0, 0, 0.12);
+    z-index: 1200;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.mobile-bottom-nav .mud-icon-button {
+    border-radius: 12px;
+    transition: all 0.2s ease;
+}
+
+.mobile-bottom-nav .mud-icon-button:active {
+    transform: scale(0.95);
+}
+
+/* Main Content Adjustments for Mobile */
+@media (max-width: 959px) {
+    /* Mobile: add padding for top bar and bottom nav */
+    .main-content-responsive {
+        margin-top: 48px !important;
+        margin-bottom: 56px !important;
+        margin-left: 0 !important;
+        padding: 12px !important;
+    }
+    
+    /* Drawer becomes full overlay on mobile */
+    .responsive-drawer {
+        position: fixed !important;
+        z-index: 1400 !important;
+    }
+    
+    /* Override drawer variant to be temporary on mobile */
+    #nav-drawer {
+        position: fixed !important;
+    }
+    
+    #nav-drawer .mud-drawer-content {
+        width: 280px !important;
+        max-width: 85vw !important;
+    }
+    
+    /* Add backdrop overlay on mobile when drawer is open */
+    .mud-drawer-open-responsive-left-temporary {
+        position: fixed !important;
+    }
+    
+    /* Tabelas responsivas */
+    .mud-table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .mud-table {
+        min-width: 600px;
+    }
+    
+    /* Cards mais compactos */
+    .mud-card {
+        margin-bottom: 12px;
+    }
+    
+    .mud-card-content {
+        padding: 12px !important;
+    }
+    
+    /* Formulários mobile-friendly */
+    .mud-input-control {
+        margin-bottom: 12px;
+    }
+    
+    /* Diálogos full-screen em mobile */
+    .mud-dialog-container {
+        align-items: flex-end;
+    }
+    
+    .mud-dialog {
+        margin: 0;
+        width: 100%;
+        max-width: 100% !important;
+        max-height: 90vh;
+        border-radius: 16px 16px 0 0;
+    }
+    
+    /* Botões mais touch-friendly */
+    .mud-button-root {
+        min-height: 44px;
+        padding: 8px 16px;
+    }
+    
+    /* Grid responsivo */
+    .mud-grid-item {
+        padding: 8px !important;
+    }
+    
+    /* Snackbar position adjustment */
+    .mud-snackbar {
+        bottom: 70px !important;
+    }
+}
+
+/* Tablet */
+@media (min-width: 600px) and (max-width: 959px) {
+    .main-content-responsive {
+        padding: 16px !important;
+    }
+    
+    .mud-card-content {
+        padding: 16px !important;
+    }
+}
+
+/* Desktop */
+@media (min-width: 960px) {
+    /* Hide mobile elements */
+    .mobile-topbar,
+    .mobile-bottom-nav {
+        display: none !important;
+    }
+    
+    /* Desktop drawer behavior - persistent/mini */
+    .responsive-drawer {
+        position: relative !important;
+    }
+    
+    #nav-drawer {
+        position: relative !important;
+    }
+    
+    .main-content-responsive {
+        margin-left: 0 !important;
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+    }
+    
+    /* MudBlazor handles the margin automatically with DrawerContainer */
+}
+
+/* Large Desktop */
+@media (min-width: 1280px) {
+    .main-content-responsive {
+        padding: 24px !important;
+    }
+}
+
+/* Extra Large Desktop */
+@media (min-width: 1920px) {
+    .main-content-responsive {
+        max-width: 1600px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+}
+
+/* Touch gestures improvements */
+@media (hover: none) and (pointer: coarse) {
+    /* Increase tap targets */
+    .mud-icon-button {
+        min-width: 48px;
+        min-height: 48px;
+    }
+    
+    .mud-list-item {
+        min-height: 48px;
+    }
+    
+    /* Remove hover effects on touch devices */
+    .mud-nav-link:hover,
+    .mud-button-root:hover {
+        transform: none;
+    }
+    
+    /* Add active states instead */
+    .mud-nav-link:active,
+    .mud-button-root:active {
+        transform: scale(0.98);
+        opacity: 0.8;
+    }
+}
+
+/* Landscape mobile adjustments */
+@media (max-width: 959px) and (orientation: landscape) {
+    .mobile-topbar {
+        height: 40px;
+    }
+    
+    .main-content-responsive {
+        margin-top: 40px !important;
+    }
+    
+    .mobile-bottom-nav {
+        height: 48px;
+    }
+}
+
+/* Print styles */
+@media print {
+    .mobile-topbar,
+    .mobile-bottom-nav,
+    .responsive-drawer,
+    .mud-fab,
+    .mud-snackbar {
+        display: none !important;
+    }
+    
+    .main-content-responsive {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+}
+
+/* Accessibility - Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* Dark mode adjustments for mobile */
+@media (prefers-color-scheme: dark) {
+    .mobile-bottom-nav {
+        border-top-color: rgba(255, 255, 255, 0.12);
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
+    }
+}
+
+/* ========================================
+   UTILITY CLASSES FOR RESPONSIVE DESIGN
+   ======================================== */
+
+/* Spacing utilities for mobile */
+.mobile-px-2 { padding-left: 8px !important; padding-right: 8px !important; }
+.mobile-py-2 { padding-top: 8px !important; padding-bottom: 8px !important; }
+.mobile-mt-2 { margin-top: 8px !important; }
+.mobile-mb-2 { margin-bottom: 8px !important; }
+
+/* Responsive cards */
+.hover-card {
+    transition: all 0.3s ease;
+}
+
+@media (min-width: 960px) {
+    .hover-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15) !important;
+    }
+}
+
+@media (max-width: 959px) {
+    .hover-card:active {
+        transform: scale(0.98);
+    }
+}
+
+/* Responsive grid adjustments */
+@media (max-width: 959px) {
+    .mud-grid-item.xs-12 {
+        padding: 8px !important;
+    }
+}
+
+/* Stack items vertically on mobile */
+.mobile-stack {
+    display: flex;
+    flex-direction: column;
+}
+
+@media (min-width: 960px) {
+    .mobile-stack {
+        flex-direction: row;
+    }
+}
+
+/* Hide on mobile */
+.hide-mobile {
+    display: block;
+}
+
+@media (max-width: 959px) {
+    .hide-mobile {
+        display: none !important;
+    }
+}
+
+/* Show only on mobile */
+.show-mobile {
+    display: none;
+}
+
+@media (max-width: 959px) {
+    .show-mobile {
+        display: block !important;
+    }
+}
+
+/* Responsive text sizes */
+@media (max-width: 959px) {
+    .mud-typography-h3 {
+        font-size: 2rem !important;
+    }
+    
+    .mud-typography-h4 {
+        font-size: 1.75rem !important;
+    }
+    
+    .mud-typography-h5 {
+        font-size: 1.5rem !important;
+    }
+    
+    .mud-typography-h6 {
+        font-size: 1.25rem !important;
+    }
+}
+
+/* Touch-friendly list items */
+@media (max-width: 959px) {
+    .mud-list-item {
+        min-height: 56px;
+        padding: 12px 16px;
+    }
+}
+
+/* Responsive data grid */
+.responsive-data-grid {
+    width: 100%;
+}
+
+@media (max-width: 959px) {
+    .responsive-data-grid .mud-table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .responsive-data-grid .mud-table-container {
+        border-radius: 8px;
+    }
+}
+
+/* Better form layouts on mobile */
+@media (max-width: 959px) {
+    .mud-form .mud-grid-item {
+        padding: 6px !important;
+    }
+    
+    .mud-input {
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+    
+    .mud-select {
+        font-size: 16px;
+    }
+}
+
+/* Responsive toolbar */
+@media (max-width: 959px) {
+    .mud-toolbar {
+        flex-wrap: wrap;
+        padding: 8px !important;
+    }
+    
+    .mud-toolbar .mud-button-root {
+        margin: 4px;
+    }
+}
+
+/* Mobile-friendly modals */
+@media (max-width: 959px) {
+    .mud-dialog-container {
+        padding: 0;
+    }
+    
+    .mud-dialog-title {
+        padding: 16px;
+    }
+    
+    .mud-dialog-content {
+        padding: 16px;
+    }
+    
+    .mud-dialog-actions {
+        padding: 12px 16px;
+        flex-direction: column-reverse;
+    }
+    
+    .mud-dialog-actions .mud-button-root {
+        width: 100%;
+        margin: 4px 0;
+    }
+}
+
+/* Swipe indicators */
+.swipe-indicator {
+    display: none;
+}
+
+@media (max-width: 959px) {
+    .swipe-indicator {
+        display: block;
+        width: 40px;
+        height: 4px;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 2px;
+        margin: 8px auto;
+    }
+}
+
+/* Safe area padding for notched devices */
+@supports (padding: max(0px)) {
+    .mobile-topbar {
+        padding-left: max(12px, env(safe-area-inset-left));
+        padding-right: max(12px, env(safe-area-inset-right));
+        padding-top: env(safe-area-inset-top);
+    }
+    
+    .mobile-bottom-nav {
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+    }
+    
+    .responsive-drawer .mud-drawer-content {
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+}
+
+/* Loading states */
+.skeleton-loader {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* Pull to refresh indicator */
+.pull-to-refresh {
+    display: none;
+}
+
+@media (max-width: 959px) {
+    .pull-to-refresh {
+        display: flex;
+        justify-content: center;
+        padding: 20px;
+        transform: translateY(-100%);
+        transition: transform 0.3s ease;
+    }
+    
+    .pull-to-refresh.active {
+        transform: translateY(0);
+    }
+}
+
