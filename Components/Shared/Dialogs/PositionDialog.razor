@@ -1,0 +1,254 @@
+@using erp.DTOs.User
+@using erp.Services
+@using MudBlazor
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" Model="@_model" Validation="@(new Func<object, string, Task<IEnumerable<string>>>(ValidateValue))">
+            <MudStack Spacing="3">
+                <MudTextField @bind-Value="_model.Code"
+                              Label="Código"
+                              Variant="Variant.Outlined"
+                              For="@(() => _model.Code)"
+                              Immediate="true"/>
+
+                <MudTextField @bind-Value="_model.Title"
+                              Label="Cargo"
+                              Variant="Variant.Outlined"
+                              For="@(() => _model.Title)"
+                              Immediate="true"
+                              Required="true"/>
+
+                <MudTextField @bind-Value="_model.Description"
+                              Label="Descrição"
+                              Variant="Variant.Outlined"
+                              Lines="3"
+                              For="@(() => _model.Description)"/>
+
+                <MudNumericField @bind-Value="_model.Level"
+                                 Label="Nível Hierárquico"
+                                 Variant="Variant.Outlined"
+                                 Min="1"
+                                 Max="10"
+                                 HideSpinButtons="false"/>
+
+                <MudSelect T="int?"
+                           @bind-Value="_model.DefaultDepartmentId"
+                           Label="Departamento Padrão"
+                           Variant="Variant.Outlined"
+                           Clearable="true">
+                    @if (_departments != null)
+                    {
+                        @foreach (var dept in _departments)
+                        {
+                            <MudSelectItem T="int?" Value="@dept.Id">@dept.Name</MudSelectItem>
+                        }
+                    }
+                </MudSelect>
+
+                <MudStack Row="true" Spacing="2">
+                    <MudNumericField @bind-Value="_model.MinSalary"
+                                     Label="Salário Mínimo"
+                                     Variant="Variant.Outlined"
+                                     Format="C2"
+                                     Culture="@(new System.Globalization.CultureInfo("pt-BR"))"
+                                     Min="0"
+                                     HideSpinButtons="true"/>
+
+                    <MudNumericField @bind-Value="_model.MaxSalary"
+                                     Label="Salário Máximo"
+                                     Variant="Variant.Outlined"
+                                     Format="C2"
+                                     Culture="@(new System.Globalization.CultureInfo("pt-BR"))"
+                                     Min="0"
+                                     HideSpinButtons="true"/>
+                </MudStack>
+
+                <MudTextField @bind-Value="_model.Requirements"
+                              Label="Requisitos"
+                              Variant="Variant.Outlined"
+                              Lines="3"/>
+
+                <MudTextField @bind-Value="_model.Responsibilities"
+                              Label="Responsabilidades"
+                              Variant="Variant.Outlined"
+                              Lines="3"/>
+
+                @if (IsEdit)
+                {
+                    <MudSwitch @bind-Value="_model.IsActive" 
+                               Label="Ativo" 
+                               Color="MudBlazor.Color.Primary"/>
+                }
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="MudBlazor.Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="_processing">
+            @if (_processing)
+            {
+                <MudProgressCircular Size="MudBlazor.Size.Small" Indeterminate="true"/>
+            }
+            else
+            {
+                <text>@(IsEdit ? "Atualizar" : "Criar")</text>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public bool IsEdit { get; set; }
+    [Parameter] public int PositionId { get; set; }
+
+    private MudForm? _form;
+    private PositionModel _model = new();
+    private bool _processing = false;
+    private List<DepartmentDto>? _departments;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDependencies();
+
+        if (IsEdit && PositionId > 0)
+        {
+            await LoadPosition();
+        }
+    }
+
+    private async Task LoadDependencies()
+    {
+        try
+        {
+            _departments = await ApiService.GetAsync<List<DepartmentDto>>("api/departments");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar dados: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadPosition()
+    {
+        try
+        {
+            var position = await ApiService.GetAsync<PositionDto>($"api/positions/{PositionId}");
+            if (position != null)
+            {
+                _model = new PositionModel
+                {
+                    Code = position.Code,
+                    Title = position.Title,
+                    Description = position.Description,
+                    Level = position.Level,
+                    MinSalary = position.MinSalary,
+                    MaxSalary = position.MaxSalary,
+                    DefaultDepartmentId = position.DefaultDepartmentId,
+                    Requirements = position.Requirements,
+                    Responsibilities = position.Responsibilities,
+                    IsActive = position.IsActive
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar cargo: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task<IEnumerable<string>> ValidateValue(object model, string propertyName)
+    {
+        if (propertyName == nameof(_model.Title))
+        {
+            if (string.IsNullOrWhiteSpace(_model.Title))
+                return new[] { "Cargo é obrigatório" };
+        }
+
+        if (propertyName == nameof(_model.MinSalary) || propertyName == nameof(_model.MaxSalary))
+        {
+            if (_model.MinSalary.HasValue && _model.MaxSalary.HasValue && _model.MinSalary > _model.MaxSalary)
+                return new[] { "Salário mínimo não pode ser maior que o máximo" };
+        }
+
+        return Array.Empty<string>();
+    }
+
+    private async Task Submit()
+    {
+        await _form!.Validate();
+
+        if (!_form.IsValid)
+            return;
+
+        _processing = true;
+
+        try
+        {
+            if (IsEdit)
+            {
+                var updateDto = new UpdatePositionDto
+                {
+                    Code = _model.Code,
+                    Title = _model.Title,
+                    Description = _model.Description,
+                    Level = _model.Level,
+                    MinSalary = _model.MinSalary,
+                    MaxSalary = _model.MaxSalary,
+                    DefaultDepartmentId = _model.DefaultDepartmentId,
+                    Requirements = _model.Requirements,
+                    Responsibilities = _model.Responsibilities,
+                    IsActive = _model.IsActive
+                };
+                // PUT retorna NoContent (204), então usamos PutAsJsonAsync
+                var response = await ApiService.PutAsJsonAsync($"api/positions/{PositionId}", updateDto);
+                response.EnsureSuccessStatusCode();
+            }
+            else
+            {
+                var createDto = new CreatePositionDto
+                {
+                    Code = _model.Code,
+                    Title = _model.Title,
+                    Description = _model.Description,
+                    Level = _model.Level,
+                    MinSalary = _model.MinSalary,
+                    MaxSalary = _model.MaxSalary,
+                    DefaultDepartmentId = _model.DefaultDepartmentId,
+                    Requirements = _model.Requirements,
+                    Responsibilities = _model.Responsibilities
+                };
+                await ApiService.PostAsync<PositionDto>("api/positions", createDto);
+            }
+
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao salvar: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _processing = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private class PositionModel
+    {
+        public string? Code { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public int? Level { get; set; }
+        public decimal? MinSalary { get; set; }
+        public decimal? MaxSalary { get; set; }
+        public int? DefaultDepartmentId { get; set; }
+        public string? Requirements { get; set; }
+        public string? Responsibilities { get; set; }
+        public bool IsActive { get; set; } = true;
+    }
+}

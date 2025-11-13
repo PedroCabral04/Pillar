@@ -1,6 +1,18 @@
-# Pillar
+# Pillar ERP
 
 Sistema ERP modular construído com Blazor (Server), .NET 9, MudBlazor e ASP.NET Core Identity. Inclui dashboard, gestão de usuários (admin), Kanban pessoal, preferências do usuário e hardening de cookies/CSRF. Suporta modo opcional de API Key para rotas `/api`.
+
+## 🚀 Deploy Rápido
+
+### Coolify (Recomendado)
+Veja o guia completo de deploy no Coolify: **[COOLIFY_DEPLOYMENT.md](COOLIFY_DEPLOYMENT.md)**
+
+### Docker
+```bash
+docker-compose up -d
+```
+
+Acesse em `http://localhost:8080`
 
 - Projeto: [erp.csproj](erp.csproj)
 - Pipeline e segurança: [Program.cs](Program.cs)

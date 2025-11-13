@@ -3,7 +3,8 @@
 
 <Router AppAssembly="typeof(Program).Assembly">
     <Found Context="routeData">
-        @if (routeData.PageType == typeof(erp.Components.Pages.Auth.Login))
+        @if (routeData.PageType == typeof(erp.Components.Pages.Auth.Login) || 
+             routeData.PageType == typeof(erp.Components.Pages.Auth.TwoFactorLogin))
         {
             <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.AuthLayout)" />
         }

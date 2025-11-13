@@ -5,6 +5,11 @@ namespace erp.Services.Inventory;
 
 public interface IStockCountService
 {
+    Task<(IEnumerable<StockCountDto> Counts, int TotalCount)> GetCountsAsync(
+        string? status = null,
+        int? warehouseId = null,
+        int page = 1,
+        int pageSize = 20);
     Task<StockCountDto> CreateCountAsync(CreateStockCountDto dto, int userId);
     Task<StockCountDto?> GetCountByIdAsync(int id);
     Task<IEnumerable<StockCountDto>> GetActiveCountsAsync();

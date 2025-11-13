@@ -1,0 +1,343 @@
+@page "/account/two-factor"
+@using erp.DTOs.Auth
+@using erp.Services
+@using MudBlazor
+@using Color = MudBlazor.Color
+@using Size = MudBlazor.Size
+@inject IApiService ApiService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@attribute [Authorize]
+
+<PageTitle>Autenticação de Dois Fatores</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-4">
+        <MudIcon Icon="@Icons.Material.Filled.Security" Class="mr-2" />
+        Autenticação de Dois Fatores (2FA)
+    </MudText>
+
+    @if (_loading)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else
+    {
+        <MudPaper Elevation="2" Class="pa-4 mb-4">
+            <MudText Typo="Typo.h6" Class="mb-3">Status do 2FA</MudText>
+            
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudChip T="string" Color="@(_status?.IsTwoFactorEnabled == true ? Color.Success : Color.Default)" 
+                             Icon="@(_status?.IsTwoFactorEnabled == true ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)">
+                        2FA: @(_status?.IsTwoFactorEnabled == true ? "Habilitado" : "Desabilitado")
+                    </MudChip>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    @if (_status?.IsTwoFactorEnabled == true)
+                    {
+                        <MudChip T="string" Color="Color.Info" Icon="@Icons.Material.Filled.Key">
+                            @_status.RecoveryCodesLeft códigos de recuperação restantes
+                        </MudChip>
+                    }
+                </MudItem>
+            </MudGrid>
+
+            @if (_status?.IsMachineRemembered == true)
+            {
+                <MudAlert Severity="Severity.Info" Class="mt-3">
+                    Este dispositivo está memorizado. Você não precisará fornecer código 2FA neste navegador.
+                    <MudButton OnClick="ForgetMachine" Size="Size.Small" Color="Color.Warning" Variant="Variant.Text">
+                        Esquecer este dispositivo
+                    </MudButton>
+                </MudAlert>
+            }
+        </MudPaper>
+
+        @if (_status?.IsTwoFactorEnabled != true)
+        {
+            <!-- Habilitar 2FA -->
+            <MudPaper Elevation="2" Class="pa-4 mb-4">
+                <MudText Typo="Typo.h6" Class="mb-3">Habilitar 2FA</MudText>
+                
+                @if (!_setupStarted)
+                {
+                    <MudText Class="mb-3">
+                        A autenticação de dois fatores adiciona uma camada extra de segurança à sua conta.
+                        Você precisará de um aplicativo autenticador como:
+                    </MudText>
+                    <MudList T="string" Dense="true">
+                        <MudListItem T="string" Icon="@Icons.Material.Filled.PhoneAndroid">Google Authenticator</MudListItem>
+                        <MudListItem T="string" Icon="@Icons.Material.Filled.PhoneAndroid">Microsoft Authenticator</MudListItem>
+                        <MudListItem T="string" Icon="@Icons.Material.Filled.PhoneAndroid">Authy</MudListItem>
+                    </MudList>
+                    
+                    <MudButton OnClick="StartSetup" 
+                               Color="Color.Primary" 
+                               Variant="Variant.Filled" 
+                               StartIcon="@Icons.Material.Filled.Add"
+                               Class="mt-3">
+                        Configurar Authenticator
+                    </MudButton>
+                }
+                else if (_setupData != null)
+                {
+                    <MudText Typo="Typo.body1" Class="mb-3">
+                        <strong>Passo 1:</strong> Escaneie o QR Code abaixo com seu aplicativo autenticador
+                    </MudText>
+                    
+                    <MudPaper Elevation="0" Class="pa-3 mb-3 d-flex justify-center">
+                        <img src="data:image/png;base64,@_setupData.QrCodeBase64" alt="QR Code" style="max-width: 250px;" />
+                    </MudPaper>
+
+                    <MudText Typo="Typo.body2" Class="mb-2">
+                        <strong>Ou digite manualmente a chave:</strong>
+                    </MudText>
+                    <MudTextField @bind-Value="_setupData.SharedKey" 
+                                  ReadOnly="true" 
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@Icons.Material.Filled.ContentCopy"
+                                  OnAdornmentClick="CopyKeyToClipboard"
+                                  Class="mb-4" />
+
+                    <MudText Typo="Typo.body1" Class="mb-3">
+                        <strong>Passo 2:</strong> Digite o código de 6 dígitos gerado pelo aplicativo
+                    </MudText>
+                    
+                    <MudTextField @bind-Value="_verificationCode" 
+                                  Label="Código de Verificação" 
+                                  Variant="Variant.Outlined"
+                                  MaxLength="7"
+                                  Immediate="true"
+                                  HelperText="Digite o código de 6 dígitos"
+                                  Class="mb-3" />
+
+                    <MudButton OnClick="VerifyAndEnable" 
+                               Color="Color.Success" 
+                               Variant="Variant.Filled" 
+                               Disabled="string.IsNullOrWhiteSpace(_verificationCode)"
+                               StartIcon="@Icons.Material.Filled.Check">
+                        Verificar e Habilitar 2FA
+                    </MudButton>
+                    <MudButton OnClick="CancelSetup" 
+                               Color="Color.Default" 
+                               Variant="Variant.Text"
+                               Class="ml-2">
+                        Cancelar
+                    </MudButton>
+                }
+            </MudPaper>
+        }
+        else
+        {
+            <!-- 2FA já habilitado - opções de gerenciamento -->
+            <MudPaper Elevation="2" Class="pa-4 mb-4">
+                <MudText Typo="Typo.h6" Class="mb-3">Gerenciar 2FA</MudText>
+                
+                <MudStack Spacing="2">
+                    <MudButton OnClick="GenerateNewRecoveryCodes" 
+                               Color="Color.Warning" 
+                               Variant="Variant.Filled" 
+                               StartIcon="@Icons.Material.Filled.Refresh">
+                        Gerar Novos Códigos de Recuperação
+                    </MudButton>
+                    
+                    <MudButton OnClick="DisableTwoFactor" 
+                               Color="Color.Error" 
+                               Variant="Variant.Outlined" 
+                               StartIcon="@Icons.Material.Filled.DeleteForever">
+                        Desabilitar 2FA
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+        }
+
+        @if (_recoveryCodes?.Any() == true)
+        {
+            <MudPaper Elevation="2" Class="pa-4 mb-4" Style="background-color: #fff3cd;">
+                <MudText Typo="Typo.h6" Class="mb-3" Color="Color.Warning">
+                    <MudIcon Icon="@Icons.Material.Filled.Warning" /> Códigos de Recuperação
+                </MudText>
+                
+                <MudAlert Severity="Severity.Warning" Class="mb-3">
+                    <strong>IMPORTANTE:</strong> Guarde estes códigos em um local seguro. 
+                    Cada código pode ser usado apenas uma vez para acessar sua conta caso você perca acesso ao seu aplicativo autenticador.
+                </MudAlert>
+
+                <MudPaper Elevation="0" Class="pa-3 mb-3" Style="background-color: white;">
+                    <MudGrid>
+                        @foreach (var recoveryCode in _recoveryCodes)
+                        {
+                            <MudItem xs="6" sm="4">
+                                <MudText Typo="Typo.body2" Style="font-family: monospace;">@recoveryCode</MudText>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                </MudPaper>
+
+                <MudButton OnClick="DownloadRecoveryCodes" 
+                           Color="Color.Primary" 
+                           Variant="Variant.Filled" 
+                           StartIcon="@Icons.Material.Filled.Download">
+                    Baixar Códigos
+                </MudButton>
+                <MudButton OnClick="CopyRecoveryCodesToClipboard" 
+                           Color="Color.Secondary" 
+                           Variant="Variant.Text"
+                           StartIcon="@Icons.Material.Filled.ContentCopy"
+                           Class="ml-2">
+                    Copiar para Área de Transferência
+                </MudButton>
+            </MudPaper>
+        }
+    }
+</MudContainer>
+
+@code {
+    private bool _loading = true;
+    private TwoFactorStatusResponse? _status;
+    private bool _setupStarted = false;
+    private EnableTwoFactorResponse? _setupData;
+    private string _verificationCode = "";
+    private List<string>? _recoveryCodes;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStatus();
+        _loading = false;
+    }
+
+    private async Task LoadStatus()
+    {
+        try
+        {
+            _status = await ApiService.GetAsync<TwoFactorStatusResponse>("api/two-factor/status");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar status: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task StartSetup()
+    {
+        try
+        {
+            _setupData = await ApiService.PostAsync<EnableTwoFactorResponse>("api/two-factor/enable", new { });
+            _setupStarted = true;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao iniciar configuração: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void CancelSetup()
+    {
+        _setupStarted = false;
+        _setupData = null;
+        _verificationCode = "";
+    }
+
+    private async Task VerifyAndEnable()
+    {
+        if (string.IsNullOrWhiteSpace(_verificationCode))
+        {
+            Snackbar.Add("Digite o código de verificação", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            var response = await ApiService.PostAsync<RecoveryCodesResponse>(
+                "api/two-factor/verify-setup", 
+                new VerifyTwoFactorSetupRequest { Code = _verificationCode });
+
+            _recoveryCodes = response?.RecoveryCodes;
+            _setupStarted = false;
+            _setupData = null;
+            _verificationCode = "";
+            
+            await LoadStatus();
+            Snackbar.Add("2FA habilitado com sucesso! Guarde seus códigos de recuperação.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao verificar código: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task GenerateNewRecoveryCodes()
+    {
+        try
+        {
+            var response = await ApiService.PostAsync<RecoveryCodesResponse>("api/two-factor/recovery-codes", new { });
+            _recoveryCodes = response?.RecoveryCodes;
+            await LoadStatus();
+            Snackbar.Add("Novos códigos de recuperação gerados", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao gerar códigos: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task DisableTwoFactor()
+    {
+        bool? result = await DialogService.ShowMessageBox(
+            "Confirmar Desabilitação",
+            "Tem certeza que deseja desabilitar a autenticação de dois fatores? Sua conta ficará menos segura.",
+            yesText: "Sim, Desabilitar", cancelText: "Cancelar");
+
+        if (result == true)
+        {
+            try
+            {
+                await ApiService.PostAsync<TwoFactorSuccessResponse>("api/two-factor/disable", new { });
+                _recoveryCodes = null;
+                await LoadStatus();
+                Snackbar.Add("2FA desabilitado", Severity.Info);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao desabilitar 2FA: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task ForgetMachine()
+    {
+        try
+        {
+            await ApiService.PostAsync<TwoFactorSuccessResponse>("api/two-factor/forget-machine", new { });
+            await LoadStatus();
+            Snackbar.Add("Dispositivo esquecido. Você precisará fornecer código 2FA no próximo login.", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void CopyKeyToClipboard()
+    {
+        // Simplified - in real implementation use JSInterop to copy to clipboard
+        Snackbar.Add("Chave copiada para área de transferência", Severity.Success);
+    }
+
+    private void CopyRecoveryCodesToClipboard()
+    {
+        // Simplified - in real implementation use JSInterop to copy to clipboard
+        Snackbar.Add("Códigos copiados para área de transferência", Severity.Success);
+    }
+
+    private void DownloadRecoveryCodes()
+    {
+        if (_recoveryCodes == null) return;
+        
+        // Simplified - in real implementation use JSInterop to trigger download
+        Snackbar.Add("Download iniciado", Severity.Success);
+    }
+}

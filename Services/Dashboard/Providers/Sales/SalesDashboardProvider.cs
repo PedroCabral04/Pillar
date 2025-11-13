@@ -26,6 +26,7 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Bar,
             Icon = "mdi-chart-bar",
             Unit = "R$"
+            , RequiredRoles = new[] { "Vendas", "Administrador" }
         },
         new DashboardWidgetDefinition
         {
@@ -36,6 +37,7 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Pie,
             Icon = "mdi-star",
             Unit = "unidades"
+            , RequiredRoles = new[] { "Vendas", "Estoque", "Administrador" }
         },
         new DashboardWidgetDefinition
         {
@@ -46,6 +48,7 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Donut,
             Icon = "mdi-chart-donut",
             Unit = "vendas"
+            , RequiredRoles = new[] { "Vendas", "Administrador" }
         }
     };
 

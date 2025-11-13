@@ -1,0 +1,259 @@
+@page "/inventory/categories"
+@using erp.DTOs.Inventory
+@using erp.Services
+@using erp.Components.Shared.Dialogs.Inventory
+@using MudBlazor
+@using Size = MudBlazor.Size
+@using Color = MudBlazor.Color
+@attribute [Authorize]
+
+@inject IApiService ApiService
+@inject ILogger<ProductCategories> Logger
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Categorias de Produtos</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Gerenciar Categorias</MudText>
+    <MudButton Color="Color.Primary" 
+               Variant="Variant.Filled" 
+               StartIcon="@Icons.Material.Filled.Add"
+               OnClick="OpenCreateDialog">
+        Adicionar Categoria
+    </MudButton>
+</MudStack>
+
+@if (_loadError != null)
+{
+    <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
+}
+
+<MudTable T="ProductCategoryDto" ServerData="ServerReload" 
+          Dense="false" Hover="true" Elevation="4" @ref="_table" Striped="true" Loading="@_loading">
+    <ToolBarContent>
+        <MudText Typo="Typo.h5">Categorias Cadastradas</MudText>
+        <MudSpacer/>
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudTextField T="string" ValueChanged="OnSearch" Immediate="false" Placeholder="Procurar categoria" 
+                          Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
+                          Clearable="true" Style="min-width: 250px;"/>
+            <MudSelect T="string" 
+                       Value="_statusFilter" 
+                       ValueChanged="OnStatusFilterChanged"
+                       Label="Status" 
+                       Variant="Variant.Outlined" 
+                       Margin="Margin.Dense"
+                       Clearable="true"
+                       Style="min-width: 120px;">
+                <MudSelectItem T="string" Value="@("Ativo")">Ativo</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Inativo")">Inativo</MudSelectItem>
+            </MudSelect>
+        </MudStack>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh>Código</MudTh>
+        <MudTh>Nome</MudTh>
+        <MudTh>Categoria Pai</MudTh>
+        <MudTh Style="text-align: center">Subcategorias</MudTh>
+        <MudTh>Status</MudTh>
+        <MudTh>Data Criação</MudTh>
+        <MudTh Style="text-align: center">Ações</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Código">
+            <MudText Typo="Typo.body2" Style="font-family: monospace; font-weight: 600;">@context.Code</MudText>
+        </MudTd>
+        <MudTd DataLabel="Nome">
+            <MudText Typo="Typo.body2">@context.Name</MudText>
+        </MudTd>
+        <MudTd DataLabel="Categoria Pai">
+            @if (!string.IsNullOrEmpty(context.ParentCategoryName))
+            {
+                <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Filled.Folder">
+                    @context.ParentCategoryName
+                </MudChip>
+            }
+            else
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Categoria Raiz</MudText>
+            }
+        </MudTd>
+        <MudTd DataLabel="Subcategorias" Style="text-align: center">
+            @if (context.SubCategories.Any())
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Info">
+                    @context.SubCategories.Count
+                </MudChip>
+            }
+            else
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary">-</MudText>
+            }
+        </MudTd>
+        <MudTd DataLabel="Status">
+            <MudChip T="string" Size="Size.Small" Color="@(context.IsActive ? Color.Success : Color.Default)">
+                @(context.IsActive ? "Ativo" : "Inativo")
+            </MudChip>
+        </MudTd>
+        <MudTd DataLabel="Data">
+            <MudText Typo="Typo.caption">@context.CreatedAt.ToString("dd/MM/yyyy")</MudText>
+        </MudTd>
+        <MudTd DataLabel="Ações" Style="text-align: center">
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                           Size="Size.Small"
+                           OnClick="@(() => OpenEditDialog(context))"
+                           Title="Editar"/>
+            <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                           Size="Size.Small" 
+                           Color="Color.Error"
+                           OnClick="@(() => DeleteCategory(context))"
+                           Title="Excluir"/>
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText>Nenhuma categoria encontrada</MudText>
+    </NoRecordsContent>
+    <LoadingContent>
+        <MudText>Carregando...</MudText>
+    </LoadingContent>
+    <PagerContent>
+        <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private MudTable<ProductCategoryDto>? _table;
+    private string? _loadError;
+    private string? _searchString;
+    private string? _statusFilter;
+    private bool _loading = false;
+
+    private async Task<TableData<ProductCategoryDto>> ServerReload(TableState state, CancellationToken ct)
+    {
+        _loading = true;
+        try
+        {
+            var page = state.Page + 1;
+            var pageSize = state.PageSize;
+
+            var queryParams = new List<string>
+            {
+                $"page={page}",
+                $"pageSize={pageSize}"
+            };
+
+            if (!string.IsNullOrWhiteSpace(_searchString))
+            {
+                queryParams.Add($"search={Uri.EscapeDataString(_searchString)}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(_statusFilter))
+            {
+                queryParams.Add($"status={Uri.EscapeDataString(_statusFilter)}");
+            }
+
+            var query = string.Join("&", queryParams);
+            var response = await ApiService.GetAsync<PaginatedCategoriesResponse>($"/api/products/categories?{query}");
+
+            if (response != null)
+            {
+                return new TableData<ProductCategoryDto>
+                {
+                    Items = response.Items,
+                    TotalItems = response.TotalItems
+                };
+            }
+
+            return new TableData<ProductCategoryDto> { Items = Array.Empty<ProductCategoryDto>(), TotalItems = 0 };
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar categorias");
+            _loadError = "Erro ao carregar categorias: " + ex.Message;
+            Snackbar.Add(_loadError, Severity.Error);
+            return new TableData<ProductCategoryDto> { Items = Array.Empty<ProductCategoryDto>(), TotalItems = 0 };
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OnSearch(string text)
+    {
+        _searchString = text;
+        _table?.ReloadServerData();
+    }
+
+    private void OnStatusFilterChanged(string? value)
+    {
+        _statusFilter = value;
+        _table?.ReloadServerData();
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var options = new DialogOptions 
+        { 
+            CloseOnEscapeKey = true,
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true
+        };
+        
+        var dialog = await DialogService.ShowAsync<CreateProductCategoryDialog>("Nova Categoria", options);
+        var result = await dialog.Result;
+        
+        if (!result.Canceled)
+        {
+            _table?.ReloadServerData();
+        }
+    }
+
+    private async Task OpenEditDialog(ProductCategoryDto category)
+    {
+        var parameters = new DialogParameters<EditProductCategoryDialog>
+        {
+            { x => x.Category, category }
+        };
+        
+        var options = new DialogOptions 
+        { 
+            CloseOnEscapeKey = true,
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true
+        };
+        
+        var dialog = await DialogService.ShowAsync<EditProductCategoryDialog>("Editar Categoria", parameters, options);
+        var result = await dialog.Result;
+        
+        if (!result.Canceled)
+        {
+            _table?.ReloadServerData();
+        }
+    }
+
+    private async Task DeleteCategory(ProductCategoryDto category)
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Confirmar exclusão",
+            $"Tem certeza que deseja excluir a categoria '{category.Name}'?",
+            yesText: "Excluir", cancelText: "Cancelar");
+
+        if (confirmed == true)
+        {
+            try
+            {
+                await ApiService.DeleteAsync($"/api/products/categories/{category.Id}");
+                Snackbar.Add("Categoria excluída com sucesso", Severity.Success);
+                _table?.ReloadServerData();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Erro ao excluir categoria {CategoryId}", category.Id);
+                Snackbar.Add($"Erro ao excluir categoria: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

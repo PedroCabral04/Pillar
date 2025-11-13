@@ -1,8 +1,12 @@
 using erp.Models;
 using erp.Models.Identity;
+using erp.Models.Audit;
+using erp.Models.TimeTracking;
+using erp.Models.Financial;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
+using System.Text.Json;
 
 namespace erp.Data;
 
@@ -34,20 +38,105 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Models.Sales.Customer> Customers { get; set; } = null!;
     public DbSet<Models.Sales.Sale> Sales { get; set; } = null!;
     public DbSet<Models.Sales.SaleItem> SaleItems { get; set; } = null!;
+    
+    // Financial
+    public DbSet<Supplier> Suppliers { get; set; } = null!;
+    public DbSet<AccountReceivable> AccountsReceivable { get; set; } = null!;
+    public DbSet<AccountPayable> AccountsPayable { get; set; } = null!;
+    public DbSet<FinancialCategory> FinancialCategories { get; set; } = null!;
+    public DbSet<CostCenter> CostCenters { get; set; } = null!;
+    
+    // HR Management
+    public DbSet<Department> Departments { get; set; } = null!;
+    public DbSet<Position> Positions { get; set; } = null!;
+    
+    // Asset Management
+    public DbSet<AssetCategory> AssetCategories { get; set; } = null!;
+    public DbSet<Asset> Assets { get; set; } = null!;
+    public DbSet<AssetAssignment> AssetAssignments { get; set; } = null!;
+    public DbSet<AssetMaintenance> AssetMaintenances { get; set; } = null!;
+    public DbSet<AssetDocument> AssetDocuments { get; set; } = null!;
+    public DbSet<AssetTransfer> AssetTransfers { get; set; } = null!;
+    
+    // Audit
+    public DbSet<AuditLog> AuditLogs { get; set; } = null!;
+    public DbSet<PayrollPeriod> PayrollPeriods { get; set; } = null!;
+    public DbSet<PayrollEntry> PayrollEntries { get; set; } = null!;
+    
+    // Serviços injetados para auditoria
+    private readonly IHttpContextAccessor? _httpContextAccessor;
+    
+    // Construtor adicional para injeção de IHttpContextAccessor
+    public ApplicationDbContext(
+        DbContextOptions<ApplicationDbContext> options,
+        IHttpContextAccessor? httpContextAccessor = null) 
+        : this(options)
+    {
+        _httpContextAccessor = httpContextAccessor;
+    }
 
     protected override void OnConfiguring(DbContextOptionsBuilder options)
         => options.UseNpgsql("Host=localhost;Database=erp;Username=postgres;Password=123");
 
-    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
         SetAuditProperties();
-        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        
+        // Captura snapshots (apenas dados serializados, não referências)
+        var auditSnapshots = CaptureAuditSnapshots();
+        
+        // Salva as mudanças E os logs de auditoria em uma única transação
+        if (auditSnapshots.Any())
+        {
+            // Adiciona os logs ao contexto ANTES de salvar
+            foreach (var snapshot in auditSnapshots)
+            {
+                AuditLogs.Add(snapshot.ToAuditLog());
+            }
+        }
+        
+        // Salva tudo de uma vez (transacional)
+        var result = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        
+        // Atualiza EntityId nos logs criados (apenas se necessário)
+        if (auditSnapshots.Any(s => s.NeedsIdUpdate))
+        {
+            foreach (var snapshot in auditSnapshots.Where(s => s.NeedsIdUpdate))
+            {
+                snapshot.UpdateEntityId();
+            }
+            await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+        
+        return result;
     }
 
     public override int SaveChanges()
     {
         SetAuditProperties();
-        return base.SaveChanges();
+        
+        var auditSnapshots = CaptureAuditSnapshots();
+        
+        if (auditSnapshots.Any())
+        {
+            foreach (var snapshot in auditSnapshots)
+            {
+                AuditLogs.Add(snapshot.ToAuditLog());
+            }
+        }
+        
+        var result = base.SaveChanges();
+        
+        if (auditSnapshots.Any(s => s.NeedsIdUpdate))
+        {
+            foreach (var snapshot in auditSnapshots.Where(s => s.NeedsIdUpdate))
+            {
+                snapshot.UpdateEntityId();
+            }
+            base.SaveChanges();
+        }
+        
+        return result;
     }
 
     private void SetAuditProperties()
@@ -70,6 +159,288 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
                 userEntity.CreatedAt = DateTime.UtcNow;
             }
         }
+    }
+    
+    /// <summary>
+    /// Captura snapshots de auditoria (apenas dados serializados, não referências)
+    /// </summary>
+    private List<AuditSnapshot> CaptureAuditSnapshots()
+    {
+        var snapshots = new List<AuditSnapshot>();
+        
+        var auditableEntries = ChangeTracker.Entries()
+            .Where(e => (e.Entity is IAuditable || e.Entity is ApplicationUser) && 
+                       e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+            .ToList();
+
+        if (!auditableEntries.Any())
+            return snapshots;
+
+        var userId = GetCurrentUserId();
+        var userName = GetCurrentUserName();
+        var ipAddress = GetCurrentIpAddress();
+        var userAgent = GetCurrentUserAgent();
+        var timestamp = DateTime.UtcNow;
+
+        foreach (var entry in auditableEntries)
+        {
+            var action = entry.State switch
+            {
+                EntityState.Added => AuditAction.Create,
+                EntityState.Modified => AuditAction.Update,
+                EntityState.Deleted => AuditAction.Delete,
+                _ => (AuditAction?)null
+            };
+
+            if (!action.HasValue)
+                continue;
+
+            var snapshot = new AuditSnapshot
+            {
+                EntityName = entry.Entity.GetType().Name,
+                Action = action.Value,
+                UserId = userId,
+                UserName = userName,
+                IpAddress = ipAddress,
+                UserAgent = userAgent,
+                Timestamp = timestamp,
+                NeedsIdUpdate = entry.State == EntityState.Added
+            };
+
+            // Captura EntityId (pode ser temporário para Added)
+            var keyProperties = entry.Properties.Where(p => p.Metadata.IsPrimaryKey()).ToList();
+            if (keyProperties.Any())
+            {
+                var keyValue = keyProperties[0].CurrentValue;
+                snapshot.EntityId = keyValue?.ToString();
+                
+                // Para entidades novas, guardamos referência para atualizar depois
+                if (snapshot.NeedsIdUpdate)
+                {
+                    snapshot.EntityReference = entry.Entity;
+                    snapshot.KeyPropertyName = keyProperties[0].Metadata.Name;
+                }
+            }
+
+            // Serializa valores conforme a operação
+            if (entry.State == EntityState.Modified)
+            {
+                snapshot.OldValues = SerializeOriginalValues(entry);
+                snapshot.NewValues = SerializeCurrentValues(entry);
+                snapshot.ChangedProperties = SerializeChangedProperties(entry);
+            }
+            else if (entry.State == EntityState.Deleted)
+            {
+                snapshot.OldValues = SerializeOriginalValues(entry);
+            }
+            else if (entry.State == EntityState.Added)
+            {
+                snapshot.NewValues = SerializeCurrentValues(entry);
+            }
+
+            snapshots.Add(snapshot);
+        }
+        
+        return snapshots;
+    }
+    
+    /// <summary>
+    /// Classe auxiliar para snapshot de auditoria (sem manter EntityEntry)
+    /// </summary>
+    private class AuditSnapshot
+    {
+        public string EntityName { get; set; } = string.Empty;
+        public string? EntityId { get; set; }
+        public AuditAction Action { get; set; }
+        public int? UserId { get; set; }
+        public string? UserName { get; set; }
+        public string? IpAddress { get; set; }
+        public string? UserAgent { get; set; }
+        public DateTime Timestamp { get; set; }
+        public string? OldValues { get; set; }
+        public string? NewValues { get; set; }
+        public string? ChangedProperties { get; set; }
+        
+        // Para atualizar ID após inserção
+        public bool NeedsIdUpdate { get; set; }
+        public object? EntityReference { get; set; }
+        public string? KeyPropertyName { get; set; }
+        
+        private AuditLog? _auditLog;
+
+        public AuditLog ToAuditLog()
+        {
+            _auditLog = new AuditLog
+            {
+                EntityName = EntityName,
+                EntityId = EntityId ?? "0",
+                Action = Action,
+                UserId = UserId,
+                UserName = UserName,
+                IpAddress = IpAddress,
+                UserAgent = UserAgent,
+                Timestamp = Timestamp,
+                OldValues = OldValues,
+                NewValues = NewValues,
+                ChangedProperties = ChangedProperties
+            };
+            return _auditLog;
+        }
+
+        public void UpdateEntityId()
+        {
+            if (_auditLog != null && EntityReference != null && !string.IsNullOrEmpty(KeyPropertyName))
+            {
+                var entityType = EntityReference.GetType();
+                var keyProperty = entityType.GetProperty(KeyPropertyName);
+                if (keyProperty != null)
+                {
+                    var newId = keyProperty.GetValue(EntityReference);
+                    _auditLog.EntityId = newId?.ToString() ?? "0";
+                }
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Serializa os valores originais da entidade
+    /// </summary>
+    private string? SerializeOriginalValues(EntityEntry entry)
+    {
+        var values = new Dictionary<string, object?>();
+        
+        foreach (var property in entry.Properties.Where(p => !p.Metadata.IsPrimaryKey()))
+        {
+            // Ignora propriedades de navegação
+            if (property.Metadata.IsForeignKey() || property.Metadata.IsKey())
+                continue;
+                
+            values[property.Metadata.Name] = property.OriginalValue;
+        }
+
+        return values.Any() ? JsonSerializer.Serialize(values) : null;
+    }
+    
+    /// <summary>
+    /// Serializa os valores atuais da entidade
+    /// </summary>
+    private string? SerializeCurrentValues(EntityEntry entry)
+    {
+        var values = new Dictionary<string, object?>();
+        
+        foreach (var property in entry.Properties.Where(p => !p.Metadata.IsPrimaryKey()))
+        {
+            // Ignora propriedades de navegação
+            if (property.Metadata.IsForeignKey() || property.Metadata.IsKey())
+                continue;
+                
+            values[property.Metadata.Name] = property.CurrentValue;
+        }
+
+        return values.Any() ? JsonSerializer.Serialize(values) : null;
+    }
+    
+    /// <summary>
+    /// Serializa apenas as propriedades que foram modificadas
+    /// </summary>
+    private string? SerializeChangedProperties(EntityEntry entry)
+    {
+        var changedProperties = entry.Properties
+            .Where(p => p.IsModified && !p.Metadata.IsPrimaryKey())
+            .Select(p => new
+            {
+                PropertyName = p.Metadata.Name,
+                OldValue = p.OriginalValue,
+                NewValue = p.CurrentValue
+            })
+            .ToList();
+
+        return changedProperties.Any() ? JsonSerializer.Serialize(changedProperties) : null;
+    }
+    
+    /// <summary>
+    /// Obtém o ID do usuário atual do contexto HTTP
+    /// </summary>
+    private int? GetCurrentUserId()
+    {
+        try
+        {
+            var userIdClaim = _httpContextAccessor?.HttpContext?.User
+                ?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            
+            if (userIdClaim != null && int.TryParse(userIdClaim.Value, out var userId))
+            {
+                return userId;
+            }
+        }
+        catch
+        {
+            // Ignora erros ao obter usuário
+        }
+
+        return null;
+    }
+    
+    /// <summary>
+    /// Obtém o nome do usuário atual do contexto HTTP
+    /// </summary>
+    private string? GetCurrentUserName()
+    {
+        try
+        {
+            return _httpContextAccessor?.HttpContext?.User?.Identity?.Name;
+        }
+        catch
+        {
+            // Ignora erros ao obter nome
+        }
+
+        return null;
+    }
+    
+    /// <summary>
+    /// Obtém o endereço IP do cliente
+    /// </summary>
+    private string? GetCurrentIpAddress()
+    {
+        try
+        {
+            var context = _httpContextAccessor?.HttpContext;
+            if (context != null)
+            {
+                // Verifica proxy/load balancer headers
+                var forwardedFor = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+                if (!string.IsNullOrEmpty(forwardedFor))
+                {
+                    return forwardedFor.Split(',')[0].Trim();
+                }
+                
+                return context.Connection.RemoteIpAddress?.ToString();
+            }
+        }
+        catch
+        {
+            // Ignora erros ao obter IP
+        }
+
+        return null;
+    }
+    
+    /// <summary>
+    /// Obtém o User-Agent do cliente
+    /// </summary>
+    private string? GetCurrentUserAgent()
+    {
+        try
+        {
+            return _httpContextAccessor?.HttpContext?.Request.Headers["User-Agent"].FirstOrDefault();
+        }
+        catch
+        {
+            // Ignora erros ao obter User-Agent
+        }
+
+        return null;
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -138,6 +509,21 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         
         // Sales model configuration
         ConfigureSalesModels(modelBuilder);
+        
+        // Financial model configuration
+        ConfigureFinancialModels(modelBuilder);
+        
+        // HR Management model configuration
+        ConfigureHRModels(modelBuilder);
+        
+        // Asset Management model configuration
+        ConfigureAssetModels(modelBuilder);
+        
+        // Audit model configuration
+        ConfigureAuditModels(modelBuilder);
+
+        // Time tracking / payroll configuration
+        ConfigureTimeTrackingModels(modelBuilder);
     }
 
     private void ConfigureInventoryModels(ModelBuilder modelBuilder)
@@ -405,6 +791,574 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             i.HasOne(x => x.Product)
                 .WithMany()
                 .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+    
+    private void ConfigureFinancialModels(ModelBuilder modelBuilder)
+    {
+        // Supplier
+        modelBuilder.Entity<Supplier>(s =>
+        {
+            s.ToTable("Suppliers");
+            s.HasKey(x => x.Id);
+            s.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            s.Property(x => x.TradeName).HasMaxLength(200);
+            s.Property(x => x.TaxId).HasMaxLength(14).IsRequired();
+            s.Property(x => x.StateRegistration).HasMaxLength(20);
+            s.Property(x => x.MunicipalRegistration).HasMaxLength(20);
+            s.Property(x => x.ZipCode).HasMaxLength(10);
+            s.Property(x => x.Street).HasMaxLength(200);
+            s.Property(x => x.Number).HasMaxLength(10);
+            s.Property(x => x.Complement).HasMaxLength(100);
+            s.Property(x => x.District).HasMaxLength(100);
+            s.Property(x => x.City).HasMaxLength(100);
+            s.Property(x => x.State).HasMaxLength(2);
+            s.Property(x => x.Country).HasMaxLength(100);
+            s.Property(x => x.Phone).HasMaxLength(20);
+            s.Property(x => x.MobilePhone).HasMaxLength(20);
+            s.Property(x => x.Email).HasMaxLength(200);
+            s.Property(x => x.Website).HasMaxLength(200);
+            s.Property(x => x.Category).HasMaxLength(100);
+            s.Property(x => x.PaymentMethod).HasMaxLength(50);
+            
+            s.HasIndex(x => x.TaxId).IsUnique();
+            s.HasIndex(x => x.Name);
+            s.HasIndex(x => x.Email);
+            s.HasIndex(x => x.IsActive);
+            
+            s.HasOne(x => x.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        
+        // AccountReceivable
+        modelBuilder.Entity<AccountReceivable>(ar =>
+        {
+            ar.ToTable("AccountsReceivable");
+            ar.HasKey(x => x.Id);
+            ar.Property(x => x.InvoiceNumber).HasMaxLength(50);
+            ar.Property(x => x.BankSlipNumber).HasMaxLength(100);
+            ar.Property(x => x.PixKey).HasMaxLength(100);
+            ar.Property(x => x.OriginalAmount).HasPrecision(18, 2);
+            ar.Property(x => x.DiscountAmount).HasPrecision(18, 2);
+            ar.Property(x => x.InterestAmount).HasPrecision(18, 2);
+            ar.Property(x => x.FineAmount).HasPrecision(18, 2);
+            ar.Property(x => x.PaidAmount).HasPrecision(18, 2);
+            
+            ar.HasIndex(x => x.CustomerId);
+            ar.HasIndex(x => x.DueDate);
+            ar.HasIndex(x => x.Status);
+            ar.HasIndex(x => x.CategoryId);
+            ar.HasIndex(x => x.CostCenterId);
+            ar.HasIndex(x => new { x.Status, x.DueDate });
+            
+            ar.HasOne(x => x.Customer)
+                .WithMany(x => x.AccountsReceivable)
+                .HasForeignKey(x => x.CustomerId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            ar.HasOne(x => x.Category)
+                .WithMany(x => x.AccountsReceivable)
+                .HasForeignKey(x => x.CategoryId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            ar.HasOne(x => x.CostCenter)
+                .WithMany(x => x.AccountsReceivable)
+                .HasForeignKey(x => x.CostCenterId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            ar.HasOne(x => x.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            ar.HasOne(x => x.ReceivedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.ReceivedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            ar.HasOne(x => x.ParentAccount)
+                .WithMany(x => x.Installments)
+                .HasForeignKey(x => x.ParentAccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        
+        // AccountPayable
+        modelBuilder.Entity<AccountPayable>(ap =>
+        {
+            ap.ToTable("AccountsPayable");
+            ap.HasKey(x => x.Id);
+            ap.Property(x => x.InvoiceNumber).HasMaxLength(50);
+            ap.Property(x => x.BankSlipNumber).HasMaxLength(100);
+            ap.Property(x => x.PixKey).HasMaxLength(100);
+            ap.Property(x => x.OriginalAmount).HasPrecision(18, 2);
+            ap.Property(x => x.DiscountAmount).HasPrecision(18, 2);
+            ap.Property(x => x.InterestAmount).HasPrecision(18, 2);
+            ap.Property(x => x.FineAmount).HasPrecision(18, 2);
+            ap.Property(x => x.PaidAmount).HasPrecision(18, 2);
+            ap.Property(x => x.InvoiceAttachmentUrl).HasMaxLength(500);
+            ap.Property(x => x.ProofOfPaymentUrl).HasMaxLength(500);
+            
+            ap.HasIndex(x => x.SupplierId);
+            ap.HasIndex(x => x.DueDate);
+            ap.HasIndex(x => x.Status);
+            ap.HasIndex(x => x.CategoryId);
+            ap.HasIndex(x => x.CostCenterId);
+            ap.HasIndex(x => x.RequiresApproval);
+            ap.HasIndex(x => new { x.Status, x.DueDate });
+            ap.HasIndex(x => new { x.RequiresApproval, x.ApprovalDate });
+            
+            ap.HasOne(x => x.Supplier)
+                .WithMany(x => x.AccountsPayable)
+                .HasForeignKey(x => x.SupplierId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            ap.HasOne(x => x.Category)
+                .WithMany(x => x.AccountsPayable)
+                .HasForeignKey(x => x.CategoryId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            ap.HasOne(x => x.CostCenter)
+                .WithMany(x => x.AccountsPayable)
+                .HasForeignKey(x => x.CostCenterId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            ap.HasOne(x => x.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            ap.HasOne(x => x.PaidByUser)
+                .WithMany()
+                .HasForeignKey(x => x.PaidByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            ap.HasOne(x => x.ApprovedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.ApprovedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            ap.HasOne(x => x.ParentAccount)
+                .WithMany(x => x.Installments)
+                .HasForeignKey(x => x.ParentAccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        
+        // FinancialCategory
+        modelBuilder.Entity<FinancialCategory>(fc =>
+        {
+            fc.ToTable("FinancialCategories");
+            fc.HasKey(x => x.Id);
+            fc.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            fc.Property(x => x.Code).HasMaxLength(20).IsRequired();
+            fc.Property(x => x.Description).HasMaxLength(500);
+            
+            fc.HasIndex(x => x.Code).IsUnique();
+            fc.HasIndex(x => x.Type);
+            fc.HasIndex(x => x.ParentCategoryId);
+            
+            fc.HasOne(x => x.ParentCategory)
+                .WithMany(x => x.SubCategories)
+                .HasForeignKey(x => x.ParentCategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        
+        // CostCenter
+        modelBuilder.Entity<CostCenter>(cc =>
+        {
+            cc.ToTable("CostCenters");
+            cc.HasKey(x => x.Id);
+            cc.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            cc.Property(x => x.Code).HasMaxLength(20).IsRequired();
+            cc.Property(x => x.Description).HasMaxLength(500);
+            cc.Property(x => x.MonthlyBudget).HasPrecision(18, 2);
+            
+            cc.HasIndex(x => x.Code).IsUnique();
+            cc.HasIndex(x => x.ManagerUserId);
+            cc.HasIndex(x => x.IsActive);
+            
+            cc.HasOne(x => x.Manager)
+                .WithMany()
+                .HasForeignKey(x => x.ManagerUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+        
+        // Update Customer with new fields
+        modelBuilder.Entity<Models.Sales.Customer>(c =>
+        {
+            c.Property(x => x.TradeName).HasMaxLength(200);
+            c.Property(x => x.StateRegistration).HasMaxLength(20);
+            c.Property(x => x.MunicipalRegistration).HasMaxLength(20);
+            c.Property(x => x.Country).HasMaxLength(100);
+            c.Property(x => x.Website).HasMaxLength(200);
+            c.Property(x => x.CreditLimit).HasPrecision(18, 2);
+            c.Property(x => x.PaymentMethod).HasMaxLength(50);
+            c.Property(x => x.CreatedByUserId).IsRequired(false); // Nullable for backward compatibility with existing data
+            
+            c.HasOne(x => x.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+    
+    private void ConfigureHRModels(ModelBuilder modelBuilder)
+    {
+        // Department
+        modelBuilder.Entity<Department>(d =>
+        {
+            d.ToTable("Departments");
+            d.HasKey(x => x.Id);
+            d.Property(x => x.Name).HasMaxLength(100).IsRequired();
+            d.Property(x => x.Description).HasMaxLength(500);
+            d.Property(x => x.Code).HasMaxLength(10);
+            d.Property(x => x.CostCenter).HasMaxLength(50);
+            
+            d.HasIndex(x => x.Code).IsUnique();
+            d.HasIndex(x => x.ParentDepartmentId);
+            d.HasIndex(x => x.ManagerId);
+            
+            // Relacionamento hierárquico
+            d.HasOne(x => x.ParentDepartment)
+                .WithMany(x => x.SubDepartments)
+                .HasForeignKey(x => x.ParentDepartmentId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            // Gerente do departamento
+            d.HasOne(x => x.Manager)
+                .WithMany()
+                .HasForeignKey(x => x.ManagerId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+        
+        // Position
+        modelBuilder.Entity<Position>(p =>
+        {
+            p.ToTable("Positions");
+            p.HasKey(x => x.Id);
+            p.Property(x => x.Title).HasMaxLength(100).IsRequired();
+            p.Property(x => x.Description).HasMaxLength(500);
+            p.Property(x => x.Code).HasMaxLength(10);
+            
+            p.HasIndex(x => x.Code).IsUnique();
+            p.HasIndex(x => x.DefaultDepartmentId);
+            
+            p.HasOne(x => x.DefaultDepartment)
+                .WithMany()
+                .HasForeignKey(x => x.DefaultDepartmentId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+        
+        // ApplicationUser - Configuração adicional para relacionamentos de RH
+        modelBuilder.Entity<ApplicationUser>(u =>
+        {
+            u.HasIndex(x => x.Cpf).IsUnique().HasFilter("\"Cpf\" IS NOT NULL");
+            u.HasIndex(x => x.Rg).HasFilter("\"Rg\" IS NOT NULL");
+            u.HasIndex(x => x.FullName);
+            u.HasIndex(x => x.DepartmentId);
+            u.HasIndex(x => x.PositionId);
+            u.HasIndex(x => x.HireDate);
+            u.HasIndex(x => x.EmploymentStatus);
+            
+            u.HasOne(x => x.Department)
+                .WithMany(x => x.Employees)
+                .HasForeignKey(x => x.DepartmentId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            u.HasOne(x => x.Position)
+                .WithMany(x => x.Employees)
+                .HasForeignKey(x => x.PositionId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+    }
+    
+    private void ConfigureAssetModels(ModelBuilder modelBuilder)
+    {
+        // AssetCategory
+        modelBuilder.Entity<AssetCategory>(c =>
+        {
+            c.ToTable("AssetCategories");
+            c.HasKey(x => x.Id);
+            c.Property(x => x.Name).HasMaxLength(100).IsRequired();
+            c.Property(x => x.Description).HasMaxLength(500);
+            c.Property(x => x.Icon).HasMaxLength(50);
+            
+            c.HasIndex(x => x.Name);
+            c.HasIndex(x => x.IsActive);
+        });
+        
+        // Asset
+        modelBuilder.Entity<Asset>(a =>
+        {
+            a.ToTable("Assets");
+            a.HasKey(x => x.Id);
+            a.Property(x => x.AssetCode).HasMaxLength(50).IsRequired();
+            a.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            a.Property(x => x.Description).HasMaxLength(2000);
+            a.Property(x => x.SerialNumber).HasMaxLength(100);
+            a.Property(x => x.Manufacturer).HasMaxLength(100);
+            a.Property(x => x.Model).HasMaxLength(100);
+            a.Property(x => x.InvoiceNumber).HasMaxLength(50);
+            a.Property(x => x.Location).HasMaxLength(200);
+            a.Property(x => x.Notes).HasMaxLength(2000);
+            a.Property(x => x.ImageUrl).HasMaxLength(500);
+            a.Property(x => x.PurchaseValue).HasPrecision(18, 2);
+            
+            a.HasIndex(x => x.AssetCode).IsUnique();
+            a.HasIndex(x => x.SerialNumber);
+            a.HasIndex(x => x.CategoryId);
+            a.HasIndex(x => x.Status);
+            a.HasIndex(x => x.IsActive);
+            a.HasIndex(x => x.SupplierId);
+            
+            a.HasOne(x => x.Category)
+                .WithMany(x => x.Assets)
+                .HasForeignKey(x => x.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        
+        // AssetAssignment
+        modelBuilder.Entity<AssetAssignment>(aa =>
+        {
+            aa.ToTable("AssetAssignments");
+            aa.HasKey(x => x.Id);
+            aa.Property(x => x.AssignmentNotes).HasMaxLength(1000);
+            aa.Property(x => x.ReturnNotes).HasMaxLength(1000);
+            
+            aa.HasIndex(x => x.AssetId);
+            aa.HasIndex(x => x.AssignedToUserId);
+            aa.HasIndex(x => x.AssignedDate);
+            aa.HasIndex(x => x.ReturnedDate);
+            aa.HasIndex(x => new { x.AssetId, x.ReturnedDate });
+            
+            aa.HasOne(x => x.Asset)
+                .WithMany(x => x.Assignments)
+                .HasForeignKey(x => x.AssetId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            aa.HasOne(x => x.AssignedToUser)
+                .WithMany()
+                .HasForeignKey(x => x.AssignedToUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            aa.HasOne(x => x.AssignedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.AssignedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            aa.HasOne<ApplicationUser>(x => x.ReturnedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.ReturnedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+        
+        // AssetMaintenance
+        modelBuilder.Entity<AssetMaintenance>(am =>
+        {
+            am.ToTable("AssetMaintenances");
+            am.HasKey(x => x.Id);
+            am.Property(x => x.Description).HasMaxLength(1000).IsRequired();
+            am.Property(x => x.ServiceDetails).HasMaxLength(2000);
+            am.Property(x => x.ServiceProvider).HasMaxLength(200);
+            am.Property(x => x.InvoiceNumber).HasMaxLength(50);
+            am.Property(x => x.Notes).HasMaxLength(2000);
+            am.Property(x => x.Cost).HasPrecision(18, 2);
+            
+            am.HasIndex(x => x.AssetId);
+            am.HasIndex(x => x.Type);
+            am.HasIndex(x => x.Status);
+            am.HasIndex(x => x.ScheduledDate);
+            am.HasIndex(x => x.NextMaintenanceDate);
+            am.HasIndex(x => new { x.Status, x.ScheduledDate });
+            
+            am.HasOne(x => x.Asset)
+                .WithMany(x => x.MaintenanceRecords)
+                .HasForeignKey(x => x.AssetId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            am.HasOne(x => x.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            am.HasOne<ApplicationUser>(x => x.CompletedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.CompletedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+        
+        // AssetDocument
+        modelBuilder.Entity<AssetDocument>(ad =>
+        {
+            ad.ToTable("AssetDocuments");
+            ad.HasKey(x => x.Id);
+            ad.Property(x => x.FileName).HasMaxLength(255).IsRequired();
+            ad.Property(x => x.OriginalFileName).HasMaxLength(255).IsRequired();
+            ad.Property(x => x.FilePath).HasMaxLength(1000).IsRequired();
+            ad.Property(x => x.ContentType).HasMaxLength(200).IsRequired();
+            ad.Property(x => x.Description).HasMaxLength(1000);
+            ad.Property(x => x.DocumentNumber).HasMaxLength(100);
+            
+            ad.HasIndex(x => x.AssetId);
+            ad.HasIndex(x => x.Type);
+            ad.HasIndex(x => x.DocumentDate);
+            ad.HasIndex(x => x.ExpiryDate);
+            ad.HasIndex(x => new { x.AssetId, x.Type });
+            
+            ad.HasOne(x => x.Asset)
+                .WithMany(x => x.Documents)
+                .HasForeignKey(x => x.AssetId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            ad.HasOne(x => x.UploadedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.UploadedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        
+        // AssetTransfer
+        modelBuilder.Entity<AssetTransfer>(at =>
+        {
+            at.ToTable("AssetTransfers");
+            at.HasKey(x => x.Id);
+            at.Property(x => x.FromLocation).HasMaxLength(200).IsRequired();
+            at.Property(x => x.ToLocation).HasMaxLength(200).IsRequired();
+            at.Property(x => x.Reason).HasMaxLength(1000);
+            at.Property(x => x.Notes).HasMaxLength(2000);
+            
+            at.HasIndex(x => x.AssetId);
+            at.HasIndex(x => x.FromDepartmentId);
+            at.HasIndex(x => x.ToDepartmentId);
+            at.HasIndex(x => x.TransferDate);
+            at.HasIndex(x => x.Status);
+            at.HasIndex(x => new { x.Status, x.TransferDate });
+            
+            at.HasOne(x => x.Asset)
+                .WithMany(x => x.Transfers)
+                .HasForeignKey(x => x.AssetId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            at.HasOne(x => x.FromDepartment)
+                .WithMany()
+                .HasForeignKey(x => x.FromDepartmentId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            at.HasOne(x => x.ToDepartment)
+                .WithMany()
+                .HasForeignKey(x => x.ToDepartmentId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            at.HasOne(x => x.RequestedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.RequestedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            at.HasOne<ApplicationUser>(x => x.ApprovedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.ApprovedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            at.HasOne<ApplicationUser>(x => x.CompletedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.CompletedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+    }
+    
+    private void ConfigureAuditModels(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AuditLog>(a =>
+        {
+            a.ToTable("AuditLogs");
+            a.HasKey(x => x.Id);
+            
+            a.Property(x => x.EntityName).HasMaxLength(100).IsRequired();
+            a.Property(x => x.EntityId).HasMaxLength(100).IsRequired();
+            a.Property(x => x.Action).HasMaxLength(20).IsRequired();
+            a.Property(x => x.UserName).HasMaxLength(200);
+            a.Property(x => x.IpAddress).HasMaxLength(45);
+            a.Property(x => x.UserAgent).HasMaxLength(500);
+            a.Property(x => x.AdditionalInfo).HasMaxLength(1000);
+            a.Property(x => x.Timestamp).IsRequired();
+            
+            // Configura colunas JSON para PostgreSQL
+            a.Property(x => x.OldValues).HasColumnType("jsonb");
+            a.Property(x => x.NewValues).HasColumnType("jsonb");
+            a.Property(x => x.ChangedProperties).HasColumnType("jsonb");
+            
+            // Índices compostos otimizados para queries comuns
+            // Índice para histórico de entidade (timeline de uma entidade específica)
+            a.HasIndex(x => new { x.EntityName, x.EntityId, x.Timestamp })
+                .HasDatabaseName("idx_audit_entity_timeline");
+            
+            // Índice para atividade de usuário (timeline de um usuário específico)
+            a.HasIndex(x => new { x.UserId, x.Timestamp })
+                .HasDatabaseName("idx_audit_user_timeline");
+            
+            // Índice para busca por tipo de ação em período
+            a.HasIndex(x => new { x.Action, x.Timestamp })
+                .HasDatabaseName("idx_audit_action_timeline");
+            
+            // Índice para busca geral por entidade e tipo de ação
+            a.HasIndex(x => new { x.EntityName, x.Action, x.Timestamp })
+                .HasDatabaseName("idx_audit_entity_action_timeline");
+        });
+    }
+
+    private void ConfigureTimeTrackingModels(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PayrollPeriod>(p =>
+        {
+            p.ToTable("PayrollPeriods");
+            p.HasKey(x => x.Id);
+            p.Property(x => x.ReferenceMonth).IsRequired();
+            p.Property(x => x.ReferenceYear).IsRequired();
+            p.Property(x => x.Status)
+                .HasConversion<int>();
+            p.Property(x => x.CreatedAt).IsRequired();
+            p.Property(x => x.UpdatedAt);
+
+            p.HasIndex(x => new { x.ReferenceYear, x.ReferenceMonth }).IsUnique();
+
+            p.HasOne(x => x.CreatedBy)
+                .WithMany()
+                .HasForeignKey(x => x.CreatedById)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            p.HasOne(x => x.UpdatedBy)
+                .WithMany()
+                .HasForeignKey(x => x.UpdatedById)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<PayrollEntry>(e =>
+        {
+            e.ToTable("PayrollEntries");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Faltas).HasColumnType("decimal(5,2)");
+            e.Property(x => x.Abonos).HasColumnType("decimal(5,2)");
+            e.Property(x => x.HorasExtras).HasColumnType("decimal(5,2)");
+            e.Property(x => x.Atrasos).HasColumnType("decimal(5,2)");
+            e.Property(x => x.Observacoes).HasMaxLength(1000);
+            e.Property(x => x.CreatedAt).IsRequired();
+
+            e.HasIndex(x => new { x.PayrollPeriodId, x.EmployeeId }).IsUnique();
+
+            e.HasOne(x => x.PayrollPeriod)
+                .WithMany(x => x.Entries)
+                .HasForeignKey(x => x.PayrollPeriodId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(x => x.Employee)
+                .WithMany()
+                .HasForeignKey(x => x.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(x => x.UpdatedBy)
+                .WithMany()
+                .HasForeignKey(x => x.UpdatedById)
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }

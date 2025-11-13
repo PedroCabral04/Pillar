@@ -73,6 +73,22 @@ public class LayoutController : ControllerBase
         return Ok(catalog);
     }
 
+    [HttpGet("widgets/{providerKey}/{widgetKey}/roles")]
+    [Authorize(Roles = "Administrador")]
+    public async Task<ActionResult<string[]?>> GetWidgetRoles(string providerKey, string widgetKey)
+    {
+        var roles = await _layoutService.GetWidgetRolesAsync(providerKey, widgetKey);
+        return Ok(roles ?? Array.Empty<string>());
+    }
+
+    [HttpPost("widgets/{providerKey}/{widgetKey}/roles")]
+    [Authorize(Roles = "Administrador")]
+    public async Task<ActionResult> SetWidgetRoles(string providerKey, string widgetKey, [FromBody] string[]? roles)
+    {
+        await _layoutService.SetWidgetRolesAsync(providerKey, widgetKey, roles);
+        return Ok(new { message = "Widget roles updated" });
+    }
+
     [HttpPost("widgets")]
     public async Task<ActionResult<WidgetConfiguration>> AddWidget([FromBody] AddWidgetRequest request)
     {

@@ -1,0 +1,304 @@
+@page "/data-access-report"
+@using erp.DTOs.Audit
+@using erp.Models.Audit
+@using erp.Services
+@using MudColor = MudBlazor.Color
+@using MudSize = MudBlazor.Size
+@using MudAlign = MudBlazor.Align
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@attribute [Authorize(Roles = "Administrador")]
+
+<PageTitle>Relatório de Acesso a Dados Sensíveis</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-4">
+        <MudIcon Icon="@Icons.Material.Filled.Shield" Class="mr-2" />
+        Relatório de Acesso a Dados Sensíveis (LGPD/GDPR)
+    </MudText>
+
+    <MudPaper Class="pa-4 mb-4">
+        <MudGrid>
+            <MudItem xs="12" md="3">
+                <MudDatePicker Label="Data Inicial" 
+                              @bind-Date="_startDate"
+                              MaxDate="DateTime.Today"
+                              Clearable="true" />
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudDatePicker Label="Data Final" 
+                              @bind-Date="_endDate"
+                              MaxDate="DateTime.Today"
+                              Clearable="true" />
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudSelect T="DataSensitivity?" 
+                          Label="Sensibilidade Mínima"
+                          @bind-Value="_minSensitivity"
+                          Clearable="true">
+                    <MudSelectItem T="DataSensitivity?" Value="@DataSensitivity.Low">
+                        <MudChip T="string" Color="MudColor.Info" Size="MudSize.Small">Baixa</MudChip>
+                    </MudSelectItem>
+                    <MudSelectItem T="DataSensitivity?" Value="@DataSensitivity.Medium">
+                        <MudChip T="string" Color="MudColor.Warning" Size="MudSize.Small">Média</MudChip>
+                    </MudSelectItem>
+                    <MudSelectItem T="DataSensitivity?" Value="@DataSensitivity.High">
+                        <MudChip T="string" Color="MudColor.Error" Size="MudSize.Small">Alta</MudChip>
+                    </MudSelectItem>
+                    <MudSelectItem T="DataSensitivity?" Value="@DataSensitivity.Critical">
+                        <MudChip T="string" Color="MudColor.Dark" Size="MudSize.Small">Crítica</MudChip>
+                    </MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="3" Class="d-flex align-center">
+                <MudButton Variant="Variant.Filled" 
+                          Color="MudColor.Primary" 
+                          OnClick="LoadReport"
+                          StartIcon="@Icons.Material.Filled.Search"
+                          FullWidth="true"
+                          Disabled="_isLoading">
+                    @if (_isLoading)
+                    {
+                        <MudProgressCircular Size="MudSize.Small" Indeterminate="true" />
+                    }
+                    else
+                    {
+                        <span>Buscar</span>
+                    }
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    @if (_showStats && _accessLogs.Any())
+    {
+        <MudGrid Class="mb-4">
+            <MudItem xs="12" md="3">
+                <MudPaper Class="pa-4">
+                    <MudText Typo="Typo.subtitle2" Color="MudColor.Secondary">Total de Acessos</MudText>
+                    <MudText Typo="Typo.h4">@_accessLogs.Count</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudPaper Class="pa-4">
+                    <MudText Typo="Typo.subtitle2" Color="MudColor.Secondary">Usuários Únicos</MudText>
+                    <MudText Typo="Typo.h4">@_accessLogs.Select(l => l.UserId).Distinct().Count()</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudPaper Class="pa-4">
+                    <MudText Typo="Typo.subtitle2" Color="MudColor.Secondary">Entidades Acessadas</MudText>
+                    <MudText Typo="Typo.h4">@_accessLogs.Select(l => l.EntityName).Distinct().Count()</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudPaper Class="pa-4">
+                    <MudText Typo="Typo.subtitle2" Color="MudColor.Secondary">Acessos Críticos</MudText>
+                    <MudText Typo="Typo.h4" Color="MudColor.Error">
+                        @_accessLogs.Count(l => l.Sensitivity == DataSensitivity.High || l.Sensitivity == DataSensitivity.Critical)
+                    </MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+
+    <MudTable Items="_accessLogs" 
+              Dense="true" 
+              Hover="true" 
+              Loading="_isLoading"
+              LoadingProgressColor="MudColor.Primary">
+        <HeaderContent>
+            <MudTh>Data/Hora</MudTh>
+            <MudTh>Entidade</MudTh>
+            <MudTh>ID</MudTh>
+            <MudTh>Sensibilidade</MudTh>
+            <MudTh>Usuário</MudTh>
+            <MudTh>IP</MudTh>
+            <MudTh>Descrição</MudTh>
+            <MudTh>Ações</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Data/Hora">
+                <MudText Typo="Typo.body2">@context.Timestamp.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")</MudText>
+            </MudTd>
+            <MudTd DataLabel="Entidade">
+                <MudChip T="string" Size="MudSize.Small" Color="MudColor.Default">@context.EntityName</MudChip>
+            </MudTd>
+            <MudTd DataLabel="ID">
+                <MudText Typo="Typo.body2">@context.EntityId</MudText>
+            </MudTd>
+            <MudTd DataLabel="Sensibilidade">
+                @switch (context.Sensitivity)
+                {
+                    case DataSensitivity.Low:
+                        <MudChip T="string" Size="MudSize.Small" Color="MudColor.Info">Baixa</MudChip>
+                        break;
+                    case DataSensitivity.Medium:
+                        <MudChip T="string" Size="MudSize.Small" Color="MudColor.Warning">Média</MudChip>
+                        break;
+                    case DataSensitivity.High:
+                        <MudChip T="string" Size="MudSize.Small" Color="MudColor.Error">Alta</MudChip>
+                        break;
+                    case DataSensitivity.Critical:
+                        <MudChip T="string" Size="MudSize.Small" Color="MudColor.Dark">Crítica</MudChip>
+                        break;
+                }
+            </MudTd>
+            <MudTd DataLabel="Usuário">
+                <MudText Typo="Typo.body2">@context.UserName</MudText>
+                <MudText Typo="Typo.caption" Color="MudColor.Secondary">ID: @context.UserId</MudText>
+            </MudTd>
+            <MudTd DataLabel="IP">
+                <MudText Typo="Typo.caption">@context.IpAddress</MudText>
+            </MudTd>
+            <MudTd DataLabel="Descrição">
+                <MudText Typo="Typo.caption">@context.Description</MudText>
+            </MudTd>
+            <MudTd DataLabel="Ações">
+                <MudIconButton Icon="@Icons.Material.Filled.Info" 
+                              Size="MudSize.Small" 
+                              Color="MudColor.Primary"
+                              OnClick="@(async () => await ShowDetails(context))"
+                              Title="Ver Detalhes" />
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Typo="Typo.body1" Align="MudAlign.Center" Class="pa-4">
+                @if (_isLoading)
+                {
+                    <span>Carregando...</span>
+                }
+                else
+                {
+                    <span>Nenhum acesso registrado no período selecionado.</span>
+                }
+            </MudText>
+        </NoRecordsContent>
+    </MudTable>
+
+    @if (_accessLogs.Any())
+    {
+        <MudPaper Class="pa-4 mt-4">
+            <MudText Typo="Typo.h6" Class="mb-2">
+                <MudIcon Icon="@Icons.Material.Filled.BarChart" Class="mr-2" />
+                Resumo por Entidade
+            </MudText>
+            <MudSimpleTable Dense="true">
+                <thead>
+                    <tr>
+                        <th>Entidade</th>
+                        <th>Total de Acessos</th>
+                        <th>Usuários Únicos</th>
+                        <th>Último Acesso</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var group in _accessLogs.GroupBy(l => l.EntityName))
+                    {
+                        <tr>
+                            <td><MudChip T="string" Size="MudSize.Small">@group.Key</MudChip></td>
+                            <td>@group.Count()</td>
+                            <td>@group.Select(l => l.UserId).Distinct().Count()</td>
+                            <td>@group.Max(l => l.Timestamp).ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    private List<DataAccessReportDto> _accessLogs = new();
+    private bool _isLoading = false;
+    private bool _showStats = false;
+    private DateTime? _startDate = DateTime.UtcNow.Date.AddDays(-7);
+    private DateTime? _endDate = DateTime.UtcNow.Date;
+    private DataSensitivity? _minSensitivity = null;
+
+    // Removido carregamento automático - só carrega quando clicar em "Buscar"
+
+    private async Task LoadReport()
+    {
+        _isLoading = true;
+        _showStats = false;
+        _accessLogs.Clear(); // Limpa a lista antes de carregar
+        
+        try
+        {
+            var queryParams = new List<string>();
+            
+            if (_startDate.HasValue)
+            {
+                // Converte para UTC para PostgreSQL
+                var utcStart = DateTime.SpecifyKind(_startDate.Value.Date, DateTimeKind.Utc);
+                queryParams.Add($"startDate={utcStart:yyyy-MM-ddTHH:mm:ssZ}");
+            }
+            
+            if (_endDate.HasValue)
+            {
+                // Converte para UTC - fim do dia (23:59:59)
+                var utcEnd = DateTime.SpecifyKind(_endDate.Value.Date.AddDays(1).AddSeconds(-1), DateTimeKind.Utc);
+                queryParams.Add($"endDate={utcEnd:yyyy-MM-ddTHH:mm:ssZ}");
+            }
+            
+            if (_minSensitivity.HasValue)
+                queryParams.Add($"minSensitivity={_minSensitivity.Value}");
+
+            var query = queryParams.Any() ? "?" + string.Join("&", queryParams) : "";
+            var url = $"api/audit/sensitive-data-access{query}";
+            
+            _accessLogs = await ApiService.GetAsync<List<DataAccessReportDto>>(url) ?? new();
+            _showStats = true;
+            
+            if (!_accessLogs.Any())
+            {
+                Snackbar.Add("Nenhum acesso encontrado no período.", Severity.Info);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar relatório: {ex.Message}", Severity.Error);
+            _accessLogs = new();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task ShowDetails(DataAccessReportDto log)
+    {
+        var sensitivityLabel = log.Sensitivity switch
+        {
+            DataSensitivity.Low => "Baixa",
+            DataSensitivity.Medium => "Média",
+            DataSensitivity.High => "Alta",
+            DataSensitivity.Critical => "Crítica",
+            _ => "N/A"
+        };
+
+        var message = $@"
+Entidade: {log.EntityName}
+ID: {log.EntityId}
+Sensibilidade: {sensitivityLabel}
+Usuário: {log.UserName} (ID: {log.UserId})
+Data/Hora: {log.Timestamp.ToLocalTime():dd/MM/yyyy HH:mm:ss}
+IP: {log.IpAddress}
+Descrição: {log.Description ?? "N/A"}";
+
+        if (!string.IsNullOrEmpty(log.Parameters))
+        {
+            message += $"\n\nParâmetros:\n{log.Parameters}";
+        }
+
+        await DialogService.ShowMessageBox(
+            "Detalhes do Acesso",
+            message,
+            yesText: "Fechar",
+            cancelText: null
+        );
+    }
+}
+

@@ -99,6 +99,63 @@
                 <MudDivider Class="my-4" />
 
                 <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.Work" Size="MudBlazor.Size.Small" Class="mr-1" />
+                    Informações Profissionais
+                </MudText>
+
+                <MudGrid Spacing="3">
+                    <MudItem xs="12" md="6">
+                        <MudSelect T="int?" 
+                                   @bind-Value="_updateUser.DepartmentId" 
+                                   Label="Departamento" 
+                                   Variant="Variant.Outlined"
+                                   Adornment="Adornment.Start"
+                                   AdornmentIcon="@Icons.Material.Filled.BusinessCenter"
+                                   HelperText="Departamento do colaborador"
+                                   Clearable="true">
+                            @foreach (var dept in _departmentsList.Where(d => d.IsActive))
+                            {
+                                <MudSelectItem T="int?" Value="@dept.Id">
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                        <MudText Typo="Typo.body2">@dept.Name</MudText>
+                                        @if (!string.IsNullOrEmpty(dept.Code))
+                                        {
+                                            <MudChip T="string" Size="MudBlazor.Size.Small" Variant="Variant.Text" Color="MudBlazor.Color.Secondary">@dept.Code</MudChip>
+                                        }
+                                    </MudStack>
+                                </MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudSelect T="int?" 
+                                   @bind-Value="_updateUser.PositionId" 
+                                   Label="Cargo" 
+                                   Variant="Variant.Outlined"
+                                   Adornment="Adornment.Start"
+                                   AdornmentIcon="@Icons.Material.Filled.WorkOutline"
+                                   HelperText="Cargo do colaborador"
+                                   Clearable="true">
+                            @foreach (var pos in _positionsList.Where(p => p.IsActive))
+                            {
+                                <MudSelectItem T="int?" Value="@pos.Id">
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                        <MudText Typo="Typo.body2">@pos.Title</MudText>
+                                        @if (pos.Level.HasValue)
+                                        {
+                                            <MudChip T="string" Size="MudBlazor.Size.Small" Variant="Variant.Text" Color="MudBlazor.Color.Info">Nível @pos.Level</MudChip>
+                                        }
+                                    </MudStack>
+                                </MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                </MudGrid>
+
+                <MudDivider Class="my-4" />
+
+                <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-3">
                     <MudIcon Icon="@Icons.Material.Filled.Security" Size="MudBlazor.Size.Small" Class="mr-1" />
                     Permissões de Acesso
                 </MudText>
@@ -209,6 +266,8 @@
     private UpdateUserDto _updateUser = new();
     private IEnumerable<RoleDto> _selectedRoles = new List<RoleDto>();
     private List<RoleDto> _rolesList = new List<RoleDto>();
+    private List<DepartmentDto> _departmentsList = new List<DepartmentDto>();
+    private List<PositionDto> _positionsList = new List<PositionDto>();
     
     private bool _loading = true;
     private bool _submitting = false;
@@ -247,6 +306,8 @@
     {
         await LoadUserData();
         await LoadRolesAsync();
+        await LoadDepartmentsAsync();
+        await LoadPositionsAsync();
         _loading = false;
     }
     
@@ -287,7 +348,9 @@
                     Email = user.Email,
                     Phone = user.Phone,
                     IsActive = user.IsActive,
-                    RoleIds = new List<int>()
+                    RoleIds = new List<int>(),
+                    DepartmentId = user.DepartmentId,
+                    PositionId = user.PositionId
                 };
 
                 // Set current roles as selected after roles are loaded
@@ -342,6 +405,58 @@
         {
             Logger.LogError($"Erro ao buscar funções: {ex.Message}");
             _rolesList = new List<RoleDto>();
+        }
+    }
+
+    private async Task LoadDepartmentsAsync()
+    {
+        try
+        {
+            var response = await ApiService.GetAsync("api/departments");
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized || 
+                response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                Logger.LogError("Sem permissão para buscar departamentos.");
+                return;
+            }
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var departments = await response.Content.ReadFromJsonAsync<List<DepartmentDto>>();
+                _departmentsList = departments ?? new List<DepartmentDto>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Erro ao buscar departamentos: {ex.Message}");
+            _departmentsList = new List<DepartmentDto>();
+        }
+    }
+
+    private async Task LoadPositionsAsync()
+    {
+        try
+        {
+            var response = await ApiService.GetAsync("api/positions");
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized || 
+                response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                Logger.LogError("Sem permissão para buscar cargos.");
+                return;
+            }
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var positions = await response.Content.ReadFromJsonAsync<List<PositionDto>>();
+                _positionsList = positions ?? new List<PositionDto>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Erro ao buscar cargos: {ex.Message}");
+            _positionsList = new List<PositionDto>();
         }
     }
 

@@ -1,0 +1,309 @@
+@using erp.DTOs.Chatbot
+@using erp.Services
+@using MudBlazor
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+
+<style>
+    .chatbot-widget {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 1000;
+    }
+
+    .chatbot-button {
+        width: 60px;
+        height: 60px;
+        border-radius: 30px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .chatbot-window {
+        position: fixed;
+        bottom: 90px;
+        right: 20px;
+        width: 400px;
+        height: 600px;
+        border-radius: 16px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        display: flex;
+        flex-direction: column;
+        z-index: 1001;
+    }
+
+    .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .chat-message {
+        max-width: 80%;
+        padding: 12px 16px;
+        border-radius: 12px;
+        word-wrap: break-word;
+        white-space: pre-wrap;
+    }
+
+    .chat-message-user {
+        align-self: flex-end;
+        background: var(--mud-palette-primary);
+        color: white;
+    }
+
+    .chat-message-assistant {
+        align-self: flex-start;
+        background: var(--mud-palette-surface);
+    }
+
+    .chat-message-error {
+        align-self: flex-start;
+        background: var(--mud-palette-error);
+        color: white;
+    }
+
+    .chat-input-area {
+        padding: 12px;
+        border-top: 1px solid var(--mud-palette-divider);
+    }
+
+    .suggested-actions {
+        display: flex;
+        gap: 8px;
+        padding: 8px 16px;
+        flex-wrap: wrap;
+    }
+
+    @@media (max-width: 600px) {
+        .chatbot-window {
+            width: calc(100vw - 40px);
+            height: calc(100vh - 120px);
+            right: 20px;
+            bottom: 90px;
+        }
+    }
+</style>
+
+<div class="chatbot-widget">
+    @if (!_isOpen)
+    {
+        <MudFab Color="MudBlazor.Color.Primary" 
+                StartIcon="@Icons.Material.Filled.Chat" 
+                OnClick="ToggleChatbot"
+                Class="chatbot-button"
+                aria-label="Abrir Assistente Virtual"/>
+    }
+    else
+    {
+        <MudPaper Class="chatbot-window" Elevation="8">
+            <MudToolBar Dense="true" Style="border-radius: 16px 16px 0 0;">
+                <MudIcon Icon="@Icons.Material.Filled.SmartToy" Class="mr-2"/>
+                <MudText Typo="Typo.h6">Assistente Virtual</MudText>
+                <MudSpacer/>
+                <MudIconButton Icon="@Icons.Material.Filled.Remove" 
+                               Color="MudBlazor.Color.Inherit" 
+                               OnClick="MinimizeChatbot"
+                               aria-label="Minimizar"/>
+                <MudIconButton Icon="@Icons.Material.Filled.Close" 
+                               Color="MudBlazor.Color.Inherit" 
+                               OnClick="ToggleChatbot"
+                               aria-label="Fechar"/>
+            </MudToolBar>
+
+            <div class="chat-messages" @ref="_messagesContainer">
+                @if (!_messages.Any())
+                {
+                    <div style="text-align: center; padding: 40px 20px; color: var(--mud-palette-text-secondary);">
+                        <MudIcon Icon="@Icons.Material.Filled.EmojiEmotions" Size="MudBlazor.Size.Large" Class="mb-4"/>
+                        <MudText Typo="Typo.h6">Olá! Como posso ajudar?</MudText>
+                        <MudText Typo="Typo.body2" Class="mt-2">
+                            Posso ajudar com produtos, vendas e muito mais!
+                        </MudText>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var message in _messages)
+                    {
+                        <div class="chat-message @(message.IsError ? "chat-message-error" : message.Role == "user" ? "chat-message-user" : "chat-message-assistant")">
+                            @if (message.Role == "assistant" && !message.IsError)
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="MudBlazor.Size.Small" Class="mr-1"/>
+                            }
+                            <MudText Typo="Typo.body2" Style="display: inline;">@message.Content</MudText>
+                        </div>
+                    }
+                    
+                    @if (_isProcessing)
+                    {
+                        <div class="chat-message chat-message-assistant">
+                            <MudProgressCircular Size="MudBlazor.Size.Small" Indeterminate="true" Class="mr-2"/>
+                            <MudText Typo="Typo.body2" Style="display: inline;">Processando...</MudText>
+                        </div>
+                    }
+                }
+            </div>
+
+            @if (_suggestedActions.Any())
+            {
+                <div class="suggested-actions">
+                    @foreach (var action in _suggestedActions)
+                    {
+                        <MudChip T="string"
+                                 Size="MudBlazor.Size.Small" 
+                                 Color="MudBlazor.Color.Primary" 
+                                 Variant="Variant.Outlined"
+                                 OnClick="@(() => SendSuggestedAction(action))">
+                            @action
+                        </MudChip>
+                    }
+                </div>
+            }
+
+            <div class="chat-input-area">
+                <MudTextField @bind-Value="_currentMessage"
+                              Placeholder="Digite sua mensagem..."
+                              Variant="Variant.Outlined"
+                              AdornmentIcon="@Icons.Material.Filled.Send"
+                              Adornment="Adornment.End"
+                              OnAdornmentClick="SendMessage"
+                              OnKeyDown="HandleKeyDown"
+                              Disabled="_isProcessing"
+                              Immediate="true"
+                              FullWidth="true"/>
+            </div>
+        </MudPaper>
+    }
+</div>
+
+@code {
+    private bool _isOpen = false;
+    private bool _isProcessing = false;
+    private string _currentMessage = string.Empty;
+    private List<ChatMessageDto> _messages = new();
+    private List<string> _suggestedActions = new();
+    private ElementReference _messagesContainer;
+
+    protected override void OnInitialized()
+    {
+        // Carregar mensagens salvas do localStorage se necessário
+        base.OnInitialized();
+    }
+
+    private void ToggleChatbot()
+    {
+        _isOpen = !_isOpen;
+        
+        if (_isOpen && !_messages.Any())
+        {
+            // Mostrar sugestões iniciais
+            _suggestedActions = new List<string>
+            {
+                "O que você pode fazer?",
+                "Listar produtos",
+                "Ver vendas recentes"
+            };
+        }
+    }
+
+    private void MinimizeChatbot()
+    {
+        _isOpen = false;
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+        {
+            await SendMessage();
+        }
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(_currentMessage) || _isProcessing)
+            return;
+
+        var userMessage = _currentMessage.Trim();
+        _currentMessage = string.Empty;
+
+        // Adicionar mensagem do usuário
+        _messages.Add(new ChatMessageDto
+        {
+            Role = "user",
+            Content = userMessage,
+            Timestamp = DateTime.UtcNow
+        });
+
+        _isProcessing = true;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            // Enviar para o backend
+            var request = new ChatRequestDto
+            {
+                Message = userMessage,
+                ConversationHistory = _messages.Where(m => !m.IsError).ToList()
+            };
+
+            var response = await ApiService.PostAsync<ChatResponseDto>("api/chatbot/message", request);
+
+            if (response?.Success == true)
+            {
+                // Adicionar resposta do assistente
+                _messages.Add(new ChatMessageDto
+                {
+                    Role = "assistant",
+                    Content = response.Response,
+                    Timestamp = DateTime.UtcNow
+                });
+
+                // Atualizar sugestões
+                if (response.SuggestedActions?.Any() == true)
+                {
+                    _suggestedActions = response.SuggestedActions;
+                }
+            }
+            else
+            {
+                _messages.Add(new ChatMessageDto
+                {
+                    Role = "assistant",
+                    Content = response?.Error ?? "Erro ao processar mensagem.",
+                    Timestamp = DateTime.UtcNow,
+                    IsError = true
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            _messages.Add(new ChatMessageDto
+            {
+                Role = "assistant",
+                Content = $"Erro: {ex.Message}",
+                Timestamp = DateTime.UtcNow,
+                IsError = true
+            });
+            Snackbar.Add("Erro ao comunicar com o assistente", Severity.Error);
+        }
+        finally
+        {
+            _isProcessing = false;
+            await InvokeAsync(StateHasChanged);
+            
+            // Scroll para o final
+            // Note: Para scroll automático, considere usar JS Interop
+        }
+    }
+
+    private async Task SendSuggestedAction(string action)
+    {
+        _currentMessage = action;
+        await SendMessage();
+    }
+}

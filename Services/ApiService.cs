@@ -127,8 +127,11 @@ public class ApiService : IApiService
             query["_"] = DateTime.UtcNow.Ticks.ToString();
             uriBuilder.Query = query.ToString();
 
-            var request = CreateRequestWithCookies(HttpMethod.Get, uriBuilder.Uri.PathAndQuery);
-            return await ExecuteWithRetryAsync(() => _httpClient.SendAsync(request, cancellationToken), endpoint);
+            return await ExecuteWithRetryAsync(() =>
+            {
+                var request = CreateRequestWithCookies(HttpMethod.Get, uriBuilder.Uri.PathAndQuery);
+                return _httpClient.SendAsync(request, cancellationToken);
+            }, endpoint);
         }
         catch (Exception ex)
         {
@@ -147,10 +150,13 @@ public class ApiService : IApiService
         {
             BeginLoading();
             
-            var request = CreateRequestWithCookies(HttpMethod.Post, endpoint);
             var json = JsonSerializer.Serialize(data);
-            request.Content = new StringContent(json, Encoding.UTF8, "application/json");
-            return await ExecuteWithRetryAsync(() => _httpClient.SendAsync(request, cancellationToken), endpoint);
+            return await ExecuteWithRetryAsync(() =>
+            {
+                var request = CreateRequestWithCookies(HttpMethod.Post, endpoint);
+                request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+                return _httpClient.SendAsync(request, cancellationToken);
+            }, endpoint);
         }
         catch (Exception ex)
         {
@@ -185,10 +191,13 @@ public class ApiService : IApiService
         {
             BeginLoading();
             
-            var request = CreateRequestWithCookies(HttpMethod.Put, endpoint);
             var json = JsonSerializer.Serialize(data);
-            request.Content = new StringContent(json, Encoding.UTF8, "application/json");
-            return await ExecuteWithRetryAsync(() => _httpClient.SendAsync(request, cancellationToken), endpoint);
+            return await ExecuteWithRetryAsync(() =>
+            {
+                var request = CreateRequestWithCookies(HttpMethod.Put, endpoint);
+                request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+                return _httpClient.SendAsync(request, cancellationToken);
+            }, endpoint);
         }
         catch (Exception ex)
         {
@@ -207,8 +216,11 @@ public class ApiService : IApiService
         {
             BeginLoading();
             
-            var request = CreateRequestWithCookies(HttpMethod.Delete, endpoint);
-            return await ExecuteWithRetryAsync(() => _httpClient.SendAsync(request, cancellationToken), endpoint);
+            return await ExecuteWithRetryAsync(() =>
+            {
+                var request = CreateRequestWithCookies(HttpMethod.Delete, endpoint);
+                return _httpClient.SendAsync(request, cancellationToken);
+            }, endpoint);
         }
         catch (Exception ex)
         {

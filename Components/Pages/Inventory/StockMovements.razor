@@ -1,0 +1,267 @@
+@page "/inventory/movements"
+@using erp.DTOs.Inventory
+@using erp.Services
+@using erp.Components.Shared.Dialogs.Inventory
+@using MudBlazor
+@using Size = MudBlazor.Size
+@using Color = MudBlazor.Color
+@attribute [Authorize]
+
+@inject IApiService ApiService
+@inject ILogger<StockMovements> Logger
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Movimentações de Estoque</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Movimentações de Estoque</MudText>
+    <MudButton Color="Color.Primary" 
+               Variant="Variant.Filled" 
+               StartIcon="@Icons.Material.Filled.Add"
+               OnClick="OpenCreateDialog">
+        Nova Movimentação
+    </MudButton>
+</MudStack>
+
+@if (_loadError != null)
+{
+    <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
+}
+
+<MudTable T="StockMovementDto" ServerData="ServerReload" 
+          Dense="false" Hover="true" Elevation="4" @ref="_table" Striped="true" Loading="@_loading">
+    <ToolBarContent>
+        <MudText Typo="Typo.h5">Histórico de Movimentações</MudText>
+        <MudSpacer/>
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudTextField T="string" ValueChanged="OnSearch" Immediate="false" Placeholder="Procurar produto" 
+                          Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
+                          Clearable="true" Style="min-width: 200px;"/>
+            <MudSelect T="string" 
+                       Value="_typeFilter" 
+                       ValueChanged="OnTypeFilterChanged"
+                       Label="Tipo" 
+                       Variant="Variant.Outlined" 
+                       Margin="Margin.Dense"
+                       Clearable="true"
+                       Style="min-width: 150px;">
+                <MudSelectItem T="string" Value="@("Entrada")">Entrada</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Saída")">Saída</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Ajuste")">Ajuste</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Transferência")">Transferência</MudSelectItem>
+            </MudSelect>
+            <MudDatePicker Label="Data Inicial" 
+                          @bind-Date="_startDate" 
+                          Variant="Variant.Outlined" 
+                          Margin="Margin.Dense"
+                          Clearable="true"/>
+            <MudDatePicker Label="Data Final" 
+                          @bind-Date="_endDate" 
+                          Variant="Variant.Outlined" 
+                          Margin="Margin.Dense"
+                          Clearable="true"/>
+            <MudIconButton Icon="@Icons.Material.Filled.FilterAlt" 
+                          Color="Color.Primary"
+                          OnClick="ApplyDateFilter"/>
+        </MudStack>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh>Data</MudTh>
+        <MudTh>Produto</MudTh>
+        <MudTh>Tipo</MudTh>
+        <MudTh>Motivo</MudTh>
+        <MudTh Style="text-align: right">Quantidade</MudTh>
+        <MudTh Style="text-align: right">Estoque Anterior</MudTh>
+        <MudTh Style="text-align: right">Estoque Atual</MudTh>
+        <MudTh>Documento</MudTh>
+        <MudTh>Usuário</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Data">
+            <MudText Typo="Typo.body2">@context.MovementDate.ToString("dd/MM/yyyy")</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">@context.MovementDate.ToString("HH:mm")</MudText>
+        </MudTd>
+        <MudTd DataLabel="Produto">
+            <MudText Typo="Typo.body2">@context.ProductName</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Style="font-family: monospace">@context.ProductSku</MudText>
+        </MudTd>
+        <MudTd DataLabel="Tipo">
+            <MudChip T="string" Size="Size.Small" Color="@GetTypeColor(context.TypeName)">
+                @context.TypeName
+            </MudChip>
+        </MudTd>
+        <MudTd DataLabel="Motivo">@context.ReasonName</MudTd>
+        <MudTd DataLabel="Quantidade" Style="text-align: right">
+            <MudText Typo="Typo.body2" Style="@GetQuantityStyle(context.TypeName)">
+                @(context.TypeName == "Entrada" || context.TypeName == "Ajuste" ? "+" : "-")@context.Quantity.ToString("N2")
+            </MudText>
+        </MudTd>
+        <MudTd DataLabel="Anterior" Style="text-align: right">@context.PreviousStock.ToString("N2")</MudTd>
+        <MudTd DataLabel="Atual" Style="text-align: right">
+            <MudText Typo="Typo.body2" Style="font-weight: 600">@context.CurrentStock.ToString("N2")</MudText>
+        </MudTd>
+        <MudTd DataLabel="Documento">
+            @if (!string.IsNullOrEmpty(context.DocumentNumber))
+            {
+                <MudText Typo="Typo.caption" Style="font-family: monospace">@context.DocumentNumber</MudText>
+            }
+            else
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary">-</MudText>
+            }
+        </MudTd>
+        <MudTd DataLabel="Usuário">
+            <MudText Typo="Typo.caption">@context.CreatedByUserName</MudText>
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText>Nenhuma movimentação encontrada</MudText>
+    </NoRecordsContent>
+    <LoadingContent>
+        <MudText>Carregando...</MudText>
+    </LoadingContent>
+    <PagerContent>
+        <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private MudTable<StockMovementDto>? _table;
+    private string? _loadError;
+    private string? _searchString;
+    private string? _typeFilter;
+    private DateTime? _startDate;
+    private DateTime? _endDate;
+    private bool _loading = false;
+
+    private async Task<TableData<StockMovementDto>> ServerReload(TableState state, CancellationToken ct)
+    {
+        _loading = true;
+        try
+        {
+            var page = state.Page + 1;
+            var pageSize = state.PageSize;
+
+            var queryParams = new List<string>
+            {
+                $"page={page}",
+                $"pageSize={pageSize}"
+            };
+
+            if (!string.IsNullOrWhiteSpace(_searchString))
+            {
+                queryParams.Add($"search={Uri.EscapeDataString(_searchString)}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(_typeFilter))
+            {
+                queryParams.Add($"type={Uri.EscapeDataString(_typeFilter)}");
+            }
+
+            if (_startDate.HasValue)
+            {
+                queryParams.Add($"startDate={_startDate.Value:yyyy-MM-dd}");
+            }
+
+            if (_endDate.HasValue)
+            {
+                queryParams.Add($"endDate={_endDate.Value:yyyy-MM-dd}");
+            }
+
+            var query = string.Join("&", queryParams);
+            var response = await ApiService.GetAsync<PaginatedResponse<StockMovementDto>>($"/api/inventory/movements?{query}");
+
+            if (response != null)
+            {
+                return new TableData<StockMovementDto>
+                {
+                    Items = response.Items,
+                    TotalItems = response.TotalItems
+                };
+            }
+
+            return new TableData<StockMovementDto> { Items = Array.Empty<StockMovementDto>(), TotalItems = 0 };
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar movimentações");
+            _loadError = "Erro ao carregar movimentações: " + ex.Message;
+            Snackbar.Add(_loadError, Severity.Error);
+            return new TableData<StockMovementDto> { Items = Array.Empty<StockMovementDto>(), TotalItems = 0 };
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OnSearch(string text)
+    {
+        _searchString = text;
+        _table?.ReloadServerData();
+    }
+
+    private void OnTypeFilterChanged(string? value)
+    {
+        _typeFilter = value;
+        _table?.ReloadServerData();
+    }
+
+    private void ApplyDateFilter()
+    {
+        _table?.ReloadServerData();
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var options = new DialogOptions 
+        { 
+            CloseOnEscapeKey = true,
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true
+        };
+        
+        var dialog = await DialogService.ShowAsync<CreateStockMovementDialog>("Nova Movimentação", options);
+        var result = await dialog.Result;
+        
+        if (!result.Canceled)
+        {
+            _table?.ReloadServerData();
+        }
+    }
+
+    private Color GetTypeColor(string type)
+    {
+        return type switch
+        {
+            "Entrada" => Color.Success,
+            "Saída" => Color.Error,
+            "Ajuste" => Color.Warning,
+            "Transferência" => Color.Info,
+            _ => Color.Default
+        };
+    }
+
+    private string GetQuantityStyle(string type)
+    {
+        var color = type switch
+        {
+            "Entrada" => "color: var(--mud-palette-success);",
+            "Saída" => "color: var(--mud-palette-error);",
+            "Ajuste" => "color: var(--mud-palette-warning);",
+            _ => ""
+        };
+        return $"font-weight: 600; {color}";
+    }
+    
+    public class PaginatedResponse<T>
+    {
+        public List<T> Items { get; set; } = new();
+        public int TotalItems { get; set; }
+        public int Page { get; set; }
+        public int PageSize { get; set; }
+        public int TotalPages => (int)Math.Ceiling((double)TotalItems / PageSize);
+    }
+}

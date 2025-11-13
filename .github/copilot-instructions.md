@@ -1,175 +1,218 @@
-# Pillar ERP - AI Coding Agent Instructions
+# Pillar ERP - AI Coding Assistant Instructions
 
 ## Project Overview
-Pillar is a modular ERP system built with **Blazor Server**, **.NET 9**, **MudBlazor**, and **ASP.NET Core Identity**. It features dashboard analytics, user administration, personal Kanban boards, and user preferences with robust cookie/CSRF security.
 
-## Architecture & Key Patterns
+**Pillar** is a modular ERP system built with Blazor Server (.NET 9), MudBlazor UI, and PostgreSQL. The system manages users, inventory, sales, HR, and includes a personal Kanban board and AI chatbot assistant.
 
-### Dual Identity System
-The project uses **two parallel identity systems** (legacy decision):
-- **ASP.NET Core Identity** (`ApplicationUser`/`ApplicationRole` with `int` keys) - Active auth system using tables `AspNetUsers`, `AspNetRoles`, etc.
-- **Legacy app tables** (`User`, `Role`, `UserRole`) - Still present in DbContext but being phased out
+**Core Tech Stack:** .NET 9, Blazor Server (interactive), ASP.NET Core Identity, Entity Framework Core, PostgreSQL (Npgsql), MudBlazor, Semantic Kernel (AI chatbot)
 
-**Critical**: All new auth code must use `UserManager<ApplicationUser>` and `RoleManager<ApplicationRole>`, NOT the legacy `User` model. See `Controllers/UserController.cs` for correct patterns.
+## Architecture Patterns
 
-### Service Layer Architecture
-- **ApiService Pattern**: Blazor components call backend APIs via `IApiService`, which automatically forwards authentication cookies from server-side HttpContext
-  - Example: `Components/Pages/Admin/Users.razor` → `ApiService` → `Controllers/UserController.cs`
-  - The ApiService wraps HttpClient and ensures cookie forwarding for authenticated API calls
-  
-- **Provider Pattern for Dashboard**: Modular widget system using `IDashboardWidgetProvider` interface
-  - Each module (Sales, Finance) registers a provider in `Program.cs`
-  - Registry (`IDashboardRegistry`) centralizes discovery and routing
-  - See `Services/Dashboard/Providers/Sales/SalesDashboardProvider.cs` for implementation example
+### 1. Dual Identity System (Critical!)
+The project uses **two separate user systems**:
+- **ASP.NET Core Identity** (`ApplicationUser`/`ApplicationRole` with int keys) - for authentication/authorization, uses default `AspNetUsers` tables
+- **Legacy User tables** (`User`/`Role`/`UserRole`) - custom tables for application-specific user data
 
-### Object Mapping
-Uses **Riok.Mapperly** (source generator) for DTO ↔ Entity mapping:
-- Mappers are partial classes with `[Mapper]` attribute
-- Register as scoped services: `builder.Services.AddScoped<UserMapper, UserMapper>()`
-- See `Mappings/UserMapper.cs` - note the `[MapperIgnoreTarget]` attributes for security-sensitive fields
+When working with user management:
+- Controllers use `UserManager<ApplicationUser>` and `RoleManager<ApplicationRole>` for Identity operations
+- DAOs/Services may still reference legacy `User` model for backward compatibility
+- See `Controllers/UserController.cs` and `Data/ApplicationDbContext.cs` for the dual-context pattern
 
-### Data Access Pattern
-- **No separate repository layer** - Services directly use `UserManager`/`RoleManager` for Identity entities
-- **Legacy DAO pattern** (`DAOs/User/UserDao.cs`) exists but avoid for new code
-- **EF Core direct access** for Kanban entities via `ApplicationDbContext`
+### 2. Hybrid API + Blazor Architecture
+- **Blazor Server pages** (`Components/Pages/**`) for UI with server-side rendering
+- **API Controllers** (`Controllers/**`) provide REST endpoints for both Blazor components (via `ApiService`) and external integrations
+- API routes follow `/api/{resource}` convention (e.g., `/api/users`, `/api/products`)
+- Use `IApiService` (DI-injected) in Razor components for HTTP calls to backend APIs
 
-## Development Workflow
+### 3. Layer Separation
+```
+┌─ Components (UI)
+│  └─ Calls → Services/ApiService → HTTP
+│
+├─ Controllers (API Layer)
+│  └─ Uses → UserManager/RoleManager (Identity) or Domain Services
+│
+├─ Services (Business Logic)
+│  └─ Uses → DAOs + ApplicationDbContext
+│
+└─ DAOs (Data Access)
+   └─ Uses → ApplicationDbContext (EF Core)
+```
 
-### Running the Application
+**Key principle:** Controllers should use `UserManager<ApplicationUser>` directly for Identity operations, not custom services.
+
+### 4. Mapperly for DTOs
+- Use **Riok.Mapperly** (source generators) for entity ↔ DTO mapping
+- Mappers are in `Mappings/` (e.g., `UserMapper.cs`, `ProductMapper.cs`)
+- Decorate with `[Mapper]` and define `partial` methods
+- Ignore sensitive fields like `PasswordHash` using `[MapperIgnoreTarget]`
+
+### 5. DbContext Configuration Pattern
+- `ApplicationDbContext` inherits `IdentityDbContext<ApplicationUser, ApplicationRole, int>`
+- Custom entities configured in `OnModelCreating` via dedicated methods:
+  - `ConfigureInventoryModels()` - Products, Stock, Warehouses
+  - `ConfigureSalesModels()` - Customers, Sales, SaleItems
+  - `ConfigureHRModels()` - Departments, Positions
+- Always use proper indexes, cascading rules, and MaxLength constraints
+
+## Development Workflows
+
+### Database & Migrations
 ```powershell
-# First time setup
-dotnet restore
-dotnet tool install --global dotnet-ef
+# Create migration (always check migration names follow pattern: YYYYMMDDHHmmss_Description)
+dotnet ef migrations add YourMigrationName
 
-# Database migrations (if needed)
-dotnet ef migrations add MigrationName
+# Apply migrations (auto-runs on startup via db.Database.Migrate())
 dotnet ef database update
 
-# Run the app
-dotnet run
+# Check last migration
+ls Migrations | sort -Descending | select -First 1
 ```
 
-**URLs**:
-- App: `https://localhost:7051` or `http://localhost:5121`
-- Swagger (dev only): `https://localhost:7051/swagger`
+**Important:** Connection string fallback in `ApplicationDbContext.OnConfiguring` is `Host=localhost;Database=erp;Username=postgres;Password=123`. Override with environment variable `ConnectionStrings__DefaultConnection` or `appsettings.json`.
 
-**Default credentials** (dev seed): `admin@erp.local` / `Admin@123!`
-
-### Database Configuration
-PostgreSQL 14+ required. Configure via:
-- `appsettings.json`: `"ConnectionStrings:DefaultConnection"`
-- Environment variable: `ConnectionStrings__DefaultConnection` (double underscore)
-
-Auto-migration runs on startup via `db.Database.Migrate()` in `Program.cs`.
-
-## Security & Authentication
-
-### Cookie Hardening (Already Applied)
-- Auth cookie: `HttpOnly=true`, `SameSite=Lax`, `Secure=Always` (prod)
-- CSRF token: `app.UseAntiforgery()` in pipeline
-- Global cookie policy enforced in `Program.cs`
-
-### Optional API Key Mode
-For `/api/*` routes, enable via environment variable:
+### Building & Running
 ```powershell
-$env:Security__ApiKey = "your-strong-key"
+# Restore packages
+dotnet restore
+
+# Build (check for compile errors)
+dotnet build
+
+# Run development server
+dotnet run
+
+# Access points:
+# - UI: https://localhost:7051
+# - Swagger: https://localhost:7051/swagger (dev only)
 ```
-Clients must send `X-Api-Key` header. See `Security/ApiKeyMiddleware.cs`.
 
-### Authorization Patterns
-- Pages: Use `@attribute [Authorize]` at top of `.razor` files
-- Controllers: Use `[Authorize]` on class or methods
-- Roles: Check via `UserManager.IsInRoleAsync()` or claims-based policies
+**Default dev credentials:** `admin@erp.local` / `Admin@123!` (seeded in `Program.cs` on first run)
 
-## UI Component Patterns
-
-### MudBlazor Conventions
-- **Server-side tables**: Use `<MudTable T="..." ServerData="ServerReload">` for paginated data
-  - Example: `Components/Pages/Admin/Users.razor` with search/filter/pagination
-  - Always implement `ServerReload` method returning `Task<TableData<T>>`
-  
-- **Dialogs**: Use `IDialogService.ShowAsync<TDialog>(...)` with dedicated dialog components in `Components/Shared/Dialogs/`
-  - Dialog components inherit from `MudDialog` base
-  - Return data via `MudDialog.Close(DialogResult.Ok(data))`
-  - See `Components/Shared/Dialogs/UserCreateDialog.razor` for form validation patterns
-
-- **Icons**: Use semantic icons from `Icons.Material.Filled.*` / `Icons.Material.Outlined.*`
-  - Roles: `AdminPanelSettings` (Admin), `ManageAccounts` (Manager), `StoreMallDirectory` (Vendor)
-
-### Form Validation
-- Use `<MudForm @ref="_form" Model="@_model" Validation="..." />`
-- Real-time validation: `Immediate="true"` on inputs
-- Server-side validation in DTOs with `[Required]`, `[EmailAddress]`, etc.
+### Tests
+- Test project: `Tests/erp.Tests.csproj`
+- Run tests: `dotnet test`
 
 ## Project-Specific Conventions
 
-### File Organization
-- **Components/Pages/**: Routable Blazor pages (use `@page "/route"`)
-- **Components/Shared/**: Reusable components, dialogs, charts
-- **Components/Layout/**: Shell layouts (`MainLayout`, `AuthLayout`, `NavMenu`)
-- **DTOs/**: Request/response models grouped by feature (Auth, Dashboard, User, etc.)
-- **Controllers/**: ASP.NET Core API controllers (suffix: `Controller.cs`)
-- **Services/**: Business logic and external integrations
-  - Scoped services for user-specific state (PreferenceService, ThemeService)
-  - Dashboard services use subdirectory pattern: `Services/Dashboard/Providers/`
+### Security & Authentication
+1. **Cookie Hardening:** All cookies use `HttpOnly`, `SameSite=Lax`, `Secure=Always` (except dev mode allows `SameAsRequest`)
+2. **Antiforgery:** Global via `app.UseAntiforgery()` - automatically applied to forms
+3. **API Key Mode (Optional):** Middleware `Security/ApiKeyMiddleware.cs` checks `X-Api-Key` header on `/api/*` routes when `Security:ApiKey` is configured
+4. **Authorization:** Use `[Authorize]` on controllers/pages. Role-based via `[Authorize(Roles = "Administrador")]`
+5. **API Auth:** Controllers return JSON 401/403 instead of redirecting when path starts with `/api` (see cookie events in `Program.cs`)
 
-### Naming Conventions
-- **Controllers**: Plural names (`UsersController`, `RolesController`)
-- **API routes**: `/api/{resource}` (lowercase, plural)
-- **Razor components**: PascalCase, match filename (`UserCreateDialog.razor`)
-- **Private fields**: `_camelCase` with underscore prefix
+### Password Management
+- **BCrypt.Net** with work factor 12
+- Password validation: min 8 chars, uppercase, lowercase, digit, special char
+- Auto-generated temp passwords on user creation (see `UserService.GenerateRandomPassword`)
+- Reset via `UserManager<ApplicationUser>.GeneratePasswordResetTokenAsync`
 
-### State Management
-- **User preferences**: Stored in `UserPreferences` JSON column on `ApplicationUser`, synced to `Blazored.LocalStorage`
-  - Managed by `PreferenceService` with event notifications (`OnPreferenceChanged`)
-- **Theme**: Managed by `ThemeService`, persisted in preferences
-- **Notifications**: Use `ISnackbar` (MudBlazor) for user feedback, `INotificationService` for app-level notifications
+### AI Chatbot Integration
+- Uses **Semantic Kernel** with plugin architecture
+- Supports OpenAI (GPT) or Google AI (Gemini) via `AI:Provider` config
+- Plugins in `Services/Chatbot/ChatbotPlugins/` define `[KernelFunction]` methods
+- Falls back to template responses if no API key configured
+- Configuration in `appsettings.json`:
+  ```json
+  {
+    "AI": { "Provider": "google" },
+    "GoogleAI": { "ApiKey": "...", "Model": "gemini-1.5-flash" }
+  }
+  ```
 
-## Common Tasks
+### Dashboard Widget System
+- Provider pattern: `IDashboardWidgetProvider` interface
+- Providers register widgets via `IDashboardRegistry`
+- Each provider in `Services/Dashboard/Providers/{Domain}/`
+- Widgets query via `/api/dashboard/query/{providerKey}/{widgetKey}`
 
-### Adding a New API Endpoint
-1. Add method to appropriate controller in `Controllers/`
-2. Use `[HttpGet]`, `[HttpPost]`, etc. with route template
-3. Add `[Authorize]` if authentication required
-4. Return `ActionResult<T>` for type safety
-5. Update Blazor component to call via `IApiService`
+### Notifications
+- Two implementations:
+  - `INotificationService` - simple in-app notifications
+  - `IAdvancedNotificationService` - advanced with persistence and filtering
 
-### Creating a New Dashboard Widget
-1. Implement `IDashboardWidgetProvider` in `Services/Dashboard/Providers/{Module}/`
-2. Return `DashboardWidgetDefinition` with `ProviderKey` and `WidgetKey`
-3. Implement `QueryAsync` to return `ChartDataResponse`
-4. Register provider in `Program.cs`: `builder.Services.AddScoped<IDashboardWidgetProvider, YourProvider>()`
+### Inventory Management
+- Multi-warehouse support via `Warehouse` entity
+- Stock movements tracked in `StockMovement` with types (In, Out, Adjustment, Transfer, Return)
+- Stock counts (physical inventory) with approval workflow
+- Products use SKU (unique), Barcode, and support NCM/CEST codes (Brazilian tax)
 
-### Adding a New Migration
-```powershell
-dotnet ef migrations add YourMigrationName
-dotnet ef database update
-```
-**Note**: Migrations folder is in `.gitignore` - this is intentional for dev flexibility.
+### Sales Module
+- Customer management with Brazilian document validation (CPF/CNPJ)
+- Sales have status workflow: Draft → Confirmed → Shipped → Completed → Cancelled
+- SaleItems link to Products with quantity/price snapshot
+- Payment methods tracked per sale
 
-## Integration Points
+### HR Management (Recent Addition - Migration 20251103134934)
+- Department hierarchy with manager assignment
+- Positions with salary ranges
+- Employee data on `ApplicationUser` (CPF, RG, hire date, contract type)
+- Bank account and emergency contact fields
 
-### External Dependencies
-- **PostgreSQL**: Primary database (Npgsql provider)
-- **MudBlazor**: Complete UI component library
-- **ApexCharts**: Dashboard charting (`Blazor-ApexCharts` package)
-- **Blazored.LocalStorage**: Client-side storage for preferences
+## Common Pitfalls
 
-### Browser JavaScript
-- Minimal JS in `wwwroot/js/auth.js` for login flow enhancements
-- Use `IJSRuntime` for interop when needed, but prefer C# solutions
+### ❌ Don't
+- Mix `User` and `ApplicationUser` entities - use `ApplicationUser` for all Identity operations
+- Call `SaveChangesAsync()` in DAOs when service needs transaction control - let service coordinate
+- Forget `AsNoTracking()` on read-only queries (causes tracking overhead)
+- Use plain HTTP in production (cookies require HTTPS)
+- Hard-code connection strings (use environment variables for CI/CD)
 
-## Troubleshooting Notes
-
-- **"Cookie not found" errors**: Check `CookieSecurePolicy` matches your dev environment (HTTP vs HTTPS)
-- **CSRF validation fails**: Ensure `app.UseAntiforgery()` is AFTER `app.UseAuthentication()` in `Program.cs`
-- **Identity tables missing**: Run `dotnet ef database update` to apply migrations
-- **Dual User models confusion**: Always use `ApplicationUser` (Identity), not `User` (legacy)
+### ✅ Do
+- Use `UserManager<ApplicationUser>` and `RoleManager<ApplicationRole>` in controllers
+- Include related entities with `.Include()` before projecting to DTOs
+- Add `[ResponseCache(NoStore = true)]` on user/role endpoints to prevent stale data
+- Sanitize phone numbers before saving (see `UserService.sanitizePhoneNumber`)
+- Use proper cascade delete rules (Restrict for critical FK, Cascade for owned entities)
 
 ## Key Files Reference
-- **App entry**: `Program.cs` - Complete middleware pipeline and DI registration
-- **Auth config**: `DTOs/Auth/README.md` - Security guidelines and patterns
-- **DB context**: `Data/ApplicationDbContext.cs` - EF Core configuration
-- **API patterns**: `Services/ApiService.cs` - Cookie-forwarding HTTP client
-- **Main nav**: `Components/Layout/NavMenu.razor` - Site navigation structure
-- **User admin**: `Components/Pages/Admin/Users.razor` - Server-side table example
+
+| Purpose | File(s) |
+|---------|---------|
+| Startup & DI | `Program.cs` |
+| DB Context | `Data/ApplicationDbContext.cs` |
+| Identity Models | `Models/Identity/ApplicationUser.cs`, `ApplicationRole.cs` |
+| Auth API | `Controllers/AuthController.cs` |
+| User CRUD | `Controllers/UserController.cs`, `Services/User/UserService.cs` |
+| Security Middleware | `Security/ApiKeyMiddleware.cs` |
+| API Client | `Services/ApiService.cs` |
+| Chatbot | `Services/Chatbot/ChatbotService.cs` |
+| Dashboard | `Services/Dashboard/DashboardService.cs` |
+| Mappings | `Mappings/*Mapper.cs` |
+| UI Layout | `Components/Layout/NavMenu.razor` |
+| Auth Docs | `DTOs/Auth/README.md` |
+
+## Environment Configuration
+
+### Required for Development
+```bash
+# PowerShell
+$env:ConnectionStrings__DefaultConnection = "Host=localhost;Database=erp;Username=postgres;Password=yourpassword"
+```
+
+### Optional API Key Protection
+```bash
+$env:Security__ApiKey = "your-strong-random-key"
+```
+
+### Chatbot Configuration
+```bash
+# Option 1: Google AI (Free tier available)
+$env:AI__Provider = "google"
+$env:GoogleAI__ApiKey = "your-google-ai-key"
+
+# Option 2: OpenAI
+$env:AI__Provider = "openai"
+$env:OpenAI__ApiKey = "your-openai-key"
+```
+
+## Additional Notes
+
+- **Portuguese Language:** UI and messages are in Brazilian Portuguese
+- **Time Zones:** All timestamps use UTC (`DateTime.UtcNow`)
+- **Logging:** Standard ASP.NET Core logging to console
+- **Static Files:** Served from `wwwroot/`
+- **Blazor Mode:** Interactive Server (not WASM or Auto)
+- **Package Restore:** Required on first clone (`dotnet restore`)
+- **Dev Environment:** Requires .NET 9 SDK and PostgreSQL 14+

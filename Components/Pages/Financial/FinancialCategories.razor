@@ -1,0 +1,117 @@
+@page "/financial/categories"
+@using erp.DTOs.Financial
+@using erp.Models.Financial
+@attribute [Authorize]
+
+<PageTitle>Categorias Financeiras - Pillar ERP</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-4">
+        <MudIcon Icon="@Icons.Material.Filled.Category" Class="mr-2" />
+        Categorias Financeiras
+    </MudText>
+
+    <MudPaper Class="pa-4 mb-4">
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudButton Variant="Variant.Filled" 
+                      Color="@(filterType == null ? Color.Primary : Color.Default)"
+                      OnClick="@(() => LoadCategories(null))">
+                Todas
+            </MudButton>
+            <MudButton Variant="Variant.Filled" 
+                      Color="@(filterType == CategoryType.Revenue ? Color.Success : Color.Default)"
+                      OnClick="@(() => LoadCategories(CategoryType.Revenue))">
+                Receitas
+            </MudButton>
+            <MudButton Variant="Variant.Filled" 
+                      Color="@(filterType == CategoryType.Expense ? Color.Error : Color.Default)"
+                      OnClick="@(() => LoadCategories(CategoryType.Expense))">
+                Despesas
+            </MudButton>
+            
+            <MudSpacer />
+            
+            <MudButton Variant="Variant.Filled" 
+                      Color="Color.Primary" 
+                      StartIcon="@Icons.Material.Filled.Add"
+                      OnClick="@(() => Snackbar.Add("Criar categoria - em desenvolvimento", Severity.Info))">
+                Nova Categoria
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+
+    <MudPaper Class="pa-4">
+        @if (isLoading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else
+        {
+            <MudTable T="FinancialCategoryDto" Items="@categories" Dense="true" Hover="true">
+                <HeaderContent>
+                    <MudTh>Nome</MudTh>
+                    <MudTh>Código</MudTh>
+                    <MudTh>Tipo</MudTh>
+                    <MudTh>Status</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Name</MudTd>
+                    <MudTd>@context.Code</MudTd>
+                    <MudTd>
+                        <MudChip T="string" Size="Size.Small" 
+                                Color="@(context.Type == CategoryType.Revenue ? Color.Success : Color.Error)">
+                            @context.TypeDescription
+                        </MudChip>
+                    </MudTd>
+                    <MudTd>
+                        <MudChip T="string" Size="Size.Small" 
+                                Color="@(context.IsActive ? Color.Success : Color.Default)">
+                            @(context.IsActive ? "Ativa" : "Inativa")
+                        </MudChip>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [Inject] private IApiService ApiService { get; set; } = null!;
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
+
+    private List<FinancialCategoryDto> categories = new();
+    private bool isLoading = false;
+    private CategoryType? filterType = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCategories(null);
+    }
+
+    private async Task LoadCategories(CategoryType? type)
+    {
+        filterType = type;
+        isLoading = true;
+        try
+        {
+            if (type.HasValue)
+            {
+                categories = await ApiService.GetAsync<List<FinancialCategoryDto>>($"api/financial-categories/by-type/{(int)type.Value}") ?? new();
+            }
+            else
+            {
+                categories = await ApiService.GetAsync<List<FinancialCategoryDto>>("api/financial-categories") ?? new();
+            }
+            
+            Snackbar.Add($"{categories.Count} categorias carregadas", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar categorias: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

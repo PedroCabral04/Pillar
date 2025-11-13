@@ -2,9 +2,13 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using erp.Services.Inventory;
 using erp.DTOs.Inventory;
+using erp.Models.Audit;
 
 namespace erp.Controllers;
 
+/// <summary>
+/// Controller para gerenciamento de produtos e inventário
+/// </summary>
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
@@ -22,9 +26,42 @@ public class ProductsController : ControllerBase
     }
 
     /// <summary>
-    /// Busca produtos com filtros, ordenação e paginação
+    /// Busca produtos com filtros avançados, ordenação e paginação
     /// </summary>
+    /// <param name="searchDto">Critérios de busca incluindo termo, categoria, filtros, ordenação e paginação</param>
+    /// <returns>Lista paginada de produtos correspondentes aos critérios</returns>
+    /// <response code="200">Produtos encontrados com sucesso</response>
+    /// <response code="401">Usuário não autenticado</response>
+    /// <response code="500">Erro interno ao processar busca</response>
+    /// <remarks>
+    /// Permite buscar produtos por diversos critérios:
+    /// - Termo de busca (nome, SKU, código de barras)
+    /// - Categoria
+    /// - Status (ativo/inativo)
+    /// - Faixa de preço
+    /// - Nível de estoque
+    /// 
+    /// Suporta ordenação por nome, SKU, preço, estoque, etc.
+    /// 
+    /// Exemplo de requisição:
+    /// 
+    ///     POST /api/products/search
+    ///     {
+    ///         "searchTerm": "notebook",
+    ///         "categoryId": 5,
+    ///         "minPrice": 1000,
+    ///         "maxPrice": 5000,
+    ///         "onlyActive": true,
+    ///         "sortBy": "Name",
+    ///         "sortDescending": false,
+    ///         "page": 1,
+    ///         "pageSize": 20
+    ///     }
+    /// </remarks>
     [HttpPost("search")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> SearchProducts([FromBody] ProductSearchDto searchDto)
     {
         try
@@ -52,9 +89,27 @@ public class ProductsController : ControllerBase
     }
 
     /// <summary>
-    /// Lista produtos (simplificado - usa search internamente)
+    /// Lista produtos de forma simplificada (wrapper para busca)
     /// </summary>
+    /// <param name="search">Termo de busca opcional</param>
+    /// <param name="page">Número da página (inicia em 1)</param>
+    /// <param name="pageSize">Quantidade de itens por página (padrão: 20)</param>
+    /// <returns>Lista paginada de produtos</returns>
+    /// <response code="200">Produtos listados com sucesso</response>
+    /// <response code="401">Usuário não autenticado</response>
+    /// <response code="500">Erro interno ao processar requisição</response>
+    /// <remarks>
+    /// Endpoint simplificado para listagem de produtos com busca básica por texto.
+    /// Para filtros avançados, use POST /api/products/search
+    /// 
+    /// Exemplo de uso:
+    /// 
+    ///     GET /api/products?search=notebook&amp;page=1&amp;pageSize=20
+    /// </remarks>
     [HttpGet]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> GetProducts(
         [FromQuery] string? search = null,
         [FromQuery] int page = 1,
@@ -84,6 +139,7 @@ public class ProductsController : ControllerBase
     /// Busca produto por ID
     /// </summary>
     [HttpGet("{id:int}")]
+    [AuditRead("Product", DataSensitivity.Low, Description = "Visualização de detalhes do produto (preços, estoque)")]
     public async Task<ActionResult<ProductDto>> GetProductById(int id)
     {
         try
@@ -336,4 +392,159 @@ public class ProductsController : ControllerBase
             return StatusCode(500, new { message = "Erro ao obter produtos", error = ex.Message });
         }
     }
+
+    #region Categories
+
+    /// <summary>
+    /// Lista categorias com paginação e filtros
+    /// </summary>
+    [HttpGet("categories")]
+    public async Task<ActionResult> GetCategories(
+        [FromQuery] string? search = null,
+        [FromQuery] int? parentCategoryId = null,
+        [FromQuery] bool? isActive = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        try
+        {
+            var (categories, totalCount) = await _inventoryService.GetCategoriesAsync(
+                search, parentCategoryId, isActive, page, pageSize);
+            
+            var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+            
+            return Ok(new
+            {
+                items = categories,
+                totalItems = totalCount,
+                page,
+                pageSize,
+                totalPages,
+                hasNextPage = page < totalPages,
+                hasPreviousPage = page > 1
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao listar categorias");
+            return StatusCode(500, new { message = "Erro ao listar categorias", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Busca categoria por ID
+    /// </summary>
+    [HttpGet("categories/{id:int}")]
+    public async Task<ActionResult<ProductCategoryDto>> GetCategoryById(int id)
+    {
+        try
+        {
+            var category = await _inventoryService.GetCategoryByIdAsync(id);
+            
+            if (category == null)
+            {
+                return NotFound(new { message = $"Categoria com ID {id} não encontrada" });
+            }
+
+            return Ok(category);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao buscar categoria {CategoryId}", id);
+            return StatusCode(500, new { message = "Erro ao buscar categoria", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Cria uma nova categoria
+    /// </summary>
+    [HttpPost("categories")]
+    public async Task<ActionResult<ProductCategoryDto>> CreateCategory([FromBody] CreateProductCategoryDto createDto)
+    {
+        try
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var category = await _inventoryService.CreateCategoryAsync(createDto);
+            
+            return CreatedAtAction(nameof(GetCategoryById), new { id = category.Id }, category);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Erro de validação ao criar categoria");
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao criar categoria");
+            return StatusCode(500, new { message = "Erro ao criar categoria", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Atualiza uma categoria existente
+    /// </summary>
+    [HttpPut("categories/{id:int}")]
+    public async Task<ActionResult<ProductCategoryDto>> UpdateCategory(int id, [FromBody] UpdateProductCategoryDto updateDto)
+    {
+        try
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            if (id != updateDto.Id)
+            {
+                return BadRequest(new { message = "ID da URL não corresponde ao ID da categoria" });
+            }
+
+            var category = await _inventoryService.UpdateCategoryAsync(updateDto);
+            return Ok(category);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Erro de validação ao atualizar categoria {CategoryId}", id);
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao atualizar categoria {CategoryId}", id);
+            return StatusCode(500, new { message = "Erro ao atualizar categoria", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Deleta uma categoria
+    /// </summary>
+    [HttpDelete("categories/{id:int}")]
+    public async Task<ActionResult> DeleteCategory(int id)
+    {
+        try
+        {
+            var success = await _inventoryService.DeleteCategoryAsync(id);
+            
+            if (!success)
+            {
+                return NotFound(new { message = $"Categoria com ID {id} não encontrada" });
+            }
+
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Erro ao deletar categoria {CategoryId}", id);
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao deletar categoria {CategoryId}", id);
+            return StatusCode(500, new { message = "Erro ao deletar categoria", error = ex.Message });
+        }
+    }
+
+    #endregion
 }

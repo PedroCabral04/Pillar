@@ -1,0 +1,285 @@
+@page "/login/verify-2fa"
+@attribute [AllowAnonymous]
+@using erp.DTOs.Auth
+@using erp.Services
+@using MudBlazor
+@using System.Text.Json
+@using Color = MudBlazor.Color
+@using Size = MudBlazor.Size
+@using Align = MudBlazor.Align
+@inject IApiService ApiService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+<PageTitle>Verificação 2FA</PageTitle>
+
+<div style="min-height: 80vh; display: flex; align-items: center; justify-content: center;">
+    <MudContainer MaxWidth="MaxWidth.Small">
+        <MudPaper Elevation="4" Class="pa-8">
+            <div class="d-flex justify-center mb-4">
+                <MudIcon Icon="@Icons.Material.Filled.Security" Color="Color.Primary" Size="Size.Large" />
+            </div>
+            
+            <MudText Typo="Typo.h5" Align="Align.Center" Class="mb-2">Autenticação de Dois Fatores</MudText>
+            <MudText Typo="Typo.body2" Align="Align.Center" Class="mb-6" Color="Color.Secondary">
+                Digite o código de 6 dígitos do seu aplicativo autenticador
+            </MudText>
+
+        @if (!_useRecoveryCode)
+        {
+            <MudTextField @bind-Value="_code"
+                          Label="Código de Autenticação"
+                          Variant="Variant.Outlined"
+                          MaxLength="7"
+                          Immediate="true"
+                          HelperText="Exemplo: 123 456"
+                          Class="mb-4"
+                          OnKeyDown="HandleKeyDown"
+                          AutoFocus="true" />
+
+            <MudCheckBox @bind-Value="_rememberMachine" Color="Color.Primary" Class="mb-4">
+                Lembrar este dispositivo por 30 dias
+            </MudCheckBox>
+
+            <MudButton OnClick="VerifyCode"
+                       Color="Color.Primary"
+                       Variant="Variant.Filled"
+                       FullWidth="true"
+                       Size="Size.Large"
+                       Disabled="_verifying || string.IsNullOrWhiteSpace(_code)"
+                       Class="mb-3">
+                @if (_verifying)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <text>Verificando...</text>
+                }
+                else
+                {
+                    <text>Verificar Código</text>
+                }
+            </MudButton>
+
+            <MudText Typo="Typo.body2" Align="Align.Center" Class="mt-4">
+                <MudLink OnClick="SwitchToRecoveryCode" Color="Color.Secondary">
+                    Usar código de recuperação
+                </MudLink>
+            </MudText>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Warning" Class="mb-4">
+                Use um dos códigos de recuperação que foram fornecidos quando você habilitou 2FA.
+            </MudAlert>
+
+            <MudTextField @bind-Value="_code"
+                          Label="Código de Recuperação"
+                          Variant="Variant.Outlined"
+                          HelperText="Digite o código de recuperação"
+                          Class="mb-4"
+                          OnKeyDown="HandleKeyDown"
+                          AutoFocus="true" />
+
+            <MudButton OnClick="VerifyRecoveryCode"
+                       Color="Color.Warning"
+                       Variant="Variant.Filled"
+                       FullWidth="true"
+                       Size="Size.Large"
+                       Disabled="_verifying || string.IsNullOrWhiteSpace(_code)"
+                       Class="mb-3">
+                @if (_verifying)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <text>Verificando...</text>
+                }
+                else
+                {
+                    <text>Usar Código de Recuperação</text>
+                }
+            </MudButton>
+
+            <MudText Typo="Typo.body2" Align="Align.Center" Class="mt-4">
+                <MudLink OnClick="SwitchToAuthenticator" Color="Color.Secondary">
+                    Voltar para código do autenticador
+                </MudLink>
+            </MudText>
+        }
+
+        <MudDivider Class="my-4" />
+
+        <MudText Typo="Typo.body2" Align="Align.Center">
+            <MudLink Href="/login" Color="Color.Secondary">
+                Voltar para o login
+            </MudLink>
+        </MudText>
+    </MudPaper>
+    </MudContainer>
+</div>
+
+@code {
+    private string _code = "";
+    private bool _rememberMachine = false;
+    private bool _verifying = false;
+    private bool _useRecoveryCode = false;
+
+    protected override void OnInitialized()
+    {
+        // Verifica se há uma sessão de 2FA pendente
+        // Se não houver, redireciona para login
+        var uri = new Uri(NavigationManager.Uri);
+        var queryParams = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        
+        // Em produção, isso seria validado via sessão/cookie temporário
+    }
+
+    private void SwitchToRecoveryCode()
+    {
+        _useRecoveryCode = true;
+        _code = "";
+    }
+
+    private void SwitchToAuthenticator()
+    {
+        _useRecoveryCode = false;
+        _code = "";
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_code))
+        {
+            if (_useRecoveryCode)
+                await VerifyRecoveryCode();
+            else
+                await VerifyCode();
+        }
+    }
+
+    private async Task VerifyCode()
+    {
+        if (string.IsNullOrWhiteSpace(_code))
+        {
+            Snackbar.Add("Digite o código de autenticação", Severity.Warning);
+            return;
+        }
+
+        _verifying = true;
+        try
+        {
+            var payload = new VerifyTwoFactorLoginRequest
+            {
+                Code = _code,
+                RememberMachine = _rememberMachine,
+                IsRecoveryCode = false
+            };
+
+            // Chama via JS para garantir que o Set-Cookie do servidor seja aplicado no navegador
+            // Usa função específica verify2fa para evitar erro de interop quando fetchJson não estiver disponível em versões antigas do script
+            string resultJson;
+            try
+            {
+                resultJson = await JS.InvokeAsync<string>("erpAuth.verify2fa", payload);
+            }
+            catch
+            {
+                // Fallback: se função não existir (cache antigo), usa fetchJson diretamente
+                resultJson = await JS.InvokeAsync<string>("erpAuth.fetchJson", "/api/auth/verify-2fa", payload);
+            }
+            var result = JsonSerializer.Deserialize<JsResult>(resultJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            if (result?.Ok == true)
+            {
+                Snackbar.Add("Autenticado com sucesso!", Severity.Success);
+                await Task.Delay(500);
+                await JS.InvokeVoidAsync("eval", "window.location.href='/'");
+            }
+            else
+            {
+                var errorMsg = result?.Data?.Message ?? "Código de autenticação inválido.";
+                Snackbar.Add(errorMsg, Severity.Error);
+                _code = "";
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao verificar código: {ex.Message}", Severity.Error);
+            _code = "";
+        }
+        finally
+        {
+            _verifying = false;
+        }
+    }
+
+    private async Task VerifyRecoveryCode()
+    {
+        if (string.IsNullOrWhiteSpace(_code))
+        {
+            Snackbar.Add("Digite o código de recuperação", Severity.Warning);
+            return;
+        }
+
+        _verifying = true;
+        try
+        {
+            var payload = new VerifyTwoFactorLoginRequest
+            {
+                Code = _code,
+                RememberMachine = false,
+                IsRecoveryCode = true
+            };
+
+            // Usa função específica verify2fa
+            string resultJson;
+            try
+            {
+                resultJson = await JS.InvokeAsync<string>("erpAuth.verify2fa", payload);
+            }
+            catch
+            {
+                // Fallback para ambientes onde verify2fa ainda não está disponível no cache do navegador
+                resultJson = await JS.InvokeAsync<string>("erpAuth.fetchJson", "/api/auth/verify-2fa", payload);
+            }
+            var result = JsonSerializer.Deserialize<JsResult>(resultJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            if (result?.Ok == true)
+            {
+                Snackbar.Add("Autenticado com código de recuperação!", Severity.Success);
+                Snackbar.Add("IMPORTANTE: Gere novos códigos de recuperação em breve.", Severity.Warning);
+                await Task.Delay(500);
+                await JS.InvokeVoidAsync("eval", "window.location.href='/'");
+            }
+            else
+            {
+                var errorMsg = result?.Data?.Message ?? "Código de recuperação inválido.";
+                Snackbar.Add(errorMsg, Severity.Error);
+                _code = "";
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao verificar código: {ex.Message}", Severity.Error);
+            _code = "";
+        }
+        finally
+        {
+            _verifying = false;
+        }
+    }
+    
+    // Classes para deserialização de resposta JS (unificada propriedade Message)
+    private class JsResult
+    {
+        public bool Ok { get; set; }
+        public int Status { get; set; }
+        public string? Text { get; set; }
+        public JsData? Data { get; set; }
+    }
+
+    private class JsData
+    {
+        public bool Success { get; set; }
+        public string? Message { get; set; } // Aceita 'message' ou 'Message' via PropertyNameCaseInsensitive
+        public string? RedirectUrl { get; set; }
+    }
+}

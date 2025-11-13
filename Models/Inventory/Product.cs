@@ -1,8 +1,9 @@
 using erp.Models.Identity;
+using erp.Models.Audit;
 
 namespace erp.Models.Inventory;
 
-public class Product
+public class Product : IAuditable
 {
     public int Id { get; set; }
     

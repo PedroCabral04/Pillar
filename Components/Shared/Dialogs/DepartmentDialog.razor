@@ -1,0 +1,222 @@
+@using erp.DTOs.User
+@using erp.Services
+@using MudBlazor
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" Model="@_model" Validation="@(new Func<object, string, Task<IEnumerable<string>>>(ValidateValue))">
+            <MudStack Spacing="3">
+                <MudTextField @bind-Value="_model.Code"
+                              Label="Código"
+                              Variant="Variant.Outlined"
+                              For="@(() => _model.Code)"
+                              Immediate="true"/>
+
+                <MudTextField @bind-Value="_model.Name"
+                              Label="Nome"
+                              Variant="Variant.Outlined"
+                              For="@(() => _model.Name)"
+                              Immediate="true"
+                              Required="true"/>
+
+                <MudTextField @bind-Value="_model.Description"
+                              Label="Descrição"
+                              Variant="Variant.Outlined"
+                              Lines="3"
+                              For="@(() => _model.Description)"/>
+
+                <MudSelect T="int?"
+                           @bind-Value="_model.ParentDepartmentId"
+                           Label="Departamento Pai"
+                           Variant="Variant.Outlined"
+                           Clearable="true">
+                    @if (_departments != null)
+                    {
+                        @foreach (var dept in _departments.Where(d => !IsEdit || d.Id != DepartmentId))
+                        {
+                            <MudSelectItem T="int?" Value="@dept.Id">@dept.Name</MudSelectItem>
+                        }
+                    }
+                </MudSelect>
+
+                <MudSelect T="int?"
+                           @bind-Value="_model.ManagerId"
+                           Label="Gerente"
+                           Variant="Variant.Outlined"
+                           Clearable="true">
+                    @if (_users != null)
+                    {
+                        @foreach (var user in _users)
+                        {
+                            <MudSelectItem T="int?" Value="@user.Id">@user.Username</MudSelectItem>
+                        }
+                    }
+                </MudSelect>
+
+                <MudTextField @bind-Value="_model.CostCenter"
+                              Label="Centro de Custo"
+                              Variant="Variant.Outlined"
+                              For="@(() => _model.CostCenter)"/>
+
+                @if (IsEdit)
+                {
+                    <MudSwitch @bind-Value="_model.IsActive" 
+                               Label="Ativo" 
+                               Color="MudBlazor.Color.Primary"/>
+                }
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="MudBlazor.Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="_processing">
+            @if (_processing)
+            {
+                <MudProgressCircular Size="MudBlazor.Size.Small" Indeterminate="true"/>
+            }
+            else
+            {
+                <text>@(IsEdit ? "Atualizar" : "Criar")</text>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public bool IsEdit { get; set; }
+    [Parameter] public int DepartmentId { get; set; }
+
+    private MudForm? _form;
+    private DepartmentModel _model = new();
+    private bool _processing = false;
+    private List<DepartmentDto>? _departments;
+    private List<UserDto>? _users;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDependencies();
+
+        if (IsEdit && DepartmentId > 0)
+        {
+            await LoadDepartment();
+        }
+    }
+
+    private async Task LoadDependencies()
+    {
+        try
+        {
+            _departments = await ApiService.GetAsync<List<DepartmentDto>>("api/departments");
+            _users = await ApiService.GetAsync<List<UserDto>>("api/users");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar dados: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadDepartment()
+    {
+        try
+        {
+            var department = await ApiService.GetAsync<DepartmentDto>($"api/departments/{DepartmentId}");
+            if (department != null)
+            {
+                _model = new DepartmentModel
+                {
+                    Code = department.Code,
+                    Name = department.Name,
+                    Description = department.Description,
+                    ParentDepartmentId = department.ParentDepartmentId,
+                    ManagerId = department.ManagerId,
+                    CostCenter = department.CostCenter,
+                    IsActive = department.IsActive
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar departamento: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task<IEnumerable<string>> ValidateValue(object model, string propertyName)
+    {
+        if (propertyName == nameof(_model.Name))
+        {
+            if (string.IsNullOrWhiteSpace(_model.Name))
+                return new[] { "Nome é obrigatório" };
+        }
+
+        return Array.Empty<string>();
+    }
+
+    private async Task Submit()
+    {
+        await _form!.Validate();
+
+        if (!_form.IsValid)
+            return;
+
+        _processing = true;
+
+        try
+        {
+            if (IsEdit)
+            {
+                var updateDto = new UpdateDepartmentDto
+                {
+                    Code = _model.Code,
+                    Name = _model.Name,
+                    Description = _model.Description,
+                    ParentDepartmentId = _model.ParentDepartmentId,
+                    ManagerId = _model.ManagerId,
+                    CostCenter = _model.CostCenter,
+                    IsActive = _model.IsActive
+                };
+                // PUT retorna NoContent (204), então usamos PutAsJsonAsync
+                var response = await ApiService.PutAsJsonAsync($"api/departments/{DepartmentId}", updateDto);
+                response.EnsureSuccessStatusCode();
+            }
+            else
+            {
+                var createDto = new CreateDepartmentDto
+                {
+                    Code = _model.Code,
+                    Name = _model.Name,
+                    Description = _model.Description,
+                    ParentDepartmentId = _model.ParentDepartmentId,
+                    ManagerId = _model.ManagerId,
+                    CostCenter = _model.CostCenter
+                };
+                await ApiService.PostAsync<DepartmentDto>("api/departments", createDto);
+            }
+
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao salvar: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _processing = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private class DepartmentModel
+    {
+        public string? Code { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public int? ParentDepartmentId { get; set; }
+        public int? ManagerId { get; set; }
+        public string? CostCenter { get; set; }
+        public bool IsActive { get; set; } = true;
+    }
+}

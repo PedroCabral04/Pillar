@@ -354,4 +354,287 @@ public class InventoryService : IInventoryService
 
         return products;
     }
+
+    public async Task<(IEnumerable<ProductCategoryDto> Categories, int TotalCount)> GetCategoriesAsync(
+        string? search = null, 
+        int? parentCategoryId = null, 
+        bool? isActive = null, 
+        int page = 1, 
+        int pageSize = 20)
+    {
+        var query = _context.ProductCategories.AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var searchLower = search.ToLower();
+            query = query.Where(c => c.Name.ToLower().Contains(searchLower) || c.Code.ToLower().Contains(searchLower));
+        }
+
+        if (parentCategoryId.HasValue)
+        {
+            query = query.Where(c => c.ParentCategoryId == parentCategoryId.Value);
+        }
+
+        if (isActive.HasValue)
+        {
+            query = query.Where(c => c.IsActive == isActive.Value);
+        }
+
+        var totalCount = await query.CountAsync();
+
+        var categories = await query
+            .OrderBy(c => c.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(c => new ProductCategoryDto
+            {
+                Id = c.Id,
+                Name = c.Name,
+                Code = c.Code,
+                ParentCategoryId = c.ParentCategoryId,
+                ParentCategoryName = c.ParentCategory != null ? c.ParentCategory.Name : null,
+                IsActive = c.IsActive,
+                CreatedAt = c.CreatedAt,
+                UpdatedAt = c.UpdatedAt,
+                SubCategories = new List<ProductCategoryDto>()
+            })
+            .ToListAsync();
+
+        return (categories, totalCount);
+    }
+
+    public async Task<ProductCategoryDto> CreateCategoryAsync(CreateProductCategoryDto dto)
+    {
+        var category = new ProductCategory
+        {
+            Name = dto.Name,
+            Code = dto.Code,
+            ParentCategoryId = dto.ParentCategoryId,
+            IsActive = dto.IsActive,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _context.ProductCategories.Add(category);
+        await _context.SaveChangesAsync();
+
+        return await GetCategoryByIdAsync(category.Id) ?? throw new InvalidOperationException("Falha ao criar categoria");
+    }
+
+    public async Task<ProductCategoryDto> UpdateCategoryAsync(UpdateProductCategoryDto dto)
+    {
+        var category = await _context.ProductCategories.FindAsync(dto.Id);
+        if (category == null)
+            throw new InvalidOperationException($"Categoria com ID {dto.Id} não encontrada");
+
+        category.Name = dto.Name;
+        category.Code = dto.Code;
+        category.ParentCategoryId = dto.ParentCategoryId;
+        category.IsActive = dto.IsActive;
+        category.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return await GetCategoryByIdAsync(category.Id) ?? throw new InvalidOperationException("Falha ao atualizar categoria");
+    }
+
+    public async Task<bool> DeleteCategoryAsync(int id)
+    {
+        var category = await _context.ProductCategories
+            .Include(c => c.SubCategories)
+            .Include(c => c.Products)
+            .FirstOrDefaultAsync(c => c.Id == id);
+
+        if (category == null) return false;
+
+        if (category.SubCategories.Any())
+            throw new InvalidOperationException("Não é possível deletar categoria que possui subcategorias");
+
+        if (category.Products.Any())
+            throw new InvalidOperationException("Não é possível deletar categoria que possui produtos vinculados");
+
+        _context.ProductCategories.Remove(category);
+        await _context.SaveChangesAsync();
+
+        return true;
+    }
+
+    public async Task<(IEnumerable<StockMovementDto> Movements, int TotalCount)> GetStockMovementsAsync(
+        int? productId = null,
+        string? movementType = null,
+        int? warehouseId = null,
+        DateTime? startDate = null,
+        DateTime? endDate = null,
+        int page = 1,
+        int pageSize = 20)
+    {
+        var query = _context.StockMovements
+            .Include(m => m.Product)
+            .Include(m => m.CreatedByUser)
+            .AsQueryable();
+
+        if (productId.HasValue)
+            query = query.Where(m => m.ProductId == productId.Value);
+
+        if (warehouseId.HasValue)
+            query = query.Where(m => m.WarehouseId == warehouseId.Value);
+
+        if (startDate.HasValue)
+            query = query.Where(m => m.MovementDate >= startDate.Value);
+
+        if (endDate.HasValue)
+            query = query.Where(m => m.MovementDate <= endDate.Value);
+
+        var totalCount = await query.CountAsync();
+
+        var movements = await query
+            .OrderByDescending(m => m.MovementDate)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(m => new StockMovementDto
+            {
+                Id = m.Id,
+                ProductId = m.ProductId,
+                ProductName = m.Product.Name,
+                ProductSku = m.Product.Sku,
+                Type = (int)m.Type,
+                TypeName = m.Type.ToString(),
+                Reason = (int)m.Reason,
+                ReasonName = m.Reason.ToString(),
+                Quantity = m.Quantity,
+                PreviousStock = m.PreviousStock,
+                CurrentStock = m.CurrentStock,
+                UnitCost = m.UnitCost,
+                TotalCost = m.TotalCost,
+                MovementDate = m.MovementDate,
+                Notes = m.Notes,
+                CreatedByUserId = m.CreatedByUserId,
+                CreatedByUserName = m.CreatedByUser.UserName ?? "Unknown",
+                DocumentNumber = m.DocumentNumber,
+                WarehouseId = m.WarehouseId,
+                SaleOrderId = m.SaleOrderId,
+                PurchaseOrderId = m.PurchaseOrderId,
+                TransferId = m.TransferId
+            })
+            .ToListAsync();
+
+        return (movements, totalCount);
+    }
+
+    public async Task<StockMovementDto?> GetStockMovementByIdAsync(int id)
+    {
+        var movement = await _context.StockMovements
+            .Include(m => m.Product)
+            .Include(m => m.CreatedByUser)
+            .FirstOrDefaultAsync(m => m.Id == id);
+
+        if (movement == null) return null;
+
+        return new StockMovementDto
+        {
+            Id = movement.Id,
+            ProductId = movement.ProductId,
+            ProductName = movement.Product.Name,
+            ProductSku = movement.Product.Sku,
+            Type = (int)movement.Type,
+            TypeName = movement.Type.ToString(),
+            Reason = (int)movement.Reason,
+            ReasonName = movement.Reason.ToString(),
+            Quantity = movement.Quantity,
+            PreviousStock = movement.PreviousStock,
+            CurrentStock = movement.CurrentStock,
+            UnitCost = movement.UnitCost,
+            TotalCost = movement.TotalCost,
+            MovementDate = movement.MovementDate,
+            Notes = movement.Notes,
+            CreatedByUserId = movement.CreatedByUserId,
+            CreatedByUserName = movement.CreatedByUser.UserName ?? "Unknown",
+            DocumentNumber = movement.DocumentNumber,
+            WarehouseId = movement.WarehouseId,
+            SaleOrderId = movement.SaleOrderId,
+            PurchaseOrderId = movement.PurchaseOrderId,
+            TransferId = movement.TransferId
+        };
+    }
+
+    public async Task<StockMovementDto> CreateStockMovementAsync(CreateStockMovementDto dto, int userId)
+    {
+        var product = await _context.Products.FindAsync(dto.ProductId);
+        if (product == null)
+            throw new InvalidOperationException($"Produto com ID {dto.ProductId} não encontrado");
+
+        var previousStock = product.CurrentStock;
+        
+        // Convert int to enum
+        var movementType = (MovementType)dto.Type;
+        var movementReason = (MovementReason)dto.Reason;
+        
+        var newStock = movementType switch
+        {
+            MovementType.In => previousStock + dto.Quantity,
+            MovementType.Out => previousStock - dto.Quantity,
+            MovementType.Transfer => previousStock - dto.Quantity,
+            _ => throw new InvalidOperationException($"Tipo de movimentação inválido")
+        };
+
+        if (newStock < 0 && !product.AllowNegativeStock)
+            throw new InvalidOperationException("Estoque não pode ficar negativo");
+
+        var movement = new StockMovement
+        {
+            ProductId = dto.ProductId,
+            Type = movementType,
+            Reason = movementReason,
+            Quantity = dto.Quantity,
+            PreviousStock = previousStock,
+            CurrentStock = newStock,
+            UnitCost = dto.UnitCost,
+            TotalCost = dto.Quantity * dto.UnitCost,
+            MovementDate = dto.MovementDate,
+            Notes = dto.Notes,
+            CreatedByUserId = userId,
+            DocumentNumber = dto.DocumentNumber,
+            WarehouseId = dto.WarehouseId,
+            SaleOrderId = dto.SaleOrderId,
+            PurchaseOrderId = dto.PurchaseOrderId,
+            TransferId = dto.TransferId
+        };
+
+        product.CurrentStock = newStock;
+
+        _context.StockMovements.Add(movement);
+        await _context.SaveChangesAsync();
+
+        return await GetStockMovementByIdAsync(movement.Id) ?? throw new InvalidOperationException("Falha ao criar movimentação");
+    }
+
+    public async Task<(IEnumerable<WarehouseDto> Warehouses, int TotalCount)> GetWarehousesAsync(
+        bool? isActive = null,
+        int page = 1,
+        int pageSize = 100)
+    {
+        var query = _context.Warehouses.AsQueryable();
+
+        if (isActive.HasValue)
+            query = query.Where(w => w.IsActive == isActive.Value);
+
+        var totalCount = await query.CountAsync();
+
+        var warehouses = await query
+            .OrderBy(w => w.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(w => new WarehouseDto
+            {
+                Id = w.Id,
+                Name = w.Name,
+                Code = w.Code,
+                Address = w.Address,
+                IsActive = w.IsActive,
+                CreatedAt = w.CreatedAt,
+                UpdatedAt = w.UpdatedAt
+            })
+            .ToListAsync();
+
+        return (warehouses, totalCount);
+    }
 }

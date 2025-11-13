@@ -14,10 +14,27 @@
         <MudStack Row Spacing="2" AlignItems="AlignItems.Center">
             <MudIcon Icon="@Icons.Material.Filled.ViewKanban" Size="MudBlazor.Size.Large" />
             <MudText Typo="Typo.h5">Meu Kanban</MudText>
+            @if (_columns?.Count > 3)
+            {
+                <MudChip T="string" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Info" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.SwipeRight">
+                    @_columns.Count colunas - role →
+                </MudChip>
+            }
             <MudSpacer />
             @if (_isLoading)
             {
                 <MudProgressCircular Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Primary" Indeterminate="true"/>
+            }
+            @if (_columns?.Count > 3)
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" 
+                              Color="MudBlazor.Color.Default" 
+                              OnClick="ScrollLeft"
+                              Title="Rolar para esquerda" />
+                <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" 
+                              Color="MudBlazor.Color.Default" 
+                              OnClick="ScrollRight"
+                              Title="Rolar para direita" />
             }
             <MudButton Color="MudBlazor.Color.Primary" 
                        Variant="Variant.Filled" 
@@ -76,6 +93,15 @@
                             </MudStack>
                             <MudDivider Class="my-2"/>
                             <MudDropZone T="KanbanCardDto" Identifier="@col.Id.ToString()" Class="kanban-cards mud-height-full" AllowReorder="true" />
+
+                            <!-- Delete bar: arraste um card aqui para excluir -->
+                            <MudDropZone T="KanbanCardDto" Identifier="@($"delete-{col.Id}")" Class="kanban-delete-zone" AllowReorder="false">
+                                <div class="delete-zone-content">
+                                    <MudIcon Icon="@Icons.Material.Filled.Delete" Size="@MudBlazor.Size.Medium" />
+                                    <span class="delete-zone-text">Arraste aqui para excluir</span>
+                                </div>
+                            </MudDropZone>
+
                             <MudButton Size="MudBlazor.Size.Small" 
                                       Variant="Variant.Outlined" 
                                       StartIcon="@Icons.Material.Filled.Add" 
@@ -327,6 +353,43 @@
         if (info?.Item is null || string.IsNullOrWhiteSpace(info.DropzoneIdentifier) || _columns is null)
             return;
 
+        // Handle deletion when dropped onto the delete bar (identifier: "delete-{columnId}")
+        if (info.DropzoneIdentifier.StartsWith("delete-"))
+        {
+            // optimistic delete in UI
+            var cardId = info.Item.Id;
+            _allCards.RemoveAll(c => c.Id == cardId);
+            foreach (var col in _columns)
+            {
+                col.Cards.RemoveAll(c => c.Id == cardId);
+            }
+            _dropContainer?.Refresh();
+            StateHasChanged();
+
+            // Call API to delete
+            try
+            {
+                var deleteRes = await Api.DeleteAsync($"api/kanban/cards/{cardId}");
+                if (deleteRes.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("Card excluído com sucesso!", Severity.Success);
+                }
+                else
+                {
+                    Snackbar.Add("Erro ao excluir card. Revertendo...", Severity.Warning);
+                    await RefreshData();
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao excluir card: {ex.Message}", Severity.Error);
+                await RefreshData();
+            }
+
+            return;
+        }
+
+        // Normal move handling (drop into a column)
         if (!int.TryParse(info.DropzoneIdentifier, out var toColumnId))
             return;
 
@@ -378,7 +441,21 @@
         }
     }
 
-    
+    private async Task ScrollLeft()
+    {
+        await JS.InvokeVoidAsync("eval", @"
+            var container = document.querySelector('.kanban-scroll');
+            if (container) container.scrollBy({ left: -350, behavior: 'smooth' });
+        ");
+    }
+
+    private async Task ScrollRight()
+    {
+        await JS.InvokeVoidAsync("eval", @"
+            var container = document.querySelector('.kanban-scroll');
+            if (container) container.scrollBy({ left: 350, behavior: 'smooth' });
+        ");
+    }
 
     // Simple JS prompt bridge
     [Inject] IJSRuntime JS { get; set; } = default!;
@@ -414,6 +491,41 @@
     overflow-x: auto; 
     overflow-y: hidden;
     padding: 16px;
+    position: relative;
+    scroll-behavior: smooth; /* smooth scrolling */
+}
+
+/* Gradient hint when there are more columns to scroll */
+.kanban-scroll::before,
+.kanban-scroll::after {
+    content: '';
+    position: sticky;
+    top: 0;
+    width: 60px;
+    height: 100%;
+    pointer-events: none;
+    z-index: 2;
+    opacity: 0;
+    transition: opacity 300ms ease;
+}
+
+.kanban-scroll::before {
+    left: 0;
+    background: linear-gradient(to right, var(--mud-palette-background) 0%, transparent 100%);
+}
+
+.kanban-scroll::after {
+    right: 0;
+    background: linear-gradient(to left, var(--mud-palette-background) 0%, transparent 100%);
+}
+
+/* Show gradients when scrollable (JS can add this class or CSS hack) */
+.kanban-scroll.has-scroll::before {
+    opacity: 0.8;
+}
+
+.kanban-scroll.has-scroll::after {
+    opacity: 0.8;
 }
 
 .kanban-loading,
@@ -436,18 +548,23 @@
 }
 
 .kanban-column { 
-    width: 320px; 
-    min-width: 320px; 
+    width: 300px; 
+    min-width: 300px; 
+    max-width: 340px;
     background: var(--mud-palette-surface);
     border-radius: 12px;
     min-height: 100px;
     display: flex;
     flex-direction: column;
-    transition: box-shadow 200ms ease;
+    transition: box-shadow 200ms ease, transform 150ms ease;
+    flex-shrink: 0; /* prevent columns from shrinking */
 }
+
+/* Subtle lift on hover for better depth perception */
 
 .kanban-column:hover {
     box-shadow: var(--mud-elevation-8);
+    transform: translateY(-2px);
 }
 
 .kanban-column .column-header {
@@ -538,23 +655,33 @@
     opacity: 0.8;
 }
 
-/* Scroll customization */
+/* Scroll customization - more prominent */
 .kanban-scroll::-webkit-scrollbar {
-    height: 12px;
+    height: 14px;
 }
 
 .kanban-scroll::-webkit-scrollbar-track {
-    background: var(--mud-palette-background);
+    background: rgba(0,0,0,0.05);
     border-radius: 10px;
+    margin: 0 8px;
 }
 
 .kanban-scroll::-webkit-scrollbar-thumb {
-    background: var(--mud-palette-divider);
+    background: rgba(0,0,0,0.2);
     border-radius: 10px;
+    border: 3px solid transparent;
+    background-clip: padding-box;
+    transition: background 200ms ease;
 }
 
 .kanban-scroll::-webkit-scrollbar-thumb:hover {
-    background: var(--mud-palette-text-secondary);
+    background: rgba(0,0,0,0.35);
+    background-clip: padding-box;
+}
+
+.kanban-scroll::-webkit-scrollbar-thumb:active {
+    background: var(--mud-palette-primary);
+    background-clip: padding-box;
 }
 
 /* Animation for new items */
@@ -572,4 +699,107 @@
 .kanban-item {
     animation: slideIn 250ms ease-out;
 }
+
+.kanban-delete-zone {
+    /* Start hidden with zero height for smooth slide-down/up */
+    max-height: 0;
+    overflow: hidden;
+    border-radius: 8px;
+    background: #fff7f7;
+    border: 2px dashed rgba(176,0,32,0.10);
+    display: block;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 8px;
+    padding: 0 12px; /* collapsed when hidden */
+    opacity: 0;
+    transform: translateY(6px) scale(0.995);
+    transition: max-height 220ms cubic-bezier(0.2,0,0,1),
+                opacity 180ms ease,
+                transform 180ms cubic-bezier(0.2,0,0,1),
+                border-color 150ms ease,
+                background-color 150ms ease;
+}
+
+.kanban-delete-zone .delete-zone-content {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    color: #b00020;
+    font-weight: 600;
+}
+
+/* Show delete zone while dragging: expand and fade in */
+.kanban-dragging .kanban-delete-zone {
+    max-height: 72px; /* enough for content */
+    padding: 10px 12px;
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+/* Gentle pop animation on drag-enter */
+.kanban-delete-zone.mud-drop-zone-drag-enter {
+    background: #ffecec;
+    border-color: #b00020;
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 8px 20px rgba(176,0,32,0.12);
+}
+
+/* Subtle pulse to attract attention when active */
+@@keyframes deletePulse {
+    0% { box-shadow: 0 6px 16px rgba(176,0,32,0.06); }
+    50% { box-shadow: 0 10px 28px rgba(176,0,32,0.10); }
+    100% { box-shadow: 0 6px 16px rgba(176,0,32,0.06); }
+}
+
+.kanban-delete-zone.mud-drop-zone-drag-enter .delete-zone-content {
+    animation: deletePulse 900ms ease-in-out 1;
+}
 </style>
+
+<script>
+(function(){
+    if (window.__kanbanDragInit) return;
+    window.__kanbanDragInit = true;
+
+    function onStart(e) {
+        var el = e.target;
+        while (el && !el.classList?.contains('kanban-item')) el = el.parentElement;
+        if (el) document.body.classList.add('kanban-dragging');
+    }
+
+    function onEnd(e) { document.body.classList.remove('kanban-dragging'); }
+
+    document.addEventListener('dragstart', onStart);
+    document.addEventListener('dragend', onEnd);
+    document.addEventListener('drop', onEnd);
+
+    // Mouse fallback: show during press on an item until mouseup
+    document.addEventListener('mousedown', function(e){
+        var el = e.target;
+        while (el && !el.classList?.contains('kanban-item')) el = el.parentElement;
+        if (el) document.body.classList.add('kanban-dragging');
+    });
+    document.addEventListener('mouseup', onEnd);
+
+    // Check if kanban-scroll has horizontal overflow and add visual hint class
+    function checkScrollable() {
+        var scrollContainer = document.querySelector('.kanban-scroll');
+        if (!scrollContainer) return;
+        
+        var hasHorizontalScroll = scrollContainer.scrollWidth > scrollContainer.clientWidth;
+        if (hasHorizontalScroll) {
+            scrollContainer.classList.add('has-scroll');
+        } else {
+            scrollContainer.classList.remove('has-scroll');
+        }
+    }
+
+    // Check on load and when window resizes
+    window.addEventListener('load', checkScrollable);
+    window.addEventListener('resize', checkScrollable);
+    
+    // Re-check periodically (for dynamic content changes via Blazor)
+    setInterval(checkScrollable, 1000);
+})();
+</script>

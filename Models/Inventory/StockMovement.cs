@@ -1,8 +1,9 @@
 using erp.Models.Identity;
+using erp.Models.Audit;
 
 namespace erp.Models.Inventory;
 
-public class StockMovement
+public class StockMovement : IAuditable
 {
     public int Id { get; set; }
     

@@ -23,12 +23,30 @@
     </MudTabPanel>
 
     <MudTabPanel Text="Segurança" Icon="@Icons.Material.Filled.Security">
-        <MudStack Row="false" Spacing="2">
+        <MudStack Row="false" Spacing="3">
+            <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid var(--mud-palette-divider);">
+                <MudText Typo="Typo.h6" Class="mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.Shield" Class="mr-2" />
+                    Autenticação de Dois Fatores (2FA)
+                </MudText>
+                <MudText Typo="Typo.body2" Class="mb-3">
+                    Adicione uma camada extra de segurança à sua conta com autenticação de dois fatores.
+                </MudText>
+                <MudButton Href="/account/two-factor" 
+                           Color="Color.Primary" 
+                           Variant="Variant.Filled"
+                           StartIcon="@Icons.Material.Filled.Security">
+                    Gerenciar 2FA
+                </MudButton>
+            </MudPaper>
+
+            <MudDivider />
+
             <MudSwitch T="bool"
                        Value="@PreferenceService.CurrentPreferences.Security.TwoFactor"
                        ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Security.TwoFactor = v))"
                        Color="MudBlazor.Color.Primary"
-                       Label="Autenticação de dois fatores (preferência)" />
+                       Label="Preferência de autenticação de dois fatores" />
 
             <MudNumericField T="int"
                              Label="Tempo para sair automaticamente (minutos)"

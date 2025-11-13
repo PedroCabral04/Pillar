@@ -1,12 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using erp.Models.Inventory;
+using erp.Models.Audit;
 
 namespace erp.Models.Sales;
 
 /// <summary>
 /// Represents an item within a sale
 /// </summary>
-public class SaleItem
+public class SaleItem : IAuditable
 {
     public int Id { get; set; }
     

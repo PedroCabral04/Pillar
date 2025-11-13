@@ -20,6 +20,8 @@ public record DashboardWidgetDefinition
     public DashboardChartType ChartType { get; init; }
     public string? Icon { get; init; }
     public string? Unit { get; init; }
+    // Optional roles required to view this widget. If null or empty, widget is available to all authenticated users.
+    public string[]? RequiredRoles { get; init; }
 }
 
 public record DashboardQuery

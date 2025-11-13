@@ -1,0 +1,210 @@
+@using erp.DTOs.Audit
+@using System.Text.Json
+@using MudColor = MudBlazor.Color
+@using MudSize = MudBlazor.Size
+
+<MudDialog>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12">
+                <MudAlert Severity="Severity.Info" Dense="true">
+                    <MudText Typo="Typo.body2">
+                        <strong>Entidade:</strong> @AuditLog.EntityName (ID: @AuditLog.EntityId)
+                    </MudText>
+                    <MudText Typo="Typo.body2">
+                        <strong>Ação:</strong> @GetActionText(AuditLog.Action)
+                    </MudText>
+                    <MudText Typo="Typo.body2">
+                        <strong>Usuário:</strong> @(AuditLog.UserName ?? "Sistema")
+                    </MudText>
+                    <MudText Typo="Typo.body2">
+                        <strong>Data/Hora:</strong> @AuditLog.Timestamp.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")
+                    </MudText>
+                    <MudText Typo="Typo.body2">
+                        <strong>IP:</strong> @AuditLog.IpAddress
+                    </MudText>
+                    @if (!string.IsNullOrEmpty(AuditLog.UserAgent))
+                    {
+                        <MudText Typo="Typo.body2">
+                            <strong>Navegador:</strong> @AuditLog.UserAgent
+                        </MudText>
+                    }
+                </MudAlert>
+            </MudItem>
+
+            @if (AuditLog.Action == "Update" && !string.IsNullOrEmpty(AuditLog.ChangedProperties))
+            {
+                <MudItem xs="12">
+                    <MudText Typo="Typo.h6" Class="mb-2">Alterações Realizadas</MudText>
+                    <MudPaper Class="pa-4" Elevation="2">
+                        @{
+                            var changedProps = ParseJsonObject(AuditLog.ChangedProperties);
+                            var oldValues = ParseJsonObject(AuditLog.OldValues);
+                            var newValues = ParseJsonObject(AuditLog.NewValues);
+                        }
+                        
+                        @if (changedProps.Count > 0)
+                        {
+                            <MudTable Items="changedProps" Dense="true" Hover="true" Elevation="0">
+                                <HeaderContent>
+                                    <MudTh>Campo</MudTh>
+                                    <MudTh>Valor Anterior</MudTh>
+                                    <MudTh>Valor Novo</MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd DataLabel="Campo">
+                                        <MudChip T="string" Size="MudSize.Small" Color="MudColor.Primary">
+                                            @context.Key
+                                        </MudChip>
+                                    </MudTd>
+                                    <MudTd DataLabel="Valor Anterior">
+                                        <MudText Typo="Typo.body2" Color="MudColor.Error">
+                                            @GetPropertyValue(oldValues, context.Key)
+                                        </MudText>
+                                    </MudTd>
+                                    <MudTd DataLabel="Valor Novo">
+                                        <MudText Typo="Typo.body2" Color="MudColor.Success">
+                                            @GetPropertyValue(newValues, context.Key)
+                                        </MudText>
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        }
+                        else
+                        {
+                            <MudText Color="MudColor.Warning">Nenhuma alteração de propriedade registrada</MudText>
+                        }
+                    </MudPaper>
+                </MudItem>
+            }
+            else if (AuditLog.Action == "Create" && !string.IsNullOrEmpty(AuditLog.NewValues))
+            {
+                <MudItem xs="12">
+                    <MudText Typo="Typo.h6" Class="mb-2">Valores Criados</MudText>
+                    <MudPaper Class="pa-4" Elevation="2">
+                        @{
+                            var newValues = ParseJsonObject(AuditLog.NewValues);
+                        }
+                        
+                        @if (newValues.Count > 0)
+                        {
+                            <MudTable Items="newValues" Dense="true" Hover="true" Elevation="0">
+                                <HeaderContent>
+                                    <MudTh>Campo</MudTh>
+                                    <MudTh>Valor</MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd DataLabel="Campo">
+                                        <MudChip T="string" Size="MudSize.Small" Color="MudColor.Primary">
+                                            @context.Key
+                                        </MudChip>
+                                    </MudTd>
+                                    <MudTd DataLabel="Valor">
+                                        <MudText Typo="Typo.body2" Color="MudColor.Success">
+                                            @FormatValue(context.Value)
+                                        </MudText>
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        }
+                    </MudPaper>
+                </MudItem>
+            }
+            else if (AuditLog.Action == "Delete" && !string.IsNullOrEmpty(AuditLog.OldValues))
+            {
+                <MudItem xs="12">
+                    <MudText Typo="Typo.h6" Class="mb-2">Valores Deletados</MudText>
+                    <MudPaper Class="pa-4" Elevation="2">
+                        @{
+                            var oldValues = ParseJsonObject(AuditLog.OldValues);
+                        }
+                        
+                        @if (oldValues.Count > 0)
+                        {
+                            <MudTable Items="oldValues" Dense="true" Hover="true" Elevation="0">
+                                <HeaderContent>
+                                    <MudTh>Campo</MudTh>
+                                    <MudTh>Valor</MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd DataLabel="Campo">
+                                        <MudChip T="string" Size="MudSize.Small" Color="MudColor.Primary">
+                                            @context.Key
+                                        </MudChip>
+                                    </MudTd>
+                                    <MudTd DataLabel="Valor">
+                                        <MudText Typo="Typo.body2" Color="MudColor.Error">
+                                            @FormatValue(context.Value)
+                                        </MudText>
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        }
+                    </MudPaper>
+                </MudItem>
+            }
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close" Color="MudColor.Primary">Fechar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] 
+    IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public AuditLogDto AuditLog { get; set; } = null!;
+
+    private void Close() => MudDialog.Close();
+
+    private string GetActionText(string action) => action switch
+    {
+        "Create" => "Criação",
+        "Update" => "Atualização",
+        "Delete" => "Exclusão",
+        _ => action
+    };
+
+    private Dictionary<string, JsonElement> ParseJsonObject(string? json)
+    {
+        if (string.IsNullOrEmpty(json))
+            return new Dictionary<string, JsonElement>();
+
+        try
+        {
+            var document = JsonDocument.Parse(json);
+            return document.RootElement.EnumerateObject()
+                .ToDictionary(p => p.Name, p => p.Value);
+        }
+        catch
+        {
+            return new Dictionary<string, JsonElement>();
+        }
+    }
+
+    private string GetPropertyValue(Dictionary<string, JsonElement> dict, string key)
+    {
+        if (dict.TryGetValue(key, out var value))
+        {
+            return FormatValue(value);
+        }
+        return "-";
+    }
+
+    private string FormatValue(JsonElement element)
+    {
+        return element.ValueKind switch
+        {
+            JsonValueKind.Null => "(nulo)",
+            JsonValueKind.String => element.GetString() ?? "",
+            JsonValueKind.Number => element.GetDecimal().ToString(),
+            JsonValueKind.True => "Sim",
+            JsonValueKind.False => "Não",
+            JsonValueKind.Array => $"[{element.GetArrayLength()} itens]",
+            JsonValueKind.Object => "{objeto}",
+            _ => element.ToString()
+        };
+    }
+}
