@@ -1,8 +1,11 @@
 ﻿@using erp.Services
+@using erp.Services.Browser
 @inherits LayoutComponentBase
 @inject ThemeService ThemeService
 @inject PreferenceService PreferenceService
+@inject IBrowserService BrowserService
 @inject IJSRuntime JsRuntime
+@implements IDisposable
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,47 +16,68 @@
 <MudDialogProvider/>
 <MudSnackbarProvider/>
 <MudLayout>
-    @if (IsTopbarNavigation)
-    {
-        <NavMenuTopbar />
-        <MudMainContent Class="pa-4" Style="@MainContentStyleTopbar()">
-            <div class="mb-4">
-                <erp.Components.Shared.Breadcrumbs />
-            </div>
-            @Body
-        </MudMainContent>
-    }
-    else
-    {
-        <MudPaper Style="position: relative; height: 100vh; display: flex" >
-            <MudDrawerContainer Class="mud-height-full">
-                <MudDrawer id="nav-drawer" 
-                           Fixed="false" 
-                           Variant="@(_drawerOpen ? DrawerVariant.Persistent : DrawerVariant.Mini)" 
-                           OpenMiniOnHover="false" 
-                           @bind-Open="_drawerOpen" 
-                           ClipMode="DrawerClipMode.Always" 
-                           Elevation="2"
-                           Width="240px"
-                           MiniWidth="56px">
-                        <NavMenu IsOpen="_drawerOpen" OnToggleDrawer="@ToggleDrawer"/>
-                </MudDrawer>
-            </MudDrawerContainer>
-            <MudMainContent 
-                Class="pa-4 full-height-content" 
-                Style="@MainContentStyle()">
+    <!-- Desktop: Topbar Navigation (when explicitly selected in preferences) -->
+    <MudHidden Breakpoint="Breakpoint.SmAndDown" Invert="false">
+        @if (IsTopbarNavigation)
+        {
+            <NavMenuTopbar />
+            <MudMainContent Class="pa-4" Style="@MainContentStyleTopbar()">
                 <div class="mb-4">
                     <erp.Components.Shared.Breadcrumbs />
                 </div>
                 @Body
             </MudMainContent>
-            <MudScrollToTop>
-                <MudFab Color="MudBlazor.Color.Tertiary" StartIcon="@Icons.Material.Filled.ArrowCircleUp" />
-            </MudScrollToTop>
-        </MudPaper>
-    }
+        }
+        else
+        {
+            <!-- Desktop: Sidebar Navigation -->
+            <MudPaper Style="position: relative; height: 100vh; display: flex" >
+                <MudDrawerContainer Class="mud-height-full">
+                    <MudDrawer id="nav-drawer" 
+                               Fixed="false" 
+                               Variant="@(_drawerOpen ? DrawerVariant.Persistent : DrawerVariant.Mini)" 
+                               OpenMiniOnHover="false" 
+                               @bind-Open="_drawerOpen" 
+                               ClipMode="DrawerClipMode.Always" 
+                               Elevation="2"
+                               Width="240px"
+                               MiniWidth="56px">
+                            <NavMenu IsOpen="_drawerOpen" OnToggleDrawer="@ToggleDrawer"/>
+                    </MudDrawer>
+                </MudDrawerContainer>
+                <MudMainContent 
+                    Class="pa-4 full-height-content" 
+                    Style="@MainContentStyle()">
+                    <div class="mb-4">
+                        <erp.Components.Shared.Breadcrumbs />
+                    </div>
+                    @Body
+                </MudMainContent>
+                <MudScrollToTop>
+                    <MudFab Color="MudBlazor.Color.Tertiary" StartIcon="@Icons.Material.Filled.ArrowCircleUp" />
+                </MudScrollToTop>
+            </MudPaper>
+        }
+    </MudHidden>
     
-    <!-- Chatbot Widget -->
+    <!-- Mobile: Adaptive Navigation with Drawer + Bottom Nav -->
+    <MudHidden Breakpoint="Breakpoint.SmAndDown" Invert="true">
+        @if (_mobileDrawerOpen)
+        {
+            <div class="mobile-drawer-backdrop" @onclick="@CloseMobileDrawer"></div>
+            <div class="mobile-drawer @(_mobileDrawerOpen ? "open" : "")">
+                <NavMenu IsOpen="true" OnToggleDrawer="@CloseMobileDrawer" IsMobile="true"/>
+            </div>
+        }
+        
+        <MudMainContent Class="mobile-content-no-topbar">
+            @Body
+        </MudMainContent>
+        
+        <MobileBottomNav />
+    </MudHidden>
+    
+    <!-- Chatbot Widget (available on all layouts) -->
     <erp.Components.Shared.ChatbotWidget />
 </MudLayout>
 
@@ -66,6 +90,8 @@
 
 @code {
     private bool _drawerOpen = true;
+    private bool _mobileDrawerOpen = false;
+    private int _unreadNotifications = 0;
     private MudThemeProvider _mudThemeProvider = null!;
     public bool IsDarkMode;
 
@@ -75,6 +101,12 @@
     private void ToggleDrawer()
     {
         _drawerOpen = !_drawerOpen;
+    }
+
+    private void CloseMobileDrawer()
+    {
+        _mobileDrawerOpen = false;
+        _ = BrowserService.UnlockScrollAsync();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

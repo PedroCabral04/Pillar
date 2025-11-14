@@ -142,6 +142,7 @@
 @code {
     [Parameter] public bool IsOpen { get; set; } = true;
     [Parameter] public EventCallback OnToggleDrawer { get; set; }
+    [Parameter] public bool IsMobile { get; set; } = false;
     
     [Inject] HttpClient Http { get; set; } = null!;
     private string? currentUrl;

@@ -1,0 +1,118 @@
+@typeparam TComponent where TComponent : ComponentBase
+@inject erp.Services.Browser.IBrowserService BrowserService
+
+@if (_isMobile && UseMobileSheet)
+{
+    <!-- Mobile: Bottom Sheet Style -->
+    <MudDialog @bind-Visible="@Visible" 
+               Options="@MobileDialogOptions"
+               Class="mobile-dialog">
+        <DialogContent>
+            @ChildContent
+        </DialogContent>
+    </MudDialog>
+}
+else
+{
+    <!-- Desktop: Standard Dialog -->
+    <MudDialog @bind-Visible="@Visible" 
+               Options="@DesktopDialogOptions">
+        <DialogContent>
+            @ChildContent
+        </DialogContent>
+    </MudDialog>
+}
+
+@code {
+    [Parameter]
+    public bool Visible { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> VisibleChanged { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter]
+    public string? Title { get; set; }
+
+    [Parameter]
+    public DialogOptions? CustomOptions { get; set; }
+
+    [Parameter]
+    public bool UseMobileSheet { get; set; } = true;
+
+    [Parameter]
+    public bool ForceMobile { get; set; } = false;
+
+    [Parameter]
+    public bool ForceDesktop { get; set; } = false;
+
+    private bool _isMobile = false;
+
+    private DialogOptions MobileDialogOptions => new()
+    {
+        MaxWidth = MaxWidth.False,
+        FullWidth = true,
+        Position = DialogPosition.Center,
+        CloseButton = true,
+        CloseOnEscapeKey = true,
+        BackdropClick = true,
+        NoHeader = string.IsNullOrEmpty(Title)
+    };
+
+    private DialogOptions DesktopDialogOptions => CustomOptions ?? new()
+    {
+        MaxWidth = MaxWidth.Medium,
+        FullWidth = false,
+        Position = DialogPosition.Center,
+        CloseButton = true,
+        CloseOnEscapeKey = true,
+        BackdropClick = true,
+        NoHeader = string.IsNullOrEmpty(Title)
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await UpdateResponsiveState();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ForceMobile)
+        {
+            _isMobile = true;
+        }
+        else if (ForceDesktop)
+        {
+            _isMobile = false;
+        }
+        else
+        {
+            await UpdateResponsiveState();
+        }
+
+        // Lock/unlock scroll based on dialog visibility
+        if (Visible && _isMobile)
+        {
+            await BrowserService.LockScrollAsync();
+        }
+        else
+        {
+            await BrowserService.UnlockScrollAsync();
+        }
+    }
+
+    private async Task UpdateResponsiveState()
+    {
+        try
+        {
+            _isMobile = await BrowserService.IsMobileAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error detecting mobile state: {ex.Message}");
+            _isMobile = false;
+        }
+    }
+}
