@@ -1,0 +1,101 @@
+@using erp.Services
+@using MudBlazor
+@inject NavigationManager Navigation
+@inject IApiService ApiService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<div class="mobile-topbar">
+    <div class="mobile-topbar__left">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" 
+                       Color="MudBlazor.Color.Inherit" 
+                       Edge="Edge.Start"
+                       OnClick="@OnMenuClick"
+                       Class="mobile-topbar__icon-btn"
+                       aria-label="Menu"/>
+        <h1 class="mobile-topbar__title">@Title</h1>
+    </div>
+    <div class="mobile-topbar__right">
+        @if (UnreadNotifications > 0)
+        {
+            <MudBadge Content="@UnreadNotifications" Color="MudBlazor.Color.Error" Overlap="true" Class="mx-1">
+                <MudIconButton Icon="@Icons.Material.Filled.Notifications" 
+                               Color="MudBlazor.Color.Inherit"
+                               OnClick="@OnNotificationsClick"
+                               Class="mobile-topbar__icon-btn"
+                               aria-label="Notificações"/>
+            </MudBadge>
+        }
+        else
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.Notifications" 
+                           Color="MudBlazor.Color.Inherit"
+                           OnClick="@OnNotificationsClick"
+                           Class="mobile-topbar__icon-btn"
+                           aria-label="Notificações"/>
+        }
+        
+        <MudMenu Icon="@Icons.Material.Filled.AccountCircle" 
+                 Color="MudBlazor.Color.Inherit" 
+                 AnchorOrigin="Origin.BottomRight"
+                 TransformOrigin="Origin.TopRight"
+                 Class="mobile-topbar__icon-btn">
+            <MudMenuItem OnClick="@NavigateToProfile">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <MudIcon Icon="@Icons.Material.Filled.Person" Size="MudBlazor.Size.Small"/>
+                    <span>Meu Perfil</span>
+                </div>
+            </MudMenuItem>
+            <MudMenuItem OnClick="@NavigateToPreferences">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <MudIcon Icon="@Icons.Material.Filled.Settings" Size="MudBlazor.Size.Small"/>
+                    <span>Preferências</span>
+                </div>
+            </MudMenuItem>
+            <MudDivider/>
+            <MudMenuItem OnClick="@Logout">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <MudIcon Icon="@Icons.Material.Filled.Logout" Size="MudBlazor.Size.Small"/>
+                    <span>Sair</span>
+                </div>
+            </MudMenuItem>
+        </MudMenu>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string Title { get; set; } = "Pillar ERP";
+    
+    [Parameter]
+    public EventCallback OnMenuClick { get; set; }
+    
+    [Parameter]
+    public EventCallback OnNotificationsClick { get; set; }
+    
+    [Parameter]
+    public int UnreadNotifications { get; set; }
+
+    private async Task NavigateToProfile()
+    {
+        Navigation.NavigateTo("/profile");
+    }
+
+    private async Task NavigateToPreferences()
+    {
+        Navigation.NavigateTo("/preferences");
+    }
+
+    private async Task Logout()
+    {
+        try
+        {
+            await ApiService.PostAsync<object>("/api/auth/logout", null);
+            Navigation.NavigateTo("/login", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao fazer logout: {ex.Message}");
+            Navigation.NavigateTo("/login", forceLoad: true);
+        }
+    }
+}

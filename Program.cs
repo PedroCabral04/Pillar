@@ -201,7 +201,16 @@ builder.Services.AddSwaggerGen(options =>
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped(sp => {
     var navigationManager = sp.GetRequiredService<NavigationManager>();
-    return new HttpClient
+    var httpClientHandler = new HttpClientHandler();
+    
+    // In development, bypass SSL certificate validation for self-signed certs
+    if (builder.Environment.IsDevelopment())
+    {
+        httpClientHandler.ServerCertificateCustomValidationCallback = 
+            HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+    }
+    
+    return new HttpClient(httpClientHandler)
     {
         BaseAddress = new Uri(navigationManager.BaseUri)
     };
@@ -328,6 +337,9 @@ builder.Services.AddScoped<erp.Services.Audit.IAuditService, erp.Services.Audit.
 
 // Chatbot services
 builder.Services.AddScoped<erp.Services.Chatbot.IChatbotService, erp.Services.Chatbot.ChatbotService>();
+
+// Browser Service (Mobile/Responsive)
+builder.Services.AddScoped<erp.Services.Browser.IBrowserService, erp.Services.Browser.BrowserService>();
 
 // Email services
 builder.Services.Configure<erp.Services.Email.EmailSettings>(builder.Configuration.GetSection("Email"));

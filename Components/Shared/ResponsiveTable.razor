@@ -1,24 +1,181 @@
-@* Componente wrapper para tornar tabelas MudBlazor responsivas em mobile *@
+@typeparam TItem
+@inject erp.Services.Browser.IBrowserService BrowserService
 
-<div class="responsive-table-container">
-    @if (IsMobile)
-    {
-        <!-- Mobile: Card View -->
-        <div class="mobile-card-list">
-            @ChildContent
-        </div>
-    }
-    else
-    {
-        <!-- Desktop: Table View -->
-        @ChildContent
-    }
-</div>
+@if (_isMobile && UseMobileCards)
+{
+    <!-- Mobile: Card View -->
+    <div class="responsive-table-cards">
+        @if (Items != null && Items.Any())
+        {
+            @foreach (var item in Items)
+            {
+                <div class="responsive-table-card @(OnRowClick.HasDelegate ? "clickable" : "")" 
+                     @onclick="@(() => HandleRowClick(item))">
+                    @if (MobileCardTemplate != null)
+                    {
+                        @MobileCardTemplate(item)
+                    }
+                    else
+                    {
+                        <!-- Default mobile card rendering -->
+                        <div class="responsive-table-card__row">
+                            <span class="responsive-table-card__label">Item</span>
+                            <span class="responsive-table-card__value">@item?.ToString()</span>
+                        </div>
+                    }
+                </div>
+            }
+        }
+        else
+        {
+            <MudText Typo="Typo.body2" Color="MudBlazor.Color.Default" Class="pa-4">
+                Nenhum registro encontrado
+            </MudText>
+        }
+    </div>
+}
+else
+{
+    <!-- Desktop: Standard MudTable -->
+    <div class="responsive-table-wrapper">
+        <MudTable Items="@Items" 
+                  Dense="@Dense"
+                  Hover="@Hover" 
+                  Striped="@Striped"
+                  Loading="@Loading"
+                  LoadingProgressColor="@LoadingProgressColor"
+                  FixedHeader="@FixedHeader"
+                  FixedFooter="@FixedFooter"
+                  Height="@Height"
+                  OnRowClick="@OnRowClick"
+                  T="TItem"
+                  Class="@TableClass">
+            <HeaderContent>
+                @HeaderContent
+            </HeaderContent>
+            <RowTemplate>
+                @RowTemplate
+            </RowTemplate>
+        </MudTable>
+    </div>
+}
 
 @code {
     [Parameter]
-    public RenderFragment? ChildContent { get; set; }
-    
+    public IEnumerable<TItem>? Items { get; set; }
+
     [Parameter]
-    public bool IsMobile { get; set; }
+    public RenderFragment? HeaderContent { get; set; }
+
+    [Parameter]
+    public RenderFragment<TItem>? RowTemplate { get; set; }
+
+    [Parameter]
+    public RenderFragment<TItem>? MobileCardTemplate { get; set; }
+
+    [Parameter]
+    public RenderFragment? FooterContent { get; set; }
+
+    [Parameter]
+    public RenderFragment? NoRecordsContent { get; set; }
+
+    [Parameter]
+    public EventCallback<TableRowClickEventArgs<TItem>> OnRowClick { get; set; }
+
+    [Parameter]
+    public bool Dense { get; set; } = false;
+
+    [Parameter]
+    public bool Hover { get; set; } = true;
+
+    [Parameter]
+    public bool Striped { get; set; } = false;
+
+    [Parameter]
+    public bool Loading { get; set; } = false;
+
+    [Parameter]
+    public MudBlazor.Color LoadingProgressColor { get; set; } = MudBlazor.Color.Primary;
+
+    [Parameter]
+    public bool FixedHeader { get; set; } = false;
+
+    [Parameter]
+    public bool FixedFooter { get; set; } = false;
+
+    [Parameter]
+    public string? Height { get; set; }
+
+    [Parameter]
+    public string? TableClass { get; set; }
+
+    [Parameter]
+    public bool UseMobileCards { get; set; } = true;
+
+    [Parameter]
+    public bool ForceMobile { get; set; } = false;
+
+    [Parameter]
+    public bool ForceDesktop { get; set; } = false;
+
+    private bool _isMobile = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await UpdateResponsiveState();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ForceMobile)
+        {
+            _isMobile = true;
+        }
+        else if (ForceDesktop)
+        {
+            _isMobile = false;
+        }
+        else
+        {
+            await UpdateResponsiveState();
+        }
+    }
+
+    private async Task UpdateResponsiveState()
+    {
+        try
+        {
+            _isMobile = await BrowserService.IsMobileAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error detecting mobile state: {ex.Message}");
+            _isMobile = false;
+        }
+    }
+
+    private async Task HandleRowClick(TItem item)
+    {
+        if (OnRowClick.HasDelegate)
+        {
+            await OnRowClick.InvokeAsync(new TableRowClickEventArgs<TItem>(null!, null!, item));
+        }
+    }
 }
+
+<style>
+    .responsive-table-cards {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .responsive-table-card.clickable {
+        cursor: pointer;
+    }
+
+    .responsive-table-card.clickable:active {
+        background-color: rgba(0, 0, 0, 0.04);
+        transform: scale(0.99);
+    }
+</style>
