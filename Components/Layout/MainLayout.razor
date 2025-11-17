@@ -42,7 +42,7 @@
                                Elevation="2"
                                Width="240px"
                                MiniWidth="56px">
-                        <NavMenu IsOpen="_drawerOpen" OnToggleDrawer="@ToggleDrawer"/>
+                        <erp.Components.Shared.Sidebar IsOpen="_drawerOpen" OnToggleDrawer="@ToggleDrawer" />
                     </MudDrawer>
 
                     <MudMainContent 
@@ -76,7 +76,7 @@
         {
             <div class="mobile-drawer-backdrop" @onclick="@CloseMobileDrawer"></div>
             <div class="mobile-drawer @(_mobileDrawerOpen ? "open" : "")">
-                <NavMenu IsOpen="true" OnToggleDrawer="@CloseMobileDrawer" IsMobile="true"/>
+                <erp.Components.Shared.Sidebar IsOpen="true" OnToggleDrawer="@CloseMobileDrawer" IsMobile="true" />
             </div>
         }
         

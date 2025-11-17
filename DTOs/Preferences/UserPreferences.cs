@@ -21,6 +21,9 @@ namespace erp.DTOs.Preferences
         public bool ReduceMotion { get; set; } = false;
         public string FontSize { get; set; } = "base"; // small|base|large
         public string NavigationType { get; set; } = "sidebar"; // sidebar|topbar
+        // Sidebar UX state
+        public List<string> PinnedRoutes { get; set; } = new();
+        public Dictionary<string, bool> GroupExpanded { get; set; } = new();
     }
 
     public class LocalePreferences

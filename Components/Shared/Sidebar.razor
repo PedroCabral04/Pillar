@@ -1,0 +1,265 @@
+@using MudBlazor
+@using Microsoft.AspNetCore.Components.Web
+@inject NavigationManager Navigation
+@inject erp.Services.PreferenceService PreferenceService
+@inject IDialogService DialogService
+@inject IJSRuntime JS
+
+<MudNavMenu Rounded="false" Class="pillar-sidebar">
+    @if (IsOpen)
+    {
+        <div class="sidebar-header px-3 py-3">
+            <div class="brand d-flex align-center">
+                <MudAvatar Size="@MudBlazor.Size.Medium" Class="me-2" Square="true" Alt="Pillar" Text="P" Color="@MudBlazor.Color.Primary" />
+                <div>
+                    <MudText Typo="Typo.h6" Style="font-weight:600;">Pillar</MudText>
+                    <AuthorizeView>
+                        <Authorized Context="auth">
+                            <MudText Typo="Typo.caption">@auth.User.Identity?.Name</MudText>
+                        </Authorized>
+                        <NotAuthorized>
+                            <MudText Typo="Typo.caption">Bem vindo</MudText>
+                        </NotAuthorized>
+                    </AuthorizeView>
+                </div>
+            </div>
+            <MudIconButton Icon="@(IsOpen ? Icons.Material.Filled.MenuOpen : Icons.Material.Filled.Menu)"
+                            Color="MudBlazor.Color.Inherit" Size="MudBlazor.Size.Small" Class="menu-toggle"
+                            Title="Alternar menu" AriaLabel="Alternar menu" OnClick="@(async ()=> await OnToggleDrawer.InvokeAsync())" />
+        </div>
+
+        <div class="px-3 pb-2">
+            <MudTextField @bind-Value="_search" Placeholder="Buscar (⌘/Ctrl + K)" Dense="true" Clearable="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true" @onkeydown="OnSearchKeyDown" />
+        </div>
+
+        @if (_isSearching)
+        {
+            <div class="px-2">
+                @if (_searchResults.Count == 0)
+                {
+                    <MudText Class="px-2 py-2" Typo="Typo.caption">Nenhum resultado</MudText>
+                }
+                else
+                {
+                    @foreach (var item in _searchResults)
+                    {
+                        <div class="d-flex align-center my-1 px-1">
+                            <div class="flex-grow-1">
+                                <MudNavLink Href="@item.Href" Icon="@item.Icon" Match="NavLinkMatch.Prefix">@item.Title</MudNavLink>
+                            </div>
+                            <MudIconButton Title="Fixar" AriaLabel="Fixar" Icon="@(IsPinned(item.Href) ? Icons.Material.Filled.Star : Icons.Material.Outlined.StarBorder)" Size="MudBlazor.Size.Small" Color="@(IsPinned(item.Href) ? MudBlazor.Color.Warning : MudBlazor.Color.Default)" OnClick="@(() => TogglePin(item.Href))" />
+                        </div>
+                    }
+                }
+            </div>
+        }
+        else
+        {
+            if (PreferenceService.CurrentPreferences.Ui.PinnedRoutes.Count > 0)
+            {
+                <MudText Class="section-title px-3 mt-2" Typo="Typo.caption">Favoritos</MudText>
+                <div class="px-2">
+                    @foreach (var href in PreferenceService.CurrentPreferences.Ui.PinnedRoutes)
+                    {
+                        var pinnedItem = _allItems.FirstOrDefault(i => i.Href == href);
+                        if (pinnedItem is not null)
+                        {
+                            <div class="d-flex align-center my-1 px-1">
+                                <div class="flex-grow-1">
+                                    <MudNavLink Href="@pinnedItem.Href" Icon="@pinnedItem.Icon" Match="NavLinkMatch.Prefix">@pinnedItem.Title</MudNavLink>
+                                </div>
+                                <MudIconButton Title="Desafixar" AriaLabel="Desafixar" Icon="@Icons.Material.Filled.PushPin" Size="MudBlazor.Size.Small" OnClick="@(() => TogglePin(pinnedItem.Href))" />
+                            </div>
+                        }
+                    }
+                </div>
+                <MudDivider Class="my-2"/>
+            }
+
+            <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home" Class="my-1">Home</MudNavLink>
+            <MudNavLink Href="/dashboard" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Dashboard" Class="my-1">Dashboard</MudNavLink>
+
+            <MudDivider Class="my-2"/>
+
+            @* Vendas *@
+            <MudNavGroup Title="Vendas" Icon="@Icons.Material.Filled.ShoppingCart" Expanded="@(IsGroupExpanded("sales"))" ExpandedChanged="@(v => OnGroupExpandedChanged("sales", v))" Class="my-1">
+                <MudNavLink Href="/sales" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Receipt">Vendas</MudNavLink>
+                <MudNavLink Href="/sales/customers" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.People">Clientes</MudNavLink>
+            </MudNavGroup>
+
+            @* Estoque *@
+            <MudNavGroup Title="Estoque" Icon="@Icons.Material.Filled.Inventory" Expanded="@(IsGroupExpanded("inventory"))" ExpandedChanged="@(v => OnGroupExpandedChanged("inventory", v))" Class="my-1">
+                <MudNavLink Href="/inventory/products" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Category">Produtos</MudNavLink>
+                <MudNavLink Href="/inventory/categories" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FolderOpen">Categorias</MudNavLink>
+                <MudNavLink Href="/inventory/movements" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.SwapHoriz">Movimentações</MudNavLink>
+                <MudNavLink Href="/inventory/counts" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Checklist">Contagens</MudNavLink>
+            </MudNavGroup>
+
+            @* Financeiro *@
+            <MudNavGroup Title="Financeiro" Icon="@Icons.Material.Filled.AccountBalance" Expanded="@(IsGroupExpanded("financial"))" ExpandedChanged="@(v => OnGroupExpandedChanged("financial", v))" Class="my-1">
+                <MudNavLink Href="/financial/dashboard" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
+                <MudNavLink Href="/financial/receivables" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CallReceived">Contas a Receber</MudNavLink>
+                <MudNavLink Href="/financial/payables" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CallMade">Contas a Pagar</MudNavLink>
+                <MudNavLink Href="/financial/suppliers" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.LocalShipping">Fornecedores</MudNavLink>
+                <MudNavLink Href="/financial/categories" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Category">Categorias</MudNavLink>
+                <MudNavLink Href="/financial/costcenters" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AccountBalanceWallet">Centros de Custo</MudNavLink>
+            </MudNavGroup>
+
+            <MudNavLink Href="/kanban" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.ViewKanban" Class="my-1">Kanban</MudNavLink>
+            <MudNavLink Href="/assets" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Devices" Class="my-1">Ativos</MudNavLink>
+            <MudNavLink Href="/reports" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Assessment" Class="my-1">Relatórios</MudNavLink>
+
+            <MudDivider Class="my-2"/>
+
+            <AuthorizeView Roles="Administrador">
+                <Authorized>
+                    <MudNavGroup Title="RH & Admin" Icon="@Icons.Material.Filled.AdminPanelSettings" Expanded="@(IsGroupExpanded("admin"))" ExpandedChanged="@(v => OnGroupExpandedChanged("admin", v))" Class="my-1">
+                        <MudNavLink Href="/admin/users" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.People">Usuários</MudNavLink>
+                        <MudNavLink Href="/admin/departments" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.BusinessCenter">Departamentos</MudNavLink>
+                        <MudNavLink Href="/admin/positions" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.WorkOutline">Cargos</MudNavLink>
+                        <MudNavLink Href="/admin/widget-roles" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Widgets">Widgets / Papéis</MudNavLink>
+                        <MudNavLink Href="/time-tracking/payroll" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AccessTime">Apontamento</MudNavLink>
+                        <MudNavLink Href="/audit" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.History">Auditoria</MudNavLink>
+                        <MudNavLink Href="/data-access-report" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Shield">Acessos LGPD</MudNavLink>
+                    </MudNavGroup>
+                </Authorized>
+            </AuthorizeView>
+
+            <MudNavLink Href="/settings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Settings" Class="my-1">Configurações</MudNavLink>
+            <MudDivider Class="my-2"/>
+            <MudNavLink OnClick="LogoutAsync" Icon="@Icons.Material.Filled.Logout" Class="my-1">Sair</MudNavLink>
+            <AuthorizeView>
+                <NotAuthorized>
+                    <MudNavLink Href="/login" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Login" Class="my-1">Entrar</MudNavLink>
+                </NotAuthorized>
+            </AuthorizeView>
+        }
+    }
+    else
+    {
+        <div class="mini-root">
+            <div class="d-flex justify-center py-3 mb-2">
+                <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="MudBlazor.Color.Inherit" Size="MudBlazor.Size.Medium" OnClick="@(async ()=> await OnToggleDrawer.InvokeAsync())" Title="Abrir menu" AriaLabel="Abrir navegação" />
+            </div>
+            <MudTooltip Text="Home" Placement="Placement.Right"><MudNavLink Href="/" Icon="@Icons.Material.Filled.Home" Class="my-1"/></MudTooltip>
+            <MudTooltip Text="Dashboard" Placement="Placement.Right"><MudNavLink Href="/dashboard" Icon="@Icons.Material.Filled.Dashboard" Class="my-1"/></MudTooltip>
+            <MudTooltip Text="Vendas" Placement="Placement.Right"><MudNavLink Href="/sales" Icon="@Icons.Material.Filled.ShoppingCart" Class="my-1"/></MudTooltip>
+            <MudTooltip Text="Produtos" Placement="Placement.Right"><MudNavLink Href="/inventory/products" Icon="@Icons.Material.Filled.Inventory" Class="my-1"/></MudTooltip>
+            <MudTooltip Text="Financeiro" Placement="Placement.Right"><MudNavLink Href="/financial/dashboard" Icon="@Icons.Material.Filled.AccountBalance" Class="my-1"/></MudTooltip>
+            <MudTooltip Text="Kanban" Placement="Placement.Right"><MudNavLink Href="/kanban" Icon="@Icons.Material.Filled.ViewKanban" Class="my-1"/></MudTooltip>
+            <MudTooltip Text="Ativos" Placement="Placement.Right"><MudNavLink Href="/assets" Icon="@Icons.Material.Filled.Devices" Class="my-1"/></MudTooltip>
+            <MudTooltip Text="Relatórios" Placement="Placement.Right"><MudNavLink Href="/reports" Icon="@Icons.Material.Filled.Assessment" Class="my-1"/></MudTooltip>
+            <AuthorizeView Roles="Administrador">
+                <Authorized>
+                    <MudTooltip Text="Administração" Placement="Placement.Right"><MudNavLink Href="/admin/users" Icon="@Icons.Material.Filled.AdminPanelSettings" Class="my-1"/></MudTooltip>
+                </Authorized>
+            </AuthorizeView>
+            <MudTooltip Text="Configurações" Placement="Placement.Right"><MudNavLink Href="/settings" Icon="@Icons.Material.Filled.Settings" Class="my-1"/></MudTooltip>
+            <MudTooltip Text="Sair" Placement="Placement.Right"><MudNavLink OnClick="LogoutAsync" Icon="@Icons.Material.Filled.Logout" Class="my-1"/></MudTooltip>
+        </div>
+    }
+</MudNavMenu>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; } = true;
+    [Parameter] public EventCallback OnToggleDrawer { get; set; }
+    [Parameter] public bool IsMobile { get; set; } = false;
+
+    private string _search = string.Empty;
+    private bool _isSearching => !string.IsNullOrWhiteSpace(_search);
+
+    private record NavItem(string Title, string Href, string Icon);
+    private readonly List<NavItem> _allItems = new()
+    {
+        new("Home", "/", Icons.Material.Filled.Home),
+        new("Dashboard", "/dashboard", Icons.Material.Filled.Dashboard),
+        new("Vendas", "/sales", Icons.Material.Filled.Receipt),
+        new("Clientes", "/sales/customers", Icons.Material.Filled.People),
+        new("Produtos", "/inventory/products", Icons.Material.Filled.Category),
+        new("Categorias", "/inventory/categories", Icons.Material.Filled.FolderOpen),
+        new("Movimentações", "/inventory/movements", Icons.Material.Filled.SwapHoriz),
+        new("Contagens", "/inventory/counts", Icons.Material.Filled.Checklist),
+        new("Financeiro", "/financial/dashboard", Icons.Material.Filled.AccountBalance),
+        new("Contas a Receber", "/financial/receivables", Icons.Material.Filled.CallReceived),
+        new("Contas a Pagar", "/financial/payables", Icons.Material.Filled.CallMade),
+        new("Fornecedores", "/financial/suppliers", Icons.Material.Filled.LocalShipping),
+        new("Categorias Financeiro", "/financial/categories", Icons.Material.Filled.Category),
+        new("Centros de Custo", "/financial/costcenters", Icons.Material.Filled.AccountBalanceWallet),
+        new("Kanban", "/kanban", Icons.Material.Filled.ViewKanban),
+        new("Ativos", "/assets", Icons.Material.Filled.Devices),
+        new("Relatórios", "/reports", Icons.Material.Filled.Assessment),
+        new("Usuários", "/admin/users", Icons.Material.Filled.People),
+        new("Departamentos", "/admin/departments", Icons.Material.Filled.BusinessCenter),
+        new("Cargos", "/admin/positions", Icons.Material.Filled.WorkOutline),
+        new("Widgets / Papéis", "/admin/widget-roles", Icons.Material.Filled.Widgets),
+        new("Apontamento", "/time-tracking/payroll", Icons.Material.Filled.AccessTime),
+        new("Auditoria", "/audit", Icons.Material.Filled.History),
+        new("Acessos LGPD", "/data-access-report", Icons.Material.Filled.Shield),
+        new("Configurações", "/settings", Icons.Material.Filled.Settings)
+    };
+
+    private List<NavItem> _searchResults => _allItems
+        .Where(i => i.Title.Contains(_search, StringComparison.OrdinalIgnoreCase))
+        .ToList();
+
+    protected override void OnInitialized()
+    {
+        // Normalize expanded dictionary with defaults
+        var g = PreferenceService.CurrentPreferences.Ui.GroupExpanded;
+        EnsureGroupKey(g, "sales", false);
+        EnsureGroupKey(g, "inventory", false);
+        EnsureGroupKey(g, "financial", false);
+        EnsureGroupKey(g, "admin", false);
+    }
+
+    private static void EnsureGroupKey(Dictionary<string, bool> dict, string key, bool defaultValue)
+    {
+        if (!dict.ContainsKey(key)) dict[key] = defaultValue;
+    }
+
+    private bool IsGroupExpanded(string key) => PreferenceService.CurrentPreferences.Ui.GroupExpanded.TryGetValue(key, out var v) && v;
+
+    private async Task OnGroupExpandedChanged(string key, bool expanded)
+    {
+        PreferenceService.CurrentPreferences.Ui.GroupExpanded[key] = expanded;
+        await PreferenceService.SaveAsync();
+    }
+
+    private bool IsPinned(string href) => PreferenceService.CurrentPreferences.Ui.PinnedRoutes.Contains(href);
+
+    private async Task TogglePin(string href)
+    {
+        if (IsPinned(href)) PreferenceService.CurrentPreferences.Ui.PinnedRoutes.RemoveAll(r => r == href);
+        else PreferenceService.CurrentPreferences.Ui.PinnedRoutes.Add(href);
+        await PreferenceService.SaveAsync();
+    }
+
+    
+
+    private void OnSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            _search = string.Empty;
+        }
+    }
+
+    private async Task LogoutAsync()
+    {
+        var parameters = new DialogParameters
+        {
+            { "ContentText", "Tem certeza que deseja sair do sistema?" },
+            { "ButtonText", "Sair" },
+            { "Color", MudBlazor.Color.Error }
+        };
+
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.Small };
+        var dialog = await DialogService.ShowAsync<erp.Components.Shared.Dialogs.ConfirmDialog>("Confirmar saída", parameters, options);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+        {
+            try { await JS.InvokeVoidAsync("erpAuth.logout"); Navigation.NavigateTo("/login", true); }
+            catch { Navigation.NavigateTo("/login", true); }
+        }
+    }
+}
