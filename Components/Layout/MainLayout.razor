@@ -31,31 +31,41 @@
         else
         {
             <!-- Desktop: Sidebar Navigation -->
-            <MudPaper Style="position: relative; height: 100vh; display: flex" >
-                <MudDrawerContainer Class="mud-height-full">
+            <MudPaper Style="position: relative; height: 100vh; display: flex;" >
+                <MudDrawerContainer Class="mud-height-full" Style="display: flex; flex-direction: row; width: 100%;">
                     <MudDrawer id="nav-drawer" 
-                               Fixed="false" 
+                               Fixed="true" 
                                Variant="@(_drawerOpen ? DrawerVariant.Persistent : DrawerVariant.Mini)" 
-                               OpenMiniOnHover="false" 
+                               OpenMiniOnHover="true" 
                                @bind-Open="_drawerOpen" 
                                ClipMode="DrawerClipMode.Always" 
                                Elevation="2"
                                Width="240px"
                                MiniWidth="56px">
-                            <NavMenu IsOpen="_drawerOpen" OnToggleDrawer="@ToggleDrawer"/>
+                        <NavMenu IsOpen="_drawerOpen" OnToggleDrawer="@ToggleDrawer"/>
                     </MudDrawer>
+
+                    <MudMainContent 
+                        Class="pa-4 full-height-content" 
+                        Style="@MainContentStyle()">
+                        <div class="mb-4 d-flex align-center justify-space-between">
+                            <div class="d-flex align-center">
+                                <MudIconButton Icon="@( _drawerOpen ? Icons.Material.Filled.MenuOpen : Icons.Material.Filled.Menu )"
+                                               Color="MudBlazor.Color.Inherit"
+                                               Size="MudBlazor.Size.Medium"
+                                               OnClick="ToggleDrawer"
+                                               AriaLabel="Toggle drawer"
+                                               Class="me-3" />
+                                <erp.Components.Shared.Breadcrumbs />
+                            </div>
+                        </div>
+                        @Body
+                    </MudMainContent>
+
+                    <MudScrollToTop>
+                        <MudFab Color="MudBlazor.Color.Tertiary" StartIcon="@Icons.Material.Filled.ArrowCircleUp" />
+                    </MudScrollToTop>
                 </MudDrawerContainer>
-                <MudMainContent 
-                    Class="pa-4 full-height-content" 
-                    Style="@MainContentStyle()">
-                    <div class="mb-4">
-                        <erp.Components.Shared.Breadcrumbs />
-                    </div>
-                    @Body
-                </MudMainContent>
-                <MudScrollToTop>
-                    <MudFab Color="MudBlazor.Color.Tertiary" StartIcon="@Icons.Material.Filled.ArrowCircleUp" />
-                </MudScrollToTop>
             </MudPaper>
         }
     </MudHidden>

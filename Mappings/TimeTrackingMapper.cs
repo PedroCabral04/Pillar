@@ -30,6 +30,9 @@ public partial class TimeTrackingMapper
     private string MapStatusToStatusName(PayrollPeriodStatus status) => status switch
     {
         PayrollPeriodStatus.Draft => "Em preenchimento",
+        PayrollPeriodStatus.Calculated => "Calculado",
+        PayrollPeriodStatus.Approved => "Aprovado",
+        PayrollPeriodStatus.Paid => "Pago",
         PayrollPeriodStatus.Locked => "Fechado",
         _ => status.ToString()
     };

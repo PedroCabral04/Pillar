@@ -6,5 +6,8 @@ namespace erp.Models.TimeTracking;
 public enum PayrollPeriodStatus
 {
     Draft = 0,
-    Locked = 1
+    Calculated = 1,
+    Approved = 2,
+    Paid = 3,
+    Locked = 4
 }

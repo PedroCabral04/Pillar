@@ -1,0 +1,548 @@
+@using MudBlazor
+@using erp.DTOs.Inventory
+@using erp.Models.Inventory
+@using erp.Services
+@inject ISnackbar Snackbar
+@inject IApiService ApiService
+@inject ILogger<EditProductDialog> Logger
+
+<MudDialog Class="edit-product-dialog" Style="min-width: 900px; max-width: 95vw; max-height: 90vh;">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Edit" Color="MudBlazor.Color.Primary" Size="MudBlazor.Size.Large" />
+            <MudText Typo="Typo.h6">Editar Produto</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        @if (_loading)
+        {
+            <MudStack AlignItems="AlignItems.Center" Spacing="3" Class="pa-6">
+                <MudProgressCircular Color="MudBlazor.Color.Primary" Indeterminate="true" Size="MudBlazor.Size.Large" />
+                <MudText Typo="Typo.body1" Color="MudBlazor.Color.Secondary">Carregando dados do produto...</MudText>
+            </MudStack>
+        }
+        else
+        {
+            <MudForm @ref="_form" Class="pa-2">
+                <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true">
+                    <MudTabPanel Text="Informações Básicas" Icon="@Icons.Material.Filled.Info">
+                        <MudGrid Spacing="3" Class="mt-2">
+                            <MudItem xs="12" md="4">
+                                <MudTextField T="string"
+                                             Label="SKU"
+                                             @bind-Value="_updateProduct.Sku"
+                                             Variant="Variant.Outlined"
+                                             Required="true"
+                                             Immediate="true"
+                                             Adornment="Adornment.Start"
+                                             AdornmentIcon="@Icons.Material.Filled.Tag"
+                                             HelperText="Código único do produto" />
+                            </MudItem>
+
+                            <MudItem xs="12" md="4">
+                                <MudTextField T="string"
+                                             Label="Código de Barras"
+                                             @bind-Value="_updateProduct.Barcode"
+                                             Variant="Variant.Outlined"
+                                             Adornment="Adornment.Start"
+                                             AdornmentIcon="@Icons.Material.Filled.QrCode" />
+                            </MudItem>
+
+                            <MudItem xs="12" md="4">
+                                <MudSelect T="int"
+                                           Label="Categoria"
+                                           @bind-Value="_updateProduct.CategoryId"
+                                           Variant="Variant.Outlined"
+                                           Required="true"
+                                           Adornment="Adornment.Start"
+                                           AdornmentIcon="@Icons.Material.Filled.Category"
+                                           Dense="true">
+                                    @foreach (var category in _categories)
+                                    {
+                                        <MudSelectItem T="int" Value="@category.Id">@category.Name</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </MudItem>
+
+                            <MudItem xs="12" md="4">
+                                <MudSelect T="int"
+                                           Label="Status"
+                                           @bind-Value="_updateProduct.Status"
+                                           Variant="Variant.Outlined"
+                                           Adornment="Adornment.Start"
+                                           AdornmentIcon="@Icons.Material.Filled.ToggleOn">
+                                    @foreach (var status in Enum.GetValues<ProductStatus>())
+                                    {
+                                        <MudSelectItem T="int" Value="@( (int)status )">@status</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </MudItem>
+
+                            <MudItem xs="12">
+                                <MudTextField T="string"
+                                             Label="Nome do Produto"
+                                             @bind-Value="_updateProduct.Name"
+                                             Variant="Variant.Outlined"
+                                             Required="true"
+                                             Adornment="Adornment.Start"
+                                             AdornmentIcon="@Icons.Material.Filled.Inventory" />
+                            </MudItem>
+
+                            <MudItem xs="12">
+                                <MudTextField T="string"
+                                             Label="Descrição"
+                                             @bind-Value="_updateProduct.Description"
+                                             Variant="Variant.Outlined"
+                                             Lines="3"
+                                             Adornment="Adornment.Start"
+                                             AdornmentIcon="@Icons.Material.Filled.Description" />
+                            </MudItem>
+
+                            <MudItem xs="12">
+                                <MudTextField T="string"
+                                             Label="Especificações Técnicas"
+                                             @bind-Value="_updateProduct.TechnicalSpecifications"
+                                             Variant="Variant.Outlined"
+                                             Lines="3"
+                                             Adornment="Adornment.Start"
+                                             AdornmentIcon="@Icons.Material.Filled.SettingsSuggest"
+                                             HelperText="Detalhes adicionais, compatibilidades e observações" />
+                            </MudItem>
+
+                            <MudItem xs="12">
+                                <MudTextField T="string"
+                                             Label="Tags"
+                                             @bind-Value="_updateProduct.Tags"
+                                             Variant="Variant.Outlined"
+                                             Adornment="Adornment.Start"
+                                             AdornmentIcon="@Icons.Material.Filled.Label"
+                                             HelperText="Separe por vírgula" />
+                            </MudItem>
+
+                            <MudItem xs="12" md="4">
+                                <MudTextField T="string"
+                                             Label="Unidade"
+                                             @bind-Value="_updateProduct.Unit"
+                                             Variant="Variant.Outlined"
+                                             HelperText="Ex: UN, KG, L, M" />
+                            </MudItem>
+
+                            <MudItem xs="12" md="4">
+                                <MudSwitch T="bool"
+                                          @bind-Value="_updateProduct.IsActive"
+                                          Color="MudBlazor.Color.Success"
+                                          Label="Produto Ativo" />
+                            </MudItem>
+
+                            <MudItem xs="12" md="4">
+                                <MudSwitch T="bool"
+                                          @bind-Value="_updateProduct.AllowNegativeStock"
+                                          Color="MudBlazor.Color.Warning"
+                                          Label="Permitir Estoque Negativo" />
+                            </MudItem>
+
+                            <MudItem xs="12" md="4">
+                                <MudSwitch T="bool"
+                                          @bind-Value="_updateProduct.IsKit"
+                                          Color="MudBlazor.Color.Info"
+                                          Label="É um kit de produtos" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudTabPanel>
+
+                    <MudTabPanel Text="Preços" Icon="@Icons.Material.Filled.AttachMoney">
+                        <MudGrid Spacing="3" Class="mt-2">
+                            <MudItem xs="12" md="4">
+                                <MudNumericField T="decimal"
+                                                Label="Preço de Custo"
+                                                @bind-Value="_updateProduct.CostPrice"
+                                                Min="0"
+                                                Step="0.01m"
+                                                Variant="Variant.Outlined"
+                                                Required="true"
+                                                Format="C2"
+                                                Adornment="Adornment.Start"
+                                                AdornmentText="R$" />
+                            </MudItem>
+
+                            <MudItem xs="12" md="4">
+                                <MudNumericField T="decimal"
+                                                Label="Preço de Venda"
+                                                @bind-Value="_updateProduct.SalePrice"
+                                                Min="0"
+                                                Step="0.01m"
+                                                Variant="Variant.Outlined"
+                                                Required="true"
+                                                Format="C2"
+                                                Adornment="Adornment.Start"
+                                                AdornmentText="R$" />
+                            </MudItem>
+
+                            <MudItem xs="12" md="4">
+                                <MudNumericField T="decimal?"
+                                                Label="Preço Atacado"
+                                                @bind-Value="_updateProduct.WholesalePrice"
+                                                Min="0"
+                                                Step="0.01m"
+                                                Variant="Variant.Outlined"
+                                                Format="C2"
+                                                Adornment="Adornment.Start"
+                                                AdornmentText="R$" />
+                            </MudItem>
+
+                            <MudItem xs="12">
+                                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                                    <strong>Margem de Lucro:</strong> @GetProfitMargin().ToString("P2")
+                                </MudAlert>
+                            </MudItem>
+                        </MudGrid>
+                    </MudTabPanel>
+
+                    <MudTabPanel Text="Estoque" Icon="@Icons.Material.Filled.Warehouse">
+                        <MudGrid Spacing="3" Class="mt-2">
+                            <MudItem xs="12" md="6">
+                                <MudNumericField T="decimal"
+                                                Label="Estoque Mínimo"
+                                                @bind-Value="_updateProduct.MinimumStock"
+                                                Min="0"
+                                                Step="1"
+                                                Variant="Variant.Outlined"
+                                                Adornment="Adornment.Start"
+                                                AdornmentIcon="@Icons.Material.Filled.ArrowDownward" />
+                            </MudItem>
+
+                            <MudItem xs="12" md="6">
+                                <MudNumericField T="decimal"
+                                                Label="Estoque Máximo"
+                                                @bind-Value="_updateProduct.MaximumStock"
+                                                Min="0"
+                                                Step="1"
+                                                Variant="Variant.Outlined"
+                                                Adornment="Adornment.Start"
+                                                AdornmentIcon="@Icons.Material.Filled.ArrowUpward" />
+                            </MudItem>
+
+                            <MudItem xs="12" md="6">
+                                <MudNumericField T="decimal"
+                                                Label="Ponto de Reposição"
+                                                @bind-Value="_updateProduct.ReorderPoint"
+                                                Min="0"
+                                                Step="1"
+                                                Variant="Variant.Outlined"
+                                                HelperText="Quando atingir este valor, fazer novo pedido"
+                                                Adornment="Adornment.Start"
+                                                AdornmentIcon="@Icons.Material.Filled.Refresh" />
+                            </MudItem>
+
+                            <MudItem xs="12" md="6">
+                                <MudNumericField T="decimal"
+                                                Label="Estoque de Segurança"
+                                                @bind-Value="_updateProduct.SafetyStock"
+                                                Min="0"
+                                                Step="1"
+                                                Variant="Variant.Outlined"
+                                                Adornment="Adornment.Start"
+                                                AdornmentIcon="@Icons.Material.Filled.Shield" />
+                            </MudItem>
+
+                            <MudItem xs="12">
+                                <MudTextField T="string"
+                                             Label="Localização no Armazém"
+                                             @bind-Value="_updateProduct.WarehouseLocation"
+                                             Variant="Variant.Outlined"
+                                             Placeholder="Ex: A-12-3"
+                                             Adornment="Adornment.Start"
+                                             AdornmentIcon="@Icons.Material.Filled.LocationOn" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudTabPanel>
+
+                    <MudTabPanel Text="Dimensões" Icon="@Icons.Material.Filled.Straighten">
+                        <MudGrid Spacing="3" Class="mt-2">
+                            <MudItem xs="12" md="6">
+                                <MudNumericField T="decimal?"
+                                                Label="Peso (kg)"
+                                                @bind-Value="_updateProduct.Weight"
+                                                Min="0"
+                                                Step="0.01m"
+                                                Variant="Variant.Outlined"
+                                                Adornment="Adornment.End"
+                                                AdornmentText="kg" />
+                            </MudItem>
+
+                            <MudItem xs="12" md="6">
+                                <MudNumericField T="decimal"
+                                                Label="Unidades por Caixa"
+                                                @bind-Value="_updateProduct.UnitsPerBox"
+                                                Min="0.01m"
+                                                Step="0.01m"
+                                                Variant="Variant.Outlined" />
+                            </MudItem>
+
+                            <MudItem xs="12" md="4">
+                                <MudNumericField T="decimal?"
+                                                Label="Comprimento (cm)"
+                                                @bind-Value="_updateProduct.Length"
+                                                Min="0"
+                                                Step="0.01m"
+                                                Variant="Variant.Outlined"
+                                                Adornment="Adornment.End"
+                                                AdornmentText="cm" />
+                            </MudItem>
+
+                            <MudItem xs="12" md="4">
+                                <MudNumericField T="decimal?"
+                                                Label="Largura (cm)"
+                                                @bind-Value="_updateProduct.Width"
+                                                Min="0"
+                                                Step="0.01m"
+                                                Variant="Variant.Outlined"
+                                                Adornment="Adornment.End"
+                                                AdornmentText="cm" />
+                            </MudItem>
+
+                            <MudItem xs="12" md="4">
+                                <MudNumericField T="decimal?"
+                                                Label="Altura (cm)"
+                                                @bind-Value="_updateProduct.Height"
+                                                Min="0"
+                                                Step="0.01m"
+                                                Variant="Variant.Outlined"
+                                                Adornment="Adornment.End"
+                                                AdornmentText="cm" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudTabPanel>
+
+                    <MudTabPanel Text="Informações Fiscais" Icon="@Icons.Material.Filled.Receipt">
+                        <MudGrid Spacing="3" Class="mt-2">
+                            <MudItem xs="12" md="6">
+                                <MudTextField T="string"
+                                             Label="NCM"
+                                             @bind-Value="_updateProduct.NcmCode"
+                                             Variant="Variant.Outlined"
+                                             Placeholder="00000000"
+                                             HelperText="Nomenclatura Comum do Mercosul" />
+                            </MudItem>
+
+                            <MudItem xs="12" md="6">
+                                <MudTextField T="string"
+                                             Label="CEST"
+                                             @bind-Value="_updateProduct.CestCode"
+                                             Variant="Variant.Outlined"
+                                             HelperText="Código Especificador da Substituição Tributária" />
+                            </MudItem>
+
+                            <MudItem xs="12" md="6">
+                                <MudNumericField T="decimal"
+                                                Label="ICMS (%)"
+                                                @bind-Value="_updateProduct.IcmsRate"
+                                                Min="0"
+                                                Max="100"
+                                                Step="0.01m"
+                                                Variant="Variant.Outlined"
+                                                Adornment="Adornment.End"
+                                                AdornmentText="%" />
+                            </MudItem>
+
+                            <MudItem xs="12" md="6">
+                                <MudNumericField T="decimal"
+                                                Label="IPI (%)"
+                                                @bind-Value="_updateProduct.IpiRate"
+                                                Min="0"
+                                                Max="100"
+                                                Step="0.01m"
+                                                Variant="Variant.Outlined"
+                                                Adornment="Adornment.End"
+                                                AdornmentText="%" />
+                            </MudItem>
+
+                            <MudItem xs="12" md="6">
+                                <MudNumericField T="decimal"
+                                                Label="PIS (%)"
+                                                @bind-Value="_updateProduct.PisRate"
+                                                Min="0"
+                                                Max="100"
+                                                Step="0.01m"
+                                                Variant="Variant.Outlined"
+                                                Adornment="Adornment.End"
+                                                AdornmentText="%" />
+                            </MudItem>
+
+                            <MudItem xs="12" md="6">
+                                <MudNumericField T="decimal"
+                                                Label="COFINS (%)"
+                                                @bind-Value="_updateProduct.CofinsRate"
+                                                Min="0"
+                                                Max="100"
+                                                Step="0.01m"
+                                                Variant="Variant.Outlined"
+                                                Adornment="Adornment.End"
+                                                AdornmentText="%" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudTabPanel>
+                </MudTabs>
+            </MudForm>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Outlined">Cancelar</MudButton>
+        <MudButton OnClick="Submit" Variant="Variant.Filled" Color="MudBlazor.Color.Primary" Disabled="@_loading">
+            <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-1" />
+            Salvar Alterações
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public ProductDto? Product { get; set; }
+
+    private MudForm? _form;
+    private bool _loading;
+    private List<ProductCategoryDto> _categories = new();
+    private UpdateProductDto _updateProduct = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Product == null)
+        {
+            Snackbar.Add("Erro: produto não informado", Severity.Error);
+            MudDialog.Cancel();
+            return;
+        }
+
+        MapProductValues();
+        _loading = true;
+
+        try
+        {
+            var response = await ApiService.GetAsync<PaginatedCategoryResponse>("/api/products/categories?pageSize=1000");
+            _categories = response?.Items ?? new List<ProductCategoryDto>();
+
+            if (Product.CategoryId > 0 && !_categories.Any(c => c.Id == Product.CategoryId))
+            {
+                _categories.Add(new ProductCategoryDto { Id = Product.CategoryId, Name = Product.CategoryName });
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar categorias");
+            Snackbar.Add("Não foi possível carregar as categorias do produto", Severity.Warning);
+
+            if (Product.CategoryId > 0 && !_categories.Any(c => c.Id == Product.CategoryId))
+            {
+                _categories.Add(new ProductCategoryDto { Id = Product.CategoryId, Name = Product.CategoryName });
+            }
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void MapProductValues()
+    {
+        var product = Product!;
+
+        _updateProduct.Id = product.Id;
+        _updateProduct.Sku = product.Sku;
+        _updateProduct.Barcode = product.Barcode;
+        _updateProduct.Name = product.Name;
+        _updateProduct.Description = product.Description;
+        _updateProduct.TechnicalSpecifications = product.TechnicalSpecifications;
+        _updateProduct.CategoryId = product.CategoryId;
+        _updateProduct.BrandId = product.BrandId;
+        _updateProduct.Tags = product.Tags;
+        _updateProduct.Unit = string.IsNullOrWhiteSpace(product.Unit) ? "UN" : product.Unit;
+        _updateProduct.UnitsPerBox = product.UnitsPerBox > 0 ? product.UnitsPerBox : 1;
+        _updateProduct.Weight = product.Weight;
+        _updateProduct.Length = product.Length;
+        _updateProduct.Width = product.Width;
+        _updateProduct.Height = product.Height;
+        _updateProduct.MinimumStock = product.MinimumStock;
+        _updateProduct.MaximumStock = product.MaximumStock;
+        _updateProduct.ReorderPoint = product.ReorderPoint;
+        _updateProduct.SafetyStock = product.SafetyStock;
+        _updateProduct.WarehouseLocation = product.WarehouseLocation;
+        _updateProduct.CostPrice = product.CostPrice;
+        _updateProduct.SalePrice = product.SalePrice;
+        _updateProduct.WholesalePrice = product.WholesalePrice;
+        _updateProduct.NcmCode = product.NcmCode;
+        _updateProduct.CestCode = product.CestCode;
+        _updateProduct.IcmsRate = product.IcmsRate;
+        _updateProduct.IpiRate = product.IpiRate;
+        _updateProduct.PisRate = product.PisRate;
+        _updateProduct.CofinsRate = product.CofinsRate;
+        _updateProduct.Status = product.Status;
+        _updateProduct.IsActive = product.IsActive;
+        _updateProduct.AllowNegativeStock = product.AllowNegativeStock;
+        _updateProduct.IsKit = product.IsKit;
+        _updateProduct.MainImageUrl = product.MainImageUrl;
+    }
+
+    private decimal GetProfitMargin()
+    {
+        if (_updateProduct.CostPrice <= 0 || _updateProduct.SalePrice <= 0)
+        {
+            return 0;
+        }
+
+        return (_updateProduct.SalePrice - _updateProduct.CostPrice) / _updateProduct.SalePrice;
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private async Task Submit()
+    {
+        if (_form != null)
+        {
+            await _form.Validate();
+            if (!_form.IsValid)
+            {
+                Snackbar.Add("Por favor, corrija os erros no formulário", Severity.Error);
+                return;
+            }
+        }
+
+        _loading = true;
+        try
+        {
+            var result = await ApiService.PutAsync<ProductDto>($"/api/products/{_updateProduct.Id}", _updateProduct);
+
+            if (result != null)
+            {
+                Snackbar.Add("Produto atualizado com sucesso!", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(result));
+            }
+            else
+            {
+                Snackbar.Add("Erro ao atualizar produto", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao atualizar produto");
+            Snackbar.Add($"Erro ao atualizar produto: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private class PaginatedCategoryResponse
+    {
+        public List<ProductCategoryDto> Items { get; set; } = new();
+        public int TotalItems { get; set; }
+        public int Page { get; set; }
+        public int PageSize { get; set; }
+    }
+}

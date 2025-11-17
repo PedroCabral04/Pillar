@@ -1,390 +1,689 @@
 @page "/time-tracking/payroll"
-@using erp.DTOs.TimeTracking
+@using System.Globalization
+@using erp.DTOs.Payroll
+@using erp.Models.Payroll
+@using erp.Models.TimeTracking
 @using erp.Services
+@using erp.Components.Shared.Dialogs
 @using Color = MudBlazor.Color
 @using Size = MudBlazor.Size
-@using System.Threading
-@using System.Threading.Tasks
-@implements IDisposable
-@attribute [Authorize(Roles = "Administrador,Gerente")]
+@attribute [Authorize(Roles = "Administrador,Gerente,RH")]
 
 @inject IApiService ApiService
 @inject ILogger<Payroll> Logger
 @inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+@inject IDialogService DialogService
 
-<PageTitle>Apontamento de Horas</PageTitle>
+<PageTitle>Folha de Pagamento</PageTitle>
 
-<MudPaper Class="pa-4 mb-4" Elevation="2">
-    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.End">
-        <MudSelect T="int" Label="Mês" @bind-Value="_selectedMonth" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 160px;">
-            @foreach (var month in _months)
-            {
-                <MudSelectItem T="int" Value="@month.Value">@month.Label</MudSelectItem>
-            }
-        </MudSelect>
-        <MudNumericField T="int" Label="Ano" @bind-Value="_selectedYear" Variant="Variant.Outlined" Margin="Margin.Dense" Min="2000" Max="2100" Style="width: 120px;" Immediate="false" />
-        <MudSpacer />
-        <MudButton Variant="Variant.Text" Color="Color.Primary" Disabled="_loading" OnClick="LoadPeriodAsync" StartIcon="@Icons.Material.Filled.Search">
-            Carregar apontamento
-        </MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_loading" OnClick="CreatePeriodAsync" StartIcon="@Icons.Material.Filled.Add">
-            Gerar planilha
-        </MudButton>
-    </MudStack>
-</MudPaper>
-
-@if (!string.IsNullOrWhiteSpace(_errorMessage))
-{
-    <MudAlert Severity="Severity.Error" Class="mb-3">@_errorMessage</MudAlert>
-}
-
-@if (_loading)
-{
-    <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="my-6">
-        <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
-        <MudText Class="mt-2">Carregando dados do apontamento...</MudText>
-    </MudStack>
-}
-else if (_currentPeriod is null)
-{
-    <MudAlert Severity="Severity.Info">
-        Selecione um mês e gere ou carregue o apontamento de horas do período desejado.
-    </MudAlert>
-}
-else
-{
+<MudStack Spacing="3">
     <MudPaper Class="pa-4" Elevation="2">
-        <MudStack Row="true" Spacing="3" AlignItems="AlignItems.Center" Class="mb-4">
-            <MudText Typo="Typo.h5">Competência: @_currentPeriod.ReferenceMonth.ToString("D2")/@_currentPeriod.ReferenceYear</MudText>
-            <MudChip T="string" Color="_currentPeriod.Status == 0 ? Color.Info : Color.Success" Variant="Variant.Filled" Size="Size.Small">
-                @_currentPeriod.StatusName
-            </MudChip>
-            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                Última atualização: @(_currentPeriod.UpdatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "não informado")
-            </MudText>
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.h5">Gestão de Folha</MudText>
+            <MudStack Row="true" Spacing="2" AlignItems="AlignItems.End">
+                <MudNumericField T="int" Label="Ano (Filtro)"
+                                 @bind-Value="_filterYear"
+                                 Min="2000" Max="2100"
+                                 Variant="Variant.Outlined" Margin="Margin.Dense"
+                                 Immediate="true" Style="width: 140px" />
+                <MudSelect T="PayrollPeriodStatus?" Label="Status" @bind-Value="_filterStatus"
+                           Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 200px">
+                    @foreach (var status in _statusFilters)
+                    {
+                        <MudSelectItem T="PayrollPeriodStatus?" Value="@status.Value">@status.Label</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" DisableElevation="true"
+                           OnClick="LoadPeriodsAsync" Disabled="_loadingPeriods"
+                           StartIcon="@Icons.Material.Filled.Refresh">
+                    Atualizar
+                </MudButton>
+                <MudSpacer />
+                <MudSelect T="int" Label="Competência (Mês)" @bind-Value="_newPeriodMonth"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 180px">
+                    @foreach (var month in _months)
+                    {
+                        <MudSelectItem T="int" Value="@month.Value">@month.Label</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudNumericField T="int" Label="Competência (Ano)" @bind-Value="_newPeriodYear"
+                                 Variant="Variant.Outlined" Margin="Margin.Dense"
+                                 Min="2000" Max="2100" Immediate="true" Style="width: 150px" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           Disabled="_creatingPeriod"
+                           OnClick="CreatePeriodAsync"
+                           StartIcon="@Icons.Material.Filled.Add">
+                    Novo período
+                </MudButton>
+            </MudStack>
         </MudStack>
-
-        <MudTable T="PayrollEntryDto" Items="_currentPeriod.Entries" Dense="true" Hover="true" Bordered="false">
-            <HeaderContent>
-                <MudTh>Funcionário</MudTh>
-                <MudTh Class="text-center">Faltas (dias)</MudTh>
-                <MudTh Class="text-center">Abonos (dias)</MudTh>
-                <MudTh Class="text-center">Horas Extras</MudTh>
-                <MudTh Class="text-center">Atrasos (horas)</MudTh>
-                <MudTh>Observações</MudTh>
-                <MudTh Class="text-center">Status</MudTh>
-            </HeaderContent>
-            <RowTemplate>
-                <MudTd DataLabel="Funcionário">
-                    <MudText Typo="Typo.subtitle2">@context.EmployeeName</MudText>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">@context.EmployeeEmail</MudText>
-                </MudTd>
-                <MudTd DataLabel="Faltas" Class="text-center">
-                    <MudNumericField T="decimal?"
-                                      Value="context.Faltas"
-                                      ValueChanged="value => OnNumericChanged(context, value, nameof(context.Faltas))"
-                                      ValueExpression="@(() => context.Faltas)"
-                                      Immediate="true"
-                                      DebounceInterval="600"
-                                      Step="0.5m"
-                                      Min="@((decimal?)0)"
-                                      Max="@((decimal?)31)"
-                                      Variant="Variant.Outlined"
-                                      Margin="Margin.Dense"
-                                      Adornment="Adornment.None"
-                                      Class="mx-auto"
-                                      Style="width:110px" />
-                </MudTd>
-                <MudTd DataLabel="Abonos" Class="text-center">
-                    <MudNumericField T="decimal?"
-                                      Value="context.Abonos"
-                                      ValueChanged="value => OnNumericChanged(context, value, nameof(context.Abonos))"
-                                      ValueExpression="@(() => context.Abonos)"
-                                      Immediate="true"
-                                      DebounceInterval="600"
-                                      Step="0.5m"
-                                      Min="@((decimal?)0)"
-                                      Max="@((decimal?)31)"
-                                      Variant="Variant.Outlined"
-                                      Margin="Margin.Dense"
-                                      Class="mx-auto"
-                                      Style="width:110px" />
-                </MudTd>
-                <MudTd DataLabel="Horas Extras" Class="text-center">
-                    <MudNumericField T="decimal?"
-                                      Value="context.HorasExtras"
-                                      ValueChanged="value => OnNumericChanged(context, value, nameof(context.HorasExtras))"
-                                      ValueExpression="@(() => context.HorasExtras)"
-                                      Immediate="true"
-                                      DebounceInterval="600"
-                                      Step="0.5m"
-                                      Min="@((decimal?)0)"
-                                      Max="@((decimal?)300)"
-                                      Variant="Variant.Outlined"
-                                      Margin="Margin.Dense"
-                                      Class="mx-auto"
-                                      Style="width:110px" />
-                </MudTd>
-                <MudTd DataLabel="Atrasos" Class="text-center">
-                    <MudNumericField T="decimal?"
-                                      Value="context.Atrasos"
-                                      ValueChanged="value => OnNumericChanged(context, value, nameof(context.Atrasos))"
-                                      ValueExpression="@(() => context.Atrasos)"
-                                      Immediate="true"
-                                      DebounceInterval="600"
-                                      Step="0.25m"
-                                      Min="@((decimal?)0)"
-                                      Max="@((decimal?)100)"
-                                      Variant="Variant.Outlined"
-                                      Margin="Margin.Dense"
-                                      Class="mx-auto"
-                                      Style="width:110px" />
-                </MudTd>
-                <MudTd DataLabel="Observações">
-                    <MudTextField T="string"
-                                   Value="context.Observacoes"
-                                   ValueChanged="value => OnObservacoesChanged(context, value)"
-                                   ValueExpression="@(() => context.Observacoes)"
-                                   Variant="Variant.Outlined"
-                                   Margin="Margin.Dense"
-                                   Lines="2"
-                                   Immediate="true"
-                                   DebounceInterval="800"
-                                   Placeholder="Anotações do RH" />
-                </MudTd>
-                <MudTd DataLabel="Status" Class="text-center">
-                    @if (_savingEntries.Contains(context.Id))
-                    {
-                        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
-                    }
-                    else if (context.UpdatedAt.HasValue)
-                    {
-                        <MudTooltip Text="@($"Atualizado em {context.UpdatedAt.Value.ToLocalTime():dd/MM/yyyy HH:mm}")">
-                            <MudChip T="string" Color="Color.Success" Variant="Variant.Filled" Size="Size.Small">Sincronizado</MudChip>
-                        </MudTooltip>
-                    }
-                    else
-                    {
-                        <MudChip T="string" Color="Color.Default" Variant="Variant.Text" Size="Size.Small">Pendente</MudChip>
-                    }
-                </MudTd>
-            </RowTemplate>
-            <NoRecordsContent>
-                <MudText>Não há colaboradores cadastrados para este período.</MudText>
-            </NoRecordsContent>
-        </MudTable>
     </MudPaper>
-}
+
+    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
+    }
+
+    <MudGrid GutterSize="3">
+        <MudItem xs="12" lg="4">
+            <MudPaper Class="pa-0" Elevation="2">
+                <div class="d-flex align-center justify-space-between pa-3 pb-2">
+                    <MudText Typo="Typo.subtitle1" Class="font-weight-500">Períodos de folha</MudText>
+                    @if (_loadingPeriods)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                    }
+                </div>
+                <MudDivider Class="mb-0" />
+                @if (_periods.Count == 0 && !_loadingPeriods)
+                {
+                    <MudAlert Severity="Severity.Info" Class="ma-3">Nenhum período encontrado para o ano selecionado.</MudAlert>
+                }
+                else
+                {
+                    <MudTable T="PayrollPeriodListDto" Items="_periods" Dense="true" Hover="true"
+                              Bordered="false" @bind-SelectedItem="_selectedPeriodSummary" Breakpoint="Breakpoint.Sm"
+                              RowClick="OnPeriodRowClicked">
+                        <HeaderContent>
+                            <MudTh>Competência</MudTh>
+                            <MudTh>Status</MudTh>
+                            <MudTh class="text-right">Colab.</MudTh>
+                            <MudTh class="text-right">Líquido</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Competência">
+                                <MudText Typo="Typo.subtitle2">@FormatCompetence(context.ReferenceMonth, context.ReferenceYear)</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Atualizado @FormatDate(context.UpdatedAt)</MudText>
+                            </MudTd>
+                            <MudTd DataLabel="Status">
+                                <MudChip T="string" Color="@GetStatusColor((PayrollPeriodStatus)context.Status)" Size="Size.Small" Variant="Variant.Filled">
+                                    @context.StatusName
+                                </MudChip>
+                            </MudTd>
+                            <MudTd DataLabel="Colaboradores" Class="text-right">@context.TotalEmployees</MudTd>
+                            <MudTd DataLabel="Líquido" Class="text-right">
+                                @FormatCurrency(context.TotalNetAmount)
+                            </MudTd>
+                        </RowTemplate>
+                        <NoRecordsContent>
+                            <MudText>Nenhum período disponível.</MudText>
+                        </NoRecordsContent>
+                    </MudTable>
+                }
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" lg="8">
+            <MudPaper Class="pa-0" Elevation="2" Style="min-height: 520px;">
+                <div class="d-flex align-center justify-space-between pa-3 pb-2">
+                    <MudText Typo="Typo.subtitle1">Detalhamento</MudText>
+                    @if (_loadingDetail)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                    }
+                </div>
+                <MudDivider Class="mb-0" />
+
+                @if (_selectedPeriod is null && !_loadingDetail)
+                {
+                    <MudAlert Severity="Severity.Info" Class="ma-4">
+                        Selecione um período para visualizar detalhes da folha e realizar ações.
+                    </MudAlert>
+                }
+                else if (_loadingDetail)
+                {
+                    <MudStack Class="ma-4" Spacing="2">
+                        <MudSkeleton Height="32px" />
+                        <MudSkeleton Height="200px" />
+                    </MudStack>
+                }
+                else if (_selectedPeriod is not null)
+                {
+                    <MudStack Spacing="3" Class="pa-4">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            <MudText Typo="Typo.h5">
+                                Folha @FormatCompetence(_selectedPeriod.ReferenceMonth, _selectedPeriod.ReferenceYear)
+                            </MudText>
+                            <MudChip T="string" Color="@GetStatusColor(CurrentStatus)" Variant="Variant.Filled" Size="Size.Small">
+                                @_selectedPeriod.StatusName
+                            </MudChip>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                Criado em @FormatDate(_selectedPeriod.CreatedAt)
+                            </MudText>
+                        </MudStack>
+
+                        <MudGrid GutterSize="2">
+                            <MudItem xs="12" md="6" lg="4">
+                                <MudPaper Class="pa-3" Elevation="1">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Colaboradores</MudText>
+                                    <MudText Typo="Typo.h5">@_selectedPeriod.TotalEmployees</MudText>
+                                </MudPaper>
+                            </MudItem>
+                            <MudItem xs="12" md="6" lg="4">
+                                <MudPaper Class="pa-3" Elevation="1">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Total Bruto</MudText>
+                                    <MudText Typo="Typo.h5">@FormatCurrency(_selectedPeriod.TotalGrossAmount)</MudText>
+                                </MudPaper>
+                            </MudItem>
+                            <MudItem xs="12" md="6" lg="4">
+                                <MudPaper Class="pa-3" Elevation="1">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Total Líquido</MudText>
+                                    <MudText Typo="Typo.h5" Color="Color.Success">@FormatCurrency(_selectedPeriod.TotalNetAmount)</MudText>
+                                </MudPaper>
+                            </MudItem>
+                            <MudItem xs="12" md="6" lg="6">
+                                <MudPaper Class="pa-3" Elevation="1">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Total INSS</MudText>
+                                    <MudText Typo="Typo.h5">@FormatCurrency(_selectedPeriod.TotalInssAmount)</MudText>
+                                </MudPaper>
+                            </MudItem>
+                            <MudItem xs="12" md="6" lg="6">
+                                <MudPaper Class="pa-3" Elevation="1">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Total IRRF</MudText>
+                                    <MudText Typo="Typo.h5">@FormatCurrency(_selectedPeriod.TotalIrrfAmount)</MudText>
+                                </MudPaper>
+                            </MudItem>
+                        </MudGrid>
+
+                        <MudDivider />
+
+                        <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="!CanCalculate || _calculating"
+                                       OnClick="CalculatePeriodAsync" StartIcon="@Icons.Material.Filled.Calculate">
+                                Calcular folha
+                            </MudButton>
+                            <MudButton Variant="Variant.Filled" Color="Color.Info" Disabled="!CanApprove || _approving"
+                                       OnClick="ApprovePeriodAsync" StartIcon="@Icons.Material.Filled.Verified">
+                                Aprovar folha
+                            </MudButton>
+                            <MudButton Variant="Variant.Filled" Color="Color.Success" Disabled="!CanPay || _paying"
+                                       OnClick="MarkAsPaidAsync" StartIcon="@Icons.Material.Filled.Payments">
+                                Registrar pagamento
+                            </MudButton>
+                            <MudSpacer />
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                Última atualização: @FormatDateTime(_selectedPeriod.UpdatedAt)
+                            </MudText>
+                        </MudStack>
+
+                        <MudTable T="PayrollResultDto" Items="_selectedPeriod.Results" Hover="true" Dense="true" Bordered="false">
+                            <HeaderContent>
+                                <MudTh>Colaborador</MudTh>
+                                <MudTh>Lotação</MudTh>
+                                <MudTh class="text-right">Bruto</MudTh>
+                                <MudTh class="text-right">Proventos</MudTh>
+                                <MudTh class="text-right">Descontos</MudTh>
+                                <MudTh class="text-right">Líquido</MudTh>
+                                <MudTh class="text-right">INSS</MudTh>
+                                <MudTh class="text-right">IRRF</MudTh>
+                                <MudTh class="text-center">Holerite</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Colaborador">
+                                    <MudText Typo="Typo.subtitle2">@context.EmployeeName</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@(string.IsNullOrWhiteSpace(context.EmployeeCpf) ? "—" : context.EmployeeCpf)</MudText>
+                                </MudTd>
+                                <MudTd DataLabel="Lotação">
+                                    <MudText>@(string.IsNullOrWhiteSpace(context.Department) ? "—" : context.Department)</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@(string.IsNullOrWhiteSpace(context.Position) ? "" : context.Position)</MudText>
+                                </MudTd>
+                                <MudTd DataLabel="Bruto" Class="text-right">@FormatCurrency(context.GrossAmount)</MudTd>
+                                <MudTd DataLabel="Proventos" Class="text-right">@FormatCurrency(context.TotalEarnings)</MudTd>
+                                <MudTd DataLabel="Descontos" Class="text-right">@FormatCurrency(context.TotalDeductions)</MudTd>
+                                <MudTd DataLabel="Líquido" Class="text-right" Style="font-weight:600">@FormatCurrency(context.NetAmount)</MudTd>
+                                <MudTd DataLabel="INSS" Class="text-right">@FormatCurrency(context.InssAmount)</MudTd>
+                                <MudTd DataLabel="IRRF" Class="text-right">@FormatCurrency(context.IrrfAmount)</MudTd>
+                                <MudTd DataLabel="Holerite" Class="text-center">
+                                    <MudStack Row="true" Justify="Justify.Center" AlignItems="AlignItems.Center" Spacing="1">
+                                        <MudButton Variant="Variant.Text" Color="Color.Primary" Disabled="_slipProcessing.Contains(context.Id)"
+                                                   OnClick="() => GenerateSlipAsync(context)" StartIcon="@Icons.Material.Filled.Description">
+                                            @(context.Slip is null ? "Gerar" : "Atualizar")
+                                        </MudButton>
+                                        <MudIconButton Icon="@Icons.Material.Filled.Download" Color="Color.Info"
+                                                       Disabled="context.Slip is null"
+                                                       OnClick="() => DownloadSlipAsync(context)" />
+                                    </MudStack>
+                                </MudTd>
+                            </RowTemplate>
+                            <ChildRowContent Context="result">
+                                <MudPaper Class="pa-3 mx-4 my-2" Elevation="1">
+                                    <MudText Typo="Typo.subtitle2" Class="mb-2">Componentes da folha</MudText>
+                                    @if (result.Components?.Count > 0)
+                                    {
+                                        <MudTable T="PayrollComponentDto" Items="result.Components.OrderBy(c => c.Sequence)" Dense="true">
+                                            <HeaderContent>
+                                                <MudTh>Descrição</MudTh>
+                                                <MudTh class="text-center">Tipo</MudTh>
+                                                <MudTh class="text-right">Ref.</MudTh>
+                                                <MudTh class="text-right">Valor</MudTh>
+                                            </HeaderContent>
+                                            <RowTemplate Context="component">
+                                                <MudTd DataLabel="Descrição">
+                                                    <MudText>@component.Description</MudText>
+                                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@component.Code</MudText>
+                                                </MudTd>
+                                                <MudTd DataLabel="Tipo" Class="text-center">
+                                                    <MudChip T="string" Color="@GetComponentColor((PayrollComponentType)component.Type)" Size="Size.Small" Variant="Variant.Filled">
+                                                        @GetComponentLabel((PayrollComponentType)component.Type)
+                                                    </MudChip>
+                                                </MudTd>
+                                                <MudTd DataLabel="Referência" Class="text-right">
+                                                    @if (component.ReferenceQuantity.HasValue)
+                                                    {
+                                                        @component.ReferenceQuantity.Value.ToString("0.##")
+                                                    }
+                                                    else
+                                                    {
+                                                        <text>—</text>
+                                                    }
+                                                </MudTd>
+                                                <MudTd DataLabel="Valor" Class="text-right">
+                                                    @FormatCurrency(component.Amount)
+                                                </MudTd>
+                                            </RowTemplate>
+                                        </MudTable>
+                                    }
+                                    else
+                                    {
+                                        <MudText Typo="Typo.body2">Nenhum componente detalhado.</MudText>
+                                    }
+                                </MudPaper>
+                            </ChildRowContent>
+                            <NoRecordsContent>
+                                <MudText>Nenhum colaborador calculado para este período.</MudText>
+                            </NoRecordsContent>
+                        </MudTable>
+                    </MudStack>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudStack>
 
 @code {
+    private readonly CultureInfo _ptBr = new("pt-BR");
     private readonly List<(int Value, string Label)> _months = new()
     {
         (1, "Janeiro"), (2, "Fevereiro"), (3, "Março"), (4, "Abril"), (5, "Maio"), (6, "Junho"),
         (7, "Julho"), (8, "Agosto"), (9, "Setembro"), (10, "Outubro"), (11, "Novembro"), (12, "Dezembro")
     };
 
-    private int _selectedMonth = DateTime.Now.Month;
-    private int _selectedYear = DateTime.Now.Year;
-    private PayrollPeriodDetailDto? _currentPeriod;
+    private readonly List<(PayrollPeriodStatus? Value, string Label)> _statusFilters = new()
+    {
+        (null, "Todos"),
+        (PayrollPeriodStatus.Draft, "Em preenchimento"),
+        (PayrollPeriodStatus.Calculated, "Calculado"),
+        (PayrollPeriodStatus.Approved, "Aprovado"),
+        (PayrollPeriodStatus.Paid, "Pago"),
+        (PayrollPeriodStatus.Locked, "Bloqueado")
+    };
+
+    private List<PayrollPeriodListDto> _periods = new();
+    private PayrollPeriodListDto? _selectedPeriodSummary;
+    private PayrollPeriodDetailDto? _selectedPeriod;
+    private int _filterYear = DateTime.UtcNow.Year;
+    private PayrollPeriodStatus? _filterStatus;
+    private int _newPeriodMonth = DateTime.UtcNow.Month;
+    private int _newPeriodYear = DateTime.UtcNow.Year;
     private string? _errorMessage;
-    private bool _loading;
-    private readonly HashSet<int> _savingEntries = new();
-    private readonly Dictionary<int, CancellationTokenSource> _saveDebouncers = new();
-    private const int SaveDebounceMilliseconds = 700;
+    private bool _loadingPeriods;
+    private bool _loadingDetail;
+    private bool _creatingPeriod;
+    private bool _calculating;
+    private bool _approving;
+    private bool _paying;
+    private readonly HashSet<int> _slipProcessing = new();
+
+    private PayrollPeriodStatus CurrentStatus => (PayrollPeriodStatus)_selectedPeriod!.Status;
+    private bool CanCalculate => _selectedPeriod is not null && CurrentStatus == PayrollPeriodStatus.Draft;
+    private bool CanApprove => _selectedPeriod is not null && CurrentStatus == PayrollPeriodStatus.Calculated;
+    private bool CanPay => _selectedPeriod is not null && CurrentStatus == PayrollPeriodStatus.Approved;
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadPeriodAsync();
+        await LoadPeriodsAsync();
     }
 
-    private async Task LoadPeriodAsync()
+    private async Task LoadPeriodsAsync()
     {
         _errorMessage = null;
-        _loading = true;
+        _loadingPeriods = true;
         try
         {
-            CancelPendingSaves();
-            var period = await ApiService.GetAsync<PayrollPeriodDetailDto>($"/api/time-tracking/periods/by-reference?month={_selectedMonth}&year={_selectedYear}");
-            if (period == null)
+            var query = $"/api/payroll/periods?year={_filterYear}";
+            if (_filterStatus.HasValue)
             {
-                _currentPeriod = null;
-                Snackbar.Add("Nenhum apontamento encontrado para o período selecionado.", Severity.Info);
+                query += $"&status={(int)_filterStatus.Value}";
+            }
+
+            var result = await ApiService.GetAsync<List<PayrollPeriodListDto>>(query);
+            _periods = result ?? new List<PayrollPeriodListDto>();
+
+            if (_periods.Count == 0)
+            {
+                _selectedPeriod = null;
+                _selectedPeriodSummary = null;
+            }
+            else if (_selectedPeriodSummary is not null)
+            {
+                var match = _periods.FirstOrDefault(p => p.Id == _selectedPeriodSummary.Id);
+                if (match != null)
+                {
+                    _selectedPeriodSummary = match;
+                    await LoadPeriodDetailAsync(match.Id, false);
+                }
+                else
+                {
+                    await LoadPeriodDetailAsync(_periods.First().Id, false);
+                }
             }
             else
             {
-                _currentPeriod = period;
+                await LoadPeriodDetailAsync(_periods.First().Id, false);
             }
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Erro ao carregar apontamento {Month}/{Year}", _selectedMonth, _selectedYear);
-            _errorMessage = $"Erro ao carregar apontamento: {ex.Message}";
+            _errorMessage = $"Erro ao carregar períodos: {ex.Message}";
+            Logger.LogError(ex, "Erro ao carregar períodos de folha");
         }
         finally
         {
-            _loading = false;
+            _loadingPeriods = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadPeriodDetailAsync(int id, bool showFeedback)
+    {
+        _loadingDetail = true;
+        try
+        {
+            var detail = await ApiService.GetAsync<PayrollPeriodDetailDto>($"/api/payroll/periods/{id}");
+            if (detail != null)
+            {
+                _selectedPeriod = detail;
+                _selectedPeriodSummary = _periods.FirstOrDefault(p => p.Id == detail.Id);
+                ApplyDetailToList(detail);
+
+                if (showFeedback)
+                {
+                    Snackbar.Add("Período atualizado.", Severity.Success);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar detalhes do período {PeriodId}", id);
+            Snackbar.Add($"Erro ao carregar detalhes do período: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingDetail = false;
             StateHasChanged();
         }
     }
 
     private async Task CreatePeriodAsync()
     {
-        _errorMessage = null;
-        _loading = true;
+        _creatingPeriod = true;
         try
         {
-            CancelPendingSaves();
-            var payload = new CreatePayrollPeriodDto
+            var payload = new CreatePayrollPeriodRequest
             {
-                ReferenceMonth = _selectedMonth,
-                ReferenceYear = _selectedYear
+                ReferenceMonth = _newPeriodMonth,
+                ReferenceYear = _newPeriodYear
             };
 
-            var period = await ApiService.PostAsync<PayrollPeriodDetailDto>("/api/time-tracking/periods", payload);
+            var period = await ApiService.PostAsync<PayrollPeriodDetailDto>("/api/payroll/periods", payload);
             if (period != null)
             {
-                _currentPeriod = period;
-                Snackbar.Add("Planilha criada com sucesso.", Severity.Success);
+                Snackbar.Add("Período criado com sucesso.", Severity.Success);
+                await LoadPeriodsAsync();
+                await LoadPeriodDetailAsync(period.Id, false);
             }
         }
         catch (HttpRequestException ex)
         {
-            Logger.LogWarning(ex, "Erro de requisição ao criar apontamento {Month}/{Year}", _selectedMonth, _selectedYear);
-            _errorMessage = ex.Message;
+            Snackbar.Add(ex.Message, Severity.Error);
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Erro inesperado ao criar apontamento {Month}/{Year}", _selectedMonth, _selectedYear);
-            _errorMessage = "Não foi possível gerar o apontamento. Tente novamente.";
+            Logger.LogError(ex, "Erro ao criar período de folha");
+            Snackbar.Add("Não foi possível criar o período. Tente novamente.", Severity.Error);
         }
         finally
         {
-            _loading = false;
+            _creatingPeriod = false;
             StateHasChanged();
         }
     }
 
-    private async Task SaveEntryAsync(PayrollEntryDto entry)
+    private async Task CalculatePeriodAsync()
     {
-        if (_currentPeriod == null || _savingEntries.Contains(entry.Id))
+        if (_selectedPeriod is null)
         {
             return;
         }
 
-        _savingEntries.Add(entry.Id);
+        _calculating = true;
         try
         {
-            var payload = new UpdatePayrollEntryDto
+            var result = await ApiService.PostAsync<PayrollPeriodDetailDto>($"/api/payroll/periods/{_selectedPeriod.Id}/calculate", null);
+            if (result != null)
             {
-                Faltas = entry.Faltas,
-                Abonos = entry.Abonos,
-                HorasExtras = entry.HorasExtras,
-                Atrasos = entry.Atrasos,
-                Observacoes = entry.Observacoes
-            };
-
-            var updated = await ApiService.PutAsync<PayrollEntryDto>($"/api/time-tracking/entries/{entry.Id}", payload);
-            if (updated != null)
-            {
-                entry.Faltas = updated.Faltas;
-                entry.Abonos = updated.Abonos;
-                entry.HorasExtras = updated.HorasExtras;
-                entry.Atrasos = updated.Atrasos;
-                entry.Observacoes = updated.Observacoes;
-                entry.UpdatedAt = updated.UpdatedAt;
-                entry.UpdatedById = updated.UpdatedById;
-                entry.CreatedAt = updated.CreatedAt;
-                Snackbar.Add("Apontamento salvo.", Severity.Success);
+                _selectedPeriod = result;
+                ApplyDetailToList(result);
+                Snackbar.Add("Folha recalculada com sucesso.", Severity.Success);
             }
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Erro ao salvar apontamento do colaborador {EmployeeId}", entry.EmployeeId);
-            Snackbar.Add($"Erro ao salvar apontamento: {ex.Message}", Severity.Error);
+            Logger.LogError(ex, "Erro ao calcular folha {PeriodId}", _selectedPeriod.Id);
+            Snackbar.Add($"Erro ao calcular folha: {ex.Message}", Severity.Error);
         }
         finally
         {
-            _savingEntries.Remove(entry.Id);
-            StateHasChanged();
+            _calculating = false;
         }
     }
 
-    private void OnNumericChanged(PayrollEntryDto entry, decimal? value, string propertyName)
+    private async Task ApprovePeriodAsync()
     {
-        switch (propertyName)
-        {
-            case nameof(PayrollEntryDto.Faltas):
-                entry.Faltas = value;
-                break;
-            case nameof(PayrollEntryDto.Abonos):
-                entry.Abonos = value;
-                break;
-            case nameof(PayrollEntryDto.HorasExtras):
-                entry.HorasExtras = value;
-                break;
-            case nameof(PayrollEntryDto.Atrasos):
-                entry.Atrasos = value;
-                break;
-        }
-
-        ScheduleSave(entry);
-    }
-
-    private void OnObservacoesChanged(PayrollEntryDto entry, string value)
-    {
-        entry.Observacoes = string.IsNullOrWhiteSpace(value) ? null : value;
-        ScheduleSave(entry);
-    }
-
-    private void ScheduleSave(PayrollEntryDto entry)
-    {
-        if (entry.Id == 0)
+        if (_selectedPeriod is null)
         {
             return;
         }
 
-        if (_saveDebouncers.TryGetValue(entry.Id, out var existing))
+        var parameters = new DialogParameters
         {
-            existing.Cancel();
-            existing.Dispose();
+            { nameof(PayrollNotesDialog.Title), "Aprovar folha" },
+            { nameof(PayrollNotesDialog.PrimaryButtonText), "Aprovar" }
+        };
+
+        var dialog = await DialogService.ShowAsync<PayrollNotesDialog>("Aprovar folha", parameters, new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small });
+        var result = await dialog.Result;
+        if (result.Canceled || result.Data is not PayrollNotesDialogResult payload)
+        {
+            return;
         }
 
-        var cts = new CancellationTokenSource();
-        _saveDebouncers[entry.Id] = cts;
-
-        _ = Task.Run(async () =>
+        _approving = true;
+        try
         {
-            try
+            var request = new ApprovePayrollPeriodRequest { Notes = payload.Notes };
+            var response = await ApiService.PostAsync<PayrollPeriodDetailDto>($"/api/payroll/periods/{_selectedPeriod.Id}/approve", request);
+            if (response != null)
             {
-                await Task.Delay(SaveDebounceMilliseconds, cts.Token);
-                await InvokeAsync(async () => await SaveEntryAsync(entry));
+                _selectedPeriod = response;
+                ApplyDetailToList(response);
+                Snackbar.Add("Folha aprovada.", Severity.Success);
             }
-            catch (TaskCanceledException)
-            {
-            }
-            finally
-            {
-                if (_saveDebouncers.TryGetValue(entry.Id, out var current) && current == cts)
-                {
-                    _saveDebouncers.Remove(entry.Id);
-                }
-                cts.Dispose();
-            }
-        });
-    }
-
-    private void CancelPendingSaves()
-    {
-        foreach (var kvp in _saveDebouncers.Values)
-        {
-            kvp.Cancel();
-            kvp.Dispose();
         }
-        _saveDebouncers.Clear();
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao aprovar folha {PeriodId}", _selectedPeriod.Id);
+            Snackbar.Add($"Erro ao aprovar folha: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _approving = false;
+        }
     }
 
-    public void Dispose()
+    private async Task MarkAsPaidAsync()
     {
-        CancelPendingSaves();
+        if (_selectedPeriod is null)
+        {
+            return;
+        }
+
+        var parameters = new DialogParameters
+        {
+            { nameof(PayrollNotesDialog.Title), "Registrar pagamento" },
+            { nameof(PayrollNotesDialog.PrimaryButtonText), "Registrar" },
+            { nameof(PayrollNotesDialog.RequiresPaymentDate), true },
+            { nameof(PayrollNotesDialog.DefaultPaymentDate), _selectedPeriod.PaidAt ?? DateTime.UtcNow.Date }
+        };
+
+        var dialog = await DialogService.ShowAsync<PayrollNotesDialog>("Registrar pagamento", parameters, new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small });
+        var result = await dialog.Result;
+        if (result.Canceled || result.Data is not PayrollNotesDialogResult payload || payload.PaymentDate is null)
+        {
+            return;
+        }
+
+        _paying = true;
+        try
+        {
+            var request = new PayPayrollPeriodRequest
+            {
+                PaymentDate = payload.PaymentDate.Value,
+                Notes = payload.Notes
+            };
+
+            var response = await ApiService.PostAsync<PayrollPeriodDetailDto>($"/api/payroll/periods/{_selectedPeriod.Id}/pay", request);
+            if (response != null)
+            {
+                _selectedPeriod = response;
+                ApplyDetailToList(response);
+                Snackbar.Add("Pagamento registrado.", Severity.Success);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao registrar pagamento da folha {PeriodId}", _selectedPeriod.Id);
+            Snackbar.Add($"Erro ao registrar pagamento: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _paying = false;
+        }
     }
+
+    private async Task GenerateSlipAsync(PayrollResultDto result)
+    {
+        if (_selectedPeriod is null || _slipProcessing.Contains(result.Id))
+        {
+            return;
+        }
+
+        _slipProcessing.Add(result.Id);
+        try
+        {
+            var response = await ApiService.PostAsync<PayrollSlipDto>($"/api/payroll/periods/{_selectedPeriod.Id}/results/{result.Id}/slip", null);
+            if (response != null)
+            {
+                result.Slip = response;
+                Snackbar.Add("Holerite atualizado.", Severity.Success);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao gerar holerite {ResultId}", result.Id);
+            Snackbar.Add($"Erro ao gerar holerite: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _slipProcessing.Remove(result.Id);
+            StateHasChanged();
+        }
+    }
+
+    private async Task DownloadSlipAsync(PayrollResultDto result)
+    {
+        if (_selectedPeriod is null)
+        {
+            return;
+        }
+
+        var url = $"/api/payroll/periods/{_selectedPeriod.Id}/results/{result.Id}/slip";
+        await JS.InvokeVoidAsync("open", url, "_blank");
+    }
+
+    private void ApplyDetailToList(PayrollPeriodDetailDto detail)
+    {
+        var summary = _periods.FirstOrDefault(p => p.Id == detail.Id);
+        if (summary == null)
+        {
+            _periods.Insert(0, detail);
+        }
+        else
+        {
+            summary.TotalGrossAmount = detail.TotalGrossAmount;
+            summary.TotalNetAmount = detail.TotalNetAmount;
+            summary.TotalInssAmount = detail.TotalInssAmount;
+            summary.TotalIrrfAmount = detail.TotalIrrfAmount;
+            summary.Status = detail.Status;
+            summary.StatusName = detail.StatusName;
+            summary.CalculationDate = detail.CalculationDate;
+            summary.ApprovedAt = detail.ApprovedAt;
+            summary.PaidAt = detail.PaidAt;
+            summary.TotalEmployees = detail.TotalEmployees;
+            summary.UpdatedAt = detail.UpdatedAt ?? detail.CalculationDate ?? detail.CreatedAt;
+        }
+    }
+
+    private async Task OnPeriodRowClicked(TableRowClickEventArgs<PayrollPeriodListDto> args)
+    {
+        if (args.Item is null || (_selectedPeriodSummary?.Id == args.Item.Id && _selectedPeriod is not null))
+        {
+            return;
+        }
+
+        _selectedPeriodSummary = args.Item;
+        await LoadPeriodDetailAsync(args.Item.Id, false);
+    }
+
+    private Color GetStatusColor(PayrollPeriodStatus status) => status switch
+    {
+        PayrollPeriodStatus.Draft => Color.Info,
+        PayrollPeriodStatus.Calculated => Color.Warning,
+        PayrollPeriodStatus.Approved => Color.Secondary,
+        PayrollPeriodStatus.Paid => Color.Success,
+        PayrollPeriodStatus.Locked => Color.Dark,
+        _ => Color.Default
+    };
+
+    private Color GetComponentColor(PayrollComponentType type) => type switch
+    {
+        PayrollComponentType.Earning => Color.Success,
+        PayrollComponentType.Deduction => Color.Error,
+        PayrollComponentType.Contribution => Color.Info,
+        _ => Color.Default
+    };
+
+    private string GetComponentLabel(PayrollComponentType type) => type switch
+    {
+        PayrollComponentType.Earning => "Provento",
+        PayrollComponentType.Deduction => "Desconto",
+        PayrollComponentType.Contribution => "Encargo",
+        _ => "N/D"
+    };
+
+    private string FormatCurrency(decimal value) => value.ToString("C", _ptBr);
+    private string FormatCompetence(int month, int year) => $"{month:00}/{year}";
+    private string FormatDate(DateTime? date) => date?.ToLocalTime().ToString("dd/MM/yyyy") ?? "—";
+    private string FormatDateTime(DateTime? date) => date?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "—";
 }

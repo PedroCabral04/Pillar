@@ -52,6 +52,11 @@ Veja [erp.csproj](erp.csproj) para a lista completa de pacotes.
 - Ajustes de preferências (tema, widgets, tabelas/colunas, notificações): [Components/Pages/Settings.razor](Components/Pages/Settings.razor)
 - Navegação principal: [Components/Layout/NavMenu.razor](Components/Layout/NavMenu.razor)
 - Swagger UI em desenvolvimento
+- Folha de pagamento (novo módulo):
+  - API `/api/payroll` para criar períodos, calcular salários, aprovar e registrar pagamento
+  - Cálculo automático de INSS/IRRF usando faixas progressivas armazenadas em `PayrollTaxBrackets`
+  - Geração de holerites em PDF (QuestPDF) salvos em `wwwroot/payroll-slips`
+  - Endpoints para baixar/regenerar comprovantes e visualizar componentes (proventos x descontos)
 
 ## Requisitos
 
@@ -104,6 +109,8 @@ dotnet tool install --global dotnet-ef
 dotnet ef migrations add Initial
 dotnet ef database update
 ```
+
+> Última migration relevante para folha: `20251117120000_AddPayrollModule`. Execute `dotnet ef database update` após atualizar o código para aplicar as novas tabelas (`PayrollResults`, `PayrollComponents`, `PayrollSlips`, `PayrollTaxBrackets`).
 
 Na primeira execução em desenvolvimento, um usuário admin pode ser criado (veja notas em [DTOs/Auth/README.md](DTOs/Auth/README.md)).
 

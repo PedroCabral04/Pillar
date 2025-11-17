@@ -159,6 +159,32 @@ input:focus-visible {
     transition: width 0.3s ease, min-width 0.3s ease;
 }
 
+/* Slightly more pronounced open/close states for a nicer feel */
+#nav-drawer.mud-drawer--open {
+    width: 240px !important;
+    min-width: 240px !important;
+}
+
+#nav-drawer.mud-drawer--closed {
+    width: 56px !important;
+    min-width: 56px !important;
+}
+
+/* Ensure icon-only mode centers nicely and the label hides cleanly */
+#nav-drawer.mud-drawer--closed .mud-nav-link {
+    padding-left: 12px !important;
+    text-align: center;
+}
+
+#nav-drawer .mud-nav-link .mud-icon-root {
+    font-size: 1.25rem;
+}
+
+/* Smooth opened drawer shadow for separation */
+#nav-drawer.mud-drawer--open {
+    box-shadow: 2px 0 12px rgba(0, 0, 0, 0.06);
+}
+
 /* Ocultar setinhas quando drawer está fechado (mini mode) */
 #nav-drawer.mud-drawer--closed .mud-nav-group .mud-nav-group-header .mud-icon-button,
 #nav-drawer .mud-drawer-content[style*="width: 56px"] .mud-nav-group .mud-nav-group-header .mud-icon-button {
@@ -189,6 +215,19 @@ input:focus-visible {
 
 .mud-icon-button:hover {
     transform: scale(1.1);
+}
+
+/* Toggle icon rotation for better UX */
+.menu-toggle {
+    transition: transform 0.25s ease;
+}
+
+#nav-drawer.mud-drawer--open .menu-toggle {
+    transform: rotate(0deg);
+}
+
+#nav-drawer.mud-drawer--closed .menu-toggle {
+    transform: rotate(180deg);
 }
 
 /* ==============================================

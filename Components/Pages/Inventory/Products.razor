@@ -92,7 +92,7 @@
                            Title="Ver detalhes"/>
             <MudIconButton Icon="@Icons.Material.Filled.Edit" 
                            Size="Size.Small"
-                           Href="@($"/inventory/products/{context.Id}/edit")"
+                           OnClick="@(() => OpenEditProductDialog(context))"
                            Title="Editar"/>
             <MudIconButton Icon="@Icons.Material.Filled.Delete" 
                            Size="Size.Small" 
@@ -194,9 +194,38 @@
         var dialog = await DialogService.ShowAsync<CreateProductDialog>("Adicionar Produto", options);
         var result = await dialog.Result;
         
-        if (!result.Canceled)
+        if (result != null && !result.Canceled)
         {
-            _table?.ReloadServerData();
+            if (_table != null)
+            {
+                await _table.ReloadServerData();
+            }
+        }
+    }
+
+    private async Task OpenEditProductDialog(ProductDto product)
+    {
+        var options = new DialogOptions
+        {
+            CloseOnEscapeKey = true,
+            MaxWidth = MaxWidth.ExtraLarge,
+            FullWidth = true
+        };
+
+        var parameters = new DialogParameters
+        {
+            { "Product", product }
+        };
+
+        var dialog = await DialogService.ShowAsync<EditProductDialog>("Editar Produto", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            if (_table != null)
+            {
+                await _table.ReloadServerData();
+            }
         }
     }
 

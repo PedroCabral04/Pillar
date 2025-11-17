@@ -1,5 +1,6 @@
 ﻿@using erp.Components.Shared.Dialogs
 @using MudBlazor
+@using Microsoft.AspNetCore.Components.Web
 @implements IDisposable
 
 @inject NavigationManager NavigationManager
@@ -8,19 +9,36 @@
     @if (IsOpen)
     {
         <div class="d-flex align-center justify-space-between px-3 py-3 mb-2">
-            <MudText Typo="Typo.h5" Style="font-weight: 600;">Pillar</MudText>
-            <MudIconButton Icon="@Icons.Material.Filled.Close" 
-                          Color="MudBlazor.Color.Inherit" 
-                          Size="MudBlazor.Size.Small"
-                          OnClick="OnToggleDrawer" 
-                          Title="Fechar menu"
-                          Class="d-md-none" />
-            <MudIconButton Icon="@Icons.Material.Filled.MenuOpen" 
-                          Color="MudBlazor.Color.Inherit" 
-                          Size="MudBlazor.Size.Small"
-                          OnClick="OnToggleDrawer" 
-                          Title="Fechar menu"
-                          Class="d-none d-md-block" />
+            <div class="d-flex align-center">
+                <MudAvatar Size="@MudBlazor.Size.Medium" Class="me-2" Square="true" Alt="Pillar" Text="P" Color="@MudBlazor.Color.Primary" />
+                <div>
+                    <MudText Typo="Typo.h6" Style="font-weight: 600;">Pillar</MudText>
+                    <AuthorizeView>
+                        <Authorized Context="auth">
+                            <MudText Typo="Typo.caption">@auth.User.Identity?.Name</MudText>
+                        </Authorized>
+                        <NotAuthorized>
+                            <MudText Typo="Typo.caption">Bem vindo</MudText>
+                        </NotAuthorized>
+                    </AuthorizeView>
+                </div>
+            </div>
+            <div class="d-flex align-center">
+                <MudIconButton Icon="@Icons.Material.Filled.Close" 
+                              Color="MudBlazor.Color.Inherit" 
+                              Size="MudBlazor.Size.Small"
+                              OnClick="@(async (MouseEventArgs e) => await OnToggleDrawer.InvokeAsync())" 
+                              Title="Fechar menu"
+                              AriaLabel="Fechar menu"
+                              Class="d-md-none" />
+                <MudIconButton Icon="@(IsOpen ? Icons.Material.Filled.MenuOpen : Icons.Material.Filled.Menu)" 
+                              Color="MudBlazor.Color.Inherit" 
+                              Size="MudBlazor.Size.Small"
+                              OnClick="@(async (MouseEventArgs e) => await OnToggleDrawer.InvokeAsync())" 
+                              Title="@(IsOpen ? "Fechar menu" : "Abrir menu")"
+                              AriaLabel="Menu toggle"
+                              Class="d-none d-md-block menu-toggle" />
+            </div>
         </div>
     }
     else
@@ -29,13 +47,13 @@
             <MudIconButton Icon="@Icons.Material.Filled.Menu" 
                           Color="MudBlazor.Color.Inherit" 
                           Size="MudBlazor.Size.Medium"
-                          OnClick="OnToggleDrawer" 
-                          Title="Abrir menu" />
+                          OnClick="@(async (MouseEventArgs e) => await OnToggleDrawer.InvokeAsync())" 
+                          Title="Abrir menu" AriaLabel="Abrir navegação" />
         </div>
     }
     
-    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home" Class="my-1">Home</MudNavLink>
-    <MudNavLink Href="dashboard" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Dashboard" Class="my-1">Dashboard</MudNavLink>
+    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home" Class="my-1" Title="Home">Home</MudNavLink>
+    <MudNavLink Href="dashboard" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Dashboard" Class="my-1" Title="Dashboard">Dashboard</MudNavLink>
     
     <MudDivider Class="my-2"/>
     
@@ -64,12 +82,18 @@
     }
     else
     {
-        <MudNavLink Href="sales" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.ShoppingCart" Class="my-1" />
-        <MudNavLink Href="inventory/products" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Inventory" Class="my-1" />
-        <MudNavLink Href="financial/dashboard" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AccountBalance" Class="my-1" />
+    <MudTooltip Text="Vendas" Placement="@MudBlazor.Placement.Bottom">
+            <MudNavLink Href="sales" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.ShoppingCart" Class="my-1" />
+        </MudTooltip>
+    <MudTooltip Text="Produtos" Placement="@MudBlazor.Placement.Bottom">
+            <MudNavLink Href="inventory/products" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Inventory" Class="my-1" />
+        </MudTooltip>
+    <MudTooltip Text="Financeiro" Placement="@MudBlazor.Placement.Bottom">
+            <MudNavLink Href="financial/dashboard" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AccountBalance" Class="my-1" />
+        </MudTooltip>
     }
     
-    <MudNavLink Href="kanban" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.ViewKanban" Class="my-1">Kanban</MudNavLink>
+    <MudNavLink Href="kanban" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.ViewKanban" Class="my-1" Title="Kanban">Kanban</MudNavLink>
     
     @if (IsOpen)
     {
@@ -77,7 +101,9 @@
     }
     else
     {
-        <MudNavLink Href="assets" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Devices" Class="my-1" />
+    <MudTooltip Text="Ativos" Placement="@MudBlazor.Placement.Bottom">
+            <MudNavLink Href="assets" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Devices" Class="my-1" />
+        </MudTooltip>
     }
     
     @if (IsOpen)
@@ -86,7 +112,9 @@
     }
     else
     {
-        <MudNavLink Href="reports" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Assessment" Class="my-1" />
+    <MudTooltip Text="Relatórios" Placement="@MudBlazor.Placement.Bottom">
+            <MudNavLink Href="reports" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Assessment" Class="my-1" />
+        </MudTooltip>
     }
     
     <MudDivider Class="my-2"/>
@@ -107,7 +135,9 @@
             }
             else
             {
-                <MudNavLink Href="admin/users" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AdminPanelSettings" Class="my-1" />
+                <MudTooltip Text="Administracao" Placement="@MudBlazor.Placement.Bottom">
+                    <MudNavLink Href="admin/users" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AdminPanelSettings" Class="my-1" />
+                </MudTooltip>
                 <MudNavLink Href="admin/widget-roles" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Widgets" Class="my-1" />
                 <MudNavLink Href="time-tracking/payroll" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AccessTime" Class="my-1" />
             }

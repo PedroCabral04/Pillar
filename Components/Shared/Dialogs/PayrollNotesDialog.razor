@@ -1,0 +1,113 @@
+@using MudBlazor
+@using Color = MudBlazor.Color
+@using Size = MudBlazor.Size
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(string.IsNullOrWhiteSpace(Title) ? PrimaryButtonText : Title)</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form">
+            <MudStack Spacing="2">
+                @if (RequiresPaymentDate)
+                {
+                    <MudDatePicker Label="Data do pagamento"
+                                    @bind-Date="_paymentDate"
+                                    Required="true"
+                                    DateFormat="dd/MM/yyyy"
+                                    DisplayFormat="dd/MM/yyyy"
+                                    Variant="Variant.Outlined"
+                                    Margin="Margin.Dense" />
+                }
+                <MudTextField T="string"
+                               Label="Observações"
+                               @bind-Value="_notes"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               Lines="3"
+                               Counter="1000"
+                               MaxLength="1000"
+                               Immediate="true" />
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Color="Color.Default">Cancelar</MudButton>
+        <MudButton OnClick="Submit" Color="Color.Primary" Variant="Variant.Filled" Disabled="_submitting">
+            @if (_submitting)
+            {
+                <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+            }
+            else
+            {
+                <text>@PrimaryButtonText</text>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private MudForm? _form;
+    private string? _notes;
+    private DateTime? _paymentDate;
+    private bool _submitting;
+
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public string PrimaryButtonText { get; set; } = "Confirmar";
+
+    [Parameter]
+    public bool RequiresPaymentDate { get; set; }
+
+    [Parameter]
+    public DateTime? DefaultPaymentDate { get; set; }
+
+    protected override void OnInitialized()
+    {
+        _paymentDate = DefaultPaymentDate ?? DateTime.UtcNow.Date;
+    }
+
+    private async Task Submit()
+    {
+        if (_form is null)
+        {
+            return;
+        }
+
+        _submitting = true;
+
+        try
+        {
+            await _form.Validate();
+
+            if (!_form.IsValid)
+            {
+                return;
+            }
+
+            if (RequiresPaymentDate && _paymentDate is null)
+            {
+                return;
+            }
+
+            var payload = new PayrollNotesDialogResult
+            {
+                Notes = string.IsNullOrWhiteSpace(_notes) ? null : _notes,
+                PaymentDate = _paymentDate
+            };
+
+            MudDialog.Close(DialogResult.Ok(payload));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

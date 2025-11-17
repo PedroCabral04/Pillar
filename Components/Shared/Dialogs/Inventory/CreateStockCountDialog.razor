@@ -1,8 +1,11 @@
 @using MudBlazor
 @using erp.DTOs.Inventory
 @using erp.Services
+@using erp.Services.Inventory
+@using System.Linq
 @inject ISnackbar Snackbar
 @inject IApiService ApiService
+@inject IInventoryService InventoryService
 @inject ILogger<CreateStockCountDialog> Logger
 
 <MudDialog Class="create-count-dialog">
@@ -126,22 +129,19 @@
         _loading = true;
         try
         {
-            // Carrega lista de armazéns
-            var response = await ApiService.GetAsync<List<WarehouseDto>>("/api/inventory/warehouses");
-            _warehouses = response ?? new List<WarehouseDto>();
-            
+            var (warehouses, _) = await InventoryService.GetWarehousesAsync(null, 1, 200);
+            _warehouses = warehouses.ToList();
+
             if (!_warehouses.Any())
             {
-                // Se não houver armazéns, cria um padrão
                 _warehouses.Add(new WarehouseDto { Id = 1, Name = "Armazém Principal" });
             }
-            
-            // Inicializa com primeiro armazém
+
             if (_warehouses.Any())
             {
                 _newCount.WarehouseId = _warehouses.First().Id;
             }
-            
+
             _newCount.CountDate = DateTime.Now;
         }
         catch (Exception ex)
@@ -203,12 +203,4 @@
         }
     }
     
-    // DTO temporário para armazéns (criar arquivo separado depois)
-    public class WarehouseDto
-    {
-        public int Id { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public string? Location { get; set; }
-        public bool IsActive { get; set; } = true;
-    }
 }

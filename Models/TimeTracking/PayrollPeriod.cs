@@ -1,5 +1,6 @@
 using erp.Models.Audit;
 using erp.Models.Identity;
+using erp.Models.Payroll;
 
 namespace erp.Models.TimeTracking;
 
@@ -21,5 +22,23 @@ public class PayrollPeriod : IAuditable
     public int? UpdatedById { get; set; }
     public ApplicationUser? UpdatedBy { get; set; }
 
+    public DateTime? CalculationDate { get; set; }
+    public DateTime? ApprovedAt { get; set; }
+    public int? ApprovedById { get; set; }
+    public ApplicationUser? ApprovedBy { get; set; }
+
+    public DateTime? PaidAt { get; set; }
+    public int? PaidById { get; set; }
+    public ApplicationUser? PaidBy { get; set; }
+
+    public decimal TotalGrossAmount { get; set; }
+    public decimal TotalNetAmount { get; set; }
+    public decimal TotalInssAmount { get; set; }
+    public decimal TotalIrrfAmount { get; set; }
+    public decimal TotalEmployerCost { get; set; }
+
+    public string? Notes { get; set; }
+
     public ICollection<PayrollEntry> Entries { get; set; } = new List<PayrollEntry>();
+    public ICollection<PayrollResult> Results { get; set; } = new List<PayrollResult>();
 }

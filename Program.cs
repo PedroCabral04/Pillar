@@ -332,6 +332,11 @@ builder.Services.AddScoped<erp.Mappings.AssetMapper>();
 // Time tracking services
 builder.Services.AddScoped<erp.Services.TimeTracking.ITimeTrackingService, erp.Services.TimeTracking.TimeTrackingService>();
 
+// Payroll services
+builder.Services.AddScoped<erp.Services.Payroll.IPayrollCalculationService, erp.Services.Payroll.PayrollCalculationService>();
+builder.Services.AddScoped<erp.Services.Payroll.IPayrollSlipService, erp.Services.Payroll.PayrollSlipService>();
+builder.Services.AddScoped<erp.Services.Payroll.IPayrollService, erp.Services.Payroll.PayrollService>();
+
 // Audit services
 builder.Services.AddScoped<erp.Services.Audit.IAuditService, erp.Services.Audit.AuditService>();
 
@@ -360,6 +365,7 @@ builder.Services.AddScoped<StockMovementMapper, StockMovementMapper>();
 builder.Services.AddScoped<StockCountMapper, StockCountMapper>();
 builder.Services.AddScoped<SalesMapper, SalesMapper>();
 builder.Services.AddScoped<TimeTrackingMapper, TimeTrackingMapper>();
+builder.Services.AddScoped<PayrollMapper, PayrollMapper>();
 builder.Services.AddScoped<erp.Mappings.FinancialMapper, erp.Mappings.FinancialMapper>();
 
 // --- Constrói a aplicação ---

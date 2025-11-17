@@ -3,6 +3,7 @@ using erp.Models.Identity;
 using erp.Models.Audit;
 using erp.Models.TimeTracking;
 using erp.Models.Financial;
+using erp.Models.Payroll;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
@@ -62,6 +63,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<AuditLog> AuditLogs { get; set; } = null!;
     public DbSet<PayrollPeriod> PayrollPeriods { get; set; } = null!;
     public DbSet<PayrollEntry> PayrollEntries { get; set; } = null!;
+    public DbSet<PayrollResult> PayrollResults { get; set; } = null!;
+    public DbSet<PayrollComponent> PayrollComponents { get; set; } = null!;
+    public DbSet<PayrollSlip> PayrollSlips { get; set; } = null!;
+    public DbSet<PayrollTaxBracket> PayrollTaxBrackets { get; set; } = null!;
     
     // Serviços injetados para auditoria
     private readonly IHttpContextAccessor? _httpContextAccessor;
@@ -527,6 +532,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         
         // Audit model configuration
         ConfigureAuditModels(modelBuilder);
+
+        // Payroll model configuration
+        // ConfigurePayrollModels(modelBuilder); // TODO: Implement this method
 
         // Time tracking / payroll configuration
         ConfigureTimeTrackingModels(modelBuilder);
@@ -1313,6 +1321,119 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         });
     }
 
+    private void ConfigurePayrollModels(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PayrollResult>(entity =>
+        {
+            entity.ToTable("PayrollResults");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.EmployeeNameSnapshot).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.EmployeeCpfSnapshot).HasMaxLength(14);
+            entity.Property(x => x.DepartmentSnapshot).HasMaxLength(100);
+            entity.Property(x => x.PositionSnapshot).HasMaxLength(100);
+            entity.Property(x => x.BankNameSnapshot).HasMaxLength(100);
+            entity.Property(x => x.BankAgencySnapshot).HasMaxLength(10);
+            entity.Property(x => x.BankAccountSnapshot).HasMaxLength(20);
+
+            entity.Property(x => x.BaseSalarySnapshot).HasPrecision(18, 2);
+            entity.Property(x => x.TotalEarnings).HasPrecision(18, 2);
+            entity.Property(x => x.TotalDeductions).HasPrecision(18, 2);
+            entity.Property(x => x.TotalContributions).HasPrecision(18, 2);
+            entity.Property(x => x.NetAmount).HasPrecision(18, 2);
+            entity.Property(x => x.GrossAmount).HasPrecision(18, 2);
+            entity.Property(x => x.InssAmount).HasPrecision(18, 2);
+            entity.Property(x => x.IrrfAmount).HasPrecision(18, 2);
+            entity.Property(x => x.AdditionalEmployerCost).HasPrecision(18, 2);
+
+            entity.HasIndex(x => new { x.PayrollPeriodId, x.EmployeeId }).IsUnique();
+
+            entity.HasOne(x => x.PayrollPeriod)
+                .WithMany(p => p.Results)
+                .HasForeignKey(x => x.PayrollPeriodId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.Employee)
+                .WithMany()
+                .HasForeignKey(x => x.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.PayrollEntry)
+                .WithMany()
+                .HasForeignKey(x => x.PayrollEntryId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(x => x.UpdatedBy)
+                .WithMany()
+                .HasForeignKey(x => x.UpdatedById)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<PayrollComponent>(entity =>
+        {
+            entity.ToTable("PayrollComponents");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Code).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Amount).HasPrecision(18, 2);
+            entity.Property(x => x.BaseAmount).HasPrecision(18, 2);
+            entity.Property(x => x.ReferenceQuantity).HasPrecision(18, 2);
+
+            entity.HasIndex(x => x.PayrollResultId);
+            entity.HasIndex(x => x.Type);
+
+            entity.HasOne(x => x.PayrollResult)
+                .WithMany(r => r.Components)
+                .HasForeignKey(x => x.PayrollResultId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PayrollSlip>(entity =>
+        {
+            entity.ToTable("PayrollSlips");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.FilePath).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.FileHash).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.ContentType).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.Notes).HasMaxLength(500);
+
+            entity.HasIndex(x => x.PayrollResultId).IsUnique();
+
+            entity.HasOne(x => x.PayrollResult)
+                .WithOne(r => r.Slip)
+                .HasForeignKey<PayrollSlip>(x => x.PayrollResultId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.GeneratedBy)
+                .WithMany()
+                .HasForeignKey(x => x.GeneratedById)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.UpdatedBy)
+                .WithMany()
+                .HasForeignKey(x => x.UpdatedById)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<PayrollTaxBracket>(entity =>
+        {
+            entity.ToTable("PayrollTaxBrackets");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.RangeStart).HasPrecision(18, 2);
+            entity.Property(x => x.RangeEnd).HasPrecision(18, 2);
+            entity.Property(x => x.Rate).HasPrecision(5, 4);
+            entity.Property(x => x.Deduction).HasPrecision(18, 2);
+
+            entity.HasIndex(x => new { x.TaxType, x.IsActive });
+            entity.HasIndex(x => new { x.TaxType, x.EffectiveFrom });
+
+            entity.Property(x => x.SortOrder).HasDefaultValue(0);
+        });
+    }
+
     private void ConfigureTimeTrackingModels(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<PayrollPeriod>(p =>
@@ -1325,6 +1446,12 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
                 .HasConversion<int>();
             p.Property(x => x.CreatedAt).IsRequired();
             p.Property(x => x.UpdatedAt);
+            p.Property(x => x.TotalGrossAmount).HasPrecision(18, 2);
+            p.Property(x => x.TotalNetAmount).HasPrecision(18, 2);
+            p.Property(x => x.TotalInssAmount).HasPrecision(18, 2);
+            p.Property(x => x.TotalIrrfAmount).HasPrecision(18, 2);
+            p.Property(x => x.TotalEmployerCost).HasPrecision(18, 2);
+            p.Property(x => x.Notes).HasMaxLength(1000);
 
             p.HasIndex(x => new { x.ReferenceYear, x.ReferenceMonth }).IsUnique();
 
@@ -1336,6 +1463,16 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             p.HasOne(x => x.UpdatedBy)
                 .WithMany()
                 .HasForeignKey(x => x.UpdatedById)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            p.HasOne(x => x.ApprovedBy)
+                .WithMany()
+                .HasForeignKey(x => x.ApprovedById)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            p.HasOne(x => x.PaidBy)
+                .WithMany()
+                .HasForeignKey(x => x.PaidById)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
