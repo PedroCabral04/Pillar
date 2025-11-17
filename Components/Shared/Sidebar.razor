@@ -5,7 +5,8 @@
 @inject IDialogService DialogService
 @inject IJSRuntime JS
 
-<MudNavMenu Rounded="false" Class="pillar-sidebar">
+<nav class="pillar-sidebar" role="navigation" aria-label="Navegação principal">
+<MudNavMenu Rounded="false">
     @if (IsOpen)
     {
         <div class="sidebar-header px-3 py-3">
@@ -29,7 +30,7 @@
         </div>
 
         <div class="px-3 pb-2">
-            <MudTextField @bind-Value="_search" Placeholder="Buscar (⌘/Ctrl + K)" Dense="true" Clearable="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true" @onkeydown="OnSearchKeyDown" />
+            <MudTextField Id="sidebar-search" @ref="_searchField" @bind-Value="_search" Placeholder="Buscar (⌘/Ctrl + K)" Dense="true" Clearable="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true" AriaLabel="Pesquisar navegação" @onkeydown="OnSearchKeyDown" />
         </div>
 
         @if (_isSearching)
@@ -76,19 +77,19 @@
                 <MudDivider Class="my-2"/>
             }
 
-            <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home" Class="my-1">Home</MudNavLink>
+            <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home" Class="my-1" AriaLabel="Ir para Home">Home</MudNavLink>
             <MudNavLink Href="/dashboard" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Dashboard" Class="my-1">Dashboard</MudNavLink>
 
             <MudDivider Class="my-2"/>
 
             @* Vendas *@
-            <MudNavGroup Title="Vendas" Icon="@Icons.Material.Filled.ShoppingCart" Expanded="@(IsGroupExpanded("sales"))" ExpandedChanged="@(v => OnGroupExpandedChanged("sales", v))" Class="my-1">
+            <MudNavGroup Title="Vendas" Icon="@Icons.Material.Filled.ShoppingCart" Expanded="@(IsGroupExpanded("sales"))" ExpandedChanged="@(v => OnGroupExpandedChanged("sales", v))" Class="my-1" AriaLabel="Seção Vendas" >
                 <MudNavLink Href="/sales" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Receipt">Vendas</MudNavLink>
                 <MudNavLink Href="/sales/customers" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.People">Clientes</MudNavLink>
             </MudNavGroup>
 
             @* Estoque *@
-            <MudNavGroup Title="Estoque" Icon="@Icons.Material.Filled.Inventory" Expanded="@(IsGroupExpanded("inventory"))" ExpandedChanged="@(v => OnGroupExpandedChanged("inventory", v))" Class="my-1">
+            <MudNavGroup Title="Estoque" Icon="@Icons.Material.Filled.Inventory" Expanded="@(IsGroupExpanded("inventory"))" ExpandedChanged="@(v => OnGroupExpandedChanged("inventory", v))" Class="my-1" AriaLabel="Seção Estoque">
                 <MudNavLink Href="/inventory/products" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Category">Produtos</MudNavLink>
                 <MudNavLink Href="/inventory/categories" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FolderOpen">Categorias</MudNavLink>
                 <MudNavLink Href="/inventory/movements" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.SwapHoriz">Movimentações</MudNavLink>
@@ -96,7 +97,7 @@
             </MudNavGroup>
 
             @* Financeiro *@
-            <MudNavGroup Title="Financeiro" Icon="@Icons.Material.Filled.AccountBalance" Expanded="@(IsGroupExpanded("financial"))" ExpandedChanged="@(v => OnGroupExpandedChanged("financial", v))" Class="my-1">
+            <MudNavGroup Title="Financeiro" Icon="@Icons.Material.Filled.AccountBalance" Expanded="@(IsGroupExpanded("financial"))" ExpandedChanged="@(v => OnGroupExpandedChanged("financial", v))" Class="my-1" AriaLabel="Seção Financeiro">
                 <MudNavLink Href="/financial/dashboard" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
                 <MudNavLink Href="/financial/receivables" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CallReceived">Contas a Receber</MudNavLink>
                 <MudNavLink Href="/financial/payables" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CallMade">Contas a Pagar</MudNavLink>
@@ -113,7 +114,7 @@
 
             <AuthorizeView Roles="Administrador">
                 <Authorized>
-                    <MudNavGroup Title="RH & Admin" Icon="@Icons.Material.Filled.AdminPanelSettings" Expanded="@(IsGroupExpanded("admin"))" ExpandedChanged="@(v => OnGroupExpandedChanged("admin", v))" Class="my-1">
+                    <MudNavGroup Title="RH & Admin" Icon="@Icons.Material.Filled.AdminPanelSettings" Expanded="@(IsGroupExpanded("admin"))" ExpandedChanged="@(v => OnGroupExpandedChanged("admin", v))" Class="my-1" AriaLabel="Seção Administração">
                         <MudNavLink Href="/admin/users" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.People">Usuários</MudNavLink>
                         <MudNavLink Href="/admin/departments" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.BusinessCenter">Departamentos</MudNavLink>
                         <MudNavLink Href="/admin/positions" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.WorkOutline">Cargos</MudNavLink>
@@ -159,6 +160,7 @@
         </div>
     }
 </MudNavMenu>
+</nav>
 
 @code {
     [Parameter] public bool IsOpen { get; set; } = true;
@@ -167,6 +169,7 @@
 
     private string _search = string.Empty;
     private bool _isSearching => !string.IsNullOrWhiteSpace(_search);
+    private MudTextField<string>? _searchField;
 
     private record NavItem(string Title, string Href, string Icon);
     private readonly List<NavItem> _allItems = new()
@@ -242,6 +245,19 @@
         {
             _search = string.Empty;
         }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try { await JS.InvokeVoidAsync("erpShortcuts.registerSearchHotkeys", "sidebar-search"); } catch { }
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("erpShortcuts.unregisterSearchHotkeys"); } catch { }
     }
 
     private async Task LogoutAsync()

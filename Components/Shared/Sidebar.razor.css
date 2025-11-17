@@ -6,3 +6,5 @@
 .pillar-sidebar .mud-nav-link { border-radius:8px; }
 .pillar-sidebar .mud-nav-link.active { background: rgba(0,0,0,0.06); }
 :root.dark .pillar-sidebar .mud-nav-link.active { background: rgba(255,255,255,0.08); }
+.pillar-sidebar .mud-nav-link:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 2px; }
+.pillar-sidebar .mud-icon-button:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 2px; border-radius:8px; }
