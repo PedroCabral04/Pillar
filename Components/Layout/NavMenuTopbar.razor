@@ -1,12 +1,22 @@
 @using erp.Components.Shared.Dialogs
+@using erp.Services.Tenancy
 @using MudBlazor
 @using Color = MudBlazor.Color
 @implements IDisposable
 
 @inject NavigationManager NavigationManager
+@inject ITenantBrandingProvider BrandingProvider
 
 <MudAppBar Elevation="2" Dense="false" Class="px-3">
-    <MudText Typo="Typo.h5" Class="mr-6" Style="font-weight: 600;">Pillar</MudText>
+    <div class="d-flex align-center mr-6">
+        <MudAvatar Size="MudBlazor.Size.Medium"
+                   Class="me-2"
+                   Square="true"
+                   Image="@_branding.LogoUrl"
+                   Text="@_branding.Initials"
+                   Style=$"background-color:{_branding.PrimaryColor};color:white;" />
+        <MudText Typo="Typo.h5" Style="font-weight: 600;">@_branding.TenantName</MudText>
+    </div>
     
     <MudButton 
                Color="@(IsActive("") ? Color.Primary : Color.Inherit)" 
@@ -85,9 +95,11 @@
 @code {
     [Inject] HttpClient Http { get; set; } = null!;
     private string? currentUrl;
+    private TenantBrandingTheme _branding = TenantBrandingTheme.Default;
 
     protected override void OnInitialized()
     {
+        _branding = BrandingProvider.GetCurrentBranding();
         currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
         NavigationManager.LocationChanged += OnLocationChanged;
     }

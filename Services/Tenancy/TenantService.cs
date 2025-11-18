@@ -67,7 +67,9 @@ public class TenantService : ITenantService
         tenant.CreatedAt = DateTime.UtcNow;
         tenant.Status = TenantStatus.Provisioning;
         tenant.Memberships = new List<TenantMembership>();
-        tenant.DatabaseName = dto.DatabaseName ?? tenant.DatabaseName;
+        var normalizedDatabaseName = NormalizeDatabaseName(dto.DatabaseName);
+        await EnsureDatabaseNameAvailableAsync(normalizedDatabaseName, null, cancellationToken, dto.DatabaseName);
+        tenant.DatabaseName = normalizedDatabaseName ?? tenant.DatabaseName;
         tenant.ConnectionString = dto.ConnectionString ?? tenant.ConnectionString;
 
         _db.Tenants.Add(tenant);
@@ -97,7 +99,15 @@ public class TenantService : ITenantService
 
         _mapper.UpdateTenantFromDto(dto, tenant);
         tenant.UpdatedAt = DateTime.UtcNow;
-        tenant.DatabaseName = dto.DatabaseName ?? tenant.DatabaseName;
+        if (dto.DatabaseName is not null)
+        {
+            var normalizedDatabaseName = NormalizeDatabaseName(dto.DatabaseName);
+            if (!string.Equals(normalizedDatabaseName, tenant.DatabaseName, StringComparison.Ordinal))
+            {
+                await EnsureDatabaseNameAvailableAsync(normalizedDatabaseName, tenant.Id, cancellationToken, dto.DatabaseName);
+                tenant.DatabaseName = normalizedDatabaseName ?? tenant.DatabaseName;
+            }
+        }
         tenant.ConnectionString = dto.ConnectionString ?? tenant.ConnectionString;
 
         if (dto.ProvisionDatabase)
@@ -108,6 +118,15 @@ public class TenantService : ITenantService
         await _db.SaveChangesAsync(cancellationToken);
 
         return _mapper.TenantToTenantDto(tenant);
+    }
+
+    public async Task<TenantConnectionInfoDto?> GetConnectionInfoAsync(int id, CancellationToken cancellationToken = default)
+    {
+        var tenant = await _db.Tenants
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
+
+        return tenant is null ? null : _mapper.TenantToConnectionInfoDto(tenant);
     }
 
     public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
@@ -143,5 +162,41 @@ public class TenantService : ITenantService
 
         await _provisioningService.ProvisionAsync(tenant, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static string? NormalizeDatabaseName(string? databaseName)
+    {
+        if (string.IsNullOrWhiteSpace(databaseName))
+        {
+            return null;
+        }
+
+        return databaseName.Trim().ToLowerInvariant();
+    }
+
+    private async Task EnsureDatabaseNameAvailableAsync(
+        string? normalizedDatabaseName,
+        int? ignoreTenantId,
+        CancellationToken cancellationToken,
+        string? displayValue = null)
+    {
+        if (string.IsNullOrWhiteSpace(normalizedDatabaseName))
+        {
+            return;
+        }
+
+        var conflict = await _db.Tenants
+            .AsNoTracking()
+            .AnyAsync(
+                t => t.DatabaseName != null
+                     && t.DatabaseName.ToLower() == normalizedDatabaseName
+                     && (!ignoreTenantId.HasValue || t.Id != ignoreTenantId),
+                cancellationToken);
+
+        if (conflict)
+        {
+            var shown = string.IsNullOrWhiteSpace(displayValue) ? normalizedDatabaseName : displayValue!.Trim();
+            throw new InvalidOperationException($"DatabaseName '{shown}' já está em uso por outro tenant.");
+        }
     }
 }

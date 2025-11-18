@@ -50,6 +50,18 @@ public class TenantsController : ControllerBase
         return Ok(tenant);
     }
 
+    [HttpGet("{id:int}/connection-info")]
+    public async Task<ActionResult<TenantConnectionInfoDto>> GetConnectionInfoAsync(int id, CancellationToken cancellationToken)
+    {
+        var info = await _tenantService.GetConnectionInfoAsync(id, cancellationToken);
+        if (info is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(info);
+    }
+
     [HttpGet("slug/{slug}/exists")]
     public async Task<ActionResult> CheckSlugAsync(string slug, CancellationToken cancellationToken)
     {

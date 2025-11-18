@@ -364,6 +364,7 @@ builder.Services.AddScoped<erp.Services.Tenancy.ITenantResolver, erp.Services.Te
 builder.Services.AddScoped<erp.Services.Tenancy.ITenantDbContextFactory, erp.Services.Tenancy.TenantDbContextFactory>();
 builder.Services.AddScoped<erp.Services.Tenancy.ITenantProvisioningService, erp.Services.Tenancy.TenantProvisioningService>();
 builder.Services.AddScoped<erp.Services.Tenancy.ITenantConnectionResolver, erp.Services.Tenancy.TenantConnectionResolver>();
+builder.Services.AddScoped<erp.Services.Tenancy.ITenantBrandingProvider, erp.Services.Tenancy.TenantBrandingProvider>();
 builder.Services.Configure<erp.Services.Tenancy.TenantDatabaseOptions>(builder.Configuration.GetSection("MultiTenancy:Database"));
 
 // Email services

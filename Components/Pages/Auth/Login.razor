@@ -2,21 +2,35 @@
 @attribute [AllowAnonymous]
 @using System.ComponentModel.DataAnnotations
 @using erp.Services
+@using erp.Services.Tenancy
+@using erp.Components.Branding
 @inject HttpClient Http
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthStateProvider
 @inject IJSRuntime JS
+@inject ITenantBrandingProvider BrandingProvider
 @code {
     [Parameter] [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
 }
 
-<PageTitle>Login</PageTitle>
+<PageTitle>Entrar • @_branding.TenantName</PageTitle>
 
-<MudPaper Class="d-flex justify-center align-center" Style="min-height: 70vh;">
-    <MudCard Style="width: 400px;">
+<MudPaper Class="d-flex justify-center align-center" Style="@LoginWrapperStyle">
+    <MudCard Style="@CardStyle">
         <MudCardHeader>
             <CardHeaderContent>
-                <MudText Typo="Typo.h5">Entrar</MudText>
+                <div class="d-flex align-center">
+                    <MudAvatar Size="MudBlazor.Size.Medium"
+                               Class="me-2"
+                               Square="true"
+                               Image="@_branding.LogoUrl"
+                               Text="@_branding.Initials"
+                               Style=$"background-color: {_branding.PrimaryColor}; color: white;" />
+                    <div>
+                        <MudText Typo="Typo.h6" Style="font-weight:600;">@_branding.TenantName</MudText>
+                        <MudText Typo="Typo.subtitle2">Entrar</MudText>
+                    </div>
+                </div>
             </CardHeaderContent>
         </MudCardHeader>
         <MudCardContent>
@@ -42,10 +56,16 @@
     private LoginModel model = new();
     private string? error;
     private bool busy;
+    private TenantBrandingTheme _branding = TenantBrandingTheme.Default;
     private string ErrorDisplayStyle => string.IsNullOrEmpty(error) ? "display:none;" : "display:block;";
+    private string LoginWrapperStyle => string.IsNullOrWhiteSpace(_branding.LoginBackgroundUrl)
+        ? "min-height: 70vh;"
+        : $"min-height: 70vh; background-image: url('{_branding.LoginBackgroundUrl}'); background-size: cover; background-position: center;";
+    private string CardStyle => $"width: 400px; border-top: 4px solid {_branding.PrimaryColor};";
 
     protected override async Task OnInitializedAsync()
     {
+        _branding = BrandingProvider.GetCurrentBranding();
         var state = await AuthStateProvider.GetAuthenticationStateAsync();
         if (state.User.Identity?.IsAuthenticated == true)
         {

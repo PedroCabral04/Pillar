@@ -1,20 +1,26 @@
-﻿@using erp.Services
+﻿@using MudBlazor
+@using erp.Services
 @using erp.Services.Browser
+@using erp.Services.Tenancy
+@using erp.Components.Branding
 @inherits LayoutComponentBase
 @inject ThemeService ThemeService
 @inject PreferenceService PreferenceService
 @inject IBrowserService BrowserService
 @inject IJSRuntime JsRuntime
+@inject ITenantBrandingProvider BrandingProvider
 @implements IDisposable
+
+<TenantBrandingHead Branding="@_branding" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
 
-<MudThemeProvider @ref="@_mudThemeProvider" @bind-IsDarkMode="ThemeService.IsDarkMode" Theme="@_customTheme"/>
-<MudPopoverProvider/>
-<MudDialogProvider/>
-<MudSnackbarProvider/>
+<MudThemeProvider @ref="@_mudThemeProvider" @bind-IsDarkMode="ThemeService.IsDarkMode" Theme="@_customTheme" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
 <MudLayout>
     <!-- Desktop: Topbar Navigation (when explicitly selected in preferences) -->
     <MudHidden Breakpoint="Breakpoint.SmAndDown" Invert="false">
@@ -31,26 +37,24 @@
         else
         {
             <!-- Desktop: Sidebar Navigation -->
-            <MudPaper Style="position: relative; height: 100vh; display: flex;" >
+            <MudPaper Style="position: relative; height: 100vh; display: flex;">
                 <MudDrawerContainer Class="mud-height-full" Style="display: flex; flex-direction: row; width: 100%;">
-                    <MudDrawer id="nav-drawer" 
-                               Fixed="true" 
-                               Variant="@(_drawerOpen ? DrawerVariant.Persistent : DrawerVariant.Mini)" 
-                               OpenMiniOnHover="true" 
-                               @bind-Open="_drawerOpen" 
-                               ClipMode="DrawerClipMode.Always" 
+                    <MudDrawer id="nav-drawer"
+                               Fixed="true"
+                               Variant="@(_drawerOpen ? DrawerVariant.Persistent : DrawerVariant.Mini)"
+                               OpenMiniOnHover="true"
+                               @bind-Open="_drawerOpen"
+                               ClipMode="DrawerClipMode.Always"
                                Elevation="2"
                                Width="240px"
                                MiniWidth="56px">
                         <erp.Components.Shared.Sidebar IsOpen="_drawerOpen" OnToggleDrawer="@ToggleDrawer" />
                     </MudDrawer>
 
-                    <MudMainContent 
-                        Class="pa-4 full-height-content" 
-                        Style="@MainContentStyle()">
+                    <MudMainContent Class="pa-4 full-height-content" Style="@MainContentStyle()">
                         <div class="mb-4 d-flex align-center justify-space-between">
                             <div class="d-flex align-center">
-                                <MudIconButton Icon="@( _drawerOpen ? Icons.Material.Filled.MenuOpen : Icons.Material.Filled.Menu )"
+                                <MudIconButton Icon="@(_drawerOpen ? Icons.Material.Filled.MenuOpen : Icons.Material.Filled.Menu)"
                                                Color="MudBlazor.Color.Inherit"
                                                Size="MudBlazor.Size.Medium"
                                                OnClick="ToggleDrawer"
@@ -75,7 +79,7 @@
         @if (_mobileDrawerOpen)
         {
             <div class="mobile-drawer-backdrop" @onclick="@CloseMobileDrawer"></div>
-            <div class="mobile-drawer @(_mobileDrawerOpen ? "open" : "")">
+            <div class="mobile-drawer @(_mobileDrawerOpen ? "open" : string.Empty)">
                 <erp.Components.Shared.Sidebar IsOpen="true" OnToggleDrawer="@CloseMobileDrawer" IsMobile="true" />
             </div>
         }
@@ -91,36 +95,27 @@
     <erp.Components.Shared.ChatbotWidget />
 </MudLayout>
 
-
-@*<div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
-    <span class="dismiss">🗙</span>
-    <div/>*@
-
 @code {
     private bool _drawerOpen = true;
-    private bool _mobileDrawerOpen = false;
-    private int _unreadNotifications = 0;
+    private bool _mobileDrawerOpen;
+    private int _unreadNotifications;
     private MudThemeProvider _mudThemeProvider = null!;
     public bool IsDarkMode;
     private string? _currentUrl;
-    private bool _isMobileView = false;
+    private bool _isMobileView;
+    private bool _brandingInitialized;
+
+    private MudTheme _customTheme = TenantBrandingThemeBuilder.BuildTheme(TenantBrandingTheme.Default);
+    private TenantBrandingTheme _branding = TenantBrandingTheme.Default;
 
     [Inject] private NavigationManager NavigationManager { get; set; } = null!;
 
     private bool IsTopbarNavigation => 
         PreferenceService.CurrentPreferences?.Ui?.NavigationType == "topbar";
 
-    private void ToggleDrawer()
+    protected override void OnInitialized()
     {
-        _drawerOpen = !_drawerOpen;
-    }
-
-    private void CloseMobileDrawer()
-    {
-        _mobileDrawerOpen = false;
-        _ = BrowserService.UnlockScrollAsync();
+        ApplyTenantBranding();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -144,9 +139,9 @@
         }
     }
 
-    private void OnPreferenceChanged()
+    protected override void OnParametersSet()
     {
-        InvokeAsync(StateHasChanged);
+        ApplyTenantBranding();
     }
 
     public void Dispose()
@@ -154,65 +149,33 @@
         PreferenceService.OnPreferenceChanged -= OnPreferenceChanged;
     }
 
-    readonly MudTheme _customTheme = new MudTheme()
+    private void ToggleDrawer()
     {
-        // Light: vibrant and friendly with warm neutrals
-        PaletteLight = new PaletteLight()
-        {
-            Primary = Colors.DeepPurple.Darken1,
-            Secondary = Colors.Cyan.Darken1,
-            Tertiary = Colors.Amber.Default,
+        _drawerOpen = !_drawerOpen;
+    }
 
-            Success = Colors.Green.Darken2,
-            Info = Colors.LightBlue.Darken1,
-            Warning = Colors.Orange.Darken1,
-            Error = Colors.Red.Darken1,
-
-            Background = Colors.BlueGray.Lighten5,
-            Surface = Colors.Gray.Lighten5,
-            AppbarBackground = Colors.DeepPurple.Darken2,
-            DrawerBackground = Colors.BlueGray.Lighten4,
-
-            TextPrimary = Colors.BlueGray.Darken3,
-            TextSecondary = Colors.BlueGray.Default,
-        },
-
-        // Dark: saturated accents on deep blue-Gray surfaces for contrast
-        PaletteDark = new PaletteDark()
-        {
-            Primary = Colors.DeepPurple.Lighten2,
-            Secondary = Colors.Cyan.Lighten2,
-            Tertiary = Colors.Amber.Lighten1,
-
-            Success = Colors.Green.Lighten2,
-            Info = Colors.LightBlue.Lighten2,
-            Warning = Colors.Orange.Lighten2,
-            Error = Colors.Red.Lighten2,
-
-            Background = Colors.BlueGray.Darken4,
-            Surface = Colors.BlueGray.Darken3,
-            AppbarBackground = Colors.DeepPurple.Darken3,
-            DrawerBackground = Colors.BlueGray.Darken3,
-
-            TextPrimary = Colors.Gray.Lighten5,
-            TextSecondary = Colors.Gray.Lighten2,
-        },
-
-        Typography = new Typography()
-        {
-            Default = new DefaultTypography()
-            {
-                FontFamily = new[] { "Poppins", "Roboto", "Segoe UI", "Arial", "sans-serif" },
-            },
-            H5 = new H5Typography(){ FontWeight = "600", LetterSpacing = "0.2px" },
-            Button = new ButtonTypography(){ TextTransform = "none", FontWeight = "600" },
-            Subtitle2 = new Subtitle2Typography(){ FontWeight = "600" }
-        },
-    };
-
-        string SetMarginForDrawer()
+    private void CloseMobileDrawer()
     {
-        return _drawerOpen ? "margin-left: 240px;" : "margin-left: 56px;";
+        _mobileDrawerOpen = false;
+        _ = BrowserService.UnlockScrollAsync();
+    }
+
+    private void OnPreferenceChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void ApplyTenantBranding()
+    {
+        var branding = BrandingProvider.GetCurrentBranding();
+        if (_brandingInitialized && branding == _branding)
+        {
+            return;
+        }
+
+        _branding = branding;
+        _customTheme = TenantBrandingThemeBuilder.BuildTheme(_branding);
+        _brandingInitialized = true;
     }
 
     private string MainContentStyle()

@@ -10,6 +10,8 @@ using erp.Models.Identity;
 using Microsoft.EntityFrameworkCore;
 using erp.Data;
 using erp.Models.Audit;
+using erp.Services.Tenancy;
+using System.Security.Claims;
 
 namespace erp.Controllers
 {
@@ -24,12 +26,53 @@ namespace erp.Controllers
         private readonly UserManager<ApplicationUser> _users;
         private readonly RoleManager<ApplicationRole> _roles;
         private readonly ApplicationDbContext _context;
+        private readonly ITenantContextAccessor _tenantContextAccessor;
 
-        public UsersController(UserManager<ApplicationUser> users, RoleManager<ApplicationRole> roles, ApplicationDbContext context)
+        public UsersController(
+            UserManager<ApplicationUser> users,
+            RoleManager<ApplicationRole> roles,
+            ApplicationDbContext context,
+            ITenantContextAccessor tenantContextAccessor)
         {
             _users = users;
             _roles = roles;
             _context = context;
+            _tenantContextAccessor = tenantContextAccessor;
+        }
+
+        private int? GetScopedTenantId()
+        {
+            var tenantId = _tenantContextAccessor.Current?.TenantId;
+            if (tenantId.HasValue)
+            {
+                return tenantId;
+            }
+
+            var claimValue = User?.FindFirstValue(TenantClaimTypes.TenantId);
+            return int.TryParse(claimValue, out var parsed) ? parsed : null;
+        }
+
+        private IQueryable<ApplicationUser> ApplyTenantScope(IQueryable<ApplicationUser> query)
+        {
+            var tenantId = GetScopedTenantId();
+            return tenantId.HasValue ? query.Where(u => u.TenantId == tenantId.Value) : query;
+        }
+
+        private IQueryable<ApplicationRole> ApplyTenantScope(IQueryable<ApplicationRole> query)
+        {
+            var tenantId = GetScopedTenantId();
+            return tenantId.HasValue ? query.Where(r => r.TenantId == tenantId.Value) : query;
+        }
+
+        private bool UserVisible(ApplicationUser? user)
+        {
+            if (user is null)
+            {
+                return false;
+            }
+
+            var tenantId = GetScopedTenantId();
+            return !tenantId.HasValue || user.TenantId == tenantId.Value;
         }
 
         /// <summary>
@@ -49,7 +92,7 @@ namespace erp.Controllers
         public async Task<ActionResult<IEnumerable<UserDto>>> GetAllUsers()
         {
             // Força uma nova consulta ao banco usando ToListAsync para garantir dados atualizados
-            var allUsers = await _users.Users
+            var allUsers = await ApplyTenantScope(_users.Users)
                 .AsNoTracking()
                 .Include(u => u.Department)
                 .Include(u => u.Position)
@@ -129,7 +172,7 @@ namespace erp.Controllers
         [AuditRead("ApplicationUser", DataSensitivity.High, Description = "Visualização de dados pessoais do usuário (CPF, RG, dados bancários)")]
         public async Task<ActionResult<UserDto>> GetUserById(int id)
         {
-            var user = await _users.Users
+            var user = await ApplyTenantScope(_users.Users)
                 .Include(u => u.Department)
                 .Include(u => u.Position)
                 .FirstOrDefaultAsync(u => u.Id == id);
@@ -226,12 +269,15 @@ namespace erp.Controllers
                 return BadRequest("Escolha pelo menos uma função/permissão.");
             }
             // Criar ApplicationUser
+            var scopedTenantId = GetScopedTenantId();
+
             var user = new ApplicationUser
             {
                 UserName = createUserDto.Username,
                 Email = createUserDto.Email,
                 PhoneNumber = createUserDto.Phone,
                 IsActive = true,
+                TenantId = scopedTenantId,
                 FullName = createUserDto.FullName,
                 Cpf = createUserDto.Cpf,
                 Rg = createUserDto.Rg,
@@ -276,7 +322,7 @@ namespace erp.Controllers
                 return BadRequest(string.Join("; ", result.Errors.Select(e => e.Description)));
 
             // Atribuir roles por Id => precisamos dos nomes
-            var allRoles = _roles.Roles.ToList();
+            var allRoles = ApplyTenantScope(_roles.Roles).ToList();
             var toAssign = allRoles.Where(r => createUserDto.RoleIds.Contains(r.Id)).Select(r => r.Name!).ToList();
             if (toAssign.Count > 0)
             {
@@ -330,7 +376,7 @@ namespace erp.Controllers
         public async Task<IActionResult> UpdateUser(int id, [FromBody] UpdateUserDto updateUserDto)
         {
             var user = await _users.FindByIdAsync(id.ToString());
-            if (user == null)
+            if (!UserVisible(user))
                 return NotFound($"Usuário com ID {id} não encontrado.");
 
             user.UserName = updateUserDto.Username ?? user.UserName;
@@ -393,7 +439,7 @@ namespace erp.Controllers
 
             // Roles
             var currentRoles = await _users.GetRolesAsync(user);
-            var allRoles = _roles.Roles.ToList();
+            var allRoles = ApplyTenantScope(_roles.Roles).ToList();
             var desiredRoles = allRoles.Where(r => updateUserDto.RoleIds.Contains(r.Id)).Select(r => r.Name!).ToList();
             var toAdd = desiredRoles.Except(currentRoles).ToList();
             var toRemove = currentRoles.Except(desiredRoles).ToList();
@@ -436,7 +482,7 @@ namespace erp.Controllers
         public async Task<IActionResult> DeleteUser(int id)
         {
             var user = await _users.FindByIdAsync(id.ToString());
-            if (user == null)
+            if (!UserVisible(user))
                 return NotFound($"Usuário com ID {id} não encontrado.");
 
             var res = await _users.DeleteAsync(user);
@@ -473,7 +519,10 @@ namespace erp.Controllers
             if (string.IsNullOrWhiteSpace(email))
                 return BadRequest(new ValidationResponse { IsAvailable = false, Message = "Email é obrigatório" });
 
-            var existingUser = await _users.FindByEmailAsync(email.Trim());
+            var normalizedEmail = email.Trim().ToUpperInvariant();
+            var existingUser = await ApplyTenantScope(_users.Users)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.NormalizedEmail == normalizedEmail);
             
             // Se encontrou um usuário e não é o que estamos excluindo da validação
             if (existingUser != null && (!excludeUserId.HasValue || existingUser.Id != excludeUserId.Value))
@@ -511,7 +560,10 @@ namespace erp.Controllers
             if (string.IsNullOrWhiteSpace(username))
                 return BadRequest(new ValidationResponse { IsAvailable = false, Message = "Username é obrigatório" });
 
-            var existingUser = await _users.FindByNameAsync(username.Trim());
+            var normalizedUsername = username.Trim().ToUpperInvariant();
+            var existingUser = await ApplyTenantScope(_users.Users)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.NormalizedUserName == normalizedUsername);
             
             // Se encontrou um usuário e não é o que estamos excluindo da validação
             if (existingUser != null && (!excludeUserId.HasValue || existingUser.Id != excludeUserId.Value))

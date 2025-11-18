@@ -12,4 +12,5 @@ public interface ITenantService
     Task DeleteAsync(int id, CancellationToken cancellationToken = default);
     Task<bool> SlugExistsAsync(string slug, int? ignoreTenantId = null, CancellationToken cancellationToken = default);
     Task ProvisionDatabaseAsync(int id, CancellationToken cancellationToken = default);
+    Task<TenantConnectionInfoDto?> GetConnectionInfoAsync(int id, CancellationToken cancellationToken = default);
 }
