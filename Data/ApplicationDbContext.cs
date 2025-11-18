@@ -583,9 +583,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         // Actually, the best way is to use a method on the context or a property.
         // Let's add a CurrentTenantId property to ApplicationDbContext that delegates to the accessor.
         
-        modelBuilder.Entity<Models.Inventory.Product>().HasQueryFilter(p => _tenantContextAccessor == null || _tenantContextAccessor.Current == null || !_tenantContextAccessor.Current.TenantId.HasValue || p.TenantId == _tenantContextAccessor.Current.TenantId.Value);
-        modelBuilder.Entity<Models.Sales.Customer>().HasQueryFilter(c => _tenantContextAccessor == null || _tenantContextAccessor.Current == null || !_tenantContextAccessor.Current.TenantId.HasValue || c.TenantId == _tenantContextAccessor.Current.TenantId.Value);
-        modelBuilder.Entity<Models.Financial.Supplier>().HasQueryFilter(s => _tenantContextAccessor == null || _tenantContextAccessor.Current == null || !_tenantContextAccessor.Current.TenantId.HasValue || s.TenantId == _tenantContextAccessor.Current.TenantId.Value);
+        modelBuilder.Entity<Models.Inventory.Product>().HasQueryFilter(p => _tenantContextAccessor == null || _tenantContextAccessor.Current == null || !_tenantContextAccessor.Current.TenantId.HasValue || p.TenantId == _tenantContextAccessor.Current.TenantId.GetValueOrDefault());
+        modelBuilder.Entity<Models.Sales.Customer>().HasQueryFilter(c => _tenantContextAccessor == null || _tenantContextAccessor.Current == null || !_tenantContextAccessor.Current.TenantId.HasValue || c.TenantId == _tenantContextAccessor.Current.TenantId.GetValueOrDefault());
+        modelBuilder.Entity<Models.Financial.Supplier>().HasQueryFilter(s => _tenantContextAccessor == null || _tenantContextAccessor.Current == null || !_tenantContextAccessor.Current.TenantId.HasValue || s.TenantId == _tenantContextAccessor.Current.TenantId.GetValueOrDefault());
     }
 
     private void ConfigureTenancyModels(ModelBuilder modelBuilder)
