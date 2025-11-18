@@ -4,6 +4,7 @@ using erp.Models.Audit;
 using erp.Models.TimeTracking;
 using erp.Models.Financial;
 using erp.Models.Payroll;
+using erp.Models.Tenancy;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
@@ -58,6 +59,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<AssetMaintenance> AssetMaintenances { get; set; } = null!;
     public DbSet<AssetDocument> AssetDocuments { get; set; } = null!;
     public DbSet<AssetTransfer> AssetTransfers { get; set; } = null!;
+    public DbSet<Tenant> Tenants { get; set; } = null!;
+    public DbSet<TenantBranding> TenantBrandings { get; set; } = null!;
+    public DbSet<TenantMembership> TenantMemberships { get; set; } = null!;
     
     // Audit
     public DbSet<AuditLog> AuditLogs { get; set; } = null!;
@@ -515,6 +519,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             t.HasIndex(x => new { x.ColumnId, x.Position });
         });
 
+        ConfigureTenancyModels(modelBuilder);
+
         // Inventory model configuration
         ConfigureInventoryModels(modelBuilder);
         
@@ -538,6 +544,79 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         // Time tracking / payroll configuration
         ConfigureTimeTrackingModels(modelBuilder);
+    }
+
+    private void ConfigureTenancyModels(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<TenantBranding>(branding =>
+        {
+            branding.ToTable("TenantBrandings");
+            branding.HasKey(x => x.Id);
+            branding.Property(x => x.LogoUrl).HasMaxLength(500);
+            branding.Property(x => x.FaviconUrl).HasMaxLength(500);
+            branding.Property(x => x.PrimaryColor).HasMaxLength(20);
+            branding.Property(x => x.SecondaryColor).HasMaxLength(20);
+            branding.Property(x => x.AccentColor).HasMaxLength(20);
+            branding.Property(x => x.LoginBackgroundUrl).HasMaxLength(500);
+            branding.Property(x => x.EmailFooterHtml).HasMaxLength(2000);
+            branding.Property(x => x.CustomCss).HasMaxLength(2000);
+        });
+
+        modelBuilder.Entity<Tenant>(tenant =>
+        {
+            tenant.ToTable("Tenants");
+            tenant.HasKey(x => x.Id);
+            tenant.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            tenant.Property(x => x.Slug).HasMaxLength(64).IsRequired();
+            tenant.Property(x => x.DocumentNumber).HasMaxLength(20);
+            tenant.Property(x => x.PrimaryContactName).HasMaxLength(200);
+            tenant.Property(x => x.PrimaryContactEmail).HasMaxLength(200);
+            tenant.Property(x => x.PrimaryContactPhone).HasMaxLength(20);
+            tenant.Property(x => x.DatabaseName).HasMaxLength(200);
+            tenant.Property(x => x.ConnectionString).HasMaxLength(500);
+            tenant.Property(x => x.Region).HasMaxLength(200);
+            tenant.Property(x => x.Notes).HasMaxLength(2000);
+
+            tenant.HasIndex(x => x.Slug).IsUnique();
+            tenant.HasIndex(x => x.Status);
+            tenant.HasIndex(x => x.DocumentNumber);
+
+            tenant.HasOne(x => x.Branding)
+                .WithMany()
+                .HasForeignKey(x => x.BrandingId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<TenantMembership>(membership =>
+        {
+            membership.ToTable("TenantMemberships");
+            membership.HasKey(x => x.Id);
+            membership.HasIndex(x => new { x.TenantId, x.UserId }).IsUnique();
+
+            membership.HasOne(x => x.Tenant)
+                .WithMany(x => x.Memberships)
+                .HasForeignKey(x => x.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            membership.HasOne(x => x.User)
+                .WithMany(x => x.TenantMemberships)
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ApplicationUser>(user =>
+        {
+            user.HasIndex(x => x.TenantId);
+            user.HasOne(x => x.Tenant)
+                .WithMany(x => x.Users)
+                .HasForeignKey(x => x.TenantId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ApplicationRole>(role =>
+        {
+            role.HasIndex(x => x.TenantId);
+        });
     }
 
     private void ConfigureInventoryModels(ModelBuilder modelBuilder)
