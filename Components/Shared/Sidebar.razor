@@ -8,37 +8,11 @@
 @inject ITenantBrandingProvider BrandingProvider
 
 <nav class="pillar-sidebar" role="navigation" aria-label="Navegação principal">
-<MudNavMenu Rounded="false">
+<MudNavMenu Rounded="true" Margin="Margin.Dense" Color="MudBlazor.Color.Primary" Class="pa-2">
     @if (IsOpen)
     {
-        <div class="sidebar-header px-3 py-3">
-            <div class="brand d-flex align-center">
-                <MudAvatar Size="@MudBlazor.Size.Medium"
-                           Class="me-2"
-                           Square="true"
-                           Alt="@_branding.TenantName"
-                           Image="@_branding.LogoUrl"
-                           Text="@_branding.Initials"
-                           Style="@($"background-color:{_branding.PrimaryColor};color:white;")" />
-                <div>
-                    <MudText Typo="Typo.h6" Style="font-weight:600;">@_branding.TenantName</MudText>
-                    <AuthorizeView>
-                        <Authorized Context="auth">
-                            <MudText Typo="Typo.caption">@auth.User.Identity?.Name</MudText>
-                        </Authorized>
-                        <NotAuthorized>
-                            <MudText Typo="Typo.caption">Bem vindo</MudText>
-                        </NotAuthorized>
-                    </AuthorizeView>
-                </div>
-            </div>
-            <MudIconButton Icon="@(IsOpen ? Icons.Material.Filled.MenuOpen : Icons.Material.Filled.Menu)"
-                            Color="MudBlazor.Color.Inherit" Size="MudBlazor.Size.Small" Class="menu-toggle"
-                            Title="Alternar menu" AriaLabel="Alternar menu" OnClick="@(async ()=> await OnToggleDrawer.InvokeAsync())" />
-        </div>
-
-        <div class="px-3 pb-2">
-            <MudTextField Id="sidebar-search" @ref="_searchField" @bind-Value="_search" Placeholder="Buscar (⌘/Ctrl + K)" Dense="true" Clearable="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true" AriaLabel="Pesquisar navegação" @onkeydown="OnSearchKeyDown" />
+        <div class="px-3 pt-4 pb-2">
+            <MudTextField Id="sidebar-search" @ref="_searchField" @bind-Value="_search" Placeholder="Buscar (⌘/Ctrl + K)" Dense="true" Clearable="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true" AriaLabel="Pesquisar navegação" @onkeydown="OnSearchKeyDown" Variant="Variant.Outlined" Margin="Margin.Dense" />
         </div>
 
         @if (_isSearching)

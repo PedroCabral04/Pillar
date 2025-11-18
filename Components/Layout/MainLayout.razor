@@ -9,6 +9,7 @@
 @inject IBrowserService BrowserService
 @inject IJSRuntime JsRuntime
 @inject ITenantBrandingProvider BrandingProvider
+@inject IDialogService DialogService
 @implements IDisposable
 
 <TenantBrandingHead Branding="@_branding" />
@@ -37,40 +38,65 @@
         else
         {
             <!-- Desktop: Sidebar Navigation -->
-            <MudPaper Style="position: relative; height: 100vh; display: flex;">
-                <MudDrawerContainer Class="mud-height-full" Style="display: flex; flex-direction: row; width: 100%;">
-                    <MudDrawer id="nav-drawer"
-                               Fixed="true"
-                               Variant="@(_drawerOpen ? DrawerVariant.Persistent : DrawerVariant.Mini)"
-                               OpenMiniOnHover="true"
-                               @bind-Open="_drawerOpen"
-                               ClipMode="DrawerClipMode.Always"
-                               Elevation="2"
-                               Width="240px"
-                               MiniWidth="56px">
-                        <erp.Components.Shared.Sidebar IsOpen="_drawerOpen" OnToggleDrawer="@ToggleDrawer" />
-                    </MudDrawer>
+            <MudAppBar Elevation="1" Color="MudBlazor.Color.Surface" Fixed="true" ClipMode="DrawerClipMode.Always">
+                <MudIconButton Icon="@(_drawerOpen ? Icons.Material.Filled.MenuOpen : Icons.Material.Filled.Menu)"
+                               Color="MudBlazor.Color.Inherit"
+                               Edge="Edge.Start"
+                               OnClick="@ToggleDrawer"
+                               Class="mr-3" />
+                
+                <div class="d-flex align-center">
+                    <MudAvatar Size="MudBlazor.Size.Medium"
+                               Class="me-2"
+                               Square="true"
+                               Image="@_branding.LogoUrl"
+                               Text="@_branding.Initials"
+                               Style="@($"background-color:{_branding.PrimaryColor};color:white;")" />
+                    <MudText Typo="Typo.h6" Style="font-weight: 600;">@_branding.TenantName</MudText>
+                </div>
 
-                    <MudMainContent Class="pa-4 full-height-content" Style="@MainContentStyle()">
-                        <div class="mb-4 d-flex align-center justify-space-between">
-                            <div class="d-flex align-center">
-                                <MudIconButton Icon="@(_drawerOpen ? Icons.Material.Filled.MenuOpen : Icons.Material.Filled.Menu)"
-                                               Color="MudBlazor.Color.Inherit"
-                                               Size="MudBlazor.Size.Medium"
-                                               OnClick="ToggleDrawer"
-                                               AriaLabel="Toggle drawer"
-                                               Class="me-3" />
-                                <erp.Components.Shared.Breadcrumbs />
-                            </div>
-                        </div>
-                        @Body
-                    </MudMainContent>
+                <MudSpacer />
 
-                    <MudScrollToTop>
-                        <MudFab Color="MudBlazor.Color.Tertiary" StartIcon="@Icons.Material.Filled.ArrowCircleUp" />
-                    </MudScrollToTop>
-                </MudDrawerContainer>
-            </MudPaper>
+                <AuthorizeView>
+                    <Authorized Context="auth">
+                        <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" LockScroll="true">
+                            <ActivatorContent>
+                                <MudChip T="string" Icon="@Icons.Material.Filled.Person" Color="MudBlazor.Color.Surface">@auth.User.Identity?.Name</MudChip>
+                            </ActivatorContent>
+                            <ChildContent>
+                                <MudMenuItem Href="/settings" Icon="@Icons.Material.Filled.Settings">Configurações</MudMenuItem>
+                                <MudMenuItem OnClick="LogoutAsync" Icon="@Icons.Material.Filled.Logout">Sair</MudMenuItem>
+                            </ChildContent>
+                        </MudMenu>
+                    </Authorized>
+                    <NotAuthorized>
+                        <MudButton Href="/login" Variant="Variant.Text" Color="MudBlazor.Color.Primary">Entrar</MudButton>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </MudAppBar>
+
+            <MudDrawer id="nav-drawer"
+                       Fixed="true"
+                       Variant="@(_drawerOpen ? DrawerVariant.Persistent : DrawerVariant.Mini)"
+                       OpenMiniOnHover="true"
+                       @bind-Open="_drawerOpen"
+                       ClipMode="DrawerClipMode.Always"
+                       Elevation="0"
+                       Width="240px"
+                       MiniWidth="56px">
+                <erp.Components.Shared.Sidebar IsOpen="_drawerOpen" OnToggleDrawer="@ToggleDrawer" />
+            </MudDrawer>
+
+            <MudMainContent Class="pa-4 full-height-content" Style="@MainContentStyle()">
+                <div class="mb-4">
+                    <erp.Components.Shared.Breadcrumbs />
+                </div>
+                @Body
+            </MudMainContent>
+
+            <MudScrollToTop>
+                <MudFab Color="MudBlazor.Color.Tertiary" StartIcon="@Icons.Material.Filled.ArrowCircleUp" />
+            </MudScrollToTop>
         }
     </MudHidden>
     
@@ -174,6 +200,33 @@
     {
         _mobileDrawerOpen = false;
         _ = BrowserService.UnlockScrollAsync();
+    }
+
+    private async Task LogoutAsync()
+    {
+        var parameters = new DialogParameters
+        {
+            { "ContentText", "Tem certeza que deseja sair do sistema?" },
+            { "ButtonText", "Sair" },
+            { "Color", MudBlazor.Color.Error }
+        };
+
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.Small };
+        var dialog = await DialogService.ShowAsync<erp.Components.Shared.Dialogs.ConfirmDialog>("Confirmar saída", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            try
+            {
+                await JsRuntime.InvokeVoidAsync("erpAuth.logout");
+                NavigationManager.NavigateTo("/login", forceLoad: true);
+            }
+            catch
+            {
+                NavigationManager.NavigateTo("/login", forceLoad: true);
+            }
+        }
     }
 
     private void OnPreferenceChanged()

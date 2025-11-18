@@ -57,8 +57,25 @@
              StartIcon="@Icons.Material.Filled.ArrowDropDown"
              EndIcon="">
         <MudMenuItem Href="inventory/products" Icon="@Icons.Material.Filled.Category">Produtos</MudMenuItem>
+        <MudMenuItem Href="inventory/categories" Icon="@Icons.Material.Filled.FolderOpen">Categorias</MudMenuItem>
         <MudMenuItem Href="inventory/movements" Icon="@Icons.Material.Filled.SwapHoriz">Movimentações</MudMenuItem>
         <MudMenuItem Href="inventory/counts" Icon="@Icons.Material.Filled.Checklist">Contagens</MudMenuItem>
+    </MudMenu>
+
+    <MudMenu 
+             Label="Financeiro" 
+             Color="@(IsActive("financial") ? Color.Primary : Color.Inherit)" 
+             Variant="@(IsActive("financial") ? Variant.Filled : Variant.Text)"
+             Class="mx-1"
+             Style="text-transform: none;"
+             StartIcon="@Icons.Material.Filled.ArrowDropDown"
+             EndIcon="">
+        <MudMenuItem Href="financial/dashboard" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudMenuItem>
+        <MudMenuItem Href="financial/receivables" Icon="@Icons.Material.Filled.CallReceived">Contas a Receber</MudMenuItem>
+        <MudMenuItem Href="financial/payables" Icon="@Icons.Material.Filled.CallMade">Contas a Pagar</MudMenuItem>
+        <MudMenuItem Href="financial/suppliers" Icon="@Icons.Material.Filled.LocalShipping">Fornecedores</MudMenuItem>
+        <MudMenuItem Href="financial/categories" Icon="@Icons.Material.Filled.Category">Categorias</MudMenuItem>
+        <MudMenuItem Href="financial/costcenters" Icon="@Icons.Material.Filled.AccountBalanceWallet">Centros de Custo</MudMenuItem>
     </MudMenu>
     
     <MudButton 
@@ -69,15 +86,46 @@
                Style="text-transform: none;">
         Kanban
     </MudButton>
+
+    <MudButton 
+               Color="@(IsActive("assets") ? Color.Primary : Color.Inherit)"
+               Variant="@(IsActive("assets") ? Variant.Filled : Variant.Text)"
+               Href="assets" 
+               Class="mx-1"
+               Style="text-transform: none;">
+        Ativos
+    </MudButton>
+
+    <MudButton 
+               Color="@(IsActive("reports") ? Color.Primary : Color.Inherit)"
+               Variant="@(IsActive("reports") ? Variant.Filled : Variant.Text)"
+               Href="reports" 
+               Class="mx-1"
+               Style="text-transform: none;">
+        Relatórios
+    </MudButton>
     
     <MudSpacer />
     
     <AuthorizeView Roles="Administrador">
         <Authorized>
-            <MudIconButton Icon="@Icons.Material.Filled.AdminPanelSettings" 
-                          Color="@(IsActive("admin") ? Color.Primary : Color.Inherit)" 
-                          Href="admin/users"
-                          Title="Administração" />
+            <MudMenu 
+                     Label="Admin" 
+                     Color="@(IsActive("admin") ? Color.Primary : Color.Inherit)" 
+                     Variant="@(IsActive("admin") ? Variant.Filled : Variant.Text)"
+                     Class="mx-1"
+                     Style="text-transform: none;"
+                     StartIcon="@Icons.Material.Filled.ArrowDropDown"
+                     EndIcon="">
+                <MudMenuItem Href="admin/users" Icon="@Icons.Material.Filled.People">Usuários</MudMenuItem>
+                <MudMenuItem Href="admin/tenants" Icon="@Icons.Material.Filled.Domain">Tenants</MudMenuItem>
+                <MudMenuItem Href="admin/departments" Icon="@Icons.Material.Filled.BusinessCenter">Departamentos</MudMenuItem>
+                <MudMenuItem Href="admin/positions" Icon="@Icons.Material.Filled.WorkOutline">Cargos</MudMenuItem>
+                <MudMenuItem Href="admin/widget-roles" Icon="@Icons.Material.Filled.Widgets">Widgets / Papéis</MudMenuItem>
+                <MudMenuItem Href="time-tracking/payroll" Icon="@Icons.Material.Filled.AccessTime">Apontamento</MudMenuItem>
+                <MudMenuItem Href="audit" Icon="@Icons.Material.Filled.History">Auditoria</MudMenuItem>
+                <MudMenuItem Href="data-access-report" Icon="@Icons.Material.Filled.Shield">Acessos LGPD</MudMenuItem>
+            </MudMenu>
         </Authorized>
     </AuthorizeView>
     
