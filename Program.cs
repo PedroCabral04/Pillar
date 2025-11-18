@@ -260,7 +260,7 @@ builder.Services.AddDbContextFactory<ApplicationDbContext>((serviceProvider, opt
         effectiveConnection ?? connectionString ?? "Host=localhost;Database=erp;Username=postgres;Password=123",
         npgsql => npgsql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)
     );
-});
+}, ServiceLifetime.Scoped);
 
 // Registra DAOs e Serviços
 builder.Services.AddScoped<IUserDao, UserDao>();

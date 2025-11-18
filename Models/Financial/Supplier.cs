@@ -2,14 +2,17 @@ using System.ComponentModel.DataAnnotations;
 using erp.Models.Audit;
 using erp.Models.Identity;
 
+using erp.Models.Tenancy;
+
 namespace erp.Models.Financial;
 
 /// <summary>
 /// Represents a supplier in the financial system
 /// </summary>
-public class Supplier : IAuditable
+public class Supplier : IAuditable, IMustHaveTenant
 {
     public int Id { get; set; }
+    public int TenantId { get; set; }
     
     [Required]
     [MaxLength(200)]

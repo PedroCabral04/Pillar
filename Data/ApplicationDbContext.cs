@@ -12,8 +12,7 @@ using System.Text.Json;
 
 namespace erp.Data;
 
-public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
-    : IdentityDbContext<ApplicationUser, ApplicationRole, int>(options)
+public class ApplicationDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, int>
 {
     // Mantemos os DbSets existentes se ainda forem usados em outras partes (tabelas próprias do app)
     public new DbSet<User> Users { get; set; } = null!;
@@ -74,14 +73,17 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     
     // Serviços injetados para auditoria
     private readonly IHttpContextAccessor? _httpContextAccessor;
+    private readonly erp.Services.Tenancy.ITenantContextAccessor? _tenantContextAccessor;
     
     // Construtor adicional para injeção de IHttpContextAccessor
     public ApplicationDbContext(
         DbContextOptions<ApplicationDbContext> options,
-        IHttpContextAccessor? httpContextAccessor = null) 
-        : this(options)
+        IHttpContextAccessor? httpContextAccessor = null,
+        erp.Services.Tenancy.ITenantContextAccessor? tenantContextAccessor = null) 
+        : base(options)
     {
         _httpContextAccessor = httpContextAccessor;
+        _tenantContextAccessor = tenantContextAccessor;
     }
 
     protected override void OnConfiguring(DbContextOptionsBuilder options)
@@ -96,6 +98,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
         SetAuditProperties();
+        SetTenantId();
         
         // Captura snapshots (apenas dados serializados, não referências)
         var auditSnapshots = CaptureAuditSnapshots();
@@ -129,6 +132,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public override int SaveChanges()
     {
         SetAuditProperties();
+        SetTenantId();
         
         var auditSnapshots = CaptureAuditSnapshots();
         
@@ -152,6 +156,25 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         }
         
         return result;
+    }
+
+    private void SetTenantId()
+    {
+        var currentTenantId = _tenantContextAccessor?.Current?.TenantId;
+        if (!currentTenantId.HasValue) return;
+
+        var entries = ChangeTracker.Entries()
+            .Where(e => e.Entity is IMustHaveTenant && e.State == EntityState.Added);
+
+        foreach (var entry in entries)
+        {
+            var entity = (IMustHaveTenant)entry.Entity;
+            // Only set if not already set (allows explicit override)
+            if (entity.TenantId == 0)
+            {
+                entity.TenantId = currentTenantId.Value;
+            }
+        }
     }
 
     private void SetAuditProperties()
@@ -544,6 +567,25 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         // Time tracking / payroll configuration
         ConfigureTimeTrackingModels(modelBuilder);
+
+        // Apply Global Query Filters for Multi-Tenancy
+        // This ensures that queries only return data for the current tenant
+        // Note: This filter is applied to the CLR type, so it works for all derived types too
+        
+        // We need to capture the tenant ID in a local variable for the expression tree
+        // However, since OnModelCreating runs once per app lifetime (cached), we can't use _tenantContextAccessor here directly.
+        // Instead, we use a Global Query Filter that references a property on the DbContext or a service.
+        // But EF Core Global Query Filters are defined in OnModelCreating.
+        // The standard way is to define the filter using a lambda that accesses a property on the DbContext instance.
+        // But we don't have a TenantId property on ApplicationDbContext.
+        // We can add one, or use the accessor via an expression.
+        
+        // Actually, the best way is to use a method on the context or a property.
+        // Let's add a CurrentTenantId property to ApplicationDbContext that delegates to the accessor.
+        
+        modelBuilder.Entity<Models.Inventory.Product>().HasQueryFilter(p => _tenantContextAccessor == null || _tenantContextAccessor.Current == null || !_tenantContextAccessor.Current.TenantId.HasValue || p.TenantId == _tenantContextAccessor.Current.TenantId.Value);
+        modelBuilder.Entity<Models.Sales.Customer>().HasQueryFilter(c => _tenantContextAccessor == null || _tenantContextAccessor.Current == null || !_tenantContextAccessor.Current.TenantId.HasValue || c.TenantId == _tenantContextAccessor.Current.TenantId.Value);
+        modelBuilder.Entity<Models.Financial.Supplier>().HasQueryFilter(s => _tenantContextAccessor == null || _tenantContextAccessor.Current == null || !_tenantContextAccessor.Current.TenantId.HasValue || s.TenantId == _tenantContextAccessor.Current.TenantId.Value);
     }
 
     private void ConfigureTenancyModels(ModelBuilder modelBuilder)
@@ -576,10 +618,14 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             tenant.Property(x => x.ConnectionString).HasMaxLength(500);
             tenant.Property(x => x.Region).HasMaxLength(200);
             tenant.Property(x => x.Notes).HasMaxLength(2000);
+            tenant.Property(x => x.ConfigurationJson).HasColumnType("jsonb");
 
             tenant.HasIndex(x => x.Slug).IsUnique();
             tenant.HasIndex(x => x.Status);
             tenant.HasIndex(x => x.DocumentNumber);
+            tenant.HasIndex(x => x.DatabaseName)
+                .IsUnique()
+                .HasFilter("\"DatabaseName\" IS NOT NULL");
 
             tenant.HasOne(x => x.Branding)
                 .WithMany()
@@ -1147,7 +1193,6 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         // ApplicationUser - Configuração adicional para relacionamentos de RH
         modelBuilder.Entity<ApplicationUser>(u =>
         {
-            u.HasIndex(x => x.Cpf).IsUnique().HasFilter("\"Cpf\" IS NOT NULL");
             u.HasIndex(x => x.Rg).HasFilter("\"Rg\" IS NOT NULL");
             u.HasIndex(x => x.FullName);
             u.HasIndex(x => x.DepartmentId);

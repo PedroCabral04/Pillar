@@ -127,12 +127,28 @@
             PreferenceService.OnPreferenceChanged += OnPreferenceChanged;
             
             // Detecta se é mobile
-            _isMobileView = await JsRuntime.InvokeAsync<bool>("erpResponsive.isMobile");
-            
-            // Fecha o drawer por padrão no mobile
-            if (_isMobileView)
+            try
             {
-                _drawerOpen = false;
+                _isMobileView = await JsRuntime.InvokeAsync<bool>("erpResponsive.isMobile");
+                
+                // Fecha o drawer por padrão no mobile
+                if (_isMobileView)
+                {
+                    _drawerOpen = false;
+                }
+            }
+            catch (JSDisconnectedException)
+            {
+                // Ignore exception if circuit is disconnected
+            }
+            catch (TaskCanceledException)
+            {
+                // Ignore exception if task is canceled
+            }
+            catch (Exception)
+            {
+                // Fallback safely if JS fails
+                _isMobileView = false;
             }
             
             StateHasChanged();

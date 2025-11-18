@@ -10,11 +10,11 @@
 <MudAppBar Elevation="2" Dense="false" Class="px-3">
     <div class="d-flex align-center mr-6">
         <MudAvatar Size="MudBlazor.Size.Medium"
-                   Class="me-2"
-                   Square="true"
-                   Image="@_branding.LogoUrl"
-                   Text="@_branding.Initials"
-                   Style=$"background-color:{_branding.PrimaryColor};color:white;" />
+               Class="me-2"
+               Square="true"
+               Image="@_branding.LogoUrl"
+               Text="@_branding.Initials"
+               Style="@($"background-color:{_branding.PrimaryColor};color:white;")" />
         <MudText Typo="Typo.h5" Style="font-weight: 600;">@_branding.TenantName</MudText>
     </div>
     

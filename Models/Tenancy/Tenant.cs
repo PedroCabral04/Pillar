@@ -42,6 +42,18 @@ public class Tenant : IAuditable
     [MaxLength(2000)]
     public string? Notes { get; set; }
 
+    public string? ConfigurationJson { get; set; }
+    
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public erp.DTOs.Tenancy.TenantConfiguration Configuration
+    {
+        get => string.IsNullOrEmpty(ConfigurationJson) 
+            ? new erp.DTOs.Tenancy.TenantConfiguration() 
+            : System.Text.Json.JsonSerializer.Deserialize<erp.DTOs.Tenancy.TenantConfiguration>(ConfigurationJson) 
+              ?? new erp.DTOs.Tenancy.TenantConfiguration();
+        set => ConfigurationJson = System.Text.Json.JsonSerializer.Serialize(value);
+    }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? ActivatedAt { get; set; }
     public DateTime? SuspendedAt { get; set; }
