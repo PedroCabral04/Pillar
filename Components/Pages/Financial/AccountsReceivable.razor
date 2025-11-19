@@ -1,4 +1,8 @@
 @page "/financial/receivables"
+@using erp.DTOs.Financial
+@using erp.DTOs.Sales
+@using erp.Models.Financial
+@using erp.Components.Shared.Dialogs.Financial
 @attribute [Authorize]
 
 <PageTitle>Contas a Receber - Pillar ERP</PageTitle>
@@ -9,19 +13,373 @@
         Contas a Receber
     </MudText>
 
+    <MudPaper Class="pa-4 mb-4">
+        <MudGrid>
+            <MudItem xs="12" sm="6" md="3">
+                <MudTextField @bind-Value="searchTerm" 
+                             Placeholder="Buscar por cliente ou nota..." 
+                             Adornment="Adornment.Start" 
+                             AdornmentIcon="@Icons.Material.Filled.Search"
+                             DebounceInterval="500"
+                             OnDebounceIntervalElapsed="OnSearch" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                 <MudSelect T="AccountStatus?" Label="Status" Value="statusFilter" ValueChanged="OnStatusChanged" Clearable="true">
+                    @foreach (AccountStatus status in Enum.GetValues(typeof(AccountStatus)))
+                    {
+                        <MudSelectItem Value="@((AccountStatus?)status)">@status.ToString()</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudDateRangePicker Label="Período de Vencimento" DateRange="dateRange" DateRangeChanged="OnDateRangeChanged" Clearable="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3" Class="d-flex align-center justify-end">
+                <MudButton Variant="Variant.Filled" 
+                          Color="MudBlazor.Color.Primary" 
+                          StartIcon="@Icons.Material.Filled.Add"
+                          OnClick="OpenCreateDialog">
+                    Nova Conta
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
     <MudPaper Class="pa-4">
-        <MudAlert Severity="Severity.Info">
-            Esta funcionalidade está em desenvolvimento. Em breve você poderá:
-            <MudList T="string" Dense="true">
-                <MudListItem T="string" Icon="@Icons.Material.Filled.Add">Cadastrar contas a receber</MudListItem>
-                <MudListItem T="string" Icon="@Icons.Material.Filled.Payment">Registrar recebimentos</MudListItem>
-                <MudListItem T="string" Icon="@Icons.Material.Filled.Splitscreen">Criar parcelamentos</MudListItem>
-                <MudListItem T="string" Icon="@Icons.Material.Filled.FilterList">Filtrar por status e período</MudListItem>
-            </MudList>
-        </MudAlert>
+        <MudTable T="AccountReceivableDto" ServerData="@(new Func<TableState, System.Threading.CancellationToken, Task<TableData<AccountReceivableDto>>>(ServerReload))"
+              @ref="table"
+                  Dense="true"
+                  Hover="true"
+                  Striped="true">
+            <HeaderContent>
+                <MudTh><MudTableSortLabel SortLabel="CustomerName" T="AccountReceivableDto">Cliente</MudTableSortLabel></MudTh>
+                <MudTh>Nota Fiscal</MudTh>
+                <MudTh><MudTableSortLabel SortLabel="DueDate" T="AccountReceivableDto">Vencimento</MudTableSortLabel></MudTh>
+                <MudTh>Valor</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>Ações</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Cliente">@context.CustomerName</MudTd>
+                <MudTd DataLabel="Nota Fiscal">@context.InvoiceNumber</MudTd>
+                <MudTd DataLabel="Vencimento">@context.DueDate.ToShortDateString()</MudTd>
+                <MudTd DataLabel="Valor">@context.RemainingAmount.ToString("C2")</MudTd>
+                <MudTd DataLabel="Status">
+                        <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">
+                        @context.StatusDescription
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Ações">
+                    @if (context.Status != AccountStatus.Paid && context.Status != AccountStatus.Cancelled)
+                    {
+                        <MudTooltip Text="Receber">
+                            <MudIconButton Icon="@Icons.Material.Filled.AttachMoney" Size="Size.Small" Color="MudBlazor.Color.Success" OnClick="@(() => OpenReceiveDialog(context))" />
+                        </MudTooltip>
+                    }
+                    <MudTooltip Text="Editar">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => OpenEditDialog(context))" Disabled="@(context.Status == AccountStatus.Paid)" />
+                    </MudTooltip>
+                    <MudTooltip Text="Excluir">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="MudBlazor.Color.Error" OnClick="@(() => DeleteAccount(context))" Disabled="@(context.Status == AccountStatus.Paid)" />
+                    </MudTooltip>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText>Nenhuma conta encontrada.</MudText>
+            </NoRecordsContent>
+            <PagerContent>
+                <MudTablePager />
+            </PagerContent>
+        </MudTable>
     </MudPaper>
 </MudContainer>
 
 @code {
-    // Implementation coming soon
+    [Inject] private IApiService ApiService { get; set; } = null!;
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
+    [Inject] private IDialogService DialogService { get; set; } = null!;
+
+    private MudTable<AccountReceivableDto> table;
+    private string searchTerm = "";
+    private AccountStatus? statusFilter;
+    private DateRange dateRange;
+
+    private List<CustomerDto> customers = new();
+    private List<FinancialCategoryDto> categories = new();
+    private List<CostCenterDto> costCenters = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAuxiliaryData();
+    }
+
+    private async Task LoadAuxiliaryData()
+    {
+        try
+        {
+            // Assuming endpoint for all customers exists or we use a paginated one with large size
+            // For now, let's try to get a list. If it fails, we might need to implement a search in the dialog.
+            // The Sales module usually has customers.
+            var customersResult = await ApiService.GetAsync<PaginatedCustomersResponse>("api/customers?pageSize=1000");
+            if (customersResult != null)
+            {
+                customers = customersResult.Items;
+            }
+            
+            categories = await ApiService.GetAsync<List<FinancialCategoryDto>>("api/financial-categories") ?? new();
+            costCenters = await ApiService.GetAsync<List<CostCenterDto>>("api/cost-centers") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar dados auxiliares: {ex.Message}", Severity.Warning);
+        }
+    }
+
+    private async Task<TableData<AccountReceivableDto>> ServerReload(TableState state, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var query = new List<string>
+            {
+                $"page={state.Page + 1}",
+                $"pageSize={state.PageSize}",
+                $"sortDescending={state.SortDirection == SortDirection.Descending}"
+            };
+
+            if (!string.IsNullOrEmpty(state.SortLabel))
+            {
+                query.Add($"sortBy={state.SortLabel}");
+            }
+
+            if (statusFilter.HasValue)
+            {
+                query.Add($"status={statusFilter.Value}");
+            }
+
+            if (dateRange?.Start.HasValue == true)
+            {
+                query.Add($"dueDateFrom={dateRange.Start.Value:yyyy-MM-dd}");
+            }
+            
+            if (dateRange?.End.HasValue == true)
+            {
+                query.Add($"dueDateTo={dateRange.End.Value:yyyy-MM-dd}");
+            }
+            
+            var queryString = string.Join("&", query);
+            var response = await ApiService.GetAsync<PagedResult<AccountReceivableDto>>($"api/accounts-receivable?{queryString}", cancellationToken);
+
+            if (response != null)
+            {
+                return new TableData<AccountReceivableDto>
+                {
+                    TotalItems = response.TotalCount,
+                    Items = response.Items
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar contas: {ex.Message}", Severity.Error);
+        }
+
+        return new TableData<AccountReceivableDto> { TotalItems = 0, Items = new List<AccountReceivableDto>() };
+    }
+
+    private void OnSearch(string text)
+    {
+        searchTerm = text;
+        table.ReloadServerData();
+    }
+
+    private void OnStatusChanged(AccountStatus? status)
+    {
+        statusFilter = status;
+        table.ReloadServerData();
+    }
+
+    private void OnDateRangeChanged(DateRange range)
+    {
+        dateRange = range;
+        table.ReloadServerData();
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("Customers", customers);
+        parameters.Add("Categories", categories);
+        parameters.Add("CostCenters", costCenters);
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = DialogService.Show<AccountReceivableDialog>("Nova Conta a Receber", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is CreateAccountReceivableDto dto)
+        {
+            try
+            {
+                await ApiService.PostAsync<AccountReceivableDto>("api/accounts-receivable", dto);
+                Snackbar.Add("Conta criada com sucesso", Severity.Success);
+                await table.ReloadServerData();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao criar conta: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task OpenEditDialog(AccountReceivableDto account)
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("Customers", customers);
+        parameters.Add("Categories", categories);
+        parameters.Add("CostCenters", costCenters);
+        
+        var model = new CreateAccountReceivableDto
+        {
+            CustomerId = account.CustomerId,
+            InvoiceNumber = account.InvoiceNumber,
+            OriginalAmount = account.OriginalAmount,
+            DiscountAmount = account.DiscountAmount,
+            InterestAmount = account.InterestAmount,
+            FineAmount = account.FineAmount,
+            IssueDate = account.IssueDate,
+            DueDate = account.DueDate,
+            PaymentMethod = account.PaymentMethod,
+            BankSlipNumber = account.BankSlipNumber,
+            PixKey = account.PixKey,
+            CategoryId = account.CategoryId,
+            CostCenterId = account.CostCenterId,
+            ParentAccountId = account.ParentAccountId,
+            InstallmentNumber = account.InstallmentNumber,
+            TotalInstallments = account.TotalInstallments,
+            Notes = account.Notes,
+            InternalNotes = account.InternalNotes
+        };
+        
+        parameters.Add("Model", model);
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = DialogService.Show<AccountReceivableDialog>("Editar Conta a Receber", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is CreateAccountReceivableDto dto)
+        {
+            try
+            {
+                var updateDto = new UpdateAccountReceivableDto
+                {
+                    CustomerId = dto.CustomerId,
+                    InvoiceNumber = dto.InvoiceNumber,
+                    OriginalAmount = dto.OriginalAmount,
+                    DiscountAmount = dto.DiscountAmount,
+                    InterestAmount = dto.InterestAmount,
+                    FineAmount = dto.FineAmount,
+                    IssueDate = dto.IssueDate,
+                    DueDate = dto.DueDate,
+                    PaymentMethod = dto.PaymentMethod,
+                    BankSlipNumber = dto.BankSlipNumber,
+                    PixKey = dto.PixKey,
+                    CategoryId = dto.CategoryId,
+                    CostCenterId = dto.CostCenterId,
+                    ParentAccountId = dto.ParentAccountId,
+                    InstallmentNumber = dto.InstallmentNumber,
+                    TotalInstallments = dto.TotalInstallments,
+                    Notes = dto.Notes,
+                    InternalNotes = dto.InternalNotes,
+                    Status = account.Status
+                };
+
+                await ApiService.PutAsync($"api/accounts-receivable/{account.Id}", updateDto);
+                Snackbar.Add("Conta atualizada com sucesso", Severity.Success);
+                await table.ReloadServerData();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao atualizar conta: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task OpenReceiveDialog(AccountReceivableDto account)
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("PaidAmount", account.RemainingAmount);
+        parameters.Add("AmountLabel", "Valor Recebido");
+        
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = DialogService.Show<PaymentDialog>("Registrar Recebimento", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            try
+            {
+                dynamic data = result.Data;
+                var payDto = new PayAccountReceivableDto
+                {
+                    PaidAmount = data.PaidAmount,
+                    PaymentDate = data.PaymentDate,
+                    AdditionalDiscount = data.AdditionalDiscount,
+                    AdditionalInterest = data.AdditionalInterest,
+                    AdditionalFine = data.AdditionalFine,
+                    Notes = data.Notes
+                };
+
+                await ApiService.PostAsync($"api/accounts-receivable/{account.Id}/receive", payDto);
+                Snackbar.Add("Recebimento registrado com sucesso", Severity.Success);
+                await table.ReloadServerData();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao registrar recebimento: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task DeleteAccount(AccountReceivableDto account)
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("ContentText", $"Tem certeza que deseja excluir a conta {account.InvoiceNumber}?");
+        parameters.Add("ButtonText", "Excluir");
+        parameters.Add("Color", MudBlazor.Color.Error);
+
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = DialogService.Show<erp.Components.Shared.Dialogs.ConfirmDialog>("Excluir Conta", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            try
+            {
+                await ApiService.DeleteAsync($"api/accounts-receivable/{account.Id}");
+                Snackbar.Add("Conta excluída com sucesso", Severity.Success);
+                await table.ReloadServerData();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao excluir conta: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private MudBlazor.Color GetStatusColor(AccountStatus status)
+    {
+        return status switch
+        {
+            AccountStatus.Pending => MudBlazor.Color.Warning,
+            AccountStatus.Paid => MudBlazor.Color.Success,
+            AccountStatus.Overdue => MudBlazor.Color.Error,
+            AccountStatus.Cancelled => MudBlazor.Color.Default,
+            _ => MudBlazor.Color.Default
+        };
+    }
+
+    public class PagedResult<T>
+    {
+        public List<T> Items { get; set; } = new();
+        public int TotalCount { get; set; }
+    }
 }

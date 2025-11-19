@@ -1,0 +1,49 @@
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="form" @bind-IsValid="@success">
+            <MudDatePicker Label="Data" @bind-Date="PaymentDate" Required="true" />
+            <MudNumericField @bind-Value="PaidAmount" Label="@AmountLabel" Format="C2" Required="true" />
+            <MudNumericField @bind-Value="AdditionalDiscount" Label="Desconto Adicional" Format="C2" />
+            <MudNumericField @bind-Value="AdditionalInterest" Label="Juros Adicionais" Format="C2" />
+            <MudNumericField @bind-Value="AdditionalFine" Label="Multa Adicional" Format="C2" />
+            <MudTextField @bind-Value="Notes" Label="Observações" Lines="2" />
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="MudBlazor.Color.Primary" OnClick="Submit">Confirmar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; }
+    [Parameter] public decimal PaidAmount { get; set; }
+    [Parameter] public DateTime? PaymentDate { get; set; } = DateTime.Today;
+    [Parameter] public string AmountLabel { get; set; } = "Valor Pago";
+
+    public decimal? AdditionalDiscount { get; set; }
+    public decimal? AdditionalInterest { get; set; }
+    public decimal? AdditionalFine { get; set; }
+    public string? Notes { get; set; }
+
+    private MudForm form;
+    private bool success;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Submit()
+    {
+        form.Validate();
+        if (success)
+        {
+            MudDialog.Close(DialogResult.Ok(new {
+                PaidAmount,
+                PaymentDate = PaymentDate ?? DateTime.Today,
+                AdditionalDiscount,
+                AdditionalInterest,
+                AdditionalFine,
+                Notes
+            }));
+        }
+    }
+}

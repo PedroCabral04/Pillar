@@ -1,6 +1,7 @@
 @page "/financial/categories"
 @using erp.DTOs.Financial
 @using erp.Models.Financial
+@using erp.Components.Shared.Dialogs.Financial
 @attribute [Authorize]
 
 <PageTitle>Categorias Financeiras - Pillar ERP</PageTitle>
@@ -34,7 +35,7 @@
             <MudButton Variant="Variant.Filled" 
                       Color="Color.Primary" 
                       StartIcon="@Icons.Material.Filled.Add"
-                      OnClick="@(() => Snackbar.Add("Criar categoria - em desenvolvimento", Severity.Info))">
+                      OnClick="OpenCreateDialog">
                 Nova Categoria
             </MudButton>
         </MudStack>
@@ -47,29 +48,45 @@
         }
         else
         {
-            <MudTable T="FinancialCategoryDto" Items="@categories" Dense="true" Hover="true">
+            <MudTable T="FinancialCategoryDto" Items="@categories" Dense="true" Hover="true" Striped="true">
                 <HeaderContent>
-                    <MudTh>Nome</MudTh>
-                    <MudTh>Código</MudTh>
+                    <MudTh><MudTableSortLabel SortBy="new Func<FinancialCategoryDto, object>(x => x.Code)">Código</MudTableSortLabel></MudTh>
+                    <MudTh><MudTableSortLabel SortBy="new Func<FinancialCategoryDto, object>(x => x.Name)">Nome</MudTableSortLabel></MudTh>
                     <MudTh>Tipo</MudTh>
+                    <MudTh>Categoria Pai</MudTh>
                     <MudTh>Status</MudTh>
+                    <MudTh>Ações</MudTh>
                 </HeaderContent>
                 <RowTemplate>
-                    <MudTd>@context.Name</MudTd>
                     <MudTd>@context.Code</MudTd>
+                    <MudTd>@context.Name</MudTd>
                     <MudTd>
                         <MudChip T="string" Size="Size.Small" 
                                 Color="@(context.Type == CategoryType.Revenue ? Color.Success : Color.Error)">
                             @context.TypeDescription
                         </MudChip>
                     </MudTd>
+                    <MudTd>@context.ParentCategoryName</MudTd>
                     <MudTd>
                         <MudChip T="string" Size="Size.Small" 
-                                Color="@(context.IsActive ? Color.Success : Color.Default)">
+                                Color="@(context.IsActive ? Color.Success : Color.Default)"
+                                OnClick="@(() => ToggleActive(context))"
+                                Class="cursor-pointer">
                             @(context.IsActive ? "Ativa" : "Inativa")
                         </MudChip>
                     </MudTd>
+                    <MudTd>
+                        <MudTooltip Text="Editar">
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => OpenEditDialog(context))" />
+                        </MudTooltip>
+                        <MudTooltip Text="Excluir">
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => DeleteCategory(context))" />
+                        </MudTooltip>
+                    </MudTd>
                 </RowTemplate>
+                <PagerContent>
+                    <MudTablePager />
+                </PagerContent>
             </MudTable>
         }
     </MudPaper>
@@ -78,6 +95,7 @@
 @code {
     [Inject] private IApiService ApiService { get; set; } = null!;
     [Inject] private ISnackbar Snackbar { get; set; } = null!;
+    [Inject] private IDialogService DialogService { get; set; } = null!;
 
     private List<FinancialCategoryDto> categories = new();
     private bool isLoading = false;
@@ -103,7 +121,8 @@
                 categories = await ApiService.GetAsync<List<FinancialCategoryDto>>("api/financial-categories") ?? new();
             }
             
-            Snackbar.Add($"{categories.Count} categorias carregadas", Severity.Success);
+            // Sort by code by default to show hierarchy better
+            categories = categories.OrderBy(c => c.Code).ToList();
         }
         catch (Exception ex)
         {
@@ -112,6 +131,117 @@
         finally
         {
             isLoading = false;
+        }
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("Categories", categories); // Pass existing categories for parent selection
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = DialogService.Show<FinancialCategoryDialog>("Nova Categoria", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is CreateFinancialCategoryDto dto)
+        {
+            try
+            {
+                await ApiService.PostAsync<FinancialCategoryDto>("api/financial-categories", dto);
+                Snackbar.Add("Categoria criada com sucesso", Severity.Success);
+                await LoadCategories(filterType);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao criar categoria: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task OpenEditDialog(FinancialCategoryDto category)
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("Categories", categories);
+        
+        var model = new CreateFinancialCategoryDto
+        {
+            Name = category.Name,
+            Code = category.Code,
+            Description = category.Description,
+            Type = category.Type,
+            ParentCategoryId = category.ParentCategoryId,
+            IsActive = category.IsActive
+        };
+        
+        parameters.Add("Model", model);
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = DialogService.Show<FinancialCategoryDialog>("Editar Categoria", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is CreateFinancialCategoryDto dto)
+        {
+            try
+            {
+                // We need UpdateFinancialCategoryDto
+                var updateDto = new UpdateFinancialCategoryDto
+                {
+                    Name = dto.Name,
+                    Code = dto.Code,
+                    Description = dto.Description,
+                    Type = dto.Type,
+                    ParentCategoryId = dto.ParentCategoryId,
+                    IsActive = dto.IsActive
+                };
+
+                await ApiService.PutAsync($"api/financial-categories/{category.Id}", updateDto);
+                Snackbar.Add("Categoria atualizada com sucesso", Severity.Success);
+                await LoadCategories(filterType);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao atualizar categoria: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task DeleteCategory(FinancialCategoryDto category)
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("ContentText", $"Tem certeza que deseja excluir a categoria {category.Name}?");
+        parameters.Add("ButtonText", "Excluir");
+        parameters.Add("Color", MudBlazor.Color.Error);
+
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = DialogService.Show<erp.Components.Shared.Dialogs.ConfirmDialog>("Excluir Categoria", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            try
+            {
+                await ApiService.DeleteAsync($"api/financial-categories/{category.Id}");
+                Snackbar.Add("Categoria excluída com sucesso", Severity.Success);
+                await LoadCategories(filterType);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao excluir categoria: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task ToggleActive(FinancialCategoryDto category)
+    {
+        try
+        {
+            await ApiService.PatchAsync<object>($"api/financial-categories/{category.Id}/toggle-active", null);
+            category.IsActive = !category.IsActive;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao alterar status: {ex.Message}", Severity.Error);
+            await LoadCategories(filterType);
         }
     }
 }

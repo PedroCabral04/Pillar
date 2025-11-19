@@ -321,6 +321,7 @@ builder.Services.AddScoped<erp.Services.Financial.IFinancialCategoryService, erp
 builder.Services.AddScoped<erp.Services.Financial.ICostCenterService, erp.Services.Financial.CostCenterService>();
 builder.Services.AddScoped<erp.Services.Financial.IAccountReceivableService, erp.Services.Financial.AccountReceivableService>();
 builder.Services.AddScoped<erp.Services.Financial.IAccountPayableService, erp.Services.Financial.AccountPayableService>();
+builder.Services.AddScoped<erp.Services.Financial.IFinancialDashboardService, erp.Services.Financial.FinancialDashboardService>();
 
 // Financial DAOs
 builder.Services.AddScoped<erp.DAOs.Financial.ISupplierDao, erp.DAOs.Financial.SupplierDao>();
