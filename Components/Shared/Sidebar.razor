@@ -122,9 +122,6 @@
     else
     {
         <div class="mini-root">
-            <div class="d-flex justify-center py-3 mb-2">
-                <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="MudBlazor.Color.Inherit" Size="MudBlazor.Size.Medium" OnClick="@(async ()=> await OnToggleDrawer.InvokeAsync())" Title="Abrir menu" AriaLabel="Abrir navegação" />
-            </div>
             <MudTooltip Text="Home" Placement="Placement.Right"><MudNavLink Href="/" Icon="@Icons.Material.Filled.Home" Class="my-1"/></MudTooltip>
             <MudTooltip Text="Dashboard" Placement="Placement.Right"><MudNavLink Href="/dashboard" Icon="@Icons.Material.Filled.Dashboard" Class="my-1"/></MudTooltip>
             <MudTooltip Text="Vendas" Placement="Placement.Right"><MudNavLink Href="/sales" Icon="@Icons.Material.Filled.ShoppingCart" Class="my-1"/></MudTooltip>

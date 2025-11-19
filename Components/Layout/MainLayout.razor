@@ -10,7 +10,7 @@
 @inject IJSRuntime JsRuntime
 @inject ITenantBrandingProvider BrandingProvider
 @inject IDialogService DialogService
-@implements IDisposable
+@implements IAsyncDisposable
 
 <TenantBrandingHead Branding="@_branding" />
 
@@ -18,10 +18,23 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
 
-<MudThemeProvider @ref="@_mudThemeProvider" @bind-IsDarkMode="ThemeService.IsDarkMode" Theme="@_customTheme" />
+<MudThemeProvider @ref="@_mudThemeProvider" @bind-IsDarkMode="ThemeService.IsDarkMode" Theme="@ThemeService.Theme" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
+
+@if (PreferenceService.CurrentPreferences.Ui.ReduceMotion)
+{
+    <style>
+        *, *::before, *::after {
+            animation-duration: 0.001s !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.001s !important;
+            scroll-behavior: auto !important;
+        }
+    </style>
+}
+
 <MudLayout>
     <!-- Desktop: Topbar Navigation (when explicitly selected in preferences) -->
     <MudHidden Breakpoint="Breakpoint.SmAndDown" Invert="false">
@@ -38,8 +51,8 @@
         else
         {
             <!-- Desktop: Sidebar Navigation -->
-            <MudAppBar Elevation="1" Color="MudBlazor.Color.Surface" Fixed="true" ClipMode="DrawerClipMode.Always">
-                <MudIconButton Icon="@(_drawerOpen ? Icons.Material.Filled.MenuOpen : Icons.Material.Filled.Menu)"
+            <MudAppBar Elevation="0" Color="MudBlazor.Color.Surface" Fixed="true" ClipMode="DrawerClipMode.Always" Style="border-bottom: 1px solid var(--mud-palette-lines-default);">
+                <MudIconButton Icon="@(_isSidebarLocked ? Icons.Material.Filled.MenuOpen : Icons.Material.Filled.Menu)"
                                Color="MudBlazor.Color.Inherit"
                                Edge="Edge.Start"
                                OnClick="@ToggleDrawer"
@@ -56,6 +69,10 @@
                 </div>
 
                 <MudSpacer />
+                
+                <MudHidden Breakpoint="Breakpoint.SmAndDown">
+                    <MudTextField @bind-Value="@_searchString" Placeholder="Pesquisar..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="MudBlazor.Size.Medium" Class="mt-0 mx-4" Variant="Variant.Outlined" Margin="Margin.Dense" Style="background-color: var(--mud-palette-background); border-radius: 8px; width: 300px;" />
+                </MudHidden>
 
                 <AuthorizeView>
                     <Authorized Context="auth">
@@ -77,14 +94,17 @@
 
             <MudDrawer id="nav-drawer"
                        Fixed="true"
-                       Variant="@(_drawerOpen ? DrawerVariant.Persistent : DrawerVariant.Mini)"
-                       OpenMiniOnHover="true"
-                       @bind-Open="_drawerOpen"
+                       Variant="@(_isSidebarLocked ? DrawerVariant.Persistent : DrawerVariant.Mini)"
+                       Open="@(_isSidebarLocked || _isMouseOver)"
+                       OpenMiniOnHover="false"
                        ClipMode="DrawerClipMode.Always"
                        Elevation="0"
-                       Width="240px"
-                       MiniWidth="56px">
-                <erp.Components.Shared.Sidebar IsOpen="_drawerOpen" OnToggleDrawer="@ToggleDrawer" />
+                       Width="280px"
+                       MiniWidth="64px"
+                       Style="border-right: 1px solid var(--mud-palette-lines-default);"
+                       @onmouseenter="OnSidebarMouseEnter"
+                       @onmouseleave="OnSidebarMouseLeave">
+                <erp.Components.Shared.Sidebar IsOpen="@(_isSidebarLocked || _isMouseOver)" OnToggleDrawer="@ToggleDrawer" />
             </MudDrawer>
 
             <MudMainContent Class="pa-4 full-height-content" Style="@MainContentStyle()">
@@ -122,7 +142,13 @@
 </MudLayout>
 
 @code {
-    private bool _drawerOpen = true;
+    private bool _drawerOpen = true; // Kept for mobile drawer logic if needed, but desktop uses _isSidebarLocked
+    private bool _isSidebarLocked = true;
+    private bool _isMouseOver = false;
+    private System.Threading.CancellationTokenSource? _closeCts;
+    private IJSObjectReference? _activityMonitor;
+    private DotNetObjectReference<MainLayout>? _dotNetRef;
+
     private bool _mobileDrawerOpen;
     private int _unreadNotifications;
     private MudThemeProvider _mudThemeProvider = null!;
@@ -130,8 +156,8 @@
     private string? _currentUrl;
     private bool _isMobileView;
     private bool _brandingInitialized;
+    private string? _searchString;
 
-    private MudTheme _customTheme = TenantBrandingThemeBuilder.BuildTheme(TenantBrandingTheme.Default);
     private TenantBrandingTheme _branding = TenantBrandingTheme.Default;
 
     [Inject] private NavigationManager NavigationManager { get; set; } = null!;
@@ -150,6 +176,7 @@
         {
             await PreferenceService.InitializeAsync();
             ThemeService.InitializeTheme();
+            ApplyCulture();
             PreferenceService.OnPreferenceChanged += OnPreferenceChanged;
             
             // Detecta se é mobile
@@ -161,7 +188,13 @@
                 if (_isMobileView)
                 {
                     _drawerOpen = false;
+                    _isSidebarLocked = false;
                 }
+
+                // Setup Auto Logout
+                _dotNetRef = DotNetObjectReference.Create(this);
+                var timeout = PreferenceService.CurrentPreferences.Security.AutoLogoutMinutes;
+                _activityMonitor = await JsRuntime.InvokeAsync<IJSObjectReference>("erpAuth.monitorActivity", _dotNetRef, timeout);
             }
             catch (JSDisconnectedException)
             {
@@ -186,14 +219,73 @@
         ApplyTenantBranding();
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         PreferenceService.OnPreferenceChanged -= OnPreferenceChanged;
+        _closeCts?.Cancel();
+        _closeCts?.Dispose();
+        _dotNetRef?.Dispose();
+        
+        if (_activityMonitor != null)
+        {
+            try { await _activityMonitor.InvokeVoidAsync("dispose"); await _activityMonitor.DisposeAsync(); } catch {}
+        }
     }
 
     private void ToggleDrawer()
     {
-        _drawerOpen = !_drawerOpen;
+        if (_isMobileView)
+        {
+            _drawerOpen = !_drawerOpen; // Mobile logic uses _drawerOpen? Wait, mobile uses _mobileDrawerOpen in markup
+            // Actually mobile drawer uses _mobileDrawerOpen in markup:
+            // <div class="mobile-drawer @(_mobileDrawerOpen ? "open" : string.Empty)">
+            // But the toggle button in AppBar calls ToggleDrawer.
+            // Let's check AppBar logic.
+            // AppBar is hidden on mobile? No.
+            // MudHidden Breakpoint="Breakpoint.SmAndDown" Invert="false" wraps the Sidebar Navigation (AppBar + Drawer).
+            // So on mobile, this AppBar is HIDDEN.
+            // Mobile has its own navigation?
+            // "Mobile: Adaptive Navigation with Drawer + Bottom Nav"
+            // <MudHidden Breakpoint="Breakpoint.SmAndDown" Invert="true"> ... <MobileBottomNav /> ... </MudHidden>
+            // So ToggleDrawer is only called on Desktop.
+        }
+        
+        _isSidebarLocked = !_isSidebarLocked;
+        if (_isSidebarLocked)
+        {
+            _isMouseOver = false; // Reset hover state when locking
+        }
+    }
+
+    private void OnSidebarMouseEnter()
+    {
+        if (!_isSidebarLocked)
+        {
+            _closeCts?.Cancel();
+            _isMouseOver = true;
+        }
+    }
+
+    private void OnSidebarMouseLeave()
+    {
+        if (!_isSidebarLocked)
+        {
+            _closeCts?.Cancel();
+            _closeCts = new System.Threading.CancellationTokenSource();
+            var token = _closeCts.Token;
+            
+            Task.Delay(2000, token).ContinueWith(t => 
+            {
+                if (!t.IsCanceled)
+                {
+                    InvokeAsync(() => 
+                    {
+                        _isMouseOver = false;
+                        StateHasChanged();
+                    });
+                }
+            });
+        }
     }
 
     private void CloseMobileDrawer()
@@ -229,9 +321,75 @@
         }
     }
 
-    private void OnPreferenceChanged()
+    private async void OnPreferenceChanged()
     {
-        InvokeAsync(StateHasChanged);
+        ApplyCulture();
+        await UpdateAutoLogout();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public async Task LogoutFromActivity()
+    {
+        try
+        {
+            await JsRuntime.InvokeVoidAsync("erpAuth.logout");
+            NavigationManager.NavigateTo("/login?reason=timeout", forceLoad: true);
+        }
+        catch
+        {
+            NavigationManager.NavigateTo("/login", forceLoad: true);
+        }
+    }
+    
+    private async Task UpdateAutoLogout()
+    {
+        if (_activityMonitor != null)
+        {
+            var timeout = PreferenceService.CurrentPreferences.Security.AutoLogoutMinutes;
+            try { await _activityMonitor.InvokeVoidAsync("updateTimeout", timeout); } catch {}
+        }
+    }
+
+    private void ApplyCulture()
+    {
+        var prefs = PreferenceService.CurrentPreferences.Locale;
+        if (string.IsNullOrEmpty(prefs.Language)) return;
+
+        try 
+        {
+            var culture = (System.Globalization.CultureInfo)System.Globalization.CultureInfo.GetCultureInfo(prefs.Language).Clone();
+            
+            // Apply Date Format
+            if (!string.IsNullOrEmpty(prefs.DateFormat))
+            {
+                culture.DateTimeFormat.ShortDatePattern = prefs.DateFormat;
+            }
+            
+            // Apply Number Format
+            if (prefs.NumberFormat == "1.234,56")
+            {
+                culture.NumberFormat.NumberGroupSeparator = ".";
+                culture.NumberFormat.NumberDecimalSeparator = ",";
+            }
+            else if (prefs.NumberFormat == "1,234.56")
+            {
+                culture.NumberFormat.NumberGroupSeparator = ",";
+                culture.NumberFormat.NumberDecimalSeparator = ".";
+            }
+            
+            // Apply Currency
+            if (!string.IsNullOrEmpty(prefs.Currency))
+            {
+                culture.NumberFormat.CurrencySymbol = prefs.Currency == "BRL" ? "R$" : 
+                                                      prefs.Currency == "USD" ? "$" : 
+                                                      prefs.Currency == "EUR" ? "€" : prefs.Currency;
+            }
+
+            System.Globalization.CultureInfo.CurrentCulture = culture;
+            System.Globalization.CultureInfo.CurrentUICulture = culture;
+        }
+        catch {}
     }
 
     private void ApplyTenantBranding()
@@ -243,7 +401,7 @@
         }
 
         _branding = branding;
-        _customTheme = TenantBrandingThemeBuilder.BuildTheme(_branding);
+        ThemeService.UpdatePrimaryColor(_branding.PrimaryColor);
         _brandingInitialized = true;
     }
 

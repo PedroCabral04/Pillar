@@ -70,5 +70,33 @@ window.erpAuth = {
     } catch {
       return false;
     }
+  },
+  monitorActivity: function (dotNetHelper, timeoutMinutes) {
+    let timer;
+    // Throttle events to avoid excessive processing, though setTimeout is cheap
+    const resetTimer = () => {
+      clearTimeout(timer);
+      if (timeoutMinutes > 0) {
+          timer = setTimeout(() => {
+            dotNetHelper.invokeMethodAsync('LogoutFromActivity');
+          }, timeoutMinutes * 60 * 1000);
+      }
+    };
+    
+    const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    events.forEach(e => window.addEventListener(e, resetTimer));
+    
+    resetTimer();
+    
+    return {
+        updateTimeout: (newMinutes) => {
+            timeoutMinutes = newMinutes;
+            resetTimer();
+        },
+        dispose: () => {
+            events.forEach(e => window.removeEventListener(e, resetTimer));
+            clearTimeout(timer);
+        }
+    };
   }
 };
