@@ -58,6 +58,18 @@ Veja [erp.csproj](erp.csproj) para a lista completa de pacotes.
   - Geração de holerites em PDF (QuestPDF) salvos em `wwwroot/payroll-slips`
   - Endpoints para baixar/regenerar comprovantes e visualizar componentes (proventos x descontos)
 
+## 🏢 Multi-Tenancy (Experimental)
+
+- Tenants e branding dedicados (`Models/Tenancy/*`, `Migrations/20251118103000_AddTenancyFoundation`)
+- API administrativa `/api/tenants` (CRUD, verificação de slug) protegida para `Administrador` via [`TenantsController`](Controllers/TenantsController.cs)
+- Serviço de domínio [`TenantService`](Services/Tenancy/TenantService.cs) + Mapperly (`Mappings/TenantMapper.cs`)
+- Resolução automática do tenant por subdomínio (`{tenant}.pillar.local`), header `X-Tenant` ou tenant padrão do usuário através do [`TenantResolutionMiddleware`](Services/Tenancy/TenantResolutionMiddleware.cs)
+- Contexto multi-tenant acessível por DI (`ITenantContextAccessor`) para que serviços/Blazor possam reagir a branding, `TenantId` e flags demo
+- Claims `pillar/tenant_id` e `pillar/tenant_slug` injetadas no usuário autenticado quando o tenant é resolvido
+- Provisionamento opcional de bancos por tenant via [`TenantProvisioningService`](Services/Tenancy/TenantProvisioningService.cs), `ITenantDbContextFactory` e endpoint `/api/tenants/{id}/provision`
+
+> Recursos avançados como provisionamento automático de banco por tenant e painel global serão adicionados nas próximas fases.
+
 ## Requisitos
 
 - .NET SDK 9.x
@@ -110,7 +122,9 @@ dotnet ef migrations add Initial
 dotnet ef database update
 ```
 
-> Última migration relevante para folha: `20251117120000_AddPayrollModule`. Execute `dotnet ef database update` após atualizar o código para aplicar as novas tabelas (`PayrollResults`, `PayrollComponents`, `PayrollSlips`, `PayrollTaxBrackets`).
+> Últimas migrations importantes:
+> - `20251118103000_AddTenancyFoundation`: cria tabelas `Tenants`, `TenantBrandings`, `TenantMemberships` e adiciona `TenantId` ao Identity.
+> - `20251117120000_AddPayrollModule`: adiciona folha (tabelas `PayrollResults`, `PayrollComponents`, `PayrollSlips`, `PayrollTaxBrackets`).
 
 Na primeira execução em desenvolvimento, um usuário admin pode ser criado (veja notas em [DTOs/Auth/README.md](DTOs/Auth/README.md)).
 

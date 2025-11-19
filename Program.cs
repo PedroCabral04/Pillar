@@ -242,14 +242,25 @@ builder.Services.AddAntiforgery(o =>
 });
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
+builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =>
 {
-    // Força a assembly de migrações explicitamente para evitar "No migrations were found" em publish
+    var resolver = serviceProvider.GetRequiredService<erp.Services.Tenancy.ITenantConnectionResolver>();
+    var effectiveConnection = resolver.GetCurrentConnectionString();
     options.UseNpgsql(
-        connectionString ?? "Host=localhost;Database=erp;Username=postgres;Password=123",
+        effectiveConnection ?? connectionString ?? "Host=localhost;Database=erp;Username=postgres;Password=123",
         npgsql => npgsql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)
     );
 });
+
+builder.Services.AddDbContextFactory<ApplicationDbContext>((serviceProvider, options) =>
+{
+    var resolver = serviceProvider.GetRequiredService<erp.Services.Tenancy.ITenantConnectionResolver>();
+    var effectiveConnection = resolver.GetCurrentConnectionString();
+    options.UseNpgsql(
+        effectiveConnection ?? connectionString ?? "Host=localhost;Database=erp;Username=postgres;Password=123",
+        npgsql => npgsql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)
+    );
+}, ServiceLifetime.Scoped);
 
 // Registra DAOs e Serviços
 builder.Services.AddScoped<IUserDao, UserDao>();
@@ -346,6 +357,16 @@ builder.Services.AddScoped<erp.Services.Chatbot.IChatbotService, erp.Services.Ch
 // Browser Service (Mobile/Responsive)
 builder.Services.AddScoped<erp.Services.Browser.IBrowserService, erp.Services.Browser.BrowserService>();
 
+// Tenancy services
+builder.Services.AddScoped<erp.Services.Tenancy.ITenantService, erp.Services.Tenancy.TenantService>();
+builder.Services.AddScoped<erp.Services.Tenancy.ITenantContextAccessor, erp.Services.Tenancy.TenantContextAccessor>();
+builder.Services.AddScoped<erp.Services.Tenancy.ITenantResolver, erp.Services.Tenancy.DefaultTenantResolver>();
+builder.Services.AddScoped<erp.Services.Tenancy.ITenantDbContextFactory, erp.Services.Tenancy.TenantDbContextFactory>();
+builder.Services.AddScoped<erp.Services.Tenancy.ITenantProvisioningService, erp.Services.Tenancy.TenantProvisioningService>();
+builder.Services.AddScoped<erp.Services.Tenancy.ITenantConnectionResolver, erp.Services.Tenancy.TenantConnectionResolver>();
+builder.Services.AddScoped<erp.Services.Tenancy.ITenantBrandingProvider, erp.Services.Tenancy.TenantBrandingProvider>();
+builder.Services.Configure<erp.Services.Tenancy.TenantDatabaseOptions>(builder.Configuration.GetSection("MultiTenancy:Database"));
+
 // Email services
 builder.Services.Configure<erp.Services.Email.EmailSettings>(builder.Configuration.GetSection("Email"));
 builder.Services.AddScoped<erp.Services.Email.IEmailService, erp.Services.Email.EmailService>();
@@ -367,6 +388,7 @@ builder.Services.AddScoped<SalesMapper, SalesMapper>();
 builder.Services.AddScoped<TimeTrackingMapper, TimeTrackingMapper>();
 builder.Services.AddScoped<PayrollMapper, PayrollMapper>();
 builder.Services.AddScoped<erp.Mappings.FinancialMapper, erp.Mappings.FinancialMapper>();
+builder.Services.AddScoped<erp.Mappings.TenantMapper, erp.Mappings.TenantMapper>();
 
 // --- Constrói a aplicação ---
 var app = builder.Build();
@@ -415,6 +437,7 @@ app.UseAntiforgery(); // Adiciona proteção contra CSRF
 // Adiciona middlewares de autenticação e autorização (se aplicável)
 // A ordem é importante: UseAuthentication antes de UseAuthorization
 app.UseAuthentication();
+app.UseMiddleware<erp.Services.Tenancy.TenantResolutionMiddleware>();
 app.UseAuthorization();
 
 // API Key enforcement placeholder: only activates if Security:ApiKey is configured

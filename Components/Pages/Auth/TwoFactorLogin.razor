@@ -2,6 +2,8 @@
 @attribute [AllowAnonymous]
 @using erp.DTOs.Auth
 @using erp.Services
+@using erp.Services.Tenancy
+@using erp.Components.Branding
 @using MudBlazor
 @using System.Text.Json
 @using Color = MudBlazor.Color
@@ -11,119 +13,166 @@
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 @inject IJSRuntime JS
+@inject ITenantBrandingProvider BrandingProvider
 
-<PageTitle>Verificação 2FA</PageTitle>
+<PageTitle>Verificação 2FA • @_branding.TenantName</PageTitle>
 
-<div style="min-height: 80vh; display: flex; align-items: center; justify-content: center;">
-    <MudContainer MaxWidth="MaxWidth.Small">
-        <MudPaper Elevation="4" Class="pa-8">
-            <div class="d-flex justify-center mb-4">
-                <MudIcon Icon="@Icons.Material.Filled.Security" Color="Color.Primary" Size="Size.Large" />
-            </div>
-            
-            <MudText Typo="Typo.h5" Align="Align.Center" Class="mb-2">Autenticação de Dois Fatores</MudText>
-            <MudText Typo="Typo.body2" Align="Align.Center" Class="mb-6" Color="Color.Secondary">
-                Digite o código de 6 dígitos do seu aplicativo autenticador
-            </MudText>
-
-        @if (!_useRecoveryCode)
+<MudGrid Spacing="0" Style="height: 100vh; overflow: hidden;">
+    <!-- Left Side: Branding / Image (Same as Login) -->
+    <MudItem xs="12" md="6" lg="7" Class="d-none d-md-flex flex-column justify-center align-center relative" 
+             Style="@($"background-color: {_branding.PrimaryColor}; color: white; position: relative;")">
+        
+        @if (!string.IsNullOrEmpty(_branding.LoginBackgroundUrl))
         {
-            <MudTextField @bind-Value="_code"
-                          Label="Código de Autenticação"
-                          Variant="Variant.Outlined"
-                          MaxLength="7"
-                          Immediate="true"
-                          HelperText="Exemplo: 123 456"
-                          Class="mb-4"
-                          OnKeyDown="HandleKeyDown"
-                          AutoFocus="true" />
-
-            <MudCheckBox @bind-Value="_rememberMachine" Color="Color.Primary" Class="mb-4">
-                Lembrar este dispositivo por 30 dias
-            </MudCheckBox>
-
-            <MudButton OnClick="VerifyCode"
-                       Color="Color.Primary"
-                       Variant="Variant.Filled"
-                       FullWidth="true"
-                       Size="Size.Large"
-                       Disabled="_verifying || string.IsNullOrWhiteSpace(_code)"
-                       Class="mb-3">
-                @if (_verifying)
-                {
-                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                    <text>Verificando...</text>
-                }
-                else
-                {
-                    <text>Verificar Código</text>
-                }
-            </MudButton>
-
-            <MudText Typo="Typo.body2" Align="Align.Center" Class="mt-4">
-                <MudLink OnClick="SwitchToRecoveryCode" Color="Color.Secondary">
-                    Usar código de recuperação
-                </MudLink>
-            </MudText>
+             <div style="@($"position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: url('{_branding.LoginBackgroundUrl}'); background-size: cover; background-position: center; opacity: 0.4; mix-blend-mode: overlay;")"></div>
         }
         else
         {
-            <MudAlert Severity="Severity.Warning" Class="mb-4">
-                Use um dos códigos de recuperação que foram fornecidos quando você habilitou 2FA.
-            </MudAlert>
-
-            <MudTextField @bind-Value="_code"
-                          Label="Código de Recuperação"
-                          Variant="Variant.Outlined"
-                          HelperText="Digite o código de recuperação"
-                          Class="mb-4"
-                          OnKeyDown="HandleKeyDown"
-                          AutoFocus="true" />
-
-            <MudButton OnClick="VerifyRecoveryCode"
-                       Color="Color.Warning"
-                       Variant="Variant.Filled"
-                       FullWidth="true"
-                       Size="Size.Large"
-                       Disabled="_verifying || string.IsNullOrWhiteSpace(_code)"
-                       Class="mb-3">
-                @if (_verifying)
-                {
-                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                    <text>Verificando...</text>
-                }
-                else
-                {
-                    <text>Usar Código de Recuperação</text>
-                }
-            </MudButton>
-
-            <MudText Typo="Typo.body2" Align="Align.Center" Class="mt-4">
-                <MudLink OnClick="SwitchToAuthenticator" Color="Color.Secondary">
-                    Voltar para código do autenticador
-                </MudLink>
-            </MudText>
+             <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%);"></div>
         }
+        
+        <div class="d-flex flex-column align-center gap-4 pa-8 text-center" style="z-index: 2; max-width: 600px;">
+             @if (!string.IsNullOrEmpty(_branding.LogoUrl))
+             {
+                 <MudImage Src="@_branding.LogoUrl" Alt="@_branding.TenantName" Width="150" Class="mb-6" ObjectFit="ObjectFit.Contain" />
+             }
+             else
+             {
+                 <MudAvatar Size="Size.Large" Color="Color.Surface" Variant="Variant.Filled" Class="mb-6" Style="width: 80px; height: 80px;">
+                     <MudText Typo="Typo.h3" Color="Color.Primary" Style="font-weight: 700;">@_branding.Initials</MudText>
+                 </MudAvatar>
+             }
+             
+             <MudText Typo="Typo.h2" Style="font-weight: 700; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">@_branding.TenantName</MudText>
+             <MudText Typo="Typo.h5" Style="opacity: 0.9; font-weight: 300;">Segurança em primeiro lugar.</MudText>
+        </div>
+    </MudItem>
 
-        <MudDivider Class="my-4" />
+    <!-- Right Side: 2FA Form -->
+    <MudItem xs="12" md="6" lg="5" Class="d-flex justify-center align-center pa-4" Style="background-color: var(--mud-palette-background);">
+        <MudPaper Elevation="0" Class="pa-8 w-100" Style="max-width: 480px; background: transparent;">
+            
+            <!-- Mobile Branding Header -->
+            <div class="d-md-none d-flex flex-column align-center mb-8">
+                 <MudAvatar Size="Size.Large" Color="Color.Primary" Class="mb-2">@_branding.Initials</MudAvatar>
+                 <MudText Typo="Typo.h5" Color="Color.Primary" Style="font-weight: 600;">@_branding.TenantName</MudText>
+            </div>
 
-        <MudText Typo="Typo.body2" Align="Align.Center">
-            <MudLink Href="/login" Color="Color.Secondary">
-                Voltar para o login
-            </MudLink>
-        </MudText>
-    </MudPaper>
-    </MudContainer>
-</div>
+            <div class="mb-10">
+                <MudText Typo="Typo.h4" Style="font-weight: 700;" Class="mb-2">Verificação em Duas Etapas</MudText>
+                <MudText Typo="Typo.body1" Color="Color.Secondary">
+                    @(_useRecoveryCode ? "Digite seu código de recuperação." : "Digite o código de 6 dígitos do seu aplicativo autenticador.")
+                </MudText>
+            </div>
+
+            @if (!_useRecoveryCode)
+            {
+                <MudTextField @bind-Value="_code"
+                              Label="Código de Autenticação"
+                              Variant="Variant.Outlined"
+                              MaxLength="7"
+                              Immediate="true"
+                              HelperText="Exemplo: 123 456"
+                              Class="mb-6"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Security"
+                              OnKeyDown="HandleKeyDown"
+                              AutoFocus="true" />
+
+                <MudCheckBox @bind-Value="_rememberMachine" Color="Color.Primary" Class="mb-6" Label="Lembrar este dispositivo por 30 dias" />
+
+                <MudButton OnClick="VerifyCode"
+                           Color="Color.Primary"
+                           Variant="Variant.Filled"
+                           FullWidth="true"
+                           Size="Size.Large"
+                           Disabled="_verifying || string.IsNullOrWhiteSpace(_code)"
+                           Class="mb-4 py-3"
+                           Style="font-weight: 600; border-radius: 8px;">
+                    @if (_verifying)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <text>Verificando...</text>
+                    }
+                    else
+                    {
+                        <text>Verificar Código</text>
+                    }
+                </MudButton>
+
+                <div class="text-center mt-4">
+                    <MudLink OnClick="SwitchToRecoveryCode" Color="Color.Primary" Underline="Underline.Hover">
+                        Não tem acesso ao autenticador?
+                    </MudLink>
+                </div>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Warning" Class="mb-6" Variant="Variant.Filled" NoIcon="false">
+                    Use um dos códigos de recuperação que foram fornecidos quando você habilitou 2FA.
+                </MudAlert>
+
+                <MudTextField @bind-Value="_code"
+                              Label="Código de Recuperação"
+                              Variant="Variant.Outlined"
+                              HelperText="Digite o código de recuperação"
+                              Class="mb-6"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.LockReset"
+                              OnKeyDown="HandleKeyDown"
+                              AutoFocus="true" />
+
+                <MudButton OnClick="VerifyRecoveryCode"
+                           Color="Color.Warning"
+                           Variant="Variant.Filled"
+                           FullWidth="true"
+                           Size="Size.Large"
+                           Disabled="_verifying || string.IsNullOrWhiteSpace(_code)"
+                           Class="mb-4 py-3"
+                           Style="font-weight: 600; border-radius: 8px;">
+                    @if (_verifying)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <text>Verificando...</text>
+                    }
+                    else
+                    {
+                        <text>Usar Código de Recuperação</text>
+                    }
+                </MudButton>
+
+                <div class="text-center mt-4">
+                    <MudLink OnClick="SwitchToAuthenticator" Color="Color.Primary" Underline="Underline.Hover">
+                        Voltar para código do autenticador
+                    </MudLink>
+                </div>
+            }
+
+            <div class="mt-8 text-center">
+                <MudLink Href="/login" Color="Color.Secondary" Underline="Underline.Hover" Typo="Typo.body2">
+                    Voltar para o login
+                </MudLink>
+            </div>
+            
+            <div class="mt-8 text-center">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    &copy; @DateTime.Now.Year @_branding.TenantName. Todos os direitos reservados.
+                </MudText>
+            </div>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
 
 @code {
     private string _code = "";
     private bool _rememberMachine = false;
     private bool _verifying = false;
     private bool _useRecoveryCode = false;
+    private TenantBrandingTheme _branding = TenantBrandingTheme.Default;
 
     protected override void OnInitialized()
     {
+        _branding = BrandingProvider.GetCurrentBranding();
         // Verifica se há uma sessão de 2FA pendente
         // Se não houver, redireciona para login
         var uri = new Uri(NavigationManager.Uri);
@@ -131,6 +180,7 @@
         
         // Em produção, isso seria validado via sessão/cookie temporário
     }
+
 
     private void SwitchToRecoveryCode()
     {

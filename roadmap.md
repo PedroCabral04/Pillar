@@ -181,10 +181,31 @@ Application Insights or Prometheus metrics
 Error tracking (Sentry, Rollbar)
 Performance monitoring
 31. Multi-Tenancy
-Support multiple companies in single deployment
-Tenant isolation at database level
-Tenant-specific branding
-Central admin dashboard
+Goal: Run multiple companies on a single deployment while keeping data/branding isolated per tenant and offering a control plane for super-admins.
+
+Phase 1 – Foundations (Control database + tenant metadata)
+- Add `Tenant` aggregate (Id, Name, Slug, DocumentNumber, Status, PrimaryContact, ConnectionString, DbName, CreatedUtc, BrandingFk) stored in the shared control database alongside Identity tables.
+- Introduce `TenantBranding` entity with logo URL/blob ref, primary/secondary colors, favicon, email footer, and custom CSS tokens.
+- Extend `ApplicationUser` and `ApplicationRole` with `TenantId` (nullable) plus a join table for cross-tenant access (super-admins keep null tenant + claim `GlobalAdmin`).
+- Seed a default tenant (company zero) and migration scripts for master vs tenant databases (separate `Migrations.Control` vs existing `Migrations.Tenant`).
+
+Phase 2 – Tenant resolution & DB isolation
+- Implement `ITenantResolver` middleware that resolves `TenantId` from subdomain (`{tenant}.pillar.local`), request header (`X-Tenant` for APIs), or logged-in user claims, then stores it in a scoped `TenantContext`.
+- Build a `TenantDbContextFactory` that clones `DbContextOptions` per request using the tenant’s connection string (database-per-tenant). Register services to request `ApplicationDbContext` via factory so each tenant hits only its own database.
+- Add a `TenantBootstrapper` service to provision databases (create schema, run migrations, seed roles/admin) when a tenant is created or when `?ensureTenantDb=true` flag is used by the control plane.
+- Update background services (Hangfire, Quartz, etc. when added) to iterate through tenants safely, ensuring per-tenant execution contexts.
+
+Phase 3 – Tenant-aware features & branding
+- Wrap controllers/services in attributes/filters that assert `TenantContext` is present and append `Where(x => x.TenantId == currentTenant)` to all tenant-owned entities (introduce `ITenantScopedEntity` with `TenantId`).
+- Store tenant-specific assets in `wwwroot/tenants/{tenantId}` or S3 bucket keyed by tenant; expose branding via `IBrandingService` consumed by MudBlazor layout.
+- Expand login flow: after auth, if the user has multiple tenants, prompt for tenant selection and issue tenant-scoped cookie claim.
+- Implement configuration overrides (date format, numbering sequences, document prefixes) persisted per tenant.
+
+Phase 4 – Central admin dashboard
+- Create `/admin/tenants` area (Blazor + API) restricted to `GlobalAdmin` role showing tenant health, DB size, active users, pending invoices, resource usage.
+- Provide tenant lifecycle actions: create, pause/disable, rotate API keys, regenerate connection strings, trigger backup/restore.
+- Include monitoring widgets (last sync, failed jobs) and audit trails for tenant management operations.
+- Add automated tests covering tenant resolution, DbContext switching, and brand rendering to avoid cross-tenant regressions.
 🎯 Quick Wins (Easy Implementations)
 ✅ Add ApexCharts (TODOs in Program.cs)
 ✅ Implement role-based widget access (TODO in DashboardLayoutService.cs)
