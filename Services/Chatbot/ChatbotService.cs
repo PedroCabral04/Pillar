@@ -65,6 +65,31 @@ public class ChatbotService : IChatbotService
                 _logger.LogInformation("Chatbot configurado com Google AI (modelo: {Model})", googleModel);
             }
         }
+        // Configurar LM Studio
+        else if (aiProvider == "lmstudio")
+        {
+            var lmStudioEndpoint = configuration["LMStudio:Endpoint"];
+            var lmStudioModel = configuration["LMStudio:Model"] ?? "local-model";
+
+            if (!string.IsNullOrEmpty(lmStudioEndpoint))
+            {
+                if (Uri.TryCreate(lmStudioEndpoint, UriKind.Absolute, out var endpointUri))
+                {
+                    builder.AddOpenAIChatCompletion(
+                        modelId: lmStudioModel,
+                        apiKey: "not-needed",
+                        endpoint: endpointUri);
+
+                    aiConfigured = true;
+                    _aiProvider = "lmstudio";
+                    _logger.LogInformation("Chatbot configurado com LM Studio: {Endpoint} (modelo: {Model})", lmStudioEndpoint, lmStudioModel);
+                }
+                else
+                {
+                    _logger.LogError("LM Studio Endpoint inválido: {Endpoint}", lmStudioEndpoint);
+                }
+            }
+        }
         // Configurar Custom OpenAI-compatible endpoint (LMStudio, Ollama, LocalAI, etc.)
         else if (aiProvider == "custom" || aiProvider == "openai-compatible")
         {
@@ -122,6 +147,14 @@ public class ChatbotService : IChatbotService
             "SalesPlugin");
         
         builder.Plugins.AddFromObject(
+            ActivatorUtilities.CreateInstance<FinancialPlugin>(serviceProvider), 
+            "FinancialPlugin");
+        
+        builder.Plugins.AddFromObject(
+            ActivatorUtilities.CreateInstance<HRPlugin>(serviceProvider), 
+            "HRPlugin");
+        
+        builder.Plugins.AddFromObject(
             new SystemPlugin(), 
             "SystemPlugin");
 
@@ -145,11 +178,11 @@ public class ChatbotService : IChatbotService
             
             // System prompt
             chatHistory.AddSystemMessage(@"Você é um assistente virtual do Pillar ERP, um sistema de gestão empresarial.
-Você tem acesso a funções para gerenciar produtos, vendas e fornecer informações do sistema.
-Seja prestativo, profissional e objetivo nas respostas.
-Quando o usuário pedir para cadastrar algo ou realizar uma ação, use as funções disponíveis.
-Sempre confirme o sucesso ou falha das operações realizadas.
-Responda em português brasileiro de forma clara e amigável.");
+                Você tem acesso a funções para gerenciar produtos, vendas, finanças e recursos humanos.
+                Seja prestativo, profissional e objetivo nas respostas.
+                Quando o usuário pedir para cadastrar algo ou realizar uma ação, use as funções disponíveis.
+                Sempre confirme o sucesso ou falha das operações realizadas.
+                Responda em português brasileiro de forma clara e amigável.");
 
             // Adicionar histórico anterior se existir
             if (conversationHistory != null)
@@ -268,14 +301,25 @@ Para habilitar todas as funcionalidades do chatbot, configure uma chave de API:
 }
 ```
 
-**Opção 3 - Custom OpenAI-Compatible (LMStudio, Ollama, LocalAI):**
+**Opção 3 - LM Studio (Local):**
+```json
+{
+  ""AI"": { ""Provider"": ""lmstudio"" },
+  ""LMStudio"": {
+    ""Endpoint"": ""http://localhost:1234/v1"",
+    ""Model"": ""gemma-2b-it""
+  }
+}
+```
+
+**Opção 4 - Custom OpenAI-Compatible (Ollama, LocalAI):**
 ```json
 {
   ""AI"": { ""Provider"": ""custom"" },
   ""CustomAI"": {
-    ""Endpoint"": ""http://localhost:1234/v1"",
+    ""Endpoint"": ""http://localhost:11434/v1"",
     ""ApiKey"": """",
-    ""Model"": ""local-model""
+    ""Model"": ""llama3""
   }
 }
 ```
@@ -317,11 +361,32 @@ Digite 'ajuda' para ver o que posso fazer quando configurado corretamente.",
             };
         }
 
+        if (lowerMessage.Contains("financeiro") || lowerMessage.Contains("conta") || lowerMessage.Contains("pagar") || lowerMessage.Contains("receber"))
+        {
+            return new List<string>
+            {
+                "Resumo financeiro",
+                "Contas a pagar vencidas",
+                "Contas a receber em atraso"
+            };
+        }
+
+        if (lowerMessage.Contains("funcionário") || lowerMessage.Contains("rh") || lowerMessage.Contains("departamento"))
+        {
+            return new List<string>
+            {
+                "Buscar funcionário",
+                "Listar departamento",
+                "Quem trabalha no TI?"
+            };
+        }
+
         return new List<string>
         {
             "O que você pode fazer?",
             "Mostrar produtos",
-            "Ver vendas recentes"
+            "Ver vendas recentes",
+            "Resumo financeiro"
         };
     }
 }

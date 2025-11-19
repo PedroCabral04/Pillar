@@ -24,6 +24,7 @@
         </PackageReference>
         <PackageReference Include="Microsoft.SemanticKernel" Version="1.66.0" />
         <PackageReference Include="Microsoft.SemanticKernel.Connectors.Google" Version="1.66.0-alpha" />
+        <PackageReference Include="Microsoft.SemanticKernel.Connectors.OpenAI" Version="1.67.1" />
   <PackageReference Include="MudBlazor" Version="8.11.0" />
         <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
         <PackageReference Include="QRCoder" Version="1.7.0" />
