@@ -71,6 +71,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<PayrollSlip> PayrollSlips { get; set; } = null!;
     public DbSet<PayrollTaxBracket> PayrollTaxBrackets { get; set; } = null!;
     
+    // Onboarding
+    public DbSet<erp.Models.Onboarding.UserOnboardingProgress> UserOnboardingProgress { get; set; } = null!;
+    
     // Serviços injetados para auditoria
     private readonly IHttpContextAccessor? _httpContextAccessor;
     private readonly erp.Services.Tenancy.ITenantContextAccessor? _tenantContextAccessor;
@@ -561,6 +564,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         
         // Audit model configuration
         ConfigureAuditModels(modelBuilder);
+
+        // Onboarding configuration
+        modelBuilder.Entity<erp.Models.Onboarding.UserOnboardingProgress>()
+            .HasIndex(p => new { p.UserId, p.TourId })
+            .IsUnique();
 
         // Payroll model configuration
         // ConfigurePayrollModels(modelBuilder); // TODO: Implement this method

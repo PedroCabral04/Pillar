@@ -1,4 +1,7 @@
 using erp.DTOs.Onboarding;
+using erp.Data;
+using erp.Models.Onboarding;
+using Microsoft.EntityFrameworkCore;
 
 namespace erp.Services.Onboarding;
 
@@ -12,16 +15,16 @@ public interface IOnboardingService
     Task CompleteTourAsync(string userId, string tourId);
     Task SkipTourAsync(string userId, string tourId);
     Task ResetTourAsync(string userId, string tourId);
+    Task<bool> HasCompletedOnboardingAsync(string userId);
 }
 
 public class OnboardingService : IOnboardingService
 {
-    private readonly IServiceProvider _serviceProvider;
-    private readonly Dictionary<string, OnboardingProgress> _progressCache = new();
+    private readonly ApplicationDbContext _context;
 
-    public OnboardingService(IServiceProvider serviceProvider)
+    public OnboardingService(ApplicationDbContext context)
     {
-        _serviceProvider = serviceProvider;
+        _context = context;
     }
 
     public List<OnboardingTour> GetAvailableTours(string userId, string[] userRoles)
@@ -30,172 +33,66 @@ public class OnboardingService : IOnboardingService
         {
             new OnboardingTour
             {
-                Id = "welcome-tour",
+                Id = "getting-started",
                 Name = "Bem-vindo ao Pillar ERP",
-                Description = "Conheça as principais funcionalidades do sistema",
+                Description = "Guia inicial para configurar sua conta e conhecer o sistema",
                 IsRequired = true,
                 Steps = new List<OnboardingStep>
                 {
                     new OnboardingStep
                     {
-                        Id = "step-1",
-                        Title = "Bem-vindo!",
-                        Description = "Este é o Pillar ERP, sua solução completa para gestão empresarial. Vamos fazer um tour rápido!",
-                        Target = "#main-content",
+                        Id = "welcome",
+                        Title = "Bem-vindo ao Pillar",
+                        Description = "Estamos felizes em tê-lo aqui! Este guia rápido vai te ajudar a configurar sua conta e entender os principais recursos do sistema.",
+                        Target = "center",
                         Placement = "center",
                         Order = 1,
                         ShowPrevious = false
                     },
                     new OnboardingStep
                     {
-                        Id = "step-2",
-                        Title = "Dashboard",
-                        Description = "Aqui você encontra uma visão geral do seu negócio com métricas e gráficos em tempo real.",
-                        Target = ".dashboard-section",
-                        Placement = "bottom",
+                        Id = "security",
+                        Title = "Segurança em Primeiro Lugar",
+                        Description = "Sua segurança é nossa prioridade. Recomendamos ativar a Autenticação de Dois Fatores (2FA) e revisar suas configurações de senha.",
+                        Target = "/settings", // Link to navigate
+                        Placement = "center",
                         Order = 2
                     },
                     new OnboardingStep
                     {
-                        Id = "step-3",
-                        Title = "Menu de Navegação",
-                        Description = "Use este menu para navegar entre as diferentes seções do sistema.",
-                        Target = ".mud-drawer",
-                        Placement = "right",
+                        Id = "customization",
+                        Title = "Personalize sua Experiência",
+                        Description = "Você pode ajustar o tema (Claro/Escuro), cores e layout do dashboard para trabalhar do seu jeito.",
+                        Target = "/settings",
+                        Placement = "center",
                         Order = 3
                     },
                     new OnboardingStep
                     {
-                        Id = "step-4",
-                        Title = "Perfil do Usuário",
-                        Description = "Acesse suas configurações, preferências e faça logout por aqui.",
-                        Target = ".mud-appbar .mud-menu",
-                        Placement = "bottom",
+                        Id = "modules",
+                        Title = "Módulos Integrados",
+                        Description = "O Pillar oferece módulos completos de Vendas, Estoque, Financeiro e RH. Tudo integrado para facilitar sua gestão.",
+                        Target = "center",
+                        Placement = "center",
                         Order = 4
                     },
                     new OnboardingStep
                     {
-                        Id = "step-5",
-                        Title = "Notificações",
-                        Description = "Fique por dentro de todas as atualizações importantes através das notificações.",
-                        Target = ".notification-icon",
-                        Placement = "bottom",
+                        Id = "dashboard",
+                        Title = "Seu Dashboard",
+                        Description = "Acompanhe métricas em tempo real e tome decisões baseadas em dados. Você pode personalizar quais widgets aparecem aqui.",
+                        Target = "/dashboard",
+                        Placement = "center",
                         Order = 5
                     },
                     new OnboardingStep
                     {
-                        Id = "step-6",
-                        Title = "Pronto!",
-                        Description = "Você está pronto para começar. Explore o sistema e descubra tudo o que ele pode fazer!",
-                        Target = "#main-content",
+                        Id = "finish",
+                        Title = "Tudo Pronto!",
+                        Description = "Você já conhece o básico. Explore o menu lateral para descobrir todas as funcionalidades. Bom trabalho!",
+                        Target = "center",
                         Placement = "center",
                         Order = 6,
-                        ShowNext = false
-                    }
-                }
-            },
-            new OnboardingTour
-            {
-                Id = "dashboard-tour",
-                Name = "Tour do Dashboard",
-                Description = "Descubra como usar o dashboard para visualizar métricas e personalizar sua experiência",
-                IsRequired = false,
-                Steps = new List<OnboardingStep>
-                {
-                    new OnboardingStep
-                    {
-                        Id = "dashboard-1",
-                        Title = "Bem-vindo ao Dashboard!",
-                        Description = "Aqui você encontra uma visão completa do seu negócio com gráficos interativos e métricas em tempo real.",
-                        Target = ".dashboard-section",
-                        Placement = "center",
-                        Order = 1,
-                        ShowPrevious = false
-                    },
-                    new OnboardingStep
-                    {
-                        Id = "dashboard-2",
-                        Title = "Saudação Personalizada",
-                        Description = "O dashboard te cumprimenta de acordo com o horário do dia e exibe a data atual.",
-                        Target = ".mud-paper:first-child",
-                        Placement = "bottom",
-                        Order = 2
-                    },
-                    new OnboardingStep
-                    {
-                        Id = "dashboard-3",
-                        Title = "Filtros de Data",
-                        Description = "Use este seletor para escolher um período personalizado e visualizar dados específicos.",
-                        Target = ".mud-picker",
-                        Placement = "bottom",
-                        Order = 3
-                    },
-                    new OnboardingStep
-                    {
-                        Id = "dashboard-4",
-                        Title = "Presets Rápidos",
-                        Description = "Economize tempo com presets: hoje, últimos 7 dias, este mês e mais!",
-                        Target = ".mud-chipset",
-                        Placement = "bottom",
-                        Order = 4
-                    },
-                    new OnboardingStep
-                    {
-                        Id = "dashboard-5",
-                        Title = "Widgets Interativos",
-                        Description = "Cada widget mostra métricas importantes. Clique neles para ver mais detalhes!",
-                        Target = ".mud-grid",
-                        Placement = "top",
-                        Order = 5
-                    },
-                    new OnboardingStep
-                    {
-                        Id = "dashboard-6",
-                        Title = "Você está pronto!",
-                        Description = "Explore os widgets, experimente os filtros e personalize seu dashboard. Bom trabalho!",
-                        Target = ".dashboard-section",
-                        Placement = "center",
-                        Order = 6,
-                        ShowNext = false
-                    }
-                }
-            },
-            new OnboardingTour
-            {
-                Id = "admin-tour",
-                Name = "Tour de Administração",
-                Description = "Aprenda a gerenciar usuários e configurações do sistema",
-                IsRequired = false,
-                RequiredRoles = new[] { "Admin" },
-                Steps = new List<OnboardingStep>
-                {
-                    new OnboardingStep
-                    {
-                        Id = "admin-1",
-                        Title = "Painel de Administração",
-                        Description = "Esta é a área administrativa onde você gerencia todo o sistema.",
-                        Target = ".admin-section",
-                        Placement = "bottom",
-                        Order = 1,
-                        ShowPrevious = false
-                    },
-                    new OnboardingStep
-                    {
-                        Id = "admin-2",
-                        Title = "Gestão de Usuários",
-                        Description = "Crie, edite e gerencie usuários do sistema, suas permissões e roles.",
-                        Target = ".users-table",
-                        Placement = "top",
-                        Order = 2
-                    },
-                    new OnboardingStep
-                    {
-                        Id = "admin-3",
-                        Title = "Configurações do Sistema",
-                        Description = "Ajuste configurações globais, integrações e personalizações.",
-                        Target = ".settings-link",
-                        Placement = "right",
-                        Order = 3,
                         ShowNext = false
                     }
                 }
@@ -217,26 +114,44 @@ public class OnboardingService : IOnboardingService
         return allTours.FirstOrDefault(t => t.Id == tourId);
     }
 
-    public Task<OnboardingProgress?> GetUserProgressAsync(string userId, string tourId)
+    public async Task<OnboardingProgress?> GetUserProgressAsync(string userId, string tourId)
     {
-        var key = $"{userId}_{tourId}";
-        _progressCache.TryGetValue(key, out var progress);
-        return Task.FromResult(progress);
+        if (!int.TryParse(userId, out int uid)) return null;
+
+        var progress = await _context.UserOnboardingProgress
+            .FirstOrDefaultAsync(p => p.UserId == uid && p.TourId == tourId);
+
+        if (progress == null) return null;
+
+        return new OnboardingProgress
+        {
+            UserId = userId,
+            TourId = tourId,
+            CurrentStep = progress.CurrentStep,
+            IsCompleted = progress.IsCompleted,
+            CompletedAt = progress.CompletedAt,
+            StartedAt = progress.StartedAt
+        };
     }
 
-    public Task SaveProgressAsync(string userId, string tourId, int currentStep, bool isCompleted = false)
+    public async Task SaveProgressAsync(string userId, string tourId, int currentStep, bool isCompleted = false)
     {
-        var key = $"{userId}_{tourId}";
-        
-        if (!_progressCache.TryGetValue(key, out var progress))
+        if (!int.TryParse(userId, out int uid)) return;
+
+        var progress = await _context.UserOnboardingProgress
+            .FirstOrDefaultAsync(p => p.UserId == uid && p.TourId == tourId);
+
+        if (progress == null)
         {
-            progress = new OnboardingProgress
+            progress = new UserOnboardingProgress
             {
-                UserId = userId,
+                UserId = uid,
                 TourId = tourId,
                 CurrentStep = currentStep,
-                IsCompleted = isCompleted
+                IsCompleted = isCompleted,
+                StartedAt = DateTime.UtcNow
             };
+            _context.UserOnboardingProgress.Add(progress);
         }
         else
         {
@@ -244,13 +159,12 @@ public class OnboardingService : IOnboardingService
             progress.IsCompleted = isCompleted;
         }
 
-        if (isCompleted)
+        if (isCompleted && progress.CompletedAt == null)
         {
             progress.CompletedAt = DateTime.UtcNow;
         }
 
-        _progressCache[key] = progress;
-        return Task.CompletedTask;
+        await _context.SaveChangesAsync();
     }
 
     public Task CompleteStepAsync(string userId, string tourId, int stepIndex)
@@ -271,10 +185,25 @@ public class OnboardingService : IOnboardingService
         return CompleteTourAsync(userId, tourId);
     }
 
-    public Task ResetTourAsync(string userId, string tourId)
+    public async Task ResetTourAsync(string userId, string tourId)
     {
-        var key = $"{userId}_{tourId}";
-        _progressCache.Remove(key);
-        return Task.CompletedTask;
+        if (!int.TryParse(userId, out int uid)) return;
+
+        var progress = await _context.UserOnboardingProgress
+            .FirstOrDefaultAsync(p => p.UserId == uid && p.TourId == tourId);
+
+        if (progress != null)
+        {
+            _context.UserOnboardingProgress.Remove(progress);
+            await _context.SaveChangesAsync();
+        }
+    }
+
+    public async Task<bool> HasCompletedOnboardingAsync(string userId)
+    {
+        if (!int.TryParse(userId, out int uid)) return false;
+
+        return await _context.UserOnboardingProgress
+            .AnyAsync(p => p.UserId == uid && p.TourId == "getting-started" && p.IsCompleted);
     }
 }

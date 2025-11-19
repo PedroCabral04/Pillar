@@ -1,0 +1,148 @@
+@using erp.DTOs.Onboarding
+@using erp.Services.Onboarding
+@using Microsoft.AspNetCore.Components.Authorization
+@using MudBlazor
+@using TourDto = erp.DTOs.Onboarding.OnboardingTour
+@using StepDto = erp.DTOs.Onboarding.OnboardingStep
+@inject IOnboardingService OnboardingService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+<MudDialog DisableSidePadding="true" Class="onboarding-wizard-dialog">
+    <DialogContent>
+        @if (CurrentStep != null)
+        {
+            <div class="d-flex flex-column align-center justify-center pa-6" style="min-height: 400px;">
+                <div class="mb-6">
+                    @if (CurrentStep.Id == "welcome")
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.WavingHand" Size="MudBlazor.Size.Large" Color="MudBlazor.Color.Primary" Style="font-size: 4rem;" />
+                    }
+                    else if (CurrentStep.Id == "security")
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Security" Size="MudBlazor.Size.Large" Color="MudBlazor.Color.Secondary" Style="font-size: 4rem;" />
+                    }
+                    else if (CurrentStep.Id == "customization")
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Palette" Size="MudBlazor.Size.Large" Color="MudBlazor.Color.Tertiary" Style="font-size: 4rem;" />
+                    }
+                    else if (CurrentStep.Id == "modules")
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Apps" Size="MudBlazor.Size.Large" Color="MudBlazor.Color.Info" Style="font-size: 4rem;" />
+                    }
+                    else if (CurrentStep.Id == "dashboard")
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Dashboard" Size="MudBlazor.Size.Large" Color="MudBlazor.Color.Warning" Style="font-size: 4rem;" />
+                    }
+                    else
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="MudBlazor.Size.Large" Color="MudBlazor.Color.Success" Style="font-size: 4rem;" />
+                    }
+                </div>
+
+                <MudText Typo="Typo.h4" Align="MudBlazor.Align.Center" Class="mb-4">@CurrentStep.Title</MudText>
+                
+                <MudText Typo="Typo.body1" Align="MudBlazor.Align.Center" Class="mb-6" Style="max-width: 500px;">
+                    @CurrentStep.Description
+                </MudText>
+
+                @if (!string.IsNullOrEmpty(CurrentStep.Target) && CurrentStep.Target.StartsWith("/"))
+                {
+                    <MudButton Variant="Variant.Outlined" 
+                              Color="MudBlazor.Color.Primary" 
+                              OnClick="@(() => NavigateTo(CurrentStep.Target))"
+                              Class="mb-4">
+                        Ir para página
+                    </MudButton>
+                }
+
+                <div class="d-flex justify-center gap-2 mt-auto w-100">
+                    
+                    @if (CurrentStepIndex > 0)
+                    {
+                        <MudButton OnClick="PreviousStep" Variant="Variant.Text">Voltar</MudButton>
+                    }
+                    
+                    <MudSpacer />
+                    
+                    <div class="d-flex align-center gap-1">
+                        @for (int i = 0; i < (CurrentTour?.Steps.Count ?? 0); i++)
+                        {
+                            var index = i;
+                            <div class="@(index == CurrentStepIndex ? "mud-theme-primary" : "mud-theme-secondary")" 
+                                 style="width: 8px; height: 8px; border-radius: 50%; opacity: @(index == CurrentStepIndex ? 1 : 0.3);">
+                            </div>
+                        }
+                    </div>
+                    
+                    <MudSpacer />
+
+                    @if (CurrentStepIndex < (CurrentTour?.Steps.Count ?? 0) - 1)
+                    {
+                        <MudButton OnClick="NextStep" Variant="Variant.Filled" Color="MudBlazor.Color.Primary">Próximo</MudButton>
+                    }
+                    else
+                    {
+                        <MudButton OnClick="CompleteTour" Variant="Variant.Filled" Color="MudBlazor.Color.Success">Começar!</MudButton>
+                    }
+                </div>
+            </div>
+        }
+    </DialogContent>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    
+    [Parameter] public string TourId { get; set; } = "getting-started";
+    [Parameter] public string UserId { get; set; } = string.Empty;
+
+    private TourDto? CurrentTour;
+    private StepDto? CurrentStep;
+    private int CurrentStepIndex = 0;
+
+    protected override void OnInitialized()
+    {
+        CurrentTour = OnboardingService.GetTourById(TourId);
+        if (CurrentTour != null && CurrentTour.Steps.Any())
+        {
+            CurrentStep = CurrentTour.Steps[0];
+        }
+    }
+
+    private async Task NextStep()
+    {
+        if (CurrentTour == null || CurrentStepIndex >= CurrentTour.Steps.Count - 1) return;
+
+        CurrentStepIndex++;
+        CurrentStep = CurrentTour.Steps[CurrentStepIndex];
+        
+        // Save progress
+        if (!string.IsNullOrEmpty(UserId))
+        {
+            await OnboardingService.CompleteStepAsync(UserId, TourId, CurrentStepIndex - 1);
+        }
+    }
+
+    private void PreviousStep()
+    {
+        if (CurrentStepIndex <= 0) return;
+
+        CurrentStepIndex--;
+        CurrentStep = CurrentTour!.Steps[CurrentStepIndex];
+    }
+
+    private async Task CompleteTour()
+    {
+        if (!string.IsNullOrEmpty(UserId))
+        {
+            await OnboardingService.CompleteTourAsync(UserId, TourId);
+        }
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void NavigateTo(string url)
+    {
+        NavigationManager.NavigateTo(url);
+    }
+}

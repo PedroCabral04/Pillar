@@ -10,6 +10,8 @@
 @inject IJSRuntime JsRuntime
 @inject ITenantBrandingProvider BrandingProvider
 @inject IDialogService DialogService
+@inject erp.Services.Onboarding.IOnboardingService OnboardingService
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @implements IAsyncDisposable
 
 <TenantBrandingHead Branding="@_branding" />
@@ -209,6 +211,9 @@
                 // Fallback safely if JS fails
                 _isMobileView = false;
             }
+
+            // Check Onboarding
+            await CheckOnboardingAsync();
             
             StateHasChanged();
         }
@@ -348,6 +353,39 @@
         {
             var timeout = PreferenceService.CurrentPreferences.Security.AutoLogoutMinutes;
             try { await _activityMonitor.InvokeVoidAsync("updateTimeout", timeout); } catch {}
+        }
+    }
+
+    private async Task CheckOnboardingAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (!string.IsNullOrEmpty(userId))
+            {
+                var hasCompleted = await OnboardingService.HasCompletedOnboardingAsync(userId);
+                if (!hasCompleted)
+                {
+                    var options = new DialogOptions 
+                    { 
+                        CloseOnEscapeKey = false,
+                        BackdropClick = false,
+                        MaxWidth = MaxWidth.Medium,
+                        FullWidth = true
+                    };
+                    
+                    var parameters = new DialogParameters
+                    {
+                        { "UserId", userId },
+                        { "TourId", "getting-started" }
+                    };
+
+                    await DialogService.ShowAsync<erp.Components.Shared.OnboardingWizard>("Bem-vindo", parameters, options);
+                }
+            }
         }
     }
 
