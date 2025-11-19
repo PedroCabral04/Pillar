@@ -1,0 +1,58 @@
+@using erp.DTOs.Financial
+@using erp.DTOs.User
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="form" @bind-IsValid="@success">
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Model.Name" Label="Nome" Required="true" RequiredError="Nome é obrigatório" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Model.Code" Label="Código" Required="true" RequiredError="Código é obrigatório" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="Model.Description" Label="Descrição" Lines="3" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int?" Label="Gerente" @bind-Value="Model.ManagerUserId" AnchorOrigin="Origin.BottomCenter" Clearable="true">
+                        @foreach (var user in Users)
+                        {
+                            <MudSelectItem T="int?" Value="@user.Id">@user.FullName</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="Model.MonthlyBudget" Label="Orçamento Mensal" Format="C2" Min="0" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudCheckBox @bind-Value="Model.IsActive" Label="Ativo" Color="MudBlazor.Color.Success" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="MudBlazor.Color.Primary" OnClick="Submit">Salvar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; }
+    [Parameter] public CreateCostCenterDto Model { get; set; } = new() { Name = "", Code = "" };
+    [Parameter] public List<UserDto> Users { get; set; } = new();
+
+    private MudForm form;
+    private bool success;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await form.Validate();
+        if (success)
+        {
+            MudDialog.Close(DialogResult.Ok(Model));
+        }
+    }
+}
