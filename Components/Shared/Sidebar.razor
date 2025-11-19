@@ -9,10 +9,11 @@
 
 <nav class="pillar-sidebar" role="navigation" aria-label="Navegação principal">
 <MudNavMenu Rounded="true" Margin="Margin.Dense" Color="MudBlazor.Color.Primary" Class="pa-2">
-    @if (IsOpen)
-    {
-        <div class="px-3 pt-4 pb-2">
-            <MudTextField Id="sidebar-search" @ref="_searchField" @bind-Value="_search" Placeholder="Buscar (⌘/Ctrl + K)" Dense="true" Clearable="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true" AriaLabel="Pesquisar navegação" @onkeydown="OnSearchKeyDown" Variant="Variant.Outlined" Margin="Margin.Dense" />
+    @if (IsOpen || !_renderMini)
+    {   <div class="full-wrapper @(IsOpen ? "open" : "closing")">
+            <div class="px-3 pt-4 pb-2">
+                <MudTextField Id="sidebar-search" @ref="_searchField" @bind-Value="_search" Placeholder="Buscar (⌘/Ctrl + K)" Dense="true" Clearable="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true" AriaLabel="Pesquisar navegação" @onkeydown="OnSearchKeyDown" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </div>
         </div>
 
         @if (_isSearching)
@@ -121,24 +122,27 @@
     }
     else
     {
-        <div class="mini-root">
-            <MudTooltip Text="Home" Placement="Placement.Right"><MudNavLink Href="/" Icon="@Icons.Material.Filled.Home" Class="my-1"/></MudTooltip>
-            <MudTooltip Text="Dashboard" Placement="Placement.Right"><MudNavLink Href="/dashboard" Icon="@Icons.Material.Filled.Dashboard" Class="my-1"/></MudTooltip>
-            <MudTooltip Text="Vendas" Placement="Placement.Right"><MudNavLink Href="/sales" Icon="@Icons.Material.Filled.ShoppingCart" Class="my-1"/></MudTooltip>
-            <MudTooltip Text="Produtos" Placement="Placement.Right"><MudNavLink Href="/inventory/products" Icon="@Icons.Material.Filled.Inventory" Class="my-1"/></MudTooltip>
-            <MudTooltip Text="Financeiro" Placement="Placement.Right"><MudNavLink Href="/financial/dashboard" Icon="@Icons.Material.Filled.AccountBalance" Class="my-1"/></MudTooltip>
-            <MudTooltip Text="Kanban" Placement="Placement.Right"><MudNavLink Href="/kanban" Icon="@Icons.Material.Filled.ViewKanban" Class="my-1"/></MudTooltip>
-            <MudTooltip Text="Ativos" Placement="Placement.Right"><MudNavLink Href="/assets" Icon="@Icons.Material.Filled.Devices" Class="my-1"/></MudTooltip>
-            <MudTooltip Text="Relatórios" Placement="Placement.Right"><MudNavLink Href="/reports" Icon="@Icons.Material.Filled.Assessment" Class="my-1"/></MudTooltip>
-            <AuthorizeView Roles="Administrador">
-                <Authorized>
-                    <MudTooltip Text="Administração" Placement="Placement.Right"><MudNavLink Href="/admin/users" Icon="@Icons.Material.Filled.AdminPanelSettings" Class="my-1"/></MudTooltip>
-                    <MudTooltip Text="Tenants" Placement="Placement.Right"><MudNavLink Href="/admin/tenants" Icon="@Icons.Material.Filled.Domain" Class="my-1"/></MudTooltip>
-                </Authorized>
-            </AuthorizeView>
-            <MudTooltip Text="Configurações" Placement="Placement.Right"><MudNavLink Href="/settings" Icon="@Icons.Material.Filled.Settings" Class="my-1"/></MudTooltip>
-            <MudTooltip Text="Sair" Placement="Placement.Right"><MudNavLink OnClick="LogoutAsync" Icon="@Icons.Material.Filled.Logout" Class="my-1"/></MudTooltip>
-        </div>
+        if (_renderMini) 
+        {
+            <div class="mini-root">
+                <MudTooltip Text="Home" Placement="Placement.Right"><MudNavLink Href="/" Icon="@Icons.Material.Filled.Home" Class="my-1"/></MudTooltip>
+                <MudTooltip Text="Dashboard" Placement="Placement.Right"><MudNavLink Href="/dashboard" Icon="@Icons.Material.Filled.Dashboard" Class="my-1"/></MudTooltip>
+                <MudTooltip Text="Vendas" Placement="Placement.Right"><MudNavLink Href="/sales" Icon="@Icons.Material.Filled.ShoppingCart" Class="my-1"/></MudTooltip>
+                <MudTooltip Text="Produtos" Placement="Placement.Right"><MudNavLink Href="/inventory/products" Icon="@Icons.Material.Filled.Inventory" Class="my-1"/></MudTooltip>
+                <MudTooltip Text="Financeiro" Placement="Placement.Right"><MudNavLink Href="/financial/dashboard" Icon="@Icons.Material.Filled.AccountBalance" Class="my-1"/></MudTooltip>
+                <MudTooltip Text="Kanban" Placement="Placement.Right"><MudNavLink Href="/kanban" Icon="@Icons.Material.Filled.ViewKanban" Class="my-1"/></MudTooltip>
+                <MudTooltip Text="Ativos" Placement="Placement.Right"><MudNavLink Href="/assets" Icon="@Icons.Material.Filled.Devices" Class="my-1"/></MudTooltip>
+                <MudTooltip Text="Relatórios" Placement="Placement.Right"><MudNavLink Href="/reports" Icon="@Icons.Material.Filled.Assessment" Class="my-1"/></MudTooltip>
+                <AuthorizeView Roles="Administrador">
+                    <Authorized>
+                        <MudTooltip Text="Administração" Placement="Placement.Right"><MudNavLink Href="/admin/users" Icon="@Icons.Material.Filled.AdminPanelSettings" Class="my-1"/></MudTooltip>
+                        <MudTooltip Text="Tenants" Placement="Placement.Right"><MudNavLink Href="/admin/tenants" Icon="@Icons.Material.Filled.Domain" Class="my-1"/></MudTooltip>
+                    </Authorized>
+                </AuthorizeView>
+                <MudTooltip Text="Configurações" Placement="Placement.Right"><MudNavLink Href="/settings" Icon="@Icons.Material.Filled.Settings" Class="my-1"/></MudTooltip>
+                <MudTooltip Text="Sair" Placement="Placement.Right"><MudNavLink OnClick="LogoutAsync" Icon="@Icons.Material.Filled.Logout" Class="my-1"/></MudTooltip>
+            </div>
+        }
     }
 </MudNavMenu>
 </nav>
@@ -262,4 +266,21 @@
             catch { Navigation.NavigateTo("/login", true); }
         }
     }
+
+    private bool _renderMini = false;
+
+protected override async Task OnParametersSetAsync()
+{
+    if (!IsOpen)
+    {
+        // espera a animação terminar antes de trocar o DOM
+        await Task.Delay(110);
+        _renderMini = true;
+    }
+    else
+    {
+        _renderMini = false;
+    }
+}
+
 }
