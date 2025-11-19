@@ -89,17 +89,32 @@
             <!-- Charts Row -->
             <MudItem xs="12" md="8">
                 <MudPaper Class="pa-4" Elevation="3">
-                    <MudText Typo="Typo.h6" Class="mb-4">Fluxo de Caixa (Próximos 30 dias)</MudText>
                     @if (dashboardData.CashFlowProjection.Any())
                     {
-                        <MudChart ChartType="MudBlazor.ChartType.Bar" 
-                                  ChartSeries="@cashFlowSeries" 
-                                  XAxisLabels="@cashFlowLabels" 
-                                  Width="100%" 
-                                  Height="350px" />
+                        <ApexChart TItem="CashFlowItemDto"
+                                   Title="Fluxo de Caixa (Próximos 30 dias)"
+                                   Options="options">
+
+                            <ApexPointSeries TItem="CashFlowItemDto"
+                                             Items="dashboardData.CashFlowProjection"
+                                             Name="Receitas"
+                                             SeriesType="SeriesType.Bar"
+                                             XValue="@(e => e.Date.ToString("dd/MM"))"
+                                             YValue="@(e => e.Revenue)"
+                                             Color="#00C853" />
+
+                            <ApexPointSeries TItem="CashFlowItemDto"
+                                             Items="dashboardData.CashFlowProjection"
+                                             Name="Despesas"
+                                             SeriesType="SeriesType.Bar"
+                                             XValue="@(e => e.Date.ToString("dd/MM"))"
+                                             YValue="@(e => e.Expense)"
+                                             Color="#F44336" />
+                        </ApexChart>
                     }
                     else
                     {
+                        <MudText Typo="Typo.h6" Class="mb-4">Fluxo de Caixa (Próximos 30 dias)</MudText>
                         <MudText>Sem dados para projeção.</MudText>
                     }
                 </MudPaper>
@@ -170,11 +185,54 @@
     private FinancialDashboardDto? dashboardData;
     private bool isLoading = false;
 
-    private List<ChartSeries> cashFlowSeries = new();
-    private string[] cashFlowLabels = Array.Empty<string>();
+    private ApexChartOptions<CashFlowItemDto> options = new();
 
     protected override async Task OnInitializedAsync()
     {
+        options.Chart = new Chart
+        {
+            Toolbar = new Toolbar
+            {
+                Show = false
+            }
+        };
+        options.PlotOptions = new PlotOptions
+        {
+            Bar = new PlotOptionsBar
+            {
+                Horizontal = false,
+                ColumnWidth = "50%"
+            }
+        };
+        options.Xaxis = new XAxis
+        {
+            Labels = new XAxisLabels
+            {
+                Rotate = -45
+            }
+        };
+        options.Yaxis = new List<YAxis>
+        {
+            new YAxis
+            {
+                Labels = new YAxisLabels
+                {
+                    Formatter = @"function (value) {
+                        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+                    }"
+                }
+            }
+        };
+        options.Tooltip = new Tooltip
+        {
+            Y = new TooltipY
+            {
+                Formatter = @"function (value) {
+                    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+                }"
+            }
+        };
+
         await LoadDashboardData();
     }
 
@@ -184,11 +242,6 @@
         try
         {
             dashboardData = await ApiService.GetAsync<FinancialDashboardDto>("api/financial-dashboard");
-
-            if (dashboardData != null)
-            {
-                PrepareCharts();
-            }
         }
         catch (Exception ex)
         {
@@ -198,28 +251,5 @@
         {
             isLoading = false;
         }
-    }
-
-    private void PrepareCharts()
-    {
-        if (dashboardData == null) return;
-
-        // Cash Flow Chart
-        // Group by week or just show all days? 30 days might be too crowded for labels.
-        // Let's show every 5th day label or similar if needed, but MudChart handles it reasonably well usually.
-        // We will take the last 30 days projection.
-        
-        var revenueData = dashboardData.CashFlowProjection.Select(x => (double)x.Revenue).ToArray();
-        var expenseData = dashboardData.CashFlowProjection.Select(x => (double)x.Expense).ToArray();
-        
-        cashFlowSeries = new List<ChartSeries>
-        {
-            new ChartSeries { Name = "Receitas", Data = revenueData },
-            new ChartSeries { Name = "Despesas", Data = expenseData }
-        };
-
-        cashFlowLabels = dashboardData.CashFlowProjection
-            .Select(x => x.Date.ToString("dd/MM"))
-            .ToArray();
     }
 }
