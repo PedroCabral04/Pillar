@@ -304,6 +304,8 @@ builder.Services.AddScoped<erp.Services.DashboardCustomization.IDashboardLayoutS
 builder.Services.AddScoped<erp.Services.Validation.IUserValidationService, erp.Services.Validation.UserValidationService>();
 // Onboarding services
 builder.Services.AddScoped<erp.Services.Onboarding.IOnboardingService, erp.Services.Onboarding.OnboardingService>();
+// Onboarding resume helper (per-circuit scoped)
+builder.Services.AddScoped<erp.Services.Onboarding.IOnboardingResumeService, erp.Services.Onboarding.OnboardingResumeService>();
 
 // Inventory services
 builder.Services.AddScoped<erp.Services.Inventory.IInventoryService, erp.Services.Inventory.InventoryService>();

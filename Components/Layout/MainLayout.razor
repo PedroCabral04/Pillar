@@ -12,6 +12,8 @@
 @inject IDialogService DialogService
 @inject erp.Services.Onboarding.IOnboardingService OnboardingService
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject erp.Services.Onboarding.IOnboardingResumeService OnboardingResumeService
+@inject ISnackbar Snackbar
 @implements IAsyncDisposable
 
 <TenantBrandingHead Branding="@_branding" />
@@ -141,6 +143,18 @@
     
     <!-- Chatbot Widget (available on all layouts) -->
     <erp.Components.Shared.ChatbotWidget />
+
+    @* Continue-tour floating button shown when user navigated away from a tour step *@
+    @if (OnboardingResumeService?.HasPending == true)
+    {
+        <div style="position:fixed; right:16px; bottom:90px; z-index:1300;">
+            <MudTooltip Text="Continuar tour">
+                <MudFab Color="MudBlazor.Color.Primary" StartIcon="@Icons.Material.Filled.PlayArrow" OnClick="OpenResumeTour">
+                    Continuar
+                </MudFab>
+            </MudTooltip>
+        </div>
+    }
 </MudLayout>
 
 @code {
@@ -170,6 +184,8 @@
     protected override void OnInitialized()
     {
         ApplyTenantBranding();
+        // Subscribe to resume requests
+        if (OnboardingResumeService != null) OnboardingResumeService.Changed += OnboardingResumeChanged;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -230,11 +246,37 @@
         _closeCts?.Cancel();
         _closeCts?.Dispose();
         _dotNetRef?.Dispose();
+        if (OnboardingResumeService != null) OnboardingResumeService.Changed -= OnboardingResumeChanged;
         
         if (_activityMonitor != null)
         {
             try { await _activityMonitor.InvokeVoidAsync("dispose"); await _activityMonitor.DisposeAsync(); } catch {}
         }
+    }
+
+    
+
+    private void OnboardingResumeChanged()
+    {
+        // Trigger UI update on circuit
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OpenResumeTour()
+    {
+        var pending = OnboardingResumeService.GetPending();
+        if (pending == null) return;
+
+        var (userId, tourId) = pending.Value;
+        var parameters = new DialogParameters
+        {
+            { "UserId", userId },
+            { "TourId", tourId }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = false, BackdropClick = false, MaxWidth = MaxWidth.Medium, FullWidth = true };
+
+        await DialogService.ShowAsync<erp.Components.Shared.OnboardingWizard>("Continuar tour", parameters, options);
+        OnboardingResumeService.ClearPendingResume();
     }
 
     private void ToggleDrawer()

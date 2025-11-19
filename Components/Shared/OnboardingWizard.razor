@@ -7,6 +7,9 @@
 @inject IOnboardingService OnboardingService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject erp.Services.Onboarding.IOnboardingResumeService ResumeService
 
 <MudDialog DisableSidePadding="true" Class="onboarding-wizard-dialog">
     <DialogContent>
@@ -101,12 +104,27 @@
     private StepDto? CurrentStep;
     private int CurrentStepIndex = 0;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         CurrentTour = OnboardingService.GetTourById(TourId);
+
+        // Try to load saved progress for this user and resume where left off
+        if (!string.IsNullOrEmpty(UserId))
+        {
+            var progress = await OnboardingService.GetUserProgressAsync(UserId, TourId);
+            if (progress != null)
+            {
+                // progress.CurrentStep stores the number of completed steps (1-based count)
+                // We want to resume at the next step index (0-based)
+                CurrentStepIndex = progress.CurrentStep;
+            }
+        }
+
         if (CurrentTour != null && CurrentTour.Steps.Any())
         {
-            CurrentStep = CurrentTour.Steps[0];
+            if (CurrentStepIndex < 0) CurrentStepIndex = 0;
+            if (CurrentStepIndex >= CurrentTour.Steps.Count) CurrentStepIndex = CurrentTour.Steps.Count - 1;
+            CurrentStep = CurrentTour.Steps[CurrentStepIndex];
         }
     }
 
@@ -120,6 +138,7 @@
         // Save progress
         if (!string.IsNullOrEmpty(UserId))
         {
+            // Mark the previous step as completed (service expects 0-based index)
             await OnboardingService.CompleteStepAsync(UserId, TourId, CurrentStepIndex - 1);
         }
     }
@@ -141,8 +160,46 @@
         MudDialog.Close(DialogResult.Ok(true));
     }
 
-    private void NavigateTo(string url)
+    private async Task NavigateTo(string url)
     {
+        // When navigating away from the wizard to a target page, persist the current step as completed
+        if (!string.IsNullOrEmpty(UserId))
+        {
+            await OnboardingService.CompleteStepAsync(UserId, TourId, CurrentStepIndex);
+        }
+
+        // Close dialog first so navigation is clean; MainLayout will reopen the wizard at saved step
+        try
+        {
+            MudDialog.Close(DialogResult.Ok(false));
+        }
+        catch {}
+
+        // Mark resume pending for the layout and show a simple info snackbar
+        if (!string.IsNullOrEmpty(UserId))
+        {
+            ResumeService.SetPendingResume(UserId, TourId);
+        }
+
+        Snackbar.Add("Você pode continuar o tour quando quiser. Use o botão 'Continuar tour' no canto inferior direito.", Severity.Info, config =>
+        {
+            config.VisibleStateDuration = 8000;
+            config.HideTransitionDuration = 300;
+            config.ShowTransitionDuration = 200;
+            config.SnackbarVariant = Variant.Filled;
+            config.Action = "Continuar";
+            config.ActionVariant = Variant.Filled;
+            config.ActionColor = MudBlazor.Color.Primary;
+            config.OnClick = async snackbar =>
+            {
+                // Clear pending marker and reopen the wizard dialog to resume
+                ResumeService.ClearPendingResume();
+                var parameters = new DialogParameters { ["TourId"] = TourId, ["UserId"] = UserId };
+                var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium };
+                await DialogService.ShowAsync<OnboardingWizard>("", parameters, options);
+            };
+        });
+
         NavigationManager.NavigateTo(url);
     }
 }
