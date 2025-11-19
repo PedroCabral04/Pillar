@@ -121,9 +121,15 @@ public class SalesReportService : ISalesReportService
 
             // Apply filters based on owning sale
             if (filter.StartDate.HasValue)
-                itemsQuery = itemsQuery.Where(i => i.Sale.SaleDate >= filter.StartDate.Value);
+            {
+                var startDate = filter.StartDate.Value.ToUniversalTime();
+                itemsQuery = itemsQuery.Where(i => i.Sale.SaleDate >= startDate);
+            }
             if (filter.EndDate.HasValue)
-                itemsQuery = itemsQuery.Where(i => i.Sale.SaleDate <= filter.EndDate.Value);
+            {
+                var endDate = filter.EndDate.Value.ToUniversalTime();
+                itemsQuery = itemsQuery.Where(i => i.Sale.SaleDate <= endDate);
+            }
             if (filter.CustomerId.HasValue)
                 itemsQuery = itemsQuery.Where(i => i.Sale.CustomerId == filter.CustomerId.Value);
             if (filter.SalespersonId.HasValue)
@@ -193,9 +199,15 @@ public class SalesReportService : ISalesReportService
     private void ApplyCommonFilters(ref IQueryable<erp.Models.Sales.Sale> query, SalesReportFilterDto filter)
     {
         if (filter.StartDate.HasValue)
-            query = query.Where(s => s.SaleDate >= filter.StartDate.Value);
+        {
+            var startDate = filter.StartDate.Value.ToUniversalTime();
+            query = query.Where(s => s.SaleDate >= startDate);
+        }
         if (filter.EndDate.HasValue)
-            query = query.Where(s => s.SaleDate <= filter.EndDate.Value);
+        {
+            var endDate = filter.EndDate.Value.ToUniversalTime();
+            query = query.Where(s => s.SaleDate <= endDate);
+        }
         if (filter.CustomerId.HasValue)
             query = query.Where(s => s.CustomerId == filter.CustomerId.Value);
         if (filter.SalespersonId.HasValue)
