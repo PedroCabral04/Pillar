@@ -20,6 +20,7 @@ public class CreateFinancialCategoryDto
 /// </summary>
 public class UpdateFinancialCategoryDto : CreateFinancialCategoryDto
 {
+    public int Id { get; set; }
 }
 
 /// <summary>

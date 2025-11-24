@@ -1,17 +1,69 @@
 @using erp.Services
+@using erp.Services.Tenancy
+@using erp.Components.Branding
 @using MudBlazor
 @inherits LayoutComponentBase
 @inject ThemeService ThemeService
+@inject ITenantBrandingProvider BrandingProvider
+
+<TenantBrandingHead Branding="@_branding" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
 
-<MudThemeProvider @bind-IsDarkMode="ThemeService.IsDarkMode" />
+<MudThemeProvider @bind-IsDarkMode="ThemeService.IsDarkMode" Theme="@_authTheme" />
 <MudPopoverProvider/>
 <MudDialogProvider/>
 <MudSnackbarProvider/>
 
-<div class="pa-4" style="min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+<div class="pa-4" style="@AuthBackgroundStyle">
     @Body
 </div>
+
+@code {
+    private TenantBrandingTheme _branding = TenantBrandingTheme.Default;
+    private MudTheme _authTheme = TenantBrandingThemeBuilder.BuildTheme(TenantBrandingTheme.Default);
+
+    protected override void OnInitialized()
+    {
+        ApplyBranding();
+    }
+
+    protected override void OnParametersSet()
+    {
+        ApplyBranding();
+    }
+
+    private void ApplyBranding()
+    {
+        var branding = BrandingProvider.GetCurrentBranding();
+        if (branding == _branding)
+        {
+            return;
+        }
+
+        _branding = branding;
+        _authTheme = TenantBrandingThemeBuilder.BuildTheme(_branding);
+    }
+
+    private string AuthBackgroundStyle
+    {
+        get
+        {
+            var style = "min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;";
+            style += " padding:2rem;";
+
+            if (!string.IsNullOrWhiteSpace(_branding.LoginBackgroundUrl))
+            {
+                style += $" background-image:url('{_branding.LoginBackgroundUrl}'); background-size:cover; background-position:center;";
+            }
+            else
+            {
+                style += $" background: linear-gradient(135deg, {_branding.PrimaryColor}, {_branding.SecondaryColor});";
+            }
+
+            return style;
+        }
+    }
+}

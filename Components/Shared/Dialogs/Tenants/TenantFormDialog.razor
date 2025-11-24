@@ -1,0 +1,369 @@
+@using System.ComponentModel.DataAnnotations
+@using erp.DTOs.Tenancy
+@using erp.Models.Tenancy
+@using erp.Services
+@using MudBlazor
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+
+<MudDialog Class="tenant-form-dialog">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@(IsEdit ? Icons.Material.Filled.Domain : Icons.Material.Filled.AddBusiness)" Color="MudBlazor.Color.Primary" />
+            <MudText Typo="Typo.h6">@(IsEdit ? "Editar tenant" : "Novo tenant")</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="2">
+            @if (!string.IsNullOrWhiteSpace(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
+            }
+            <MudForm @ref="_form" OnValidSubmit="HandleValidSubmit">
+                <MudStack Spacing="3">
+                    <MudGrid GutterSize="GutterSize.Small">
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_model.Name"
+                                      Label="Nome da empresa"
+                                      For="() => _model.Name"
+                                      Required="true"
+                                      MaxLength="200"
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_model.Slug"
+                                      Label="Slug (subdomínio)"
+                                      For="() => _model.Slug"
+                                      Required="true"
+                                      Disabled="@IsEdit"
+                                      HelperText="Usado em links como {slug}.pillar.local"
+                                      MaxLength="64"
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_model.DocumentNumber"
+                                      Label="Documento (CNPJ/CPF)"
+                                      For="() => _model.DocumentNumber"
+                                      Variant="Variant.Outlined"
+                                      MaxLength="20" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_model.Region"
+                                      Label="Região / Unidade"
+                                      For="() => _model.Region"
+                                      Variant="Variant.Outlined"
+                                      MaxLength="200" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_model.PrimaryContactName"
+                                      Label="Contato principal"
+                                      For="() => _model.PrimaryContactName"
+                                      Variant="Variant.Outlined"
+                                      MaxLength="200" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_model.PrimaryContactEmail"
+                                      Label="Email do contato"
+                                      For="() => _model.PrimaryContactEmail"
+                                      Variant="Variant.Outlined"
+                                      MaxLength="200" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_model.PrimaryContactPhone"
+                                      Label="Telefone do contato"
+                                      For="() => _model.PrimaryContactPhone"
+                                      Variant="Variant.Outlined"
+                                      MaxLength="20" />
+                    </MudItem>
+                    <MudItem xs="12" md="6" Class="d-flex align-center">
+                        <MudSwitch T="bool" @bind-Checked="_model.IsDemo" Color="MudBlazor.Color.Info" Label="Tenant de demonstração" />
+                    </MudItem>
+                    @if (IsEdit)
+                    {
+                        <MudItem xs="12" md="6">
+                            <MudSelect @bind-Value="_model.Status" Label="Status" Variant="Variant.Outlined">
+                                @foreach (var status in Enum.GetValues<TenantStatus>())
+                                {
+                                    <MudSelectItem Value="@status">@GetStatusLabel(status)</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_model.Notes"
+                                          Label="Observações"
+                                          For="() => _model.Notes"
+                                          Variant="Variant.Outlined"
+                                          Lines="3"
+                                          MaxLength="2000" />
+                        </MudItem>
+                    }
+                </MudGrid>
+
+                <MudExpansionPanels Elevation="0">
+                    <MudExpansionPanel Text="Branding e identidade visual" Expanded="@(!IsEdit)">
+                        <MudGrid GutterSize="GutterSize.Small">
+                            <MudItem xs="12" md="6">
+                                <MudTextField @bind-Value="_model.Branding.LogoUrl" Label="Logo URL" Variant="Variant.Outlined" />
+                            </MudItem>
+                            <MudItem xs="12" md="6">
+                                <MudTextField @bind-Value="_model.Branding.FaviconUrl" Label="Favicon URL" Variant="Variant.Outlined" />
+                            </MudItem>
+                            <MudItem xs="12" md="4">
+                                <MudTextField @bind-Value="_model.Branding.PrimaryColor" Label="Cor primária" Variant="Variant.Outlined" MaxLength="20" />
+                            </MudItem>
+                            <MudItem xs="12" md="4">
+                                <MudTextField @bind-Value="_model.Branding.SecondaryColor" Label="Cor secundária" Variant="Variant.Outlined" MaxLength="20" />
+                            </MudItem>
+                            <MudItem xs="12" md="4">
+                                <MudTextField @bind-Value="_model.Branding.AccentColor" Label="Cor destaque" Variant="Variant.Outlined" MaxLength="20" />
+                            </MudItem>
+                            <MudItem xs="12" md="6">
+                                <MudTextField @bind-Value="_model.Branding.LoginBackgroundUrl" Label="Fundo da tela de login" Variant="Variant.Outlined" />
+                            </MudItem>
+                            <MudItem xs="12">
+                                <MudTextField @bind-Value="_model.Branding.EmailFooterHtml" Label="Rodapé de email (HTML)" Variant="Variant.Outlined" Lines="3" />
+                            </MudItem>
+                            <MudItem xs="12">
+                                <MudTextField @bind-Value="_model.Branding.CustomCss" Label="CSS customizado" Variant="Variant.Outlined" Lines="3" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudExpansionPanel>
+                    <MudExpansionPanel Text="Infraestrutura & Banco de Dados">
+                        <MudAlert Severity="Severity.Info" Dense="true">
+                            Caso não informe uma connection string, o template configurado em <code>appsettings.json</code> será usado.
+                        </MudAlert>
+                        <MudGrid GutterSize="GutterSize.Small" Class="mt-2">
+                            <MudItem xs="12" md="6">
+                                <MudTextField @bind-Value="_model.DatabaseName" Label="Nome do banco" Variant="Variant.Outlined" MaxLength="200" />
+                            </MudItem>
+                            <MudItem xs="12" md="6">
+                                <MudTextField @bind-Value="_model.ConnectionString" Label="Connection string" Variant="Variant.Outlined" MaxLength="500" />
+                            </MudItem>
+                        </MudGrid>
+                        <MudStack Direction="Row" AlignItems="AlignItems.Center" Spacing="1" Class="mt-3">
+                            <MudSwitch T="bool" @bind-Checked="_model.ProvisionDatabase" Color="MudBlazor.Color.Primary" />
+                            <MudText Typo="Typo.body2">Executar provisionamento (criar banco e rodar migrations) após salvar</MudText>
+                        </MudStack>
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+            </MudStack>
+        </MudForm>
+    </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" Disabled="_saving" OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Variant="Variant.Filled" Color="MudBlazor.Color.Primary" OnClick="SubmitForm" Disabled="_saving">
+            @if (_saving)
+            {
+                <MudProgressCircular Indeterminate="true" Size="MudBlazor.Size.Small" Class="mr-2" />
+            }
+            @(IsEdit ? "Salvar alterações" : "Criar tenant")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public TenantDto? Tenant { get; set; }
+    [Parameter] public bool IsEdit { get; set; }
+
+    private MudForm? _form;
+    private readonly TenantFormModel _model = new();
+    private bool _saving;
+    private string? _errorMessage;
+
+    protected override void OnInitialized()
+    {
+        if (Tenant is not null)
+        {
+            _model.Name = Tenant.Name;
+            _model.Slug = Tenant.Slug;
+            _model.DocumentNumber = Tenant.DocumentNumber;
+            _model.PrimaryContactEmail = Tenant.PrimaryContactEmail;
+            _model.PrimaryContactName = Tenant.PrimaryContactName;
+            _model.PrimaryContactPhone = Tenant.PrimaryContactPhone;
+            _model.Region = Tenant.Region;
+            _model.IsDemo = Tenant.IsDemo;
+            _model.DatabaseName = Tenant.DatabaseName;
+            _model.ConnectionString = Tenant.ConnectionString;
+            _model.Status = Tenant.Status;
+            _model.Notes = Tenant.Notes;
+            if (Tenant.Branding is not null)
+            {
+                _model.Branding = TenantBrandingModel.FromDto(Tenant.Branding);
+            }
+        }
+        else
+        {
+            _model.ProvisionDatabase = true;
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        _errorMessage = null;
+        _saving = true;
+        try
+        {
+            if (IsEdit && Tenant is not null)
+            {
+                var updateDto = new UpdateTenantDto
+                {
+                    Name = _model.Name,
+                    DocumentNumber = _model.DocumentNumber,
+                    PrimaryContactName = _model.PrimaryContactName,
+                    PrimaryContactEmail = _model.PrimaryContactEmail,
+                    PrimaryContactPhone = _model.PrimaryContactPhone,
+                    Region = _model.Region,
+                    IsDemo = _model.IsDemo,
+                    Status = _model.Status,
+                    Notes = _model.Notes,
+                    Branding = _model.Branding.ToDto(),
+                    DatabaseName = _model.DatabaseName,
+                    ConnectionString = _model.ConnectionString,
+                    ProvisionDatabase = _model.ProvisionDatabase
+                };
+
+                var updated = await ApiService.PutAsync<TenantDto>($"api/tenants/{Tenant.Id}", updateDto);
+                Snackbar.Add($"Tenant '{updated?.Name ?? _model.Name}' atualizado com sucesso", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(updated));
+            }
+            else
+            {
+                var createDto = new CreateTenantDto
+                {
+                    Name = _model.Name,
+                    Slug = _model.Slug?.ToLowerInvariant() ?? string.Empty,
+                    DocumentNumber = _model.DocumentNumber,
+                    PrimaryContactName = _model.PrimaryContactName,
+                    PrimaryContactEmail = _model.PrimaryContactEmail,
+                    PrimaryContactPhone = _model.PrimaryContactPhone,
+                    Region = _model.Region,
+                    IsDemo = _model.IsDemo,
+                    Branding = _model.Branding.ToDto(),
+                    DatabaseName = _model.DatabaseName,
+                    ConnectionString = _model.ConnectionString,
+                    ProvisionDatabase = _model.ProvisionDatabase
+                };
+
+                var created = await ApiService.PostAsync<TenantDto>("api/tenants", createDto);
+                Snackbar.Add($"Tenant '{created?.Name ?? _model.Name}' criado", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(created));
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+            Snackbar.Add("Não foi possível salvar o tenant. Verifique os dados e tente novamente.", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void SubmitForm() => _form?.Validate();
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private static string GetStatusLabel(TenantStatus status) => status switch
+    {
+        TenantStatus.Active => "Ativo",
+        TenantStatus.Provisioning => "Provisionando",
+        TenantStatus.Suspended => "Suspenso",
+        TenantStatus.Disabled => "Desativado",
+        TenantStatus.Archived => "Arquivado",
+        _ => status.ToString()
+    };
+
+    private class TenantFormModel
+    {
+        [Required]
+        [MaxLength(200)]
+        public string Name { get; set; } = string.Empty;
+
+        [Required]
+        [MaxLength(64)]
+        [RegularExpression("^[a-z0-9-]+$", ErrorMessage = "Use apenas letras minúsculas, números e hífen")]
+        public string Slug { get; set; } = string.Empty;
+
+        [MaxLength(20)]
+        public string? DocumentNumber { get; set; }
+
+        [MaxLength(200)]
+        [EmailAddress]
+        public string? PrimaryContactEmail { get; set; }
+
+        [MaxLength(200)]
+        public string? PrimaryContactName { get; set; }
+
+        [MaxLength(20)]
+        public string? PrimaryContactPhone { get; set; }
+
+        [MaxLength(200)]
+        public string? Region { get; set; }
+
+        public bool IsDemo { get; set; }
+        public TenantStatus Status { get; set; } = TenantStatus.Provisioning;
+        public string? Notes { get; set; }
+
+        [MaxLength(200)]
+        public string? DatabaseName { get; set; }
+
+        [MaxLength(500)]
+        public string? ConnectionString { get; set; }
+
+        public bool ProvisionDatabase { get; set; }
+
+        public TenantBrandingModel Branding { get; set; } = new();
+    }
+
+    private class TenantBrandingModel
+    {
+        public string? LogoUrl { get; set; }
+        public string? FaviconUrl { get; set; }
+        public string? PrimaryColor { get; set; }
+        public string? SecondaryColor { get; set; }
+        public string? AccentColor { get; set; }
+        public string? LoginBackgroundUrl { get; set; }
+        public string? EmailFooterHtml { get; set; }
+        public string? CustomCss { get; set; }
+
+        public TenantBrandingDto? ToDto()
+        {
+            if (string.IsNullOrWhiteSpace(LogoUrl) &&
+                string.IsNullOrWhiteSpace(FaviconUrl) &&
+                string.IsNullOrWhiteSpace(PrimaryColor) &&
+                string.IsNullOrWhiteSpace(SecondaryColor) &&
+                string.IsNullOrWhiteSpace(AccentColor) &&
+                string.IsNullOrWhiteSpace(LoginBackgroundUrl) &&
+                string.IsNullOrWhiteSpace(EmailFooterHtml) &&
+                string.IsNullOrWhiteSpace(CustomCss))
+            {
+                return null;
+            }
+
+            return new TenantBrandingDto(
+                LogoUrl,
+                FaviconUrl,
+                PrimaryColor,
+                SecondaryColor,
+                AccentColor,
+                LoginBackgroundUrl,
+                EmailFooterHtml,
+                CustomCss);
+        }
+
+        public static TenantBrandingModel FromDto(TenantBrandingDto dto) => new()
+        {
+            LogoUrl = dto.LogoUrl,
+            FaviconUrl = dto.FaviconUrl,
+            PrimaryColor = dto.PrimaryColor,
+            SecondaryColor = dto.SecondaryColor,
+            AccentColor = dto.AccentColor,
+            LoginBackgroundUrl = dto.LoginBackgroundUrl,
+            EmailFooterHtml = dto.EmailFooterHtml,
+            CustomCss = dto.CustomCss
+        };
+    }
+}

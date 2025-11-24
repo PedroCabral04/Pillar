@@ -30,6 +30,11 @@ public class AccountPayable : IAuditable
     /// </summary>
     public decimal NetAmount => OriginalAmount - DiscountAmount + InterestAmount + FineAmount;
     
+    /// <summary>
+    /// Saldo restante a pagar: NetAmount - PaidAmount
+    /// </summary>
+    public decimal RemainingAmount => NetAmount - PaidAmount;
+    
     // Datas
     public DateTime IssueDate { get; set; }
     public DateTime DueDate { get; set; }

@@ -101,12 +101,14 @@ public class InventoryReportService : IInventoryReportService
 
             if (filter.StartDate.HasValue)
             {
-                query = query.Where(m => m.MovementDate >= filter.StartDate.Value);
+                var startDate = filter.StartDate.Value.ToUniversalTime();
+                query = query.Where(m => m.MovementDate >= startDate);
             }
 
             if (filter.EndDate.HasValue)
             {
-                query = query.Where(m => m.MovementDate <= filter.EndDate.Value);
+                var endDate = filter.EndDate.Value.ToUniversalTime();
+                query = query.Where(m => m.MovementDate <= endDate);
             }
 
             if (filter.ProductId.HasValue)

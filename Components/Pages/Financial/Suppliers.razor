@@ -1,5 +1,6 @@
 @page "/financial/suppliers"
 @using erp.DTOs.Financial
+@using erp.Components.Shared.Dialogs.Financial
 @attribute [Authorize]
 
 <PageTitle>Fornecedores - Pillar ERP</PageTitle>
@@ -16,12 +17,14 @@
                          Placeholder="Buscar fornecedores..." 
                          Adornment="Adornment.Start" 
                          AdornmentIcon="@Icons.Material.Filled.Search"
-                         Class="flex-grow-1" />
+                         Class="flex-grow-1" 
+                         DebounceInterval="500"
+                         OnDebounceIntervalElapsed="OnSearch" />
             
             <MudButton Variant="Variant.Filled" 
                       Color="Color.Primary" 
                       StartIcon="@Icons.Material.Filled.Add"
-                      OnClick="@(() => Snackbar.Add("Criar fornecedor - em desenvolvimento", Severity.Info))">
+                      OnClick="OpenCreateDialog">
                 Novo Fornecedor
             </MudButton>
         </MudStack>
@@ -32,12 +35,16 @@
                     Items="@suppliers" 
                     Loading="@isLoading"
                     Dense="true"
-                    Hover="true">
+                    Hover="true"
+                    Filterable="true"
+                    SortMode="SortMode.Multiple">
             <Columns>
                 <PropertyColumn Property="x => x.Name" Title="Nome" />
-                <PropertyColumn Property="x => x.TaxId" Title="CNPJ" />
+                <PropertyColumn Property="x => x.TradeName" Title="Nome Fantasia" />
+                <PropertyColumn Property="x => x.TaxId" Title="CNPJ/CPF" />
                 <PropertyColumn Property="x => x.Email" Title="Email" />
                 <PropertyColumn Property="x => x.Phone" Title="Telefone" />
+                <PropertyColumn Property="x => x.City" Title="Cidade" />
                 <TemplateColumn Title="Status">
                     <CellTemplate>
                         <MudChip T="string" Size="Size.Small" 
@@ -46,7 +53,16 @@
                         </MudChip>
                     </CellTemplate>
                 </TemplateColumn>
+                <TemplateColumn Title="Ações">
+                    <CellTemplate>
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => OpenEditDialog(context.Item))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => DeleteSupplier(context.Item))" />
+                    </CellTemplate>
+                </TemplateColumn>
             </Columns>
+            <PagerContent>
+                <MudDataGridPager T="SupplierDto" />
+            </PagerContent>
         </MudDataGrid>
     </MudPaper>
 </MudContainer>
@@ -54,6 +70,7 @@
 @code {
     [Inject] private IApiService ApiService { get; set; } = null!;
     [Inject] private ISnackbar Snackbar { get; set; } = null!;
+    [Inject] private IDialogService DialogService { get; set; } = null!;
 
     private List<SupplierDto> suppliers = new();
     private bool isLoading = false;
@@ -69,8 +86,17 @@
         isLoading = true;
         try
         {
+            // In a real scenario, we would use server-side filtering with the search term
             suppliers = await ApiService.GetAsync<List<SupplierDto>>("api/suppliers") ?? new();
-            Snackbar.Add($"{suppliers.Count} fornecedores carregados", Severity.Success);
+            
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                suppliers = suppliers.Where(s => 
+                    s.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) || 
+                    (s.TradeName?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    s.TaxId.Contains(searchTerm)
+                ).ToList();
+            }
         }
         catch (Exception ex)
         {
@@ -79,6 +105,115 @@
         finally
         {
             isLoading = false;
+        }
+    }
+
+    private async Task OnSearch()
+    {
+        await LoadSuppliers();
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = DialogService.Show<SupplierDialog>("Novo Fornecedor", options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is CreateSupplierDto dto)
+        {
+            try
+            {
+                await ApiService.PostAsync<CreateSupplierDto>("api/suppliers", dto);
+                Snackbar.Add("Fornecedor criado com sucesso", Severity.Success);
+                await LoadSuppliers();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao criar fornecedor: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task OpenEditDialog(SupplierDto supplier)
+    {
+        var parameters = new DialogParameters();
+        
+        // Map SupplierDto to CreateSupplierDto (which is used as the model in the dialog)
+        // In a real app, we might want a separate UpdateSupplierDto or use AutoMapper
+        var model = new CreateSupplierDto
+        {
+            Name = supplier.Name,
+            TradeName = supplier.TradeName,
+            TaxId = supplier.TaxId,
+            StateRegistration = supplier.StateRegistration,
+            MunicipalRegistration = supplier.MunicipalRegistration,
+            ZipCode = supplier.ZipCode,
+            Street = supplier.Street,
+            Number = supplier.Number,
+            Complement = supplier.Complement,
+            District = supplier.District,
+            City = supplier.City,
+            State = supplier.State,
+            Country = supplier.Country,
+            Phone = supplier.Phone,
+            MobilePhone = supplier.MobilePhone,
+            Email = supplier.Email,
+            Website = supplier.Website,
+            Category = supplier.Category,
+            MinimumOrderValue = supplier.MinimumOrderValue,
+            DeliveryLeadTimeDays = supplier.DeliveryLeadTimeDays,
+            PaymentTermDays = supplier.PaymentTermDays,
+            PaymentMethod = supplier.PaymentMethod,
+            IsPreferred = supplier.IsPreferred,
+            Notes = supplier.Notes,
+            IsActive = supplier.IsActive
+        };
+
+        parameters.Add("Model", model);
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = DialogService.Show<SupplierDialog>("Editar Fornecedor", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is CreateSupplierDto dto)
+        {
+            try
+            {
+                // Assuming UpdateSupplierDto inherits from CreateSupplierDto or is compatible
+                await ApiService.PutAsync($"api/suppliers/{supplier.Id}", dto);
+                Snackbar.Add("Fornecedor atualizado com sucesso", Severity.Success);
+                await LoadSuppliers();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao atualizar fornecedor: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task DeleteSupplier(SupplierDto supplier)
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("ContentText", $"Tem certeza que deseja excluir o fornecedor {supplier.Name}?");
+        parameters.Add("ButtonText", "Excluir");
+        parameters.Add("Color", MudBlazor.Color.Error);
+
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = DialogService.Show<erp.Components.Shared.Dialogs.ConfirmDialog>("Excluir Fornecedor", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            try
+            {
+                await ApiService.DeleteAsync($"api/suppliers/{supplier.Id}");
+                Snackbar.Add("Fornecedor excluído com sucesso", Severity.Success);
+                await LoadSuppliers();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao excluir fornecedor: {ex.Message}", Severity.Error);
+            }
         }
     }
 }

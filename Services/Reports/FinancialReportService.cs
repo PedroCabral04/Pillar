@@ -31,14 +31,16 @@ public class FinancialReportService : IFinancialReportService
             // Apply date filters
             if (filter.StartDate.HasValue)
             {
-                receivablesQuery = receivablesQuery.Where(a => a.DueDate >= filter.StartDate.Value);
-                payablesQuery = payablesQuery.Where(a => a.DueDate >= filter.StartDate.Value);
+                var startDate = filter.StartDate.Value.ToUniversalTime();
+                receivablesQuery = receivablesQuery.Where(a => a.DueDate >= startDate);
+                payablesQuery = payablesQuery.Where(a => a.DueDate >= startDate);
             }
 
             if (filter.EndDate.HasValue)
             {
-                receivablesQuery = receivablesQuery.Where(a => a.DueDate <= filter.EndDate.Value);
-                payablesQuery = payablesQuery.Where(a => a.DueDate <= filter.EndDate.Value);
+                var endDate = filter.EndDate.Value.ToUniversalTime();
+                receivablesQuery = receivablesQuery.Where(a => a.DueDate <= endDate);
+                payablesQuery = payablesQuery.Where(a => a.DueDate <= endDate);
             }
 
             var receivables = await receivablesQuery.ToListAsync();
@@ -101,10 +103,16 @@ public class FinancialReportService : IFinancialReportService
             var salesQuery = _context.Sales.AsQueryable();
             
             if (filter.StartDate.HasValue)
-                salesQuery = salesQuery.Where(s => s.SaleDate >= filter.StartDate.Value);
+            {
+                var startDate = filter.StartDate.Value.ToUniversalTime();
+                salesQuery = salesQuery.Where(s => s.SaleDate >= startDate);
+            }
             
             if (filter.EndDate.HasValue)
-                salesQuery = salesQuery.Where(s => s.SaleDate <= filter.EndDate.Value);
+            {
+                var endDate = filter.EndDate.Value.ToUniversalTime();
+                salesQuery = salesQuery.Where(s => s.SaleDate <= endDate);
+            }
 
             var sales = await salesQuery.Where(s => s.Status != "Cancelada").ToListAsync();
             var totalRevenue = sales.Sum(s => s.NetAmount);
@@ -115,10 +123,16 @@ public class FinancialReportService : IFinancialReportService
                 .Where(m => m.Type == Models.Inventory.MovementType.Out);
 
             if (filter.StartDate.HasValue)
-                movementsQuery = movementsQuery.Where(m => m.MovementDate >= filter.StartDate.Value);
+            {
+                var startDate = filter.StartDate.Value.ToUniversalTime();
+                movementsQuery = movementsQuery.Where(m => m.MovementDate >= startDate);
+            }
             
             if (filter.EndDate.HasValue)
-                movementsQuery = movementsQuery.Where(m => m.MovementDate <= filter.EndDate.Value);
+            {
+                var endDate = filter.EndDate.Value.ToUniversalTime();
+                movementsQuery = movementsQuery.Where(m => m.MovementDate <= endDate);
+            }
 
             var movements = await movementsQuery.ToListAsync();
             var costOfGoodsSold = movements.Sum(m => m.Quantity * m.UnitCost);
@@ -129,10 +143,16 @@ public class FinancialReportService : IFinancialReportService
                 .Where(a => a.Status == AccountStatus.Paid);
 
             if (filter.StartDate.HasValue)
-                expensesQuery = expensesQuery.Where(a => a.PaymentDate >= filter.StartDate.Value);
+            {
+                var startDate = filter.StartDate.Value.ToUniversalTime();
+                expensesQuery = expensesQuery.Where(a => a.PaymentDate >= startDate);
+            }
             
             if (filter.EndDate.HasValue)
-                expensesQuery = expensesQuery.Where(a => a.PaymentDate <= filter.EndDate.Value);
+            {
+                var endDate = filter.EndDate.Value.ToUniversalTime();
+                expensesQuery = expensesQuery.Where(a => a.PaymentDate <= endDate);
+            }
 
             var expenses = await expensesQuery.ToListAsync();
             var operatingExpenses = expenses.Sum(e => e.NetAmount);

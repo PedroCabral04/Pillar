@@ -2,8 +2,10 @@ using System.Security.Claims;
 using erp.Controllers;
 using erp.DTOs.User;
 using erp.Models.Identity;
+using erp.Services.Tenancy;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace erp.Tests.Controllers;
@@ -16,9 +18,11 @@ public class UserControllerTests
 {
     private readonly Mock<UserManager<ApplicationUser>> _mockUserManager;
     private readonly Mock<RoleManager<ApplicationRole>> _mockRoleManager;
+    private readonly Mock<ITenantContextAccessor> _mockTenantAccessor;
     private readonly UsersController _controller;
 
     private readonly Mock<erp.Data.ApplicationDbContext> _mockContext;
+    private readonly TenantContext _tenantContext;
     
     public UserControllerTests()
     {
@@ -35,7 +39,17 @@ public class UserControllerTests
         // Setup DbContext mock - apenas mock simples, sem banco real
         _mockContext = new Mock<erp.Data.ApplicationDbContext>();
 
-        _controller = new UsersController(_mockUserManager.Object, _mockRoleManager.Object, _mockContext.Object);
+        _mockTenantAccessor = new Mock<ITenantContextAccessor>();
+        _tenantContext = new TenantContext();
+        _mockTenantAccessor.SetupGet(x => x.Current).Returns(_tenantContext);
+
+        _controller = new UsersController(
+            _mockUserManager.Object,
+            _mockRoleManager.Object,
+            _mockContext.Object,
+            _mockTenantAccessor.Object);
+
+        SetUsersQueryable(Array.Empty<ApplicationUser>());
 
         // Setup user context
         var user = new ClaimsPrincipal(new ClaimsIdentity(new Claim[]
@@ -51,6 +65,27 @@ public class UserControllerTests
         };
     }
 
+    private void SetUsersQueryable(IEnumerable<ApplicationUser> users)
+    {
+        _mockUserManager.Setup(x => x.Users).Returns(users.AsQueryable());
+    }
+
+    private void SetTenantClaim(int tenantId)
+    {
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, "1"),
+            new(ClaimTypes.Name, "admin@test.com"),
+            new(ClaimTypes.Role, "Admin"),
+            new(TenantClaimTypes.TenantId, tenantId.ToString())
+        };
+
+        _controller.ControllerContext.HttpContext = new DefaultHttpContext
+        {
+            User = new ClaimsPrincipal(new ClaimsIdentity(claims, "mock"))
+        };
+    }
+
     #region GetAllUsers Tests
 
     [Fact]
@@ -63,8 +98,7 @@ public class UserControllerTests
             new ApplicationUser { Id = 2, UserName = "user2", Email = "user2@test.com", IsActive = true }
         };
 
-        _mockUserManager.Setup(x => x.Users)
-            .Returns(users.AsQueryable());
+        SetUsersQueryable(users);
 
         _mockUserManager.Setup(x => x.GetRolesAsync(It.IsAny<ApplicationUser>()))
             .ReturnsAsync(new List<string> { "User" });
@@ -77,6 +111,33 @@ public class UserControllerTests
         var returnedUsers = okResult.Value as List<UserDto>;
         returnedUsers.Should().NotBeNull();
         returnedUsers.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task GetAllUsers_WithTenantClaim_FiltersOtherTenants()
+    {
+        // Arrange
+        var users = new List<ApplicationUser>
+        {
+            new() { Id = 1, UserName = "t1", Email = "t1@test.com", TenantId = 10 },
+            new() { Id = 2, UserName = "t2", Email = "t2@test.com", TenantId = 20 }
+        };
+
+        SetUsersQueryable(users);
+        SetTenantClaim(10);
+
+        _mockUserManager.Setup(x => x.GetRolesAsync(It.IsAny<ApplicationUser>()))
+            .ReturnsAsync(new List<string>());
+
+        // Act
+        var result = await _controller.GetAllUsers();
+
+        // Assert
+        var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var returnedUsers = okResult.Value as List<UserDto>;
+        returnedUsers.Should().NotBeNull();
+        returnedUsers!.Should().HaveCount(1);
+        returnedUsers[0].Id.Should().Be(1);
     }
 
     #endregion
@@ -97,8 +158,7 @@ public class UserControllerTests
             IsActive = true
         };
 
-        _mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString()))
-            .ReturnsAsync(user);
+        SetUsersQueryable(new List<ApplicationUser> { user });
 
         _mockUserManager.Setup(x => x.GetRolesAsync(user))
             .ReturnsAsync(new List<string> { "User" });
@@ -120,11 +180,32 @@ public class UserControllerTests
     {
         // Arrange
         var userId = 999;
-        _mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString()))
-            .ReturnsAsync((ApplicationUser?)null);
+        SetUsersQueryable(Array.Empty<ApplicationUser>());
 
         // Act
         var result = await _controller.GetUserById(userId);
+
+        // Assert
+        result.Result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetUserById_WithDifferentTenant_ReturnsNotFound()
+    {
+        // Arrange
+        var user = new ApplicationUser
+        {
+            Id = 5,
+            UserName = "other",
+            Email = "other@test.com",
+            TenantId = 20
+        };
+
+        SetUsersQueryable(new List<ApplicationUser> { user });
+        SetTenantClaim(10);
+
+        // Act
+        var result = await _controller.GetUserById(user.Id);
 
         // Assert
         result.Result.Should().BeOfType<NotFoundObjectResult>();
@@ -422,8 +503,7 @@ public class UserControllerTests
     {
         // Arrange
         var email = "available@test.com";
-        _mockUserManager.Setup(x => x.FindByEmailAsync(email))
-            .ReturnsAsync((ApplicationUser?)null);
+        SetUsersQueryable(Array.Empty<ApplicationUser>());
 
         // Act
         var result = await _controller.ValidateEmail(email);
@@ -443,11 +523,10 @@ public class UserControllerTests
         var existingUser = new ApplicationUser
         {
             Id = 1,
-            Email = email
+            Email = email,
+            NormalizedEmail = email.ToUpperInvariant()
         };
-
-        _mockUserManager.Setup(x => x.FindByEmailAsync(email))
-            .ReturnsAsync(existingUser);
+        SetUsersQueryable(new List<ApplicationUser> { existingUser });
 
         // Act
         var result = await _controller.ValidateEmail(email);
@@ -474,6 +553,31 @@ public class UserControllerTests
 
     [Fact]
     public async Task ValidateEmail_WithExcludedUserId_ReturnsOk()
+        [Fact]
+        public async Task ValidateEmail_IgnoresUsersFromOtherTenant()
+        {
+            // Arrange
+            var email = "tenant@test.com";
+            var otherTenantUser = new ApplicationUser
+            {
+                Id = 10,
+                Email = email,
+                NormalizedEmail = email.ToUpperInvariant(),
+                TenantId = 20
+            };
+
+            SetUsersQueryable(new List<ApplicationUser> { otherTenantUser });
+            SetTenantClaim(10);
+
+            // Act
+            var result = await _controller.ValidateEmail(email);
+
+            // Assert
+            var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
+            var response = okResult.Value as ValidationResponse;
+            response.Should().NotBeNull();
+            response!.IsAvailable.Should().BeTrue();
+        }
     {
         // Arrange
         var email = "test@test.com";
@@ -481,11 +585,10 @@ public class UserControllerTests
         var existingUser = new ApplicationUser
         {
             Id = userId,
-            Email = email
+            Email = email,
+            NormalizedEmail = email.ToUpperInvariant()
         };
-
-        _mockUserManager.Setup(x => x.FindByEmailAsync(email))
-            .ReturnsAsync(existingUser);
+        SetUsersQueryable(new List<ApplicationUser> { existingUser });
 
         // Act
         var result = await _controller.ValidateEmail(email, userId);
@@ -506,8 +609,7 @@ public class UserControllerTests
     {
         // Arrange
         var username = "availableuser";
-        _mockUserManager.Setup(x => x.FindByNameAsync(username))
-            .ReturnsAsync((ApplicationUser?)null);
+        SetUsersQueryable(Array.Empty<ApplicationUser>());
 
         // Act
         var result = await _controller.ValidateUsername(username);
@@ -527,11 +629,10 @@ public class UserControllerTests
         var existingUser = new ApplicationUser
         {
             Id = 1,
-            UserName = username
+            UserName = username,
+            NormalizedUserName = username.ToUpperInvariant()
         };
-
-        _mockUserManager.Setup(x => x.FindByNameAsync(username))
-            .ReturnsAsync(existingUser);
+        SetUsersQueryable(new List<ApplicationUser> { existingUser });
 
         // Act
         var result = await _controller.ValidateUsername(username);
@@ -565,11 +666,10 @@ public class UserControllerTests
         var existingUser = new ApplicationUser
         {
             Id = userId,
-            UserName = username
+            UserName = username,
+            NormalizedUserName = username.ToUpperInvariant()
         };
-
-        _mockUserManager.Setup(x => x.FindByNameAsync(username))
-            .ReturnsAsync(existingUser);
+        SetUsersQueryable(new List<ApplicationUser> { existingUser });
 
         // Act
         var result = await _controller.ValidateUsername(username, userId);

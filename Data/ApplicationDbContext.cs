@@ -4,6 +4,7 @@ using erp.Models.Audit;
 using erp.Models.TimeTracking;
 using erp.Models.Financial;
 using erp.Models.Payroll;
+using erp.Models.Tenancy;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
@@ -11,8 +12,7 @@ using System.Text.Json;
 
 namespace erp.Data;
 
-public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
-    : IdentityDbContext<ApplicationUser, ApplicationRole, int>(options)
+public class ApplicationDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, int>
 {
     // Mantemos os DbSets existentes se ainda forem usados em outras partes (tabelas próprias do app)
     public new DbSet<User> Users { get; set; } = null!;
@@ -58,6 +58,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<AssetMaintenance> AssetMaintenances { get; set; } = null!;
     public DbSet<AssetDocument> AssetDocuments { get; set; } = null!;
     public DbSet<AssetTransfer> AssetTransfers { get; set; } = null!;
+    public DbSet<Tenant> Tenants { get; set; } = null!;
+    public DbSet<TenantBranding> TenantBrandings { get; set; } = null!;
+    public DbSet<TenantMembership> TenantMemberships { get; set; } = null!;
     
     // Audit
     public DbSet<AuditLog> AuditLogs { get; set; } = null!;
@@ -68,16 +71,22 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<PayrollSlip> PayrollSlips { get; set; } = null!;
     public DbSet<PayrollTaxBracket> PayrollTaxBrackets { get; set; } = null!;
     
+    // Onboarding
+    public DbSet<erp.Models.Onboarding.UserOnboardingProgress> UserOnboardingProgress { get; set; } = null!;
+    
     // Serviços injetados para auditoria
     private readonly IHttpContextAccessor? _httpContextAccessor;
+    private readonly erp.Services.Tenancy.ITenantContextAccessor? _tenantContextAccessor;
     
     // Construtor adicional para injeção de IHttpContextAccessor
     public ApplicationDbContext(
         DbContextOptions<ApplicationDbContext> options,
-        IHttpContextAccessor? httpContextAccessor = null) 
-        : this(options)
+        IHttpContextAccessor? httpContextAccessor = null,
+        erp.Services.Tenancy.ITenantContextAccessor? tenantContextAccessor = null) 
+        : base(options)
     {
         _httpContextAccessor = httpContextAccessor;
+        _tenantContextAccessor = tenantContextAccessor;
     }
 
     protected override void OnConfiguring(DbContextOptionsBuilder options)
@@ -92,6 +101,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
         SetAuditProperties();
+        SetTenantId();
         
         // Captura snapshots (apenas dados serializados, não referências)
         var auditSnapshots = CaptureAuditSnapshots();
@@ -125,6 +135,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public override int SaveChanges()
     {
         SetAuditProperties();
+        SetTenantId();
         
         var auditSnapshots = CaptureAuditSnapshots();
         
@@ -148,6 +159,25 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         }
         
         return result;
+    }
+
+    private void SetTenantId()
+    {
+        var currentTenantId = _tenantContextAccessor?.Current?.TenantId;
+        if (!currentTenantId.HasValue) return;
+
+        var entries = ChangeTracker.Entries()
+            .Where(e => e.Entity is IMustHaveTenant && e.State == EntityState.Added);
+
+        foreach (var entry in entries)
+        {
+            var entity = (IMustHaveTenant)entry.Entity;
+            // Only set if not already set (allows explicit override)
+            if (entity.TenantId == 0)
+            {
+                entity.TenantId = currentTenantId.Value;
+            }
+        }
     }
 
     private void SetAuditProperties()
@@ -515,6 +545,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             t.HasIndex(x => new { x.ColumnId, x.Position });
         });
 
+        ConfigureTenancyModels(modelBuilder);
+
         // Inventory model configuration
         ConfigureInventoryModels(modelBuilder);
         
@@ -533,11 +565,112 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         // Audit model configuration
         ConfigureAuditModels(modelBuilder);
 
+        // Onboarding configuration
+        modelBuilder.Entity<erp.Models.Onboarding.UserOnboardingProgress>()
+            .HasIndex(p => new { p.UserId, p.TourId })
+            .IsUnique();
+
         // Payroll model configuration
         // ConfigurePayrollModels(modelBuilder); // TODO: Implement this method
 
         // Time tracking / payroll configuration
         ConfigureTimeTrackingModels(modelBuilder);
+
+        // Apply Global Query Filters for Multi-Tenancy
+        // This ensures that queries only return data for the current tenant
+        // Note: This filter is applied to the CLR type, so it works for all derived types too
+        
+        // We need to capture the tenant ID in a local variable for the expression tree
+        // However, since OnModelCreating runs once per app lifetime (cached), we can't use _tenantContextAccessor here directly.
+        // Instead, we use a Global Query Filter that references a property on the DbContext or a service.
+        // But EF Core Global Query Filters are defined in OnModelCreating.
+        // The standard way is to define the filter using a lambda that accesses a property on the DbContext instance.
+        // But we don't have a TenantId property on ApplicationDbContext.
+        // We can add one, or use the accessor via an expression.
+        
+        // Actually, the best way is to use a method on the context or a property.
+        // Let's add a CurrentTenantId property to ApplicationDbContext that delegates to the accessor.
+        
+        modelBuilder.Entity<Models.Inventory.Product>().HasQueryFilter(p => _tenantContextAccessor == null || _tenantContextAccessor.Current == null || !_tenantContextAccessor.Current.TenantId.HasValue || p.TenantId == _tenantContextAccessor.Current.TenantId.GetValueOrDefault());
+        modelBuilder.Entity<Models.Sales.Customer>().HasQueryFilter(c => _tenantContextAccessor == null || _tenantContextAccessor.Current == null || !_tenantContextAccessor.Current.TenantId.HasValue || c.TenantId == _tenantContextAccessor.Current.TenantId.GetValueOrDefault());
+        modelBuilder.Entity<Models.Financial.Supplier>().HasQueryFilter(s => _tenantContextAccessor == null || _tenantContextAccessor.Current == null || !_tenantContextAccessor.Current.TenantId.HasValue || s.TenantId == _tenantContextAccessor.Current.TenantId.GetValueOrDefault());
+    }
+
+    private void ConfigureTenancyModels(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<TenantBranding>(branding =>
+        {
+            branding.ToTable("TenantBrandings");
+            branding.HasKey(x => x.Id);
+            branding.Property(x => x.LogoUrl).HasMaxLength(500);
+            branding.Property(x => x.FaviconUrl).HasMaxLength(500);
+            branding.Property(x => x.PrimaryColor).HasMaxLength(20);
+            branding.Property(x => x.SecondaryColor).HasMaxLength(20);
+            branding.Property(x => x.AccentColor).HasMaxLength(20);
+            branding.Property(x => x.LoginBackgroundUrl).HasMaxLength(500);
+            branding.Property(x => x.EmailFooterHtml).HasMaxLength(2000);
+            branding.Property(x => x.CustomCss).HasMaxLength(2000);
+        });
+
+        modelBuilder.Entity<Tenant>(tenant =>
+        {
+            tenant.ToTable("Tenants");
+            tenant.HasKey(x => x.Id);
+            tenant.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            tenant.Property(x => x.Slug).HasMaxLength(64).IsRequired();
+            tenant.Property(x => x.DocumentNumber).HasMaxLength(20);
+            tenant.Property(x => x.PrimaryContactName).HasMaxLength(200);
+            tenant.Property(x => x.PrimaryContactEmail).HasMaxLength(200);
+            tenant.Property(x => x.PrimaryContactPhone).HasMaxLength(20);
+            tenant.Property(x => x.DatabaseName).HasMaxLength(200);
+            tenant.Property(x => x.ConnectionString).HasMaxLength(500);
+            tenant.Property(x => x.Region).HasMaxLength(200);
+            tenant.Property(x => x.Notes).HasMaxLength(2000);
+            tenant.Property(x => x.ConfigurationJson).HasColumnType("jsonb");
+
+            tenant.HasIndex(x => x.Slug).IsUnique();
+            tenant.HasIndex(x => x.Status);
+            tenant.HasIndex(x => x.DocumentNumber);
+            tenant.HasIndex(x => x.DatabaseName)
+                .IsUnique()
+                .HasFilter("\"DatabaseName\" IS NOT NULL");
+
+            tenant.HasOne(x => x.Branding)
+                .WithMany()
+                .HasForeignKey(x => x.BrandingId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<TenantMembership>(membership =>
+        {
+            membership.ToTable("TenantMemberships");
+            membership.HasKey(x => x.Id);
+            membership.HasIndex(x => new { x.TenantId, x.UserId }).IsUnique();
+
+            membership.HasOne(x => x.Tenant)
+                .WithMany(x => x.Memberships)
+                .HasForeignKey(x => x.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            membership.HasOne(x => x.User)
+                .WithMany(x => x.TenantMemberships)
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ApplicationUser>(user =>
+        {
+            user.HasIndex(x => x.TenantId);
+            user.HasOne(x => x.Tenant)
+                .WithMany(x => x.Users)
+                .HasForeignKey(x => x.TenantId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ApplicationRole>(role =>
+        {
+            role.HasIndex(x => x.TenantId);
+        });
     }
 
     private void ConfigureInventoryModels(ModelBuilder modelBuilder)
@@ -1068,7 +1201,6 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         // ApplicationUser - Configuração adicional para relacionamentos de RH
         modelBuilder.Entity<ApplicationUser>(u =>
         {
-            u.HasIndex(x => x.Cpf).IsUnique().HasFilter("\"Cpf\" IS NOT NULL");
             u.HasIndex(x => x.Rg).HasFilter("\"Rg\" IS NOT NULL");
             u.HasIndex(x => x.FullName);
             u.HasIndex(x => x.DepartmentId);

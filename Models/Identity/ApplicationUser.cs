@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using erp.Models.Tenancy;
 
 namespace erp.Models.Identity;
 
@@ -8,6 +9,12 @@ public class ApplicationUser : IdentityUser<int>, erp.Models.Audit.IAuditable
 {
     public bool IsActive { get; set; } = true;
     public string? PreferencesJson { get; set; }
+    public int? TenantId { get; set; }
+
+    [ForeignKey(nameof(TenantId))]
+    public Tenant? Tenant { get; set; }
+
+    public ICollection<TenantMembership> TenantMemberships { get; set; } = new List<TenantMembership>();
     
     // Informações Pessoais
     [MaxLength(200)]

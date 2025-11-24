@@ -1,0 +1,208 @@
+@page "/admin/tenants"
+@attribute [Authorize(Roles = "Administrador")]
+@using erp.DTOs.Tenancy
+@using erp.Models.Tenancy
+@using erp.Services
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject ILogger<Tenants> Logger
+
+<PageTitle>Tenants</PageTitle>
+
+<MudStack Spacing="3">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+        <MudStack Spacing="1">
+            <MudText Typo="Typo.h4">Tenants</MudText>
+            <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Secondary">Gerenciamento de empresas, provisionamento e status de bancos.</MudText>
+        </MudStack>
+        <MudButton Variant="Variant.Filled" Color="MudBlazor.Color.Primary" StartIcon="@Icons.Material.Filled.AddBusiness" OnClick="CreateTenant">
+            Novo tenant
+        </MudButton>
+    </MudStack>
+
+    @if (!string.IsNullOrWhiteSpace(_loadError))
+    {
+        <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
+    }
+
+    <MudPaper Elevation="1" Class="pa-4">
+        <MudStack Spacing="2">
+            <MudTextField @bind-Value="_search" Placeholder="Filtrar por nome, slug, região ou contato" Variant="Variant.Outlined" Immediate="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" />
+            <MudTable Items="@FilteredTenants" Hover="true" Dense="true">
+                <HeaderContent>
+                    <MudTh>Empresa</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Contato</MudTh>
+                    <MudTh>Região</MudTh>
+                    <MudTh>Provisionamento</MudTh>
+                    <MudTh Align="Align.Right">Ações</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Empresa">
+                        <MudStack>
+                            <MudText Typo="Typo.body1">@context.Name</MudText>
+                            <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">Slug: @context.Slug</MudText>
+                            @if (context.IsDemo)
+                            {
+                                <MudChip T="string" Color="MudBlazor.Color.Info" Variant="Variant.Outlined" Size="MudBlazor.Size.Small">Demo</MudChip>
+                            }
+                        </MudStack>
+                    </MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudChip T="string" Color="@GetStatusColor(context.Status)" Variant="Variant.Filled" Size="MudBlazor.Size.Small">@GetStatusLabel(context.Status)</MudChip>
+                        @if (!string.IsNullOrWhiteSpace(context.DatabaseName))
+                        {
+                            <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">BD: @context.DatabaseName</MudText>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Contato">
+                        <MudText Typo="Typo.subtitle2">@context.PrimaryContactName</MudText>
+                        <MudText Typo="Typo.caption">@context.PrimaryContactEmail</MudText>
+                        <MudText Typo="Typo.caption">@context.PrimaryContactPhone</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Região">@context.Region</MudTd>
+                    <MudTd DataLabel="Provisionamento">
+                        <MudStack>
+                            <MudText Typo="Typo.caption">@((context.ConnectionString is null) ? "Template" : "Custom")</MudText>
+                            <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">
+                                @if (context.ActivatedAt.HasValue)
+                                {
+                                    <text>Ativado em @context.ActivatedAt.Value.ToString("dd/MM/yyyy HH:mm")</text>
+                                }
+                                else
+                                {
+                                    <text>Aguardando provisionamento</text>
+                                }
+                            </MudText>
+                        </MudStack>
+                    </MudTd>
+                    <MudTd Align="Align.Right">
+                        <MudButtonGroup Variant="Variant.Text" Dense="true">
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="MudBlazor.Color.Info" Title="Editar" OnClick="@(() => EditTenant(context))" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Storage" Color="MudBlazor.Color.Primary" Title="Provisionar" OnClick="@(() => ProvisionTenant(context))" Disabled="_provisioningIds.Contains(context.Id)" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="MudBlazor.Color.Error" Title="Excluir" Disabled="true" />
+                        </MudButtonGroup>
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText>Nenhum tenant encontrado.</MudText>
+                </NoRecordsContent>
+            </MudTable>
+        </MudStack>
+    </MudPaper>
+</MudStack>
+
+@code {
+    private List<TenantDto> _tenants = new();
+    private string? _loadError;
+    private string _search = string.Empty;
+    private readonly HashSet<int> _provisioningIds = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTenantsAsync();
+    }
+
+    private IEnumerable<TenantDto> FilteredTenants => _tenants.Where(t =>
+        string.IsNullOrWhiteSpace(_search)
+        || t.Name.Contains(_search, StringComparison.OrdinalIgnoreCase)
+        || t.Slug.Contains(_search, StringComparison.OrdinalIgnoreCase)
+        || (t.Region?.Contains(_search, StringComparison.OrdinalIgnoreCase) ?? false)
+        || (t.PrimaryContactName?.Contains(_search, StringComparison.OrdinalIgnoreCase) ?? false));
+
+    private async Task LoadTenantsAsync()
+    {
+        try
+        {
+            var response = await ApiService.GetAsync("api/tenants");
+            response.EnsureSuccessStatusCode();
+            var tenants = await response.Content.ReadFromJsonAsync<List<TenantDto>>() ?? new List<TenantDto>();
+            _tenants = tenants.OrderBy(t => t.Name).ToList();
+            _loadError = null;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar tenants");
+            _loadError = "Não foi possível carregar os tenants.";
+            Snackbar.Add(_loadError, Severity.Error);
+        }
+    }
+
+    private async Task CreateTenant()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Large, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<TenantFormDialog>("Novo tenant", options);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadTenantsAsync();
+        }
+    }
+
+    private async Task EditTenant(TenantDto tenant)
+    {
+        var parameters = new DialogParameters<TenantFormDialog> { { x => x.Tenant, tenant }, { x => x.IsEdit, true } };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Large, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<TenantFormDialog>($"Editar {tenant.Name}", parameters, options);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadTenantsAsync();
+        }
+    }
+
+    private async Task ProvisionTenant(TenantDto tenant)
+    {
+        var parameters = new DialogParameters
+        {
+            { "ContentText", $"Executar provisionamento do tenant '{tenant.Name}'?" },
+            { "ButtonText", "Provisionar" },
+            { "Color", MudBlazor.Color.Primary }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Provisionar tenant", parameters, options);
+        var result = await dialog.Result;
+        if (result?.Canceled != false)
+        {
+            return;
+        }
+
+        try
+        {
+            _provisioningIds.Add(tenant.Id);
+            await ApiService.PostAsJsonAsync($"api/tenants/{tenant.Id}/provision", new { });
+            Snackbar.Add($"Provisionamento de '{tenant.Name}' iniciado.", Severity.Success);
+            await LoadTenantsAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao provisionar tenant {Tenant}", tenant.Name);
+            Snackbar.Add("Não foi possível provisionar o tenant.", Severity.Error);
+        }
+        finally
+        {
+            _provisioningIds.Remove(tenant.Id);
+        }
+    }
+
+    private MudBlazor.Color GetStatusColor(TenantStatus status) => status switch
+    {
+        TenantStatus.Active => MudBlazor.Color.Success,
+        TenantStatus.Provisioning => MudBlazor.Color.Info,
+        TenantStatus.Suspended => MudBlazor.Color.Warning,
+        TenantStatus.Disabled => MudBlazor.Color.Dark,
+        TenantStatus.Archived => MudBlazor.Color.Secondary,
+        _ => MudBlazor.Color.Default
+    };
+
+    private static string GetStatusLabel(TenantStatus status) => status switch
+    {
+        TenantStatus.Active => "Ativo",
+        TenantStatus.Provisioning => "Provisionando",
+        TenantStatus.Suspended => "Suspenso",
+        TenantStatus.Disabled => "Desativado",
+        TenantStatus.Archived => "Arquivado",
+        _ => status.ToString()
+    };
+}

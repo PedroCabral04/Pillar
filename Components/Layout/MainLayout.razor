@@ -1,20 +1,44 @@
-﻿@using erp.Services
+﻿@using MudBlazor
+@using erp.Services
 @using erp.Services.Browser
+@using erp.Services.Tenancy
+@using erp.Components.Branding
 @inherits LayoutComponentBase
 @inject ThemeService ThemeService
 @inject PreferenceService PreferenceService
 @inject IBrowserService BrowserService
 @inject IJSRuntime JsRuntime
-@implements IDisposable
+@inject ITenantBrandingProvider BrandingProvider
+@inject IDialogService DialogService
+@inject erp.Services.Onboarding.IOnboardingService OnboardingService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject erp.Services.Onboarding.IOnboardingResumeService OnboardingResumeService
+@inject ISnackbar Snackbar
+@implements IAsyncDisposable
+
+<TenantBrandingHead Branding="@_branding" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
 
-<MudThemeProvider @ref="@_mudThemeProvider" @bind-IsDarkMode="ThemeService.IsDarkMode" Theme="@_customTheme"/>
-<MudPopoverProvider/>
-<MudDialogProvider/>
-<MudSnackbarProvider/>
+<MudThemeProvider @ref="@_mudThemeProvider" @bind-IsDarkMode="ThemeService.IsDarkMode" Theme="@ThemeService.Theme" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+@if (PreferenceService.CurrentPreferences.Ui.ReduceMotion)
+{
+    <style>
+        *, *::before, *::after {
+            animation-duration: 0.001s !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.001s !important;
+            scroll-behavior: auto !important;
+        }
+    </style>
+}
+
 <MudLayout>
     <!-- Desktop: Topbar Navigation (when explicitly selected in preferences) -->
     <MudHidden Breakpoint="Breakpoint.SmAndDown" Invert="false">
@@ -31,42 +55,72 @@
         else
         {
             <!-- Desktop: Sidebar Navigation -->
-            <MudPaper Style="position: relative; height: 100vh; display: flex;" >
-                <MudDrawerContainer Class="mud-height-full" Style="display: flex; flex-direction: row; width: 100%;">
-                    <MudDrawer id="nav-drawer" 
-                               Fixed="true" 
-                               Variant="@(_drawerOpen ? DrawerVariant.Persistent : DrawerVariant.Mini)" 
-                               OpenMiniOnHover="true" 
-                               @bind-Open="_drawerOpen" 
-                               ClipMode="DrawerClipMode.Always" 
-                               Elevation="2"
-                               Width="240px"
-                               MiniWidth="56px">
-                        <erp.Components.Shared.Sidebar IsOpen="_drawerOpen" OnToggleDrawer="@ToggleDrawer" />
-                    </MudDrawer>
+            <MudAppBar Elevation="0" Color="MudBlazor.Color.Surface" Fixed="true" ClipMode="DrawerClipMode.Always" Style="border-bottom: 1px solid var(--mud-palette-lines-default);">
+                <MudIconButton Icon="@(_isSidebarLocked ? Icons.Material.Filled.MenuOpen : Icons.Material.Filled.Menu)"
+                               Color="MudBlazor.Color.Inherit"
+                               Edge="Edge.Start"
+                               OnClick="@ToggleDrawer"
+                               Class="mr-3" />
+                
+                <div class="d-flex align-center">
+                    <MudAvatar Size="MudBlazor.Size.Medium"
+                               Class="me-2"
+                               Square="true"
+                               Image="@_branding.LogoUrl"
+                               Text="@_branding.Initials"
+                               Style="@($"background-color:{_branding.PrimaryColor};color:white;")" />
+                    <MudText Typo="Typo.h6" Style="font-weight: 600;">@_branding.TenantName</MudText>
+                </div>
 
-                    <MudMainContent 
-                        Class="pa-4 full-height-content" 
-                        Style="@MainContentStyle()">
-                        <div class="mb-4 d-flex align-center justify-space-between">
-                            <div class="d-flex align-center">
-                                <MudIconButton Icon="@( _drawerOpen ? Icons.Material.Filled.MenuOpen : Icons.Material.Filled.Menu )"
-                                               Color="MudBlazor.Color.Inherit"
-                                               Size="MudBlazor.Size.Medium"
-                                               OnClick="ToggleDrawer"
-                                               AriaLabel="Toggle drawer"
-                                               Class="me-3" />
-                                <erp.Components.Shared.Breadcrumbs />
-                            </div>
-                        </div>
-                        @Body
-                    </MudMainContent>
+                <MudSpacer />
+                
+                <MudHidden Breakpoint="Breakpoint.SmAndDown">
+                    <MudTextField @bind-Value="@_searchString" Placeholder="Pesquisar..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="MudBlazor.Size.Medium" Class="mt-0 mx-4" Variant="Variant.Outlined" Margin="Margin.Dense" Style="background-color: var(--mud-palette-background); border-radius: 8px; width: 300px;" />
+                </MudHidden>
 
-                    <MudScrollToTop>
-                        <MudFab Color="MudBlazor.Color.Tertiary" StartIcon="@Icons.Material.Filled.ArrowCircleUp" />
-                    </MudScrollToTop>
-                </MudDrawerContainer>
-            </MudPaper>
+                <AuthorizeView>
+                    <Authorized Context="auth">
+                        <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" LockScroll="true">
+                            <ActivatorContent>
+                                <MudChip T="string" Icon="@Icons.Material.Filled.Person" Color="MudBlazor.Color.Surface">@auth.User.Identity?.Name</MudChip>
+                            </ActivatorContent>
+                            <ChildContent>
+                                <MudMenuItem Href="/settings" Icon="@Icons.Material.Filled.Settings">Configurações</MudMenuItem>
+                                <MudMenuItem OnClick="LogoutAsync" Icon="@Icons.Material.Filled.Logout">Sair</MudMenuItem>
+                            </ChildContent>
+                        </MudMenu>
+                    </Authorized>
+                    <NotAuthorized>
+                        <MudButton Href="/login" Variant="Variant.Text" Color="MudBlazor.Color.Primary">Entrar</MudButton>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </MudAppBar>
+
+            <MudDrawer id="nav-drawer"
+                       Fixed="true"
+                       Variant="@(_isSidebarLocked ? DrawerVariant.Persistent : DrawerVariant.Mini)"
+                       Open="@(_isSidebarLocked || _isMouseOver)"
+                       OpenMiniOnHover="false"
+                       ClipMode="DrawerClipMode.Always"
+                       Elevation="0"
+                       Width="280px"
+                       MiniWidth="64px"
+                       Style="border-right: 1px solid var(--mud-palette-lines-default);"
+                       @onmouseenter="OnSidebarMouseEnter"
+                       @onmouseleave="OnSidebarMouseLeave">
+                <erp.Components.Shared.Sidebar IsOpen="@(_isSidebarLocked || _isMouseOver)" OnToggleDrawer="@ToggleDrawer" />
+            </MudDrawer>
+
+            <MudMainContent Class="pa-4 full-height-content" Style="@MainContentStyle()">
+                <div class="mb-4">
+                    <erp.Components.Shared.Breadcrumbs />
+                </div>
+                @Body
+            </MudMainContent>
+
+            <MudScrollToTop>
+                <MudFab Color="MudBlazor.Color.Tertiary" StartIcon="@Icons.Material.Filled.ArrowCircleUp" />
+            </MudScrollToTop>
         }
     </MudHidden>
     
@@ -75,7 +129,7 @@
         @if (_mobileDrawerOpen)
         {
             <div class="mobile-drawer-backdrop" @onclick="@CloseMobileDrawer"></div>
-            <div class="mobile-drawer @(_mobileDrawerOpen ? "open" : "")">
+            <div class="mobile-drawer @(_mobileDrawerOpen ? "open" : string.Empty)">
                 <erp.Components.Shared.Sidebar IsOpen="true" OnToggleDrawer="@CloseMobileDrawer" IsMobile="true" />
             </div>
         }
@@ -89,38 +143,49 @@
     
     <!-- Chatbot Widget (available on all layouts) -->
     <erp.Components.Shared.ChatbotWidget />
+
+    @* Continue-tour floating button shown when user navigated away from a tour step *@
+    @if (OnboardingResumeService?.HasPending == true)
+    {
+        <div style="position:fixed; right:16px; bottom:90px; z-index:1300;">
+            <MudTooltip Text="Continuar tour">
+                <MudFab Color="MudBlazor.Color.Primary" StartIcon="@Icons.Material.Filled.PlayArrow" OnClick="OpenResumeTour">
+                    Continuar
+                </MudFab>
+            </MudTooltip>
+        </div>
+    }
 </MudLayout>
 
-
-@*<div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
-    <span class="dismiss">🗙</span>
-    <div/>*@
-
 @code {
-    private bool _drawerOpen = true;
-    private bool _mobileDrawerOpen = false;
-    private int _unreadNotifications = 0;
+    private bool _drawerOpen = true; // Kept for mobile drawer logic if needed, but desktop uses _isSidebarLocked
+    private bool _isSidebarLocked = true;
+    private bool _isMouseOver = false;
+    private System.Threading.CancellationTokenSource? _closeCts;
+    private IJSObjectReference? _activityMonitor;
+    private DotNetObjectReference<MainLayout>? _dotNetRef;
+
+    private bool _mobileDrawerOpen;
+    private int _unreadNotifications;
     private MudThemeProvider _mudThemeProvider = null!;
     public bool IsDarkMode;
     private string? _currentUrl;
-    private bool _isMobileView = false;
+    private bool _isMobileView;
+    private bool _brandingInitialized;
+    private string? _searchString;
+
+    private TenantBrandingTheme _branding = TenantBrandingTheme.Default;
 
     [Inject] private NavigationManager NavigationManager { get; set; } = null!;
 
     private bool IsTopbarNavigation => 
         PreferenceService.CurrentPreferences?.Ui?.NavigationType == "topbar";
 
-    private void ToggleDrawer()
+    protected override void OnInitialized()
     {
-        _drawerOpen = !_drawerOpen;
-    }
-
-    private void CloseMobileDrawer()
-    {
-        _mobileDrawerOpen = false;
-        _ = BrowserService.UnlockScrollAsync();
+        ApplyTenantBranding();
+        // Subscribe to resume requests
+        if (OnboardingResumeService != null) OnboardingResumeService.Changed += OnboardingResumeChanged;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -129,90 +194,295 @@
         {
             await PreferenceService.InitializeAsync();
             ThemeService.InitializeTheme();
+            ApplyCulture();
             PreferenceService.OnPreferenceChanged += OnPreferenceChanged;
             
             // Detecta se é mobile
-            _isMobileView = await JsRuntime.InvokeAsync<bool>("erpResponsive.isMobile");
-            
-            // Fecha o drawer por padrão no mobile
-            if (_isMobileView)
+            try
             {
-                _drawerOpen = false;
+                _isMobileView = await JsRuntime.InvokeAsync<bool>("erpResponsive.isMobile");
+                
+                // Fecha o drawer por padrão no mobile
+                if (_isMobileView)
+                {
+                    _drawerOpen = false;
+                    _isSidebarLocked = false;
+                }
+
+                // Setup Auto Logout
+                _dotNetRef = DotNetObjectReference.Create(this);
+                var timeout = PreferenceService.CurrentPreferences.Security.AutoLogoutMinutes;
+                _activityMonitor = await JsRuntime.InvokeAsync<IJSObjectReference>("erpAuth.monitorActivity", _dotNetRef, timeout);
             }
+            catch (JSDisconnectedException)
+            {
+                // Ignore exception if circuit is disconnected
+            }
+            catch (TaskCanceledException)
+            {
+                // Ignore exception if task is canceled
+            }
+            catch (Exception)
+            {
+                // Fallback safely if JS fails
+                _isMobileView = false;
+            }
+
+            // Check Onboarding
+            await CheckOnboardingAsync();
             
             StateHasChanged();
         }
     }
 
-    private void OnPreferenceChanged()
+    protected override void OnParametersSet()
     {
+        ApplyTenantBranding();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        PreferenceService.OnPreferenceChanged -= OnPreferenceChanged;
+        _closeCts?.Cancel();
+        _closeCts?.Dispose();
+        _dotNetRef?.Dispose();
+        if (OnboardingResumeService != null) OnboardingResumeService.Changed -= OnboardingResumeChanged;
+        
+        if (_activityMonitor != null)
+        {
+            try { await _activityMonitor.InvokeVoidAsync("dispose"); await _activityMonitor.DisposeAsync(); } catch {}
+        }
+    }
+
+    
+
+    private void OnboardingResumeChanged()
+    {
+        // Trigger UI update on circuit
         InvokeAsync(StateHasChanged);
     }
 
-    public void Dispose()
+    private async Task OpenResumeTour()
     {
-        PreferenceService.OnPreferenceChanged -= OnPreferenceChanged;
+        var pending = OnboardingResumeService.GetPending();
+        if (pending == null) return;
+
+        var (userId, tourId) = pending.Value;
+        var parameters = new DialogParameters
+        {
+            { "UserId", userId },
+            { "TourId", tourId }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = false, BackdropClick = false, MaxWidth = MaxWidth.Medium, FullWidth = true };
+
+        await DialogService.ShowAsync<erp.Components.Shared.OnboardingWizard>("Continuar tour", parameters, options);
+        OnboardingResumeService.ClearPendingResume();
     }
 
-    readonly MudTheme _customTheme = new MudTheme()
+    private void ToggleDrawer()
     {
-        // Light: vibrant and friendly with warm neutrals
-        PaletteLight = new PaletteLight()
+        if (_isMobileView)
         {
-            Primary = Colors.DeepPurple.Darken1,
-            Secondary = Colors.Cyan.Darken1,
-            Tertiary = Colors.Amber.Default,
-
-            Success = Colors.Green.Darken2,
-            Info = Colors.LightBlue.Darken1,
-            Warning = Colors.Orange.Darken1,
-            Error = Colors.Red.Darken1,
-
-            Background = Colors.BlueGray.Lighten5,
-            Surface = Colors.Gray.Lighten5,
-            AppbarBackground = Colors.DeepPurple.Darken2,
-            DrawerBackground = Colors.BlueGray.Lighten4,
-
-            TextPrimary = Colors.BlueGray.Darken3,
-            TextSecondary = Colors.BlueGray.Default,
-        },
-
-        // Dark: saturated accents on deep blue-Gray surfaces for contrast
-        PaletteDark = new PaletteDark()
+            _drawerOpen = !_drawerOpen; // Mobile logic uses _drawerOpen? Wait, mobile uses _mobileDrawerOpen in markup
+            // Actually mobile drawer uses _mobileDrawerOpen in markup:
+            // <div class="mobile-drawer @(_mobileDrawerOpen ? "open" : string.Empty)">
+            // But the toggle button in AppBar calls ToggleDrawer.
+            // Let's check AppBar logic.
+            // AppBar is hidden on mobile? No.
+            // MudHidden Breakpoint="Breakpoint.SmAndDown" Invert="false" wraps the Sidebar Navigation (AppBar + Drawer).
+            // So on mobile, this AppBar is HIDDEN.
+            // Mobile has its own navigation?
+            // "Mobile: Adaptive Navigation with Drawer + Bottom Nav"
+            // <MudHidden Breakpoint="Breakpoint.SmAndDown" Invert="true"> ... <MobileBottomNav /> ... </MudHidden>
+            // So ToggleDrawer is only called on Desktop.
+        }
+        
+        _isSidebarLocked = !_isSidebarLocked;
+        if (_isSidebarLocked)
         {
-            Primary = Colors.DeepPurple.Lighten2,
-            Secondary = Colors.Cyan.Lighten2,
-            Tertiary = Colors.Amber.Lighten1,
+            _isMouseOver = false; // Reset hover state when locking
+        }
+    }
 
-            Success = Colors.Green.Lighten2,
-            Info = Colors.LightBlue.Lighten2,
-            Warning = Colors.Orange.Lighten2,
-            Error = Colors.Red.Lighten2,
-
-            Background = Colors.BlueGray.Darken4,
-            Surface = Colors.BlueGray.Darken3,
-            AppbarBackground = Colors.DeepPurple.Darken3,
-            DrawerBackground = Colors.BlueGray.Darken3,
-
-            TextPrimary = Colors.Gray.Lighten5,
-            TextSecondary = Colors.Gray.Lighten2,
-        },
-
-        Typography = new Typography()
+    private void OnSidebarMouseEnter()
+    {
+        if (!_isSidebarLocked)
         {
-            Default = new DefaultTypography()
+            _closeCts?.Cancel();
+            _isMouseOver = true;
+        }
+    }
+
+    private void OnSidebarMouseLeave()
+    {
+        if (!_isSidebarLocked)
+        {
+            _closeCts?.Cancel();
+            _closeCts = new System.Threading.CancellationTokenSource();
+            var token = _closeCts.Token;
+            
+            Task.Delay(2000, token).ContinueWith(t => 
             {
-                FontFamily = new[] { "Poppins", "Roboto", "Segoe UI", "Arial", "sans-serif" },
-            },
-            H5 = new H5Typography(){ FontWeight = "600", LetterSpacing = "0.2px" },
-            Button = new ButtonTypography(){ TextTransform = "none", FontWeight = "600" },
-            Subtitle2 = new Subtitle2Typography(){ FontWeight = "600" }
-        },
-    };
+                if (!t.IsCanceled)
+                {
+                    InvokeAsync(() => 
+                    {
+                        _isMouseOver = false;
+                        StateHasChanged();
+                    });
+                }
+            });
+        }
+    }
 
-        string SetMarginForDrawer()
+    private void CloseMobileDrawer()
     {
-        return _drawerOpen ? "margin-left: 240px;" : "margin-left: 56px;";
+        _mobileDrawerOpen = false;
+        _ = BrowserService.UnlockScrollAsync();
+    }
+
+    private async Task LogoutAsync()
+    {
+        var parameters = new DialogParameters
+        {
+            { "ContentText", "Tem certeza que deseja sair do sistema?" },
+            { "ButtonText", "Sair" },
+            { "Color", MudBlazor.Color.Error }
+        };
+
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.Small };
+        var dialog = await DialogService.ShowAsync<erp.Components.Shared.Dialogs.ConfirmDialog>("Confirmar saída", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            try
+            {
+                await JsRuntime.InvokeVoidAsync("erpAuth.logout");
+                NavigationManager.NavigateTo("/login", forceLoad: true);
+            }
+            catch
+            {
+                NavigationManager.NavigateTo("/login", forceLoad: true);
+            }
+        }
+    }
+
+    private async void OnPreferenceChanged()
+    {
+        ApplyCulture();
+        await UpdateAutoLogout();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public async Task LogoutFromActivity()
+    {
+        try
+        {
+            await JsRuntime.InvokeVoidAsync("erpAuth.logout");
+            NavigationManager.NavigateTo("/login?reason=timeout", forceLoad: true);
+        }
+        catch
+        {
+            NavigationManager.NavigateTo("/login", forceLoad: true);
+        }
+    }
+    
+    private async Task UpdateAutoLogout()
+    {
+        if (_activityMonitor != null)
+        {
+            var timeout = PreferenceService.CurrentPreferences.Security.AutoLogoutMinutes;
+            try { await _activityMonitor.InvokeVoidAsync("updateTimeout", timeout); } catch {}
+        }
+    }
+
+    private async Task CheckOnboardingAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (!string.IsNullOrEmpty(userId))
+            {
+                var hasCompleted = await OnboardingService.HasCompletedOnboardingAsync(userId);
+                if (!hasCompleted)
+                {
+                    var options = new DialogOptions 
+                    { 
+                        CloseOnEscapeKey = false,
+                        BackdropClick = false,
+                        MaxWidth = MaxWidth.Medium,
+                        FullWidth = true
+                    };
+                    
+                    var parameters = new DialogParameters
+                    {
+                        { "UserId", userId },
+                        { "TourId", "getting-started" }
+                    };
+
+                    await DialogService.ShowAsync<erp.Components.Shared.OnboardingWizard>("Bem-vindo", parameters, options);
+                }
+            }
+        }
+    }
+
+    private void ApplyCulture()
+    {
+        var prefs = PreferenceService.CurrentPreferences.Locale;
+        if (string.IsNullOrEmpty(prefs.Language)) return;
+
+        try 
+        {
+            var culture = (System.Globalization.CultureInfo)System.Globalization.CultureInfo.GetCultureInfo(prefs.Language).Clone();
+            
+            // Apply Date Format
+            if (!string.IsNullOrEmpty(prefs.DateFormat))
+            {
+                culture.DateTimeFormat.ShortDatePattern = prefs.DateFormat;
+            }
+            
+            // Apply Number Format
+            if (prefs.NumberFormat == "1.234,56")
+            {
+                culture.NumberFormat.NumberGroupSeparator = ".";
+                culture.NumberFormat.NumberDecimalSeparator = ",";
+            }
+            else if (prefs.NumberFormat == "1,234.56")
+            {
+                culture.NumberFormat.NumberGroupSeparator = ",";
+                culture.NumberFormat.NumberDecimalSeparator = ".";
+            }
+            
+            // Apply Currency
+            if (!string.IsNullOrEmpty(prefs.Currency))
+            {
+                culture.NumberFormat.CurrencySymbol = prefs.Currency == "BRL" ? "R$" : 
+                                                      prefs.Currency == "USD" ? "$" : 
+                                                      prefs.Currency == "EUR" ? "€" : prefs.Currency;
+            }
+
+            System.Globalization.CultureInfo.CurrentCulture = culture;
+            System.Globalization.CultureInfo.CurrentUICulture = culture;
+        }
+        catch {}
+    }
+
+    private void ApplyTenantBranding()
+    {
+        var branding = BrandingProvider.GetCurrentBranding();
+        if (_brandingInitialized && branding == _branding)
+        {
+            return;
+        }
+
+        _branding = branding;
+        ThemeService.UpdatePrimaryColor(_branding.PrimaryColor);
+        _brandingInitialized = true;
     }
 
     private string MainContentStyle()

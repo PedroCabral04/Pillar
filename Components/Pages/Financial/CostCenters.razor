@@ -1,5 +1,7 @@
 @page "/financial/costcenters"
 @using erp.DTOs.Financial
+@using erp.DTOs.User
+@using erp.Components.Shared.Dialogs.Financial
 @attribute [Authorize]
 
 <PageTitle>Centros de Custo - Pillar ERP</PageTitle>
@@ -16,12 +18,14 @@
                          Placeholder="Buscar centros de custo..." 
                          Adornment="Adornment.Start" 
                          AdornmentIcon="@Icons.Material.Filled.Search"
-                         Class="flex-grow-1" />
+                         Class="flex-grow-1" 
+                         DebounceInterval="500"
+                         OnDebounceIntervalElapsed="OnSearch" />
             
             <MudButton Variant="Variant.Filled" 
                       Color="Color.Primary" 
                       StartIcon="@Icons.Material.Filled.Add"
-                      OnClick="@(() => Snackbar.Add("Criar centro de custo - em desenvolvimento", Severity.Info))">
+                      OnClick="OpenCreateDialog">
                 Novo Centro de Custo
             </MudButton>
         </MudStack>
@@ -41,10 +45,10 @@
                             <MudText Typo="Typo.body2" Color="Color.Secondary">Código: @costCenter.Code</MudText>
                         </CardHeaderContent>
                         <CardHeaderActions>
-                            <MudChip T="string" Size="Size.Small" 
-                                    Color="@(costCenter.IsActive ? Color.Success : Color.Default)">
-                                @(costCenter.IsActive ? "Ativo" : "Inativo")
-                            </MudChip>
+                            <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                                <MudMenuItem Icon="@Icons.Material.Filled.Edit" OnClick="@(() => OpenEditDialog(costCenter))">Editar</MudMenuItem>
+                                <MudMenuItem Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error" OnClick="@(() => DeleteCostCenter(costCenter))">Excluir</MudMenuItem>
+                            </MudMenu>
                         </CardHeaderActions>
                     </MudCardHeader>
                     <MudCardContent>
@@ -72,6 +76,16 @@
                                 </MudStack>
                             </MudStack>
                         }
+
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Class="mt-2">
+                            <MudText Typo="Typo.caption">Status:</MudText>
+                             <MudChip T="string" Size="Size.Small" 
+                                     Color="@(costCenter.IsActive ? Color.Success : Color.Default)"
+                                     OnClick="@(() => ToggleActive(costCenter))"
+                                     Class="cursor-pointer">
+                                @(costCenter.IsActive ? "Ativo" : "Inativo")
+                            </MudChip>
+                        </MudStack>
                     </MudCardContent>
                 </MudCard>
             </MudItem>
@@ -92,31 +106,188 @@
 @code {
     [Inject] private IApiService ApiService { get; set; } = null!;
     [Inject] private ISnackbar Snackbar { get; set; } = null!;
+    [Inject] private IDialogService DialogService { get; set; } = null!;
 
     private List<CostCenterDto> costCenters = new();
+    private List<UserDto> users = new();
     private bool isLoading = false;
     private string searchTerm = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadCostCenters();
+        await LoadData();
     }
 
-    private async Task LoadCostCenters()
+    private async Task LoadData()
     {
         isLoading = true;
         try
         {
-            costCenters = await ApiService.GetAsync<List<CostCenterDto>>("api/cost-centers") ?? new();
-            Snackbar.Add($"{costCenters.Count} centros de custo carregados", Severity.Success);
+            var tasks = new List<Task>
+            {
+                LoadCostCenters(),
+                LoadUsers()
+            };
+            await Task.WhenAll(tasks);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadCostCenters()
+    {
+        try
+        {
+            var allCostCenters = await ApiService.GetAsync<List<CostCenterDto>>("api/cost-centers") ?? new();
+            
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                costCenters = allCostCenters.Where(c => 
+                    c.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) || 
+                    c.Code.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
+                ).ToList();
+            }
+            else
+            {
+                costCenters = allCostCenters;
+            }
         }
         catch (Exception ex)
         {
             Snackbar.Add($"Erro ao carregar centros de custo: {ex.Message}", Severity.Error);
         }
-        finally
+    }
+
+    private async Task LoadUsers()
+    {
+        try
         {
-            isLoading = false;
+            // Assuming we have an endpoint to get users for dropdowns
+            users = await ApiService.GetAsync<List<UserDto>>("api/users") ?? new();
+        }
+        catch (Exception ex)
+        {
+            // Silent fail for users, just won't show in dropdown
+            Console.WriteLine($"Error loading users: {ex.Message}");
+        }
+    }
+
+    private async Task OnSearch()
+    {
+        await LoadCostCenters();
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("Users", users);
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = DialogService.Show<CostCenterDialog>("Novo Centro de Custo", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is CreateCostCenterDto dto)
+        {
+            try
+            {
+                await ApiService.PostAsync<CostCenterDto>("api/cost-centers", dto);
+                Snackbar.Add("Centro de custo criado com sucesso", Severity.Success);
+                await LoadCostCenters();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao criar centro de custo: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task OpenEditDialog(CostCenterDto costCenter)
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("Users", users);
+        
+        var model = new CreateCostCenterDto
+        {
+            Name = costCenter.Name,
+            Code = costCenter.Code,
+            Description = costCenter.Description,
+            ManagerUserId = costCenter.ManagerUserId,
+            MonthlyBudget = costCenter.MonthlyBudget,
+            IsActive = costCenter.IsActive
+        };
+        
+        parameters.Add("Model", model);
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = DialogService.Show<CostCenterDialog>("Editar Centro de Custo", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is CreateCostCenterDto dto)
+        {
+            try
+            {
+                var updateDto = new UpdateCostCenterDto
+                {
+                    Name = dto.Name,
+                    Code = dto.Code,
+                    Description = dto.Description,
+                    ManagerUserId = dto.ManagerUserId,
+                    MonthlyBudget = dto.MonthlyBudget,
+                    IsActive = dto.IsActive
+                };
+
+                await ApiService.PutAsync($"api/cost-centers/{costCenter.Id}", updateDto);
+                Snackbar.Add("Centro de custo atualizado com sucesso", Severity.Success);
+                await LoadCostCenters();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao atualizar centro de custo: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task DeleteCostCenter(CostCenterDto costCenter)
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("ContentText", $"Tem certeza que deseja excluir o centro de custo {costCenter.Name}?");
+        parameters.Add("ButtonText", "Excluir");
+        parameters.Add("Color", MudBlazor.Color.Error);
+
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = DialogService.Show<erp.Components.Shared.Dialogs.ConfirmDialog>("Excluir Centro de Custo", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            try
+            {
+                await ApiService.DeleteAsync($"api/cost-centers/{costCenter.Id}");
+                Snackbar.Add("Centro de custo excluído com sucesso", Severity.Success);
+                await LoadCostCenters();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao excluir centro de custo: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task ToggleActive(CostCenterDto costCenter)
+    {
+        try
+        {
+            await ApiService.PatchAsync<object>($"api/cost-centers/{costCenter.Id}/toggle-active", null);
+            costCenter.IsActive = !costCenter.IsActive;
+            // No need to reload everything, just toggle UI state
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao alterar status: {ex.Message}", Severity.Error);
+            // Revert UI change if failed (though we haven't changed it yet in UI object reference except above line which runs after success usually, but here we are optimistic or need to reload)
+            await LoadCostCenters(); 
         }
     }
 }
