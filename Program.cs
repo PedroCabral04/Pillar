@@ -23,7 +23,9 @@ using erp.Services.Dashboard.Providers.Sales;
 using erp.Services.Dashboard.Providers.Finance;
 using erp.Services.Dashboard.Providers.Inventory;
 using erp.Services.Sales;
+using erp.Services.Seeding;
 using System.Reflection;
+using Microsoft.Extensions.Options;
 // using ApexCharts; // TODO: Instalar pacote ApexCharts se necessário
 
 // Prefer using DotNetEnv to load .env into environment variables in dev.
@@ -199,6 +201,8 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 builder.Services.AddHttpContextAccessor();
+builder.Services.Configure<DemoSeedOptions>(builder.Configuration.GetSection("DemoSeed"));
+builder.Services.AddScoped<DemoDataSeeder>();
 builder.Services.AddScoped(sp => {
     var navigationManager = sp.GetRequiredService<NavigationManager>();
     var httpClientHandler = new HttpClientHandler();
@@ -568,6 +572,20 @@ using (var scope = app.Services.CreateScope())
             {
                 await userManager.AddToRoleAsync(admin, "Administrador");
             }
+        }
+
+        try
+        {
+            var demoSeedOptions = scope.ServiceProvider.GetRequiredService<IOptions<DemoSeedOptions>>();
+            if (demoSeedOptions.Value.Enabled)
+            {
+                var demoSeeder = scope.ServiceProvider.GetRequiredService<DemoDataSeeder>();
+                await demoSeeder.SeedAsync();
+            }
+        }
+        catch (Exception demoSeedEx)
+        {
+            Console.WriteLine($"Demo data seed error: {demoSeedEx.Message}");
         }
     }
     catch (Exception ex)
