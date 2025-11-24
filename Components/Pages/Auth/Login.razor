@@ -103,13 +103,25 @@
                            Style="font-weight: 600; border-radius: 8px; text-transform: none; font-size: 1.1rem;">
                     Entrar
                 </MudButton>
+                
+                    <MudButton Disabled="busy" 
+                               OnClick="DemoLoginAsync"
+                               Color="MudBlazor.Color.Secondary"
+                               Variant="Variant.Outlined"
+                               Size="MudBlazor.Size.Medium"
+                               FullWidth="true"
+                               Class="mt-3 py-2"
+                               Style="font-weight: 600; border-radius: 8px; text-transform: none; font-size: 1rem;">
+                        Testar com dados demo
+                    </MudButton>
+
             </EditForm>
             
-            <div class="mt-12 text-center">
+            @* <div class="mt-12 text-center">
                 <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">
                     &copy; @DateTime.Now.Year @_branding.TenantName. Todos os direitos reservados.
                 </MudText>
-            </div>
+            </div> *@
         </MudPaper>
     </MudItem>
 </MudGrid>
@@ -202,6 +214,16 @@
         {
             busy = false;
         }
+    }
+
+    private async Task DemoLoginAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs? _ = null)
+    {
+        // Preenche credenciais demo e dispara o fluxo de login
+        model.Email = "admin@erp.local";
+        model.Password = "Admin@123!";
+        model.RememberMe = false;
+
+        await HandleLoginAsync();
     }
 
     public class LoginModel
