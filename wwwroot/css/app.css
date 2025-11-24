@@ -1,3 +1,13 @@
+/* Tenant branding defaults */
+:root {
+    --tenant-primary: #594AE2;
+    --tenant-secondary: #00ACC1;
+    --tenant-accent: #FFC107;
+    --tenant-primary-rgb: 89, 74, 226;
+    --tenant-secondary-rgb: 0, 172, 193;
+    --tenant-accent-rgb: 255, 193, 7;
+}
+
 /* Breadcrumbs personalizados */
 .mud-breadcrumbs {
     padding: 8px 0;
@@ -88,12 +98,12 @@ input:focus-visible {
 }
 
 .mud-nav-link:hover {
-    background-color: rgba(103, 58, 183, 0.08);
+    background-color: rgba(var(--tenant-primary-rgb), 0.08);
     transform: translateX(2px);
 }
 
 .mud-nav-link.active {
-    background-color: rgba(103, 58, 183, 0.12);
+    background-color: rgba(var(--tenant-primary-rgb), 0.12);
     font-weight: 600;
 }
 
@@ -108,7 +118,7 @@ input:focus-visible {
 }
 
 .mud-nav-group .mud-nav-group-header:hover {
-    background-color: rgba(103, 58, 183, 0.08);
+    background-color: rgba(var(--tenant-primary-rgb), 0.08);
 }
 
 /* Mobile NavMenu adjustments */
@@ -199,7 +209,7 @@ input:focus-visible {
 }
 
 .mud-popover .mud-list-item:hover {
-    background-color: rgba(103, 58, 183, 0.08);
+    background-color: rgba(var(--tenant-primary-rgb), 0.08);
     transform: translateX(2px);
 }
 

@@ -3,14 +3,17 @@ using erp.Models.Audit;
 using erp.Models.Financial;
 using erp.Models.Identity;
 
+using erp.Models.Tenancy;
+
 namespace erp.Models.Sales;
 
 /// <summary>
 /// Represents a customer in the sales system
 /// </summary>
-public class Customer : IAuditable
+public class Customer : IAuditable, IMustHaveTenant
 {
     public int Id { get; set; }
+    public int TenantId { get; set; }
     
     [Required]
     [MaxLength(14)]

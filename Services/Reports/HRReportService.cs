@@ -115,8 +115,8 @@ public class HRReportService : IHRReportService
             // termination tracking and hire date tracking
             
             var items = new List<TurnoverReportItemDto>();
-            var startDate = filter.StartDate ?? DateTime.UtcNow.AddYears(-1);
-            var endDate = filter.EndDate ?? DateTime.UtcNow;
+            var startDate = filter.StartDate?.ToUniversalTime() ?? DateTime.UtcNow.AddYears(-1);
+            var endDate = filter.EndDate?.ToUniversalTime() ?? DateTime.UtcNow;
 
             // Get current headcount
             var currentHeadcount = await _context.Set<erp.Models.Identity.ApplicationUser>()
@@ -124,7 +124,7 @@ public class HRReportService : IHRReportService
                 .CountAsync();
 
             // Create a simple month-by-month report
-            var currentDate = new DateTime(startDate.Year, startDate.Month, 1);
+            var currentDate = new DateTime(startDate.Year, startDate.Month, 1, 0, 0, 0, DateTimeKind.Utc);
             while (currentDate <= endDate)
             {
                 var monthEnd = currentDate.AddMonths(1).AddDays(-1);

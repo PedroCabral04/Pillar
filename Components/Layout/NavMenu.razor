@@ -125,6 +125,7 @@
             {
                 <MudNavGroup Title="RH & Admin" Icon="@Icons.Material.Filled.AdminPanelSettings" Expanded="false" Class="my-1" HideExpandIcon="false">
                     <MudNavLink Href="admin/users" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.People">Usuários</MudNavLink>
+                    <MudNavLink Href="admin/tenants" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CorporateFare">Tenants</MudNavLink>
                     <MudNavLink Href="admin/departments" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.BusinessCenter">Departamentos</MudNavLink>
                     <MudNavLink Href="admin/positions" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.WorkOutline">Cargos</MudNavLink>
                     <MudNavLink Href="admin/widget-roles" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Widgets">Widgets / Papéis</MudNavLink>
@@ -137,6 +138,9 @@
             {
                 <MudTooltip Text="Administracao" Placement="@MudBlazor.Placement.Bottom">
                     <MudNavLink Href="admin/users" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AdminPanelSettings" Class="my-1" />
+                </MudTooltip>
+                <MudTooltip Text="Tenants" Placement="@MudBlazor.Placement.Bottom">
+                    <MudNavLink Href="admin/tenants" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CorporateFare" Class="my-1" />
                 </MudTooltip>
                 <MudNavLink Href="admin/widget-roles" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Widgets" Class="my-1" />
                 <MudNavLink Href="time-tracking/payroll" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AccessTime" Class="my-1" />

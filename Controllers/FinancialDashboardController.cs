@@ -1,0 +1,38 @@
+using erp.DTOs.Financial;
+using erp.Services.Financial;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace erp.Controllers;
+
+[ApiController]
+[Route("api/financial-dashboard")]
+[Authorize]
+public class FinancialDashboardController : ControllerBase
+{
+    private readonly IFinancialDashboardService _dashboardService;
+    private readonly ILogger<FinancialDashboardController> _logger;
+
+    public FinancialDashboardController(
+        IFinancialDashboardService dashboardService,
+        ILogger<FinancialDashboardController> logger)
+    {
+        _dashboardService = dashboardService;
+        _logger = logger;
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<FinancialDashboardDto>> GetDashboardData()
+    {
+        try
+        {
+            var data = await _dashboardService.GetDashboardDataAsync();
+            return Ok(data);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting financial dashboard data");
+            return StatusCode(500, "Erro ao carregar dados do dashboard financeiro");
+        }
+    }
+}

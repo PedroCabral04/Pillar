@@ -1,36 +1,19 @@
 @using MudBlazor
 @using Microsoft.AspNetCore.Components.Web
+@using erp.Services.Tenancy
 @inject NavigationManager Navigation
 @inject erp.Services.PreferenceService PreferenceService
 @inject IDialogService DialogService
 @inject IJSRuntime JS
+@inject ITenantBrandingProvider BrandingProvider
 
 <nav class="pillar-sidebar" role="navigation" aria-label="Navegação principal">
-<MudNavMenu Rounded="false">
-    @if (IsOpen)
-    {
-        <div class="sidebar-header px-3 py-3">
-            <div class="brand d-flex align-center">
-                <MudAvatar Size="@MudBlazor.Size.Medium" Class="me-2" Square="true" Alt="Pillar" Text="P" Color="@MudBlazor.Color.Primary" />
-                <div>
-                    <MudText Typo="Typo.h6" Style="font-weight:600;">Pillar</MudText>
-                    <AuthorizeView>
-                        <Authorized Context="auth">
-                            <MudText Typo="Typo.caption">@auth.User.Identity?.Name</MudText>
-                        </Authorized>
-                        <NotAuthorized>
-                            <MudText Typo="Typo.caption">Bem vindo</MudText>
-                        </NotAuthorized>
-                    </AuthorizeView>
-                </div>
+<MudNavMenu Rounded="true" Margin="Margin.Dense" Color="MudBlazor.Color.Primary" Class="pa-2">
+    @if (IsOpen || !_renderMini)
+    {   <div class="full-wrapper @(IsOpen ? "open" : "closing")">
+            <div class="px-3 pt-4 pb-2">
+                <MudTextField Id="sidebar-search" @ref="_searchField" @bind-Value="_search" Placeholder="Buscar (⌘/Ctrl + K)" Dense="true" Clearable="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true" AriaLabel="Pesquisar navegação" @onkeydown="OnSearchKeyDown" Variant="Variant.Outlined" Margin="Margin.Dense" />
             </div>
-            <MudIconButton Icon="@(IsOpen ? Icons.Material.Filled.MenuOpen : Icons.Material.Filled.Menu)"
-                            Color="MudBlazor.Color.Inherit" Size="MudBlazor.Size.Small" Class="menu-toggle"
-                            Title="Alternar menu" AriaLabel="Alternar menu" OnClick="@(async ()=> await OnToggleDrawer.InvokeAsync())" />
-        </div>
-
-        <div class="px-3 pb-2">
-            <MudTextField Id="sidebar-search" @ref="_searchField" @bind-Value="_search" Placeholder="Buscar (⌘/Ctrl + K)" Dense="true" Clearable="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true" AriaLabel="Pesquisar navegação" @onkeydown="OnSearchKeyDown" />
         </div>
 
         @if (_isSearching)
@@ -116,6 +99,7 @@
                 <Authorized>
                     <MudNavGroup Title="RH & Admin" Icon="@Icons.Material.Filled.AdminPanelSettings" Expanded="@(IsGroupExpanded("admin"))" ExpandedChanged="@(v => OnGroupExpandedChanged("admin", v))" Class="my-1" AriaLabel="Seção Administração">
                         <MudNavLink Href="/admin/users" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.People">Usuários</MudNavLink>
+                        <MudNavLink Href="/admin/tenants" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Domain">Tenants</MudNavLink>
                         <MudNavLink Href="/admin/departments" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.BusinessCenter">Departamentos</MudNavLink>
                         <MudNavLink Href="/admin/positions" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.WorkOutline">Cargos</MudNavLink>
                         <MudNavLink Href="/admin/widget-roles" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Widgets">Widgets / Papéis</MudNavLink>
@@ -138,26 +122,27 @@
     }
     else
     {
-        <div class="mini-root">
-            <div class="d-flex justify-center py-3 mb-2">
-                <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="MudBlazor.Color.Inherit" Size="MudBlazor.Size.Medium" OnClick="@(async ()=> await OnToggleDrawer.InvokeAsync())" Title="Abrir menu" AriaLabel="Abrir navegação" />
+        if (_renderMini) 
+        {
+            <div class="mini-root">
+                <MudTooltip Text="Home" Placement="Placement.Right"><MudNavLink Href="/" Icon="@Icons.Material.Filled.Home" Class="my-1"/></MudTooltip>
+                <MudTooltip Text="Dashboard" Placement="Placement.Right"><MudNavLink Href="/dashboard" Icon="@Icons.Material.Filled.Dashboard" Class="my-1"/></MudTooltip>
+                <MudTooltip Text="Vendas" Placement="Placement.Right"><MudNavLink Href="/sales" Icon="@Icons.Material.Filled.ShoppingCart" Class="my-1"/></MudTooltip>
+                <MudTooltip Text="Produtos" Placement="Placement.Right"><MudNavLink Href="/inventory/products" Icon="@Icons.Material.Filled.Inventory" Class="my-1"/></MudTooltip>
+                <MudTooltip Text="Financeiro" Placement="Placement.Right"><MudNavLink Href="/financial/dashboard" Icon="@Icons.Material.Filled.AccountBalance" Class="my-1"/></MudTooltip>
+                <MudTooltip Text="Kanban" Placement="Placement.Right"><MudNavLink Href="/kanban" Icon="@Icons.Material.Filled.ViewKanban" Class="my-1"/></MudTooltip>
+                <MudTooltip Text="Ativos" Placement="Placement.Right"><MudNavLink Href="/assets" Icon="@Icons.Material.Filled.Devices" Class="my-1"/></MudTooltip>
+                <MudTooltip Text="Relatórios" Placement="Placement.Right"><MudNavLink Href="/reports" Icon="@Icons.Material.Filled.Assessment" Class="my-1"/></MudTooltip>
+                <AuthorizeView Roles="Administrador">
+                    <Authorized>
+                        <MudTooltip Text="Administração" Placement="Placement.Right"><MudNavLink Href="/admin/users" Icon="@Icons.Material.Filled.AdminPanelSettings" Class="my-1"/></MudTooltip>
+                        <MudTooltip Text="Tenants" Placement="Placement.Right"><MudNavLink Href="/admin/tenants" Icon="@Icons.Material.Filled.Domain" Class="my-1"/></MudTooltip>
+                    </Authorized>
+                </AuthorizeView>
+                <MudTooltip Text="Configurações" Placement="Placement.Right"><MudNavLink Href="/settings" Icon="@Icons.Material.Filled.Settings" Class="my-1"/></MudTooltip>
+                <MudTooltip Text="Sair" Placement="Placement.Right"><MudNavLink OnClick="LogoutAsync" Icon="@Icons.Material.Filled.Logout" Class="my-1"/></MudTooltip>
             </div>
-            <MudTooltip Text="Home" Placement="Placement.Right"><MudNavLink Href="/" Icon="@Icons.Material.Filled.Home" Class="my-1"/></MudTooltip>
-            <MudTooltip Text="Dashboard" Placement="Placement.Right"><MudNavLink Href="/dashboard" Icon="@Icons.Material.Filled.Dashboard" Class="my-1"/></MudTooltip>
-            <MudTooltip Text="Vendas" Placement="Placement.Right"><MudNavLink Href="/sales" Icon="@Icons.Material.Filled.ShoppingCart" Class="my-1"/></MudTooltip>
-            <MudTooltip Text="Produtos" Placement="Placement.Right"><MudNavLink Href="/inventory/products" Icon="@Icons.Material.Filled.Inventory" Class="my-1"/></MudTooltip>
-            <MudTooltip Text="Financeiro" Placement="Placement.Right"><MudNavLink Href="/financial/dashboard" Icon="@Icons.Material.Filled.AccountBalance" Class="my-1"/></MudTooltip>
-            <MudTooltip Text="Kanban" Placement="Placement.Right"><MudNavLink Href="/kanban" Icon="@Icons.Material.Filled.ViewKanban" Class="my-1"/></MudTooltip>
-            <MudTooltip Text="Ativos" Placement="Placement.Right"><MudNavLink Href="/assets" Icon="@Icons.Material.Filled.Devices" Class="my-1"/></MudTooltip>
-            <MudTooltip Text="Relatórios" Placement="Placement.Right"><MudNavLink Href="/reports" Icon="@Icons.Material.Filled.Assessment" Class="my-1"/></MudTooltip>
-            <AuthorizeView Roles="Administrador">
-                <Authorized>
-                    <MudTooltip Text="Administração" Placement="Placement.Right"><MudNavLink Href="/admin/users" Icon="@Icons.Material.Filled.AdminPanelSettings" Class="my-1"/></MudTooltip>
-                </Authorized>
-            </AuthorizeView>
-            <MudTooltip Text="Configurações" Placement="Placement.Right"><MudNavLink Href="/settings" Icon="@Icons.Material.Filled.Settings" Class="my-1"/></MudTooltip>
-            <MudTooltip Text="Sair" Placement="Placement.Right"><MudNavLink OnClick="LogoutAsync" Icon="@Icons.Material.Filled.Logout" Class="my-1"/></MudTooltip>
-        </div>
+        }
     }
 </MudNavMenu>
 </nav>
@@ -167,6 +152,7 @@
     [Parameter] public EventCallback OnToggleDrawer { get; set; }
     [Parameter] public bool IsMobile { get; set; } = false;
 
+    private TenantBrandingTheme _branding = TenantBrandingTheme.Default;
     private string _search = string.Empty;
     private bool _isSearching => !string.IsNullOrWhiteSpace(_search);
     private MudTextField<string>? _searchField;
@@ -192,6 +178,7 @@
         new("Ativos", "/assets", Icons.Material.Filled.Devices),
         new("Relatórios", "/reports", Icons.Material.Filled.Assessment),
         new("Usuários", "/admin/users", Icons.Material.Filled.People),
+        new("Tenants", "/admin/tenants", Icons.Material.Filled.Domain),
         new("Departamentos", "/admin/departments", Icons.Material.Filled.BusinessCenter),
         new("Cargos", "/admin/positions", Icons.Material.Filled.WorkOutline),
         new("Widgets / Papéis", "/admin/widget-roles", Icons.Material.Filled.Widgets),
@@ -207,6 +194,7 @@
 
     protected override void OnInitialized()
     {
+        _branding = BrandingProvider.GetCurrentBranding();
         // Normalize expanded dictionary with defaults
         var g = PreferenceService.CurrentPreferences.Ui.GroupExpanded;
         EnsureGroupKey(g, "sales", false);
@@ -278,4 +266,21 @@
             catch { Navigation.NavigateTo("/login", true); }
         }
     }
+
+    private bool _renderMini = false;
+
+protected override async Task OnParametersSetAsync()
+{
+    if (!IsOpen)
+    {
+        // espera a animação terminar antes de trocar o DOM
+        await Task.Delay(110);
+        _renderMini = true;
+    }
+    else
+    {
+        _renderMini = false;
+    }
+}
+
 }

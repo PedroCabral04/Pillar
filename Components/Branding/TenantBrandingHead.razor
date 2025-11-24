@@ -1,0 +1,49 @@
+@using erp.Services.Tenancy
+@using MudBlazor
+@using MudBlazor.Utilities
+@using Microsoft.AspNetCore.Components
+
+<HeadContent>
+    <meta name="theme-color" content="@Branding.PrimaryColor" />
+    @if (!string.IsNullOrWhiteSpace(Branding.FaviconUrl))
+    {
+        <link rel="icon" href="@Branding.FaviconUrl" />
+    }
+    <style id="tenant-branding-vars">
+        :root {
+            --tenant-primary: @Branding.PrimaryColor;
+            --tenant-secondary: @Branding.SecondaryColor;
+            --tenant-accent: @Branding.AccentColor;
+            --tenant-primary-rgb: @PrimaryRgb;
+            --tenant-secondary-rgb: @SecondaryRgb;
+            --tenant-accent-rgb: @AccentRgb;
+        }
+    </style>
+    @if (!string.IsNullOrWhiteSpace(Branding.CustomCss))
+    {
+        <style id="tenant-branding-custom-css">@((MarkupString)Branding.CustomCss!)</style>
+    }
+</HeadContent>
+
+@code {
+    [Parameter]
+    public TenantBrandingTheme Branding { get; set; } = TenantBrandingTheme.Default;
+
+    private string PrimaryRgb => ToRgb(Branding.PrimaryColor);
+    private string SecondaryRgb => ToRgb(Branding.SecondaryColor);
+    private string AccentRgb => ToRgb(Branding.AccentColor);
+
+    private static string ToRgb(string? color)
+    {
+        try
+        {
+            var mudColor = new MudColor(color ?? TenantBrandingTheme.Default.PrimaryColor);
+            return $"{mudColor.R}, {mudColor.G}, {mudColor.B}";
+        }
+        catch
+        {
+            var fallback = new MudColor(TenantBrandingTheme.Default.PrimaryColor);
+            return $"{fallback.R}, {fallback.G}, {fallback.B}";
+        }
+    }
+}

@@ -50,6 +50,13 @@
                 </ApexChart>
                 break;
             case DashboardChartType.Donut:
+                <ApexChart TItem="DataPoint" Height="280">
+                    @foreach (var s in _seriesData)
+                    {
+                        <ApexPointSeries TItem="DataPoint" Items="@s.Items" Name="@s.Name" SeriesType="SeriesType.Donut" XValue="e => e.Category" YValue="e => e.Value" />
+                    }
+                </ApexChart>
+                break;
             case DashboardChartType.Pie:
                 <ApexChart TItem="DataPoint" Height="280">
                     @foreach (var s in _seriesData)

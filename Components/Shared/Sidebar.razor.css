@@ -2,9 +2,15 @@
 .pillar-sidebar .sidebar-header { display:flex; align-items:center; justify-content:space-between; }
 .pillar-sidebar .menu-toggle { margin-left:auto; }
 .pillar-sidebar .section-title { color: var(--mud-palette-text-secondary); text-transform: uppercase; letter-spacing: .08em; }
-.pillar-sidebar .mini-root { display:flex; flex-direction:column; align-items:stretch; }
+.pillar-sidebar .mini-root { display:flex; flex-direction:column; align-items:stretch ;min-width: 64px; width: 64px; flex-shrink: 0; }
 .pillar-sidebar .mud-nav-link { border-radius:8px; }
 .pillar-sidebar .mud-nav-link.active { background: rgba(0,0,0,0.06); }
 :root.dark .pillar-sidebar .mud-nav-link.active { background: rgba(255,255,255,0.08); }
 .pillar-sidebar .mud-nav-link:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 2px; }
 .pillar-sidebar .mud-icon-button:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 2px; border-radius:8px; }
+.pillar-sidebar { overflow: hidden; }
+
+.pillar-sidebar * { transition: none !important; }
+.full-wrapper { width: 260px; transition: width 200ms ease; overflow: hidden; }
+
+.full-wrapper.closing { width: 65px; }

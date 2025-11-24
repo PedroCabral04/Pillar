@@ -3,9 +3,10 @@ using erp.Models.Audit;
 
 namespace erp.Models.Inventory;
 
-public class Product : IAuditable
+public class Product : IAuditable, IMustHaveTenant
 {
     public int Id { get; set; }
+    public int TenantId { get; set; }
     
     // Identificação
     public string Sku { get; set; } = string.Empty;

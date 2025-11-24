@@ -1,0 +1,120 @@
+@using erp.DTOs.Financial
+@using erp.DTOs.Sales
+@using erp.Models.Financial
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="form" @bind-IsValid="@success">
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int" Label="Cliente" @bind-Value="Model.CustomerId" Required="true" RequiredError="Cliente é obrigatório" AnchorOrigin="Origin.BottomCenter">
+                        @foreach (var customer in Customers)
+                        {
+                            <MudSelectItem Value="@customer.Id">@customer.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Model.InvoiceNumber" Label="Número da Nota" />
+                </MudItem>
+                
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker Label="Data de Emissão" Date="@(Model.IssueDate == default ? DateTime.Today : Model.IssueDate)" DateChanged="@(d => Model.IssueDate = d ?? DateTime.Today)" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker Label="Data de Vencimento" Date="@(Model.DueDate == default ? DateTime.Today : Model.DueDate)" DateChanged="@(d => Model.DueDate = d ?? DateTime.Today)" Required="true" RequiredError="Data de vencimento é obrigatória" />
+                </MudItem>
+
+                <MudItem xs="12" sm="4">
+                    <MudNumericField @bind-Value="Model.OriginalAmount" Label="Valor Original" Format="C2" Required="true" RequiredError="Valor é obrigatório" Min="0.01M" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudNumericField @bind-Value="Model.DiscountAmount" Label="Desconto" Format="C2" Min="0" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudNumericField @bind-Value="Model.InterestAmount" Label="Juros" Format="C2" Min="0" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudNumericField @bind-Value="Model.FineAmount" Label="Multa" Format="C2" Min="0" />
+                </MudItem>
+
+                 <MudItem xs="12" sm="4">
+                    <MudSelect T="PaymentMethod" Label="Método de Pagamento" @bind-Value="Model.PaymentMethod" AnchorOrigin="Origin.BottomCenter">
+                        @foreach (PaymentMethod method in Enum.GetValues(typeof(PaymentMethod)))
+                        {
+                            <MudSelectItem Value="@method">@method.ToString()</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                
+                @if (Model.PaymentMethod == PaymentMethod.BankSlip)
+                {
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="Model.BankSlipNumber" Label="Código de Barras" />
+                    </MudItem>
+                }
+                @if (Model.PaymentMethod == PaymentMethod.Pix)
+                {
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="Model.PixKey" Label="Chave Pix" />
+                    </MudItem>
+                }
+
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int?" Label="Categoria" @bind-Value="Model.CategoryId" AnchorOrigin="Origin.BottomCenter">
+                        <MudSelectItem T="int?" Value="null">Nenhuma</MudSelectItem>
+                        @foreach (var category in Categories)
+                        {
+                            <MudSelectItem T="int?" Value="@category.Id">@category.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                 <MudItem xs="12" sm="6">
+                    <MudSelect T="int?" Label="Centro de Custo" @bind-Value="Model.CostCenterId" AnchorOrigin="Origin.BottomCenter">
+                        <MudSelectItem T="int?" Value="null">Nenhum</MudSelectItem>
+                        @foreach (var center in CostCenters)
+                        {
+                            <MudSelectItem T="int?" Value="@center.Id">@center.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="Model.Notes" Label="Observações" Lines="3" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="MudBlazor.Color.Primary" OnClick="Submit">Salvar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; }
+    [Parameter] public CreateAccountReceivableDto Model { get; set; } = new();
+    [Parameter] public List<CustomerDto> Customers { get; set; } = new();
+    [Parameter] public List<FinancialCategoryDto> Categories { get; set; } = new();
+    [Parameter] public List<CostCenterDto> CostCenters { get; set; } = new();
+
+    private MudForm form;
+    private bool success;
+
+    protected override void OnInitialized()
+    {
+        if (Model.IssueDate == default) Model.IssueDate = DateTime.Today;
+        if (Model.DueDate == default) Model.DueDate = DateTime.Today.AddDays(30);
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await form.Validate();
+        if (success)
+        {
+            MudDialog.Close(DialogResult.Ok(Model));
+        }
+    }
+}

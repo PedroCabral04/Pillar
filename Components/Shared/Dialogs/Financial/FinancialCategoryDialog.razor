@@ -1,0 +1,62 @@
+@using erp.DTOs.Financial
+@using erp.Models.Financial
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="form" @bind-IsValid="@success">
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Model.Name" Label="Nome" Required="true" RequiredError="Nome é obrigatório" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="Model.Code" Label="Código" Required="true" RequiredError="Código é obrigatório" HelperText="Ex: 1.01" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="CategoryType" Label="Tipo" @bind-Value="Model.Type" AnchorOrigin="Origin.BottomCenter">
+                        <MudSelectItem Value="@CategoryType.Revenue">Receita</MudSelectItem>
+                        <MudSelectItem Value="@CategoryType.Expense">Despesa</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int?" Label="Categoria Pai" @bind-Value="Model.ParentCategoryId" AnchorOrigin="Origin.BottomCenter" Clearable="true">
+                        <MudSelectItem T="int?" Value="null">Nenhuma</MudSelectItem>
+                        @foreach (var cat in Categories.Where(c => c.Id != (Model as UpdateFinancialCategoryDto)?.Id)) // Avoid self-reference if updating (simple check)
+                        {
+                            <MudSelectItem T="int?" Value="@cat.Id">@cat.Name (@cat.Code)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="Model.Description" Label="Descrição" Lines="3" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudCheckBox @bind-Value="Model.IsActive" Label="Ativa" Color="MudBlazor.Color.Success" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="MudBlazor.Color.Primary" OnClick="Submit">Salvar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; }
+    [Parameter] public CreateFinancialCategoryDto Model { get; set; } = new() { Name = "", Code = "" };
+    [Parameter] public List<FinancialCategoryDto> Categories { get; set; } = new();
+
+    private MudForm form;
+    private bool success;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await form.Validate();
+        if (success)
+        {
+            MudDialog.Close(DialogResult.Ok(Model));
+        }
+    }
+}

@@ -9,12 +9,14 @@
 @using Size = MudBlazor.Size
 @using erp.Services.Onboarding
 @using erp.DTOs.Onboarding
+@using ApexCharts
 
 @inject IDashboardService Dashboard
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IOnboardingService OnboardingService
 @inject IApiService Api
 @inject ISnackbar Snackbar
+@inject PreferenceService PreferenceService
 
 <MudStack Spacing="3" Class="dashboard-section">
     <!-- Greeting Section -->
@@ -186,6 +188,15 @@
             // If layout endpoint fails, still show definitions
             _widgetVms = _widgets.Select(d => new WidgetVm { Definition = d, Config = new WidgetConfiguration { WidgetId = $"{d.ProviderKey}_{d.WidgetKey}_default", ProviderKey = d.ProviderKey, WidgetKey = d.WidgetKey, Order = 0, Row = 0, Column = 0 }, Query = new DashboardQuery { From = _range.Start, To = _range.End } }).ToList();
             Console.WriteLine($"Warning loading dashboard layout: {ex.Message}");
+        }
+
+        // Filter by user preferences if any are selected
+        var preferredWidgets = PreferenceService.CurrentPreferences.Dashboard.Widgets;
+        if (preferredWidgets != null && preferredWidgets.Any())
+        {
+            _widgetVms = _widgetVms?
+                .Where(vm => preferredWidgets.Contains(vm.Definition.Title))
+                .ToList();
         }
         
         // Check if should show dashboard tour

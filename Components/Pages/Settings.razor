@@ -8,7 +8,9 @@
 @using erp.DTOs.Preferences
 @using Color = MudBlazor.Color
 @using Size = MudBlazor.Size
+@using erp.Services.Dashboard
 @inject ISnackbar Snackbar
+@inject IDashboardService DashboardService
 
 <PageTitle>Configurações</PageTitle>
 
@@ -348,14 +350,14 @@
     [Inject] PreferenceService PreferenceService { get; set; } = null!;
     private string ThemeLabel => ThemeService.IsDarkMode ? "Modo escuro" : "Modo claro";
     private string ThemeIcon => ThemeService.IsDarkMode ? Icons.Material.Filled.DarkMode : Icons.Material.Filled.LightMode;
-    private string[] AvailableWidgets { get; } = new[] { "Vendas do dia", "Estoque", "Tarefas", "Atalhos", "Indicadores" };
+    private List<string> AvailableWidgets { get; set; } = new();
     private string NewWidgetName { get; set; } = string.Empty;
 
     // Helpers to edit dictionary preferences in a simple list form
     private List<DefaultSortRow> DefaultSortRows = new();
     private List<VisibleColumnsRow> VisibleColumnsRows = new();
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         // Seed rows from current preferences for editing
         var ds = PreferenceService.CurrentPreferences.Tables.DefaultSortPerModule;
@@ -365,6 +367,18 @@
         var vc = PreferenceService.CurrentPreferences.Tables.VisibleColumnsPerModule;
         if (vc != null)
             VisibleColumnsRows = vc.Select(kv => new VisibleColumnsRow { Module = kv.Key, ColumnsCsv = string.Join(",", kv.Value) }).ToList();
+
+        // Load available widgets
+        try
+        {
+            var widgets = await DashboardService.GetWidgetsAsync();
+            AvailableWidgets = widgets.Select(w => w.Title).ToList();
+        }
+        catch
+        {
+            // Fallback if service fails
+            AvailableWidgets = new List<string> { "Vendas do dia", "Estoque", "Tarefas", "Atalhos", "Indicadores" };
+        }
     }
 
     private async Task OnThemeSwitchChanged(bool newValue)

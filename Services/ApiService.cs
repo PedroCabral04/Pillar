@@ -15,6 +15,10 @@ public interface IApiService
     // Simplified overloads
     Task<T?> PostAsync<T>(string endpoint, object? data, CancellationToken cancellationToken = default);
     Task<T?> PutAsync<T>(string endpoint, object data, CancellationToken cancellationToken = default);
+    Task<HttpResponseMessage> PostAsync(string endpoint, object? data, CancellationToken cancellationToken = default);
+    Task<HttpResponseMessage> PutAsync(string endpoint, object? data, CancellationToken cancellationToken = default);
+    Task<HttpResponseMessage> PatchAsync(string endpoint, object? data, CancellationToken cancellationToken = default);
+    Task<T?> PatchAsync<T>(string endpoint, object data, CancellationToken cancellationToken = default);
     
     event EventHandler<bool>? LoadingStateChanged;
     event EventHandler<string>? ErrorOccurred;
@@ -265,6 +269,58 @@ public class ApiService : IApiService
         }
         
         // If not successful, throw exception with error details
+        var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+        throw new HttpRequestException($"Request failed with status {response.StatusCode}: {errorContent}");
+    }
+
+    public async Task<HttpResponseMessage> PostAsync(string endpoint, object? data, CancellationToken cancellationToken = default)
+    {
+        return await PostAsJsonAsync(endpoint, data!, cancellationToken);
+    }
+
+    public async Task<HttpResponseMessage> PutAsync(string endpoint, object? data, CancellationToken cancellationToken = default)
+    {
+        return await PutAsJsonAsync(endpoint, data!, cancellationToken);
+    }
+
+    public async Task<HttpResponseMessage> PatchAsync(string endpoint, object? data, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            BeginLoading();
+
+            var json = JsonSerializer.Serialize(data);
+            return await ExecuteWithRetryAsync(() =>
+            {
+                var request = CreateRequestWithCookies(new HttpMethod("PATCH"), endpoint);
+                request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+                return _httpClient.SendAsync(request, cancellationToken);
+            }, endpoint);
+        }
+        catch (Exception ex)
+        {
+            HandleError(ex, endpoint, "PATCH");
+            throw;
+        }
+        finally
+        {
+            EndLoading();
+        }
+    }
+
+    public async Task<T?> PatchAsync<T>(string endpoint, object data, CancellationToken cancellationToken = default)
+    {
+        var response = await PatchAsync(endpoint, data, cancellationToken);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var content = await response.Content.ReadAsStringAsync(cancellationToken);
+            return JsonSerializer.Deserialize<T>(content, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+        }
+
         var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
         throw new HttpRequestException($"Request failed with status {response.StatusCode}: {errorContent}");
     }
