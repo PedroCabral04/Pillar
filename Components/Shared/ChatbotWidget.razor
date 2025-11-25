@@ -3,6 +3,7 @@
 @using MudBlazor
 @inject IApiService ApiService
 @inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
 
 <style>
     .chatbot-widget {
@@ -10,82 +11,169 @@
         bottom: 24px;
         right: 24px;
         z-index: 2000;
-        font-family: 'Inter', sans-serif;
+        font-family: inherit;
     }
 
     .chatbot-button {
-        width: 64px;
-        height: 64px;
+        width: 60px;
+        height: 60px;
         border-radius: 50%;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-        transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-        background: linear-gradient(135deg, var(--mud-palette-primary) 0%, var(--mud-palette-secondary) 100%);
+        box-shadow: 0 4px 16px rgba(var(--tenant-primary-rgb, 89, 74, 226), 0.35);
+        transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        background: linear-gradient(135deg, var(--mud-palette-primary) 0%, var(--mud-palette-primary-darken) 100%);
         color: white !important;
+        border: none;
     }
 
     .chatbot-button:hover {
-        transform: scale(1.1);
-        box-shadow: 0 12px 32px rgba(0,0,0,0.3);
+        transform: scale(1.08) translateY(-2px);
+        box-shadow: 0 8px 24px rgba(var(--tenant-primary-rgb, 89, 74, 226), 0.45);
+    }
+
+    .chatbot-button:focus-visible {
+        outline: 2px solid var(--mud-palette-primary);
+        outline-offset: 3px;
+    }
+
+    .chatbot-button.is-open {
+        background: var(--mud-palette-text-secondary);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
     }
 
     .chatbot-window {
         position: fixed;
-        bottom: 100px;
+        bottom: 96px;
         right: 24px;
         width: 380px;
-        height: 600px;
-        max-height: calc(100vh - 120px);
-        border-radius: 24px;
-        box-shadow: 0 16px 48px rgba(0,0,0,0.25);
+        height: 560px;
+        max-height: calc(100vh - 140px);
+        border-radius: 16px;
+        box-shadow: 0 12px 40px rgba(0,0,0,0.18), 0 4px 12px rgba(0,0,0,0.1);
         display: flex;
         flex-direction: column;
         z-index: 2001;
         background-color: var(--mud-palette-surface);
         overflow: hidden;
-        animation: slideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        animation: chatSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
         border: 1px solid var(--mud-palette-lines-default);
     }
 
-    @@keyframes slideIn {
-        from { opacity: 0; transform: translateY(20px) scale(0.95); }
-        to { opacity: 1; transform: translateY(0) scale(1); }
+    @@keyframes chatSlideIn {
+        from { 
+            opacity: 0; 
+            transform: translateY(16px) scale(0.96); 
+        }
+        to { 
+            opacity: 1; 
+            transform: translateY(0) scale(1); 
+        }
     }
 
     .chat-header {
-        padding: 16px 20px;
+        padding: 14px 16px;
         background: linear-gradient(135deg, var(--mud-palette-primary) 0%, var(--mud-palette-primary-darken) 100%);
         color: white;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        flex-shrink: 0;
+    }
+
+    .chat-header-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .chat-header-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .chat-header-title {
+        font-weight: 600;
+        font-size: 0.95rem;
+        line-height: 1.2;
+    }
+
+    .chat-header-status {
+        font-size: 0.75rem;
+        opacity: 0.85;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .status-dot {
+        width: 6px;
+        height: 6px;
+        background-color: #4ade80;
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+    }
+
+    @@keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+
+    .chat-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 4px;
     }
 
     .chat-messages {
         flex: 1;
         overflow-y: auto;
-        padding: 20px;
+        padding: 16px;
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: 12px;
         background-color: var(--mud-palette-background-grey);
         scroll-behavior: smooth;
     }
 
-    .chat-message {
-        max-width: 85%;
-        padding: 12px 16px;
-        border-radius: 18px;
-        font-size: 0.95rem;
-        line-height: 1.5;
-        position: relative;
-        animation: fadeIn 0.3s ease;
-        word-wrap: break-word;
+    /* Scrollbar customizada para mensagens */
+    .chat-messages::-webkit-scrollbar {
+        width: 6px;
     }
 
-    @@keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
+    .chat-messages::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .chat-messages::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.15);
+        border-radius: 3px;
+    }
+
+    .chat-messages::-webkit-scrollbar-thumb:hover {
+        background: rgba(0, 0, 0, 0.25);
+    }
+
+    .chat-message {
+        max-width: 82%;
+        padding: 10px 14px;
+        border-radius: 16px;
+        font-size: 0.875rem;
+        line-height: 1.5;
+        position: relative;
+        animation: messageIn 0.25s ease-out;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+
+    @@keyframes messageIn {
+        from { 
+            opacity: 0; 
+            transform: translateY(8px); 
+        }
+        to { 
+            opacity: 1; 
+            transform: translateY(0); 
+        }
     }
 
     .chat-message-user {
@@ -93,7 +181,7 @@
         background: var(--mud-palette-primary);
         color: white;
         border-bottom-right-radius: 4px;
-        box-shadow: 0 4px 12px rgba(var(--mud-palette-primary-rgb), 0.3);
+        box-shadow: 0 2px 8px rgba(var(--tenant-primary-rgb, 89, 74, 226), 0.25);
     }
 
     .chat-message-assistant {
@@ -101,89 +189,190 @@
         background: var(--mud-palette-surface);
         color: var(--mud-palette-text-primary);
         border-bottom-left-radius: 4px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        box-shadow: 0 1px 4px rgba(0,0,0,0.06);
         border: 1px solid var(--mud-palette-lines-default);
     }
 
     .chat-message-error {
         align-self: center;
-        background: var(--mud-palette-error-lighten);
+        background: rgba(var(--mud-palette-error-rgb, 244, 67, 54), 0.1);
         color: var(--mud-palette-error);
-        border: 1px solid var(--mud-palette-error);
-        font-size: 0.85rem;
+        border: 1px solid rgba(var(--mud-palette-error-rgb, 244, 67, 54), 0.3);
+        font-size: 0.8rem;
         text-align: center;
+        max-width: 90%;
+        border-radius: 8px;
     }
 
     .chat-input-area {
-        padding: 16px;
+        padding: 12px 16px;
         background-color: var(--mud-palette-surface);
         border-top: 1px solid var(--mud-palette-lines-default);
         display: flex;
-        align-items: center;
-        gap: 12px;
+        align-items: flex-end;
+        gap: 8px;
+        flex-shrink: 0;
+    }
+
+    .chat-input-area .mud-input-control {
+        margin: 0;
+    }
+
+    .chat-input-area .mud-input-outlined .mud-input-outlined-border {
+        border-radius: 20px;
     }
 
     .suggested-actions {
         display: flex;
-        gap: 8px;
-        padding: 12px 20px;
+        gap: 6px;
+        padding: 10px 16px;
         overflow-x: auto;
         white-space: nowrap;
         background-color: var(--mud-palette-background-grey);
-        border-bottom: 1px solid var(--mud-palette-lines-default);
-        scrollbar-width: none; /* Firefox */
+        border-top: 1px solid var(--mud-palette-lines-default);
+        scrollbar-width: none;
+        flex-shrink: 0;
     }
 
     .suggested-actions .mud-chip {
         flex-shrink: 0;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .suggested-actions .mud-chip:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
     
     .suggested-actions::-webkit-scrollbar {
-        display: none; /* Chrome, Safari */
+        display: none;
     }
 
     .typing-indicator {
         display: flex;
+        align-items: center;
         gap: 4px;
-        padding: 12px 16px;
+        padding: 10px 14px;
         background: var(--mud-palette-surface);
-        border-radius: 18px;
+        border-radius: 16px;
         width: fit-content;
         border-bottom-left-radius: 4px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        box-shadow: 0 1px 4px rgba(0,0,0,0.06);
         align-self: flex-start;
+        border: 1px solid var(--mud-palette-lines-default);
     }
 
     .typing-dot {
-        width: 8px;
-        height: 8px;
+        width: 7px;
+        height: 7px;
         background: var(--mud-palette-text-secondary);
         border-radius: 50%;
-        animation: typing 1.4s infinite ease-in-out both;
+        animation: typingBounce 1.4s infinite ease-in-out both;
     }
 
     .typing-dot:nth-child(1) { animation-delay: -0.32s; }
     .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+    .typing-dot:nth-child(3) { animation-delay: 0s; }
 
-    @@keyframes typing {
-        0%, 80%, 100% { transform: scale(0); }
-        40% { transform: scale(1); }
+    @@keyframes typingBounce {
+        0%, 80%, 100% { 
+            transform: scale(0.6);
+            opacity: 0.5;
+        }
+        40% { 
+            transform: scale(1);
+            opacity: 1;
+        }
     }
 
+    .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        padding: 32px 24px;
+        text-align: center;
+        color: var(--mud-palette-text-secondary);
+    }
+
+    .empty-state-icon {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, rgba(var(--tenant-primary-rgb, 89, 74, 226), 0.1) 0%, rgba(var(--tenant-primary-rgb, 89, 74, 226), 0.05) 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 16px;
+    }
+
+    .send-button {
+        border-radius: 50%;
+        min-width: 40px;
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        transition: all 0.2s ease;
+    }
+
+    .send-button:not(:disabled):hover {
+        transform: scale(1.05);
+    }
+
+    .send-button:disabled {
+        opacity: 0.5;
+    }
+
+    /* Responsividade */
     @@media (max-width: 600px) {
-        .chatbot-window {
-            width: 100%;
-            height: 100%;
-            max-height: 100%;
-            bottom: 0;
-            right: 0;
-            border-radius: 0;
-        }
-        
-        .chatbot-button {
+        .chatbot-widget {
             bottom: 16px;
             right: 16px;
         }
+
+        .chatbot-button {
+            width: 56px;
+            height: 56px;
+        }
+
+        .chatbot-window {
+            width: calc(100vw - 32px);
+            height: calc(100vh - 120px);
+            max-height: calc(100vh - 120px);
+            bottom: 88px;
+            right: 16px;
+            border-radius: 16px;
+        }
+    }
+
+    @@media (max-width: 400px) {
+        .chatbot-window {
+            width: 100%;
+            height: calc(100vh - 80px);
+            max-height: calc(100vh - 80px);
+            bottom: 80px;
+            right: 0;
+            border-radius: 16px 16px 0 0;
+        }
+    }
+
+    /* Suporte a tema escuro */
+    .mud-theme-dark .chat-messages {
+        background-color: var(--mud-palette-background);
+    }
+
+    .mud-theme-dark .suggested-actions {
+        background-color: var(--mud-palette-background);
+    }
+
+    .mud-theme-dark .chat-messages::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.15);
+    }
+
+    .mud-theme-dark .chat-messages::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.25);
     }
 </style>
 
@@ -192,36 +381,50 @@
     {
         <div class="chatbot-window">
             <div class="chat-header">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <MudAvatar Color="MudBlazor.Color.Surface" Size="MudBlazor.Size.Medium">
-                        <MudIcon Icon="@Icons.Material.Filled.SmartToy" Color="MudBlazor.Color.Primary" Size="MudBlazor.Size.Small"/>
+                <div class="chat-header-info">
+                    <MudAvatar Color="MudBlazor.Color.Surface" Size="MudBlazor.Size.Medium" Style="background: rgba(255,255,255,0.15);">
+                        <MudIcon Icon="@Icons.Material.Filled.SmartToy" Style="color: white;" Size="MudBlazor.Size.Small"/>
                     </MudAvatar>
-                    <div>
-                        <MudText Typo="Typo.subtitle1" Style="font-weight: 600; line-height: 1.2;">Assistente Virtual</MudText>
-                        <MudText Typo="Typo.caption" Style="opacity: 0.8;">Online</MudText>
+                    <div class="chat-header-text">
+                        <span class="chat-header-title">Assistente Virtual</span>
+                        <span class="chat-header-status">
+                            <span class="status-dot"></span>
+                            Online
+                        </span>
                     </div>
                 </div>
-                <div>
-                    <MudIconButton Icon="@Icons.Material.Filled.Remove" 
-                                   Color="MudBlazor.Color.Inherit" 
-                                   OnClick="MinimizeChatbot"
-                                   Size="MudBlazor.Size.Small"
-                                   aria-label="Minimizar"/>
-                    <MudIconButton Icon="@Icons.Material.Filled.Close" 
-                                   Color="MudBlazor.Color.Inherit" 
-                                   OnClick="ToggleChatbot"
-                                   Size="MudBlazor.Size.Small"
-                                   aria-label="Fechar"/>
+                <div class="chat-header-actions">
+                    <MudTooltip Text="Limpar conversa" Placement="Placement.Bottom">
+                        <MudIconButton Icon="@Icons.Material.Filled.Refresh" 
+                                       Color="MudBlazor.Color.Inherit" 
+                                       OnClick="ClearChat"
+                                       Size="MudBlazor.Size.Small"
+                                       Disabled="@(!_messages.Any())"
+                                       Style="color: rgba(255,255,255,0.8);"
+                                       aria-label="Limpar conversa"/>
+                    </MudTooltip>
+                    <MudTooltip Text="Fechar" Placement="Placement.Bottom">
+                        <MudIconButton Icon="@Icons.Material.Filled.Close" 
+                                       Color="MudBlazor.Color.Inherit" 
+                                       OnClick="ToggleChatbot"
+                                       Size="MudBlazor.Size.Small"
+                                       Style="color: rgba(255,255,255,0.8);"
+                                       aria-label="Fechar"/>
+                    </MudTooltip>
                 </div>
             </div>
 
-            <div class="chat-messages" @ref="_messagesContainer">
+            <div class="chat-messages" id="chat-messages-container" @ref="_messagesContainer">
                 @if (!_messages.Any())
                 {
-                    <div style="text-align: center; padding: 40px 20px; color: var(--mud-palette-text-secondary); display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
-                        <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Size="MudBlazor.Size.Large" Class="mb-4" Color="MudBlazor.Color.Primary"/>
-                        <MudText Typo="Typo.h6" Style="font-weight: 600; margin-bottom: 8px;">Olá! Como posso ajudar?</MudText>
-                        <MudText Typo="Typo.body2" Style="max-width: 260px;">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">
+                            <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Size="MudBlazor.Size.Large" Color="MudBlazor.Color.Primary"/>
+                        </div>
+                        <MudText Typo="Typo.h6" Style="font-weight: 600; margin-bottom: 8px; color: var(--mud-palette-text-primary);">
+                            Olá! Como posso ajudar?
+                        </MudText>
+                        <MudText Typo="Typo.body2" Style="max-width: 240px; opacity: 0.8;">
                             Estou aqui para ajudar com produtos, vendas e informações do sistema.
                         </MudText>
                     </div>
@@ -231,11 +434,7 @@
                     @foreach (var message in _messages)
                     {
                         <div class="chat-message @(message.IsError ? "chat-message-error" : message.Role == "user" ? "chat-message-user" : "chat-message-assistant")">
-                            @if (message.Role == "assistant" && !message.IsError)
-                            {
-                                // Optional: Add avatar or icon for assistant messages inside the bubble if needed
-                            }
-                            <MudText Typo="Typo.body2">@message.Content</MudText>
+                            <span>@message.Content</span>
                         </div>
                     }
                     
@@ -250,7 +449,7 @@
                 }
             </div>
 
-            @if (_suggestedActions.Any())
+            @if (_suggestedActions.Any() && !_isProcessing)
             {
                 <div class="suggested-actions">
                     @foreach (var action in _suggestedActions)
@@ -276,22 +475,26 @@
                               Disabled="_isProcessing"
                               Immediate="true"
                               FullWidth="true"
-                              Class="rounded-pill"
-                              Style="background-color: var(--mud-palette-background);"/>
+                              Adornment="Adornment.None"
+                              Style="flex: 1;"/>
                 <MudIconButton Icon="@Icons.Material.Filled.Send" 
                                Color="MudBlazor.Color.Primary" 
+                               Variant="Variant.Filled"
+                               Class="send-button"
                                OnClick="SendMessage"
                                Disabled="@(string.IsNullOrWhiteSpace(_currentMessage) || _isProcessing)"
-                               Size="MudBlazor.Size.Medium"/>
+                               aria-label="Enviar mensagem"/>
             </div>
         </div>
     }
 
-    <MudIconButton Icon="@(_isOpen ? Icons.Material.Filled.Close : Icons.Material.Filled.SmartToy)" 
-                   Class="chatbot-button"
-                   OnClick="ToggleChatbot"
-                   Size="MudBlazor.Size.Large"
-                   aria-label="@(_isOpen ? "Fechar Assistente Virtual" : "Abrir Assistente Virtual")"/>
+    <MudTooltip Text="@(_isOpen ? "Fechar assistente" : "Abrir assistente")" Placement="Placement.Left">
+        <MudIconButton Icon="@(_isOpen ? Icons.Material.Filled.Close : Icons.Material.Filled.SmartToy)" 
+                       Class="@($"chatbot-button {(_isOpen ? "is-open" : "")}")"
+                       OnClick="ToggleChatbot"
+                       Size="MudBlazor.Size.Large"
+                       aria-label="@(_isOpen ? "Fechar Assistente Virtual" : "Abrir Assistente Virtual")"/>
+    </MudTooltip>
 </div>
 
 @code {
@@ -304,8 +507,28 @@
 
     protected override void OnInitialized()
     {
-        // Carregar mensagens salvas do localStorage se necessário
         base.OnInitialized();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_isOpen && _messages.Any())
+        {
+            await ScrollToBottom();
+        }
+    }
+
+    private async Task ScrollToBottom()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("eval", 
+                "document.getElementById('chat-messages-container')?.scrollTo({ top: document.getElementById('chat-messages-container').scrollHeight, behavior: 'smooth' })");
+        }
+        catch
+        {
+            // Ignore JS interop errors
+        }
     }
 
     private void ToggleChatbot()
@@ -314,7 +537,6 @@
         
         if (_isOpen && !_messages.Any())
         {
-            // Mostrar sugestões iniciais
             _suggestedActions = new List<string>
             {
                 "O que você pode fazer?",
@@ -323,9 +545,14 @@
         }
     }
 
-    private void MinimizeChatbot()
+    private void ClearChat()
     {
-        _isOpen = false;
+        _messages.Clear();
+        _suggestedActions = new List<string>
+        {
+            "O que você pode fazer?",
+            "Listar produtos",
+        };
     }
 
     private async Task HandleKeyDown(KeyboardEventArgs e)
@@ -343,8 +570,8 @@
 
         var userMessage = _currentMessage.Trim();
         _currentMessage = string.Empty;
+        _suggestedActions.Clear();
 
-        // Adicionar mensagem do usuário
         _messages.Add(new ChatMessageDto
         {
             Role = "user",
@@ -357,7 +584,6 @@
 
         try
         {
-            // Enviar para o backend
             var request = new ChatRequestDto
             {
                 Message = userMessage,
@@ -368,7 +594,6 @@
 
             if (response?.Success == true)
             {
-                // Adicionar resposta do assistente
                 _messages.Add(new ChatMessageDto
                 {
                     Role = "assistant",
@@ -376,7 +601,6 @@
                     Timestamp = DateTime.UtcNow
                 });
 
-                // Atualizar sugestões
                 if (response.SuggestedActions?.Any() == true)
                 {
                     _suggestedActions = response.SuggestedActions;
@@ -387,7 +611,7 @@
                 _messages.Add(new ChatMessageDto
                 {
                     Role = "assistant",
-                    Content = response?.Error ?? "Erro ao processar mensagem.",
+                    Content = response?.Error ?? "Desculpe, não consegui processar sua mensagem. Tente novamente.",
                     Timestamp = DateTime.UtcNow,
                     IsError = true
                 });
@@ -398,7 +622,7 @@
             _messages.Add(new ChatMessageDto
             {
                 Role = "assistant",
-                Content = $"Erro: {ex.Message}",
+                Content = "Erro de conexão. Verifique sua internet e tente novamente.",
                 Timestamp = DateTime.UtcNow,
                 IsError = true
             });
@@ -408,9 +632,6 @@
         {
             _isProcessing = false;
             await InvokeAsync(StateHasChanged);
-            
-            // Scroll para o final
-            // Note: Para scroll automático, considere usar JS Interop
         }
     }
 

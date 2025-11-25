@@ -187,8 +187,8 @@
         var options = new DialogOptions 
         { 
             CloseOnEscapeKey = true,
-            MaxWidth = MaxWidth.ExtraLarge,
-            FullWidth = true
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = false
         };
         
         var dialog = await DialogService.ShowAsync<CreateProductDialog>("Adicionar Produto", options);
@@ -208,8 +208,8 @@
         var options = new DialogOptions
         {
             CloseOnEscapeKey = true,
-            MaxWidth = MaxWidth.ExtraLarge,
-            FullWidth = true
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = false
         };
 
         var parameters = new DialogParameters

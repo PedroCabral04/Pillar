@@ -199,7 +199,7 @@
         { 
             CloseOnEscapeKey = true,
             MaxWidth = MaxWidth.Medium,
-            FullWidth = true
+            FullWidth = false
         };
         
         var dialog = await DialogService.ShowAsync<CreateProductCategoryDialog>("Nova Categoria", options);
@@ -222,7 +222,7 @@
         { 
             CloseOnEscapeKey = true,
             MaxWidth = MaxWidth.Medium,
-            FullWidth = true
+            FullWidth = false
         };
         
         var dialog = await DialogService.ShowAsync<EditProductCategoryDialog>("Editar Categoria", parameters, options);

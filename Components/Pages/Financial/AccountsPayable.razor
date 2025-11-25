@@ -321,7 +321,7 @@
         var parameters = new DialogParameters();
         parameters.Add("PaidAmount", account.RemainingAmount);
         
-        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = false };
         var dialog = DialogService.Show<PaymentDialog>("Registrar Pagamento", parameters, options);
         var result = await dialog.Result;
 

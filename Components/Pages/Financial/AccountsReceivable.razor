@@ -309,7 +309,7 @@
         parameters.Add("PaidAmount", account.RemainingAmount);
         parameters.Add("AmountLabel", "Valor Recebido");
         
-        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = false };
         var dialog = DialogService.Show<PaymentDialog>("Registrar Recebimento", parameters, options);
         var result = await dialog.Result;
 

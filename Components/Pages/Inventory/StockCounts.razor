@@ -249,7 +249,7 @@
         { 
             CloseOnEscapeKey = true,
             MaxWidth = MaxWidth.Medium,
-            FullWidth = true
+            FullWidth = false
         };
         
         var dialog = await DialogService.ShowAsync<CreateStockCountDialog>("Nova Contagem", options);
