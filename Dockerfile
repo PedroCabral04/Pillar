@@ -19,7 +19,8 @@ WORKDIR /app
 # Optional: set timezone to UTC explicitly (app already uses UTC)
 ENV TZ=Etc/UTC \
     ASPNETCORE_URLS=http://+:8080 \
-    ASPNETCORE_ENVIRONMENT=Production
+    ASPNETCORE_ENVIRONMENT=Production \
+    DB_BOOTSTRAP=false
 
 EXPOSE 8080
 

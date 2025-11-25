@@ -498,6 +498,57 @@ using (var scope = app.Services.CreateScope())
         var dbBootstrap = bootstrapCfg || string.Equals(bootstrapEnv, "true", StringComparison.OrdinalIgnoreCase);
 
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        
+        // --- AUTO-FIX: Baseline migrations if missing (Self-Healing for Coolify) ---
+        try 
+        {
+            // Check if AspNetUsers exists (implies DB was created with EnsureCreated)
+            var userTableExists = await db.Database.SqlQueryRaw<int>(
+                "SELECT count(*)::int FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'AspNetUsers'")
+                .FirstOrDefaultAsync() > 0;
+
+            // Check if history table exists
+            var historyTableExists = await db.Database.SqlQueryRaw<int>(
+                "SELECT count(*)::int FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '__EFMigrationsHistory'")
+                .FirstOrDefaultAsync() > 0;
+
+            if (userTableExists && !historyTableExists)
+            {
+                Console.WriteLine("[DB] CRITICAL: Existing database detected without migration history. Injecting baseline...");
+                await db.Database.ExecuteSqlRawAsync(@"
+                    CREATE TABLE IF NOT EXISTS ""__EFMigrationsHistory"" (
+                        ""MigrationId"" character varying(150) NOT NULL,
+                        ""ProductVersion"" character varying(32) NOT NULL,
+                        CONSTRAINT ""PK___EFMigrationsHistory"" PRIMARY KEY (""MigrationId"")
+                    );
+                    
+                    INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"") VALUES
+                    ('20251013022123_first', '9.0.0'),
+                    ('20251013055802_AddInventoryModule', '9.0.0'),
+                    ('20251013115625_AddSalesModule', '9.0.0'),
+                    ('20251013120656_AddSaleOrderForeignKeyToStockMovement', '9.0.0'),
+                    ('20251013121723_StandardizeTableNaming', '9.0.0'),
+                    ('20251107224217_AddAuditSystem', '9.0.0'),
+                    ('20251108001102_FixAuditSystemIdCapture', '9.0.0'),
+                    ('20251108025347_OptimizeAuditIndexes', '9.0.0'),
+                    ('20251108025813_OptimizeAuditIndexesComposite', '9.0.0'),
+                    ('20251108031849_AddAuditReadTracking', '9.0.0'),
+                    ('20251109234656_AddTimeTrackingModule', '9.0.0'),
+                    ('20251110025704_AddPayrollTimeTracking', '9.0.0'),
+                    ('20251110052846_AddFinancialModule', '9.0.0'),
+                    ('20251113232410_assets', '9.0.0'),
+                    ('20251124204325_slq', '9.0.0')
+                    ON CONFLICT DO NOTHING;
+                ");
+                Console.WriteLine("[DB] Baseline injected successfully.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[DB] Baseline check failed (ignoring): {ex.Message}");
+        }
+        // ------------------------------------------------
+
         // Prefer Migrate when migrations exist; allow forcing EnsureCreated via DB_BOOTSTRAP
         var anyModelMigrations = db.Database.GetMigrations().Any();
         var bootstrapMode = Environment.GetEnvironmentVariable("DB_BOOTSTRAP")?.Trim().ToLowerInvariant();
