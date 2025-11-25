@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using erp.DTOs.Sales;
 using erp.Services.Sales;
+using erp.Services.Reports;
 using erp.Models.Audit;
 
 namespace erp.Controllers;
@@ -16,15 +17,21 @@ public class SalesController : ControllerBase
 {
     private readonly ISalesService _salesService;
     private readonly ICustomerService _customerService;
+    private readonly IPdfExportService _pdfExportService;
+    private readonly IWebHostEnvironment _webHostEnvironment;
     private readonly ILogger<SalesController> _logger;
 
     public SalesController(
         ISalesService salesService,
         ICustomerService customerService,
+        IPdfExportService pdfExportService,
+        IWebHostEnvironment webHostEnvironment,
         ILogger<SalesController> logger)
     {
         _salesService = salesService;
         _customerService = customerService;
+        _pdfExportService = pdfExportService;
+        _webHostEnvironment = webHostEnvironment;
         _logger = logger;
     }
 
@@ -340,6 +347,54 @@ public class SalesController : ControllerBase
         {
             _logger.LogError(ex, "Erro ao buscar venda {SaleId}", id);
             return StatusCode(500, new { message = "Erro ao buscar venda", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Exporta uma venda para PDF
+    /// </summary>
+    /// <param name="id">ID da venda</param>
+    /// <returns>Arquivo PDF da venda</returns>
+    /// <response code="200">PDF gerado com sucesso</response>
+    /// <response code="404">Venda não encontrada</response>
+    /// <response code="401">Usuário não autenticado</response>
+    /// <response code="500">Erro interno</response>
+    /// <remarks>
+    /// Gera um PDF formatado da venda com:
+    /// - Cabeçalho com logo da empresa
+    /// - Informações da venda e cliente
+    /// - Tabela de itens
+    /// - Totais e observações
+    /// </remarks>
+    [HttpGet("{id:int}/export/pdf")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> ExportSaleToPdf(int id)
+    {
+        try
+        {
+            var sale = await _salesService.GetByIdAsync(id);
+            if (sale == null)
+            {
+                return NotFound(new { message = $"Venda com ID {id} não encontrada" });
+            }
+
+            // Try to find company logo
+            var logoPath = Path.Combine(_webHostEnvironment.WebRootPath, "images", "logo.png");
+            if (!System.IO.File.Exists(logoPath))
+            {
+                logoPath = null;
+            }
+
+            var pdfBytes = _pdfExportService.ExportSaleToPdf(sale, logoPath);
+            return File(pdfBytes, "application/pdf", $"venda-{sale.SaleNumber}.pdf");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao exportar venda {SaleId} para PDF", id);
+            return StatusCode(500, new { message = "Erro ao exportar PDF", error = ex.Message });
         }
     }
 
