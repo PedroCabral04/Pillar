@@ -184,7 +184,7 @@
         var parameters = new DialogParameters();
         parameters.Add("Users", users);
 
-        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var options = new DialogOptions { CloseOnEscapeKey = true };
         var dialog = DialogService.Show<CostCenterDialog>("Novo Centro de Custo", parameters, options);
         var result = await dialog.Result;
 
@@ -220,7 +220,7 @@
         
         parameters.Add("Model", model);
 
-        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var options = new DialogOptions { CloseOnEscapeKey = true };
         var dialog = DialogService.Show<CostCenterDialog>("Editar Centro de Custo", parameters, options);
         var result = await dialog.Result;
 

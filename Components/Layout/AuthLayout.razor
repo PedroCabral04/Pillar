@@ -14,7 +14,7 @@
 
 <MudThemeProvider @bind-IsDarkMode="ThemeService.IsDarkMode" Theme="@_authTheme" />
 <MudPopoverProvider/>
-<MudDialogProvider/>
+<MudDialogProvider MaxWidth="MaxWidth.Medium" FullWidth="true" CloseOnEscapeKey="true" />
 <MudSnackbarProvider/>
 
 <div class="pa-4" style="@AuthBackgroundStyle">

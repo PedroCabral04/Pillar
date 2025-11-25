@@ -8,48 +8,92 @@
 @inject ILogger<CustomerCreateDialog> Logger
 
 <MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Color="Color.Primary" Size="Size.Large" />
+            <MudText Typo="Typo.h6">Novo Cliente</MudText>
+        </MudStack>
+    </TitleContent>
     <DialogContent>
-        <MudForm @ref="_form" Model="@_model" Validation="@(new Func<object, string, Task<IEnumerable<string>>>(ValidateValue))">
-            <MudGrid>
+        <MudForm @ref="_form" Model="@_model" Class="pa-2">
+            <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Badge" Size="Size.Small" Class="mr-1" />
+                Dados Principais
+            </MudText>
+            <MudGrid Spacing="3">
                 <MudItem xs="12" md="6">
                     <MudTextField @bind-Value="_model.Document" 
                                   Label="CPF/CNPJ" 
                                   Required="true"
                                   Immediate="true"
-                                  Variant="Variant.Outlined"/>
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Badge"
+                                  HelperText="Digite o CPF ou CNPJ do cliente"/>
                 </MudItem>
                 <MudItem xs="12" md="6">
                     <MudTextField @bind-Value="_model.Name" 
                                   Label="Nome/Razão Social" 
                                   Required="true"
                                   Immediate="true"
-                                  Variant="Variant.Outlined"/>
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Person"
+                                  HelperText="Nome completo ou razão social"/>
                 </MudItem>
+            </MudGrid>
+
+            <MudDivider Class="my-4" />
+            
+            <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.ContactPhone" Size="Size.Small" Class="mr-1" />
+                Contato
+            </MudText>
+            <MudGrid Spacing="3">
                 <MudItem xs="12" md="6">
                     <MudTextField @bind-Value="_model.Email" 
                                   Label="E-mail"
                                   InputType="InputType.Email"
-                                  Variant="Variant.Outlined"/>
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Email"/>
                 </MudItem>
                 <MudItem xs="12" md="3">
                     <MudTextField @bind-Value="_model.Phone" 
                                   Label="Telefone"
-                                  Variant="Variant.Outlined"/>
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Phone"/>
                 </MudItem>
                 <MudItem xs="12" md="3">
                     <MudTextField @bind-Value="_model.Mobile" 
                                   Label="Celular"
-                                  Variant="Variant.Outlined"/>
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.PhoneAndroid"/>
                 </MudItem>
+            </MudGrid>
+
+            <MudDivider Class="my-4" />
+            
+            <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.LocationOn" Size="Size.Small" Class="mr-1" />
+                Endereço
+            </MudText>
+            <MudGrid Spacing="3">
                 <MudItem xs="12" md="3">
                     <MudTextField @bind-Value="_model.ZipCode" 
                                   Label="CEP"
-                                  Variant="Variant.Outlined"/>
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.LocationOn"/>
                 </MudItem>
                 <MudItem xs="12" md="7">
                     <MudTextField @bind-Value="_model.Address" 
                                   Label="Endereço"
-                                  Variant="Variant.Outlined"/>
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Home"/>
                 </MudItem>
                 <MudItem xs="12" md="2">
                     <MudTextField @bind-Value="_model.Number" 
@@ -69,12 +113,17 @@
                 <MudItem xs="12" md="4">
                     <MudTextField @bind-Value="_model.City" 
                                   Label="Cidade"
-                                  Variant="Variant.Outlined"/>
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.LocationCity"/>
                 </MudItem>
-                <MudItem xs="12" md="8">
+                <MudItem xs="12" md="4">
                     <MudSelect @bind-Value="_model.State" 
                                Label="Estado"
-                               Variant="Variant.Outlined">
+                               Variant="Variant.Outlined"
+                               Adornment="Adornment.Start"
+                               AdornmentIcon="@Icons.Material.Filled.Map"
+                               AnchorOrigin="Origin.BottomCenter">
                         @foreach (var state in _brazilianStates)
                         {
                             <MudSelectItem Value="@state">@state</MudSelectItem>
@@ -85,15 +134,17 @@
         </MudForm>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton OnClick="Cancel" Variant="Variant.Outlined">Cancelar</MudButton>
         <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@_processing">
             @if (_processing)
             {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true"/>
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2"/>
+                <text>Salvando...</text>
             }
             else
             {
-                <text>Salvar</text>
+                <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-1"/>
+                <text>Salvar Cliente</text>
             }
         </MudButton>
     </DialogActions>
@@ -118,6 +169,7 @@
         await _form!.Validate();
         if (!_form.IsValid)
         {
+            Snackbar.Add("Por favor, corrija os erros no formulário", Severity.Warning);
             return;
         }
 
@@ -125,7 +177,7 @@
         try
         {
             var customer = await ApiService.PostAsync<CustomerDto>("/api/sales/customers", _model);
-            Snackbar.Add("Cliente criado com sucesso", Severity.Success);
+            Snackbar.Add("Cliente criado com sucesso!", Severity.Success);
             MudDialog.Close(DialogResult.Ok(customer));
         }
         catch (Exception ex)
@@ -140,10 +192,4 @@
     }
 
     private void Cancel() => MudDialog.Cancel();
-
-    private Task<IEnumerable<string>> ValidateValue(object model, string propertyName)
-    {
-        // Add custom validation logic here if needed
-        return Task.FromResult(Enumerable.Empty<string>());
-    }
 }

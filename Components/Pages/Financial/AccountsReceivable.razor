@@ -211,7 +211,7 @@
         parameters.Add("Categories", categories);
         parameters.Add("CostCenters", costCenters);
 
-        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var options = new DialogOptions { CloseOnEscapeKey = true };
         var dialog = DialogService.Show<AccountReceivableDialog>("Nova Conta a Receber", parameters, options);
         var result = await dialog.Result;
 
@@ -261,7 +261,7 @@
         
         parameters.Add("Model", model);
 
-        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var options = new DialogOptions { CloseOnEscapeKey = true };
         var dialog = DialogService.Show<AccountReceivableDialog>("Editar Conta a Receber", parameters, options);
         var result = await dialog.Result;
 

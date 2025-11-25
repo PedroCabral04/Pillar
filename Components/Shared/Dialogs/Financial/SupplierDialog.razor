@@ -1,97 +1,202 @@
 @using erp.DTOs.Financial
 
 <MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.LocalShipping" Color="MudBlazor.Color.Primary" Size="MudBlazor.Size.Large" />
+            <MudText Typo="Typo.h6">@(string.IsNullOrEmpty(Model.Name) ? "Novo Fornecedor" : "Editar Fornecedor")</MudText>
+        </MudStack>
+    </TitleContent>
     <DialogContent>
-        <MudForm @ref="form" @bind-IsValid="@success">
-            <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
-                <MudTabPanel Text="Dados Gerais">
-                    <MudGrid>
+        <MudForm @ref="form" @bind-IsValid="@success" Class="pa-2">
+            <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4" Color="MudBlazor.Color.Primary">
+                <MudTabPanel Text="Dados Gerais" Icon="@Icons.Material.Filled.Business">
+                    <MudGrid Spacing="3">
                         <MudItem xs="12" sm="6">
-                            <MudTextField @bind-Value="Model.Name" Label="Razão Social" Required="true" RequiredError="Razão Social é obrigatória" />
-                        </MudItem>
-                        <MudItem xs="12" sm="6">
-                            <MudTextField @bind-Value="Model.TradeName" Label="Nome Fantasia" />
-                        </MudItem>
-                        <MudItem xs="12" sm="6">
-                            <MudTextField @bind-Value="Model.TaxId" Label="CNPJ/CPF" Required="true" RequiredError="CNPJ/CPF é obrigatório" />
-                        </MudItem>
-                        <MudItem xs="12" sm="3">
-                            <MudTextField @bind-Value="Model.StateRegistration" Label="Inscrição Estadual" />
-                        </MudItem>
-                        <MudItem xs="12" sm="3">
-                            <MudTextField @bind-Value="Model.MunicipalRegistration" Label="Inscrição Municipal" />
+                            <MudTextField @bind-Value="Model.Name" 
+                                          Label="Razão Social" 
+                                          Required="true" 
+                                          RequiredError="Razão Social é obrigatória" 
+                                          Variant="Variant.Outlined"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.Business"/>
                         </MudItem>
                         <MudItem xs="12" sm="6">
-                            <MudTextField @bind-Value="Model.Email" Label="Email" InputType="InputType.Email" />
+                            <MudTextField @bind-Value="Model.TradeName" 
+                                          Label="Nome Fantasia" 
+                                          Variant="Variant.Outlined"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.Store"/>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="Model.TaxId" 
+                                          Label="CNPJ/CPF" 
+                                          Required="true" 
+                                          RequiredError="CNPJ/CPF é obrigatório" 
+                                          Variant="Variant.Outlined"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.Badge"/>
                         </MudItem>
                         <MudItem xs="12" sm="3">
-                            <MudTextField @bind-Value="Model.Phone" Label="Telefone" />
+                            <MudTextField @bind-Value="Model.StateRegistration" 
+                                          Label="Inscrição Estadual" 
+                                          Variant="Variant.Outlined"/>
                         </MudItem>
                         <MudItem xs="12" sm="3">
-                            <MudTextField @bind-Value="Model.MobilePhone" Label="Celular" />
+                            <MudTextField @bind-Value="Model.MunicipalRegistration" 
+                                          Label="Inscrição Municipal" 
+                                          Variant="Variant.Outlined"/>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="Model.Email" 
+                                          Label="Email" 
+                                          InputType="InputType.Email" 
+                                          Variant="Variant.Outlined"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.Email"/>
+                        </MudItem>
+                        <MudItem xs="12" sm="3">
+                            <MudTextField @bind-Value="Model.Phone" 
+                                          Label="Telefone" 
+                                          Variant="Variant.Outlined"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.Phone"/>
+                        </MudItem>
+                        <MudItem xs="12" sm="3">
+                            <MudTextField @bind-Value="Model.MobilePhone" 
+                                          Label="Celular" 
+                                          Variant="Variant.Outlined"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.PhoneAndroid"/>
                         </MudItem>
                         <MudItem xs="12">
-                            <MudTextField @bind-Value="Model.Website" Label="Website" />
+                            <MudTextField @bind-Value="Model.Website" 
+                                          Label="Website" 
+                                          Variant="Variant.Outlined"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.Language"/>
                         </MudItem>
                     </MudGrid>
                 </MudTabPanel>
-                <MudTabPanel Text="Endereço">
-                    <MudGrid>
+                <MudTabPanel Text="Endereço" Icon="@Icons.Material.Filled.LocationOn">
+                    <MudGrid Spacing="3">
                         <MudItem xs="12" sm="4">
-                            <MudTextField @bind-Value="Model.ZipCode" Label="CEP" />
+                            <MudTextField @bind-Value="Model.ZipCode" 
+                                          Label="CEP" 
+                                          Variant="Variant.Outlined"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.LocationOn"/>
                         </MudItem>
                         <MudItem xs="12" sm="8">
-                            <MudTextField @bind-Value="Model.Street" Label="Logradouro" />
+                            <MudTextField @bind-Value="Model.Street" 
+                                          Label="Logradouro" 
+                                          Variant="Variant.Outlined"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.Home"/>
                         </MudItem>
                         <MudItem xs="12" sm="4">
-                            <MudTextField @bind-Value="Model.Number" Label="Número" />
+                            <MudTextField @bind-Value="Model.Number" 
+                                          Label="Número" 
+                                          Variant="Variant.Outlined"/>
                         </MudItem>
                         <MudItem xs="12" sm="8">
-                            <MudTextField @bind-Value="Model.Complement" Label="Complemento" />
+                            <MudTextField @bind-Value="Model.Complement" 
+                                          Label="Complemento" 
+                                          Variant="Variant.Outlined"/>
                         </MudItem>
                         <MudItem xs="12" sm="4">
-                            <MudTextField @bind-Value="Model.District" Label="Bairro" />
+                            <MudTextField @bind-Value="Model.District" 
+                                          Label="Bairro" 
+                                          Variant="Variant.Outlined"/>
                         </MudItem>
                         <MudItem xs="12" sm="4">
-                            <MudTextField @bind-Value="Model.City" Label="Cidade" />
+                            <MudTextField @bind-Value="Model.City" 
+                                          Label="Cidade" 
+                                          Variant="Variant.Outlined"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.LocationCity"/>
                         </MudItem>
                         <MudItem xs="12" sm="4">
-                            <MudTextField @bind-Value="Model.State" Label="Estado" />
+                            <MudTextField @bind-Value="Model.State" 
+                                          Label="Estado" 
+                                          Variant="Variant.Outlined"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.Map"/>
                         </MudItem>
                     </MudGrid>
                 </MudTabPanel>
-                <MudTabPanel Text="Financeiro">
-                    <MudGrid>
+                <MudTabPanel Text="Financeiro" Icon="@Icons.Material.Filled.AttachMoney">
+                    <MudGrid Spacing="3">
                         <MudItem xs="12" sm="6">
-                            <MudTextField @bind-Value="Model.Category" Label="Categoria" />
+                            <MudTextField @bind-Value="Model.Category" 
+                                          Label="Categoria" 
+                                          Variant="Variant.Outlined"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.Category"/>
                         </MudItem>
                         <MudItem xs="12" sm="6">
-                            <MudTextField @bind-Value="Model.PaymentMethod" Label="Método de Pagamento Padrão" />
+                            <MudTextField @bind-Value="Model.PaymentMethod" 
+                                          Label="Método de Pagamento Padrão" 
+                                          Variant="Variant.Outlined"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.Payment"/>
                         </MudItem>
                         <MudItem xs="12" sm="4">
-                            <MudNumericField @bind-Value="Model.PaymentTermDays" Label="Prazo de Pagamento (dias)" Min="0" />
+                            <MudNumericField @bind-Value="Model.PaymentTermDays" 
+                                             Label="Prazo de Pagamento (dias)" 
+                                             Min="0" 
+                                             Variant="Variant.Outlined"
+                                             Adornment="Adornment.Start"
+                                             AdornmentIcon="@Icons.Material.Filled.CalendarMonth"/>
                         </MudItem>
                         <MudItem xs="12" sm="4">
-                            <MudNumericField @bind-Value="Model.DeliveryLeadTimeDays" Label="Prazo de Entrega (dias)" Min="0" />
+                            <MudNumericField @bind-Value="Model.DeliveryLeadTimeDays" 
+                                             Label="Prazo de Entrega (dias)" 
+                                             Min="0" 
+                                             Variant="Variant.Outlined"
+                                             Adornment="Adornment.Start"
+                                             AdornmentIcon="@Icons.Material.Filled.LocalShipping"/>
                         </MudItem>
                         <MudItem xs="12" sm="4">
-                            <MudNumericField @bind-Value="Model.MinimumOrderValue" Label="Pedido Mínimo" Format="C2" />
+                            <MudNumericField @bind-Value="Model.MinimumOrderValue" 
+                                             Label="Pedido Mínimo" 
+                                             Format="C2" 
+                                             Variant="Variant.Outlined"
+                                             Adornment="Adornment.Start"
+                                             AdornmentIcon="@Icons.Material.Filled.AttachMoney"/>
                         </MudItem>
                         <MudItem xs="12">
-                            <MudCheckBox @bind-Value="Model.IsPreferred" Label="Fornecedor Preferencial" Color="MudBlazor.Color.Primary" />
+                            <MudCheckBox @bind-Value="Model.IsPreferred" 
+                                         Label="Fornecedor Preferencial" 
+                                         Color="MudBlazor.Color.Primary" />
                         </MudItem>
                     </MudGrid>
                 </MudTabPanel>
-                <MudTabPanel Text="Observações">
-                    <MudTextField @bind-Value="Model.Notes" Label="Observações" Lines="5" />
-                    <MudCheckBox @bind-Value="Model.IsActive" Label="Ativo" Color="MudBlazor.Color.Success" Class="mt-4" />
+                <MudTabPanel Text="Observações" Icon="@Icons.Material.Filled.Notes">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="Model.Notes" 
+                                          Label="Observações" 
+                                          Lines="5" 
+                                          Variant="Variant.Outlined"
+                                          HelperText="Anotações internas sobre o fornecedor"/>
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudSwitch @bind-Value="Model.IsActive" 
+                                       Label="Fornecedor Ativo" 
+                                       Color="MudBlazor.Color.Success" />
+                        </MudItem>
+                    </MudGrid>
                 </MudTabPanel>
             </MudTabs>
         </MudForm>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="Cancel">Cancelar</MudButton>
-        <MudButton Color="MudBlazor.Color.Primary" OnClick="Submit">Salvar</MudButton>
+        <MudButton OnClick="Cancel" Variant="Variant.Outlined">Cancelar</MudButton>
+        <MudButton Color="MudBlazor.Color.Primary" Variant="Variant.Filled" OnClick="Submit">
+            <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-1"/>
+            Salvar Fornecedor
+        </MudButton>
     </DialogActions>
 </MudDialog>
 

@@ -24,7 +24,7 @@
 
 <MudThemeProvider @ref="@_mudThemeProvider" @bind-IsDarkMode="ThemeService.IsDarkMode" Theme="@ThemeService.Theme" />
 <MudPopoverProvider />
-<MudDialogProvider />
+<MudDialogProvider MaxWidth="MaxWidth.Medium" FullWidth="true" CloseOnEscapeKey="true" CloseButton="true"/>
 <MudSnackbarProvider />
 
 @if (PreferenceService.CurrentPreferences.Ui.ReduceMotion)

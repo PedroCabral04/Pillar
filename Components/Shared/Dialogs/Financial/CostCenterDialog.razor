@@ -2,20 +2,66 @@
 @using erp.DTOs.User
 
 <MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Color="MudBlazor.Color.Primary" Size="MudBlazor.Size.Large" />
+            <MudText Typo="Typo.h6">Centro de Custo</MudText>
+        </MudStack>
+    </TitleContent>
     <DialogContent>
-        <MudForm @ref="form" @bind-IsValid="@success">
-            <MudGrid>
+        <MudForm @ref="form" @bind-IsValid="@success" Class="pa-2">
+            <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Info" Size="MudBlazor.Size.Small" Class="mr-1" />
+                Dados do Centro de Custo
+            </MudText>
+            <MudGrid Spacing="3">
                 <MudItem xs="12" sm="6">
-                    <MudTextField @bind-Value="Model.Name" Label="Nome" Required="true" RequiredError="Nome é obrigatório" />
+                    <MudTextField @bind-Value="Model.Name" 
+                                  Label="Nome" 
+                                  Required="true" 
+                                  RequiredError="Nome é obrigatório" 
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Label"
+                                  HelperText="Nome do centro de custo"/>
                 </MudItem>
                 <MudItem xs="12" sm="6">
-                    <MudTextField @bind-Value="Model.Code" Label="Código" Required="true" RequiredError="Código é obrigatório" />
+                    <MudTextField @bind-Value="Model.Code" 
+                                  Label="Código" 
+                                  Required="true" 
+                                  RequiredError="Código é obrigatório" 
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Tag"
+                                  HelperText="Código único para identificação"
+                                  Placeholder="CC001"/>
                 </MudItem>
                 <MudItem xs="12">
-                    <MudTextField @bind-Value="Model.Description" Label="Descrição" Lines="3" />
+                    <MudTextField @bind-Value="Model.Description" 
+                                  Label="Descrição" 
+                                  Lines="3" 
+                                  Variant="Variant.Outlined"
+                                  HelperText="Descreva a finalidade deste centro de custo"/>
                 </MudItem>
+            </MudGrid>
+
+            <MudDivider Class="my-4" />
+
+            <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Settings" Size="MudBlazor.Size.Small" Class="mr-1" />
+                Configurações
+            </MudText>
+            <MudGrid Spacing="3">
                 <MudItem xs="12" sm="6">
-                    <MudSelect T="int?" Label="Gerente" @bind-Value="Model.ManagerUserId" AnchorOrigin="Origin.BottomCenter" Clearable="true">
+                    <MudSelect T="int?" 
+                               Label="Gerente Responsável" 
+                               @bind-Value="Model.ManagerUserId" 
+                               Variant="Variant.Outlined"
+                               Adornment="Adornment.Start"
+                               AdornmentIcon="@Icons.Material.Filled.Person"
+                               Clearable="true"
+                               HelperText="Selecione o responsável (opcional)"
+                               AnchorOrigin="Origin.BottomCenter">
                         @foreach (var user in Users)
                         {
                             <MudSelectItem T="int?" Value="@user.Id">@user.FullName</MudSelectItem>
@@ -23,17 +69,37 @@
                     </MudSelect>
                 </MudItem>
                 <MudItem xs="12" sm="6">
-                    <MudNumericField @bind-Value="Model.MonthlyBudget" Label="Orçamento Mensal" Format="C2" Min="0" />
+                    <MudNumericField @bind-Value="Model.MonthlyBudget" 
+                                     Label="Orçamento Mensal" 
+                                     Format="C2" 
+                                     Min="0" 
+                                     Variant="Variant.Outlined"
+                                     Adornment="Adornment.Start"
+                                     AdornmentIcon="@Icons.Material.Filled.AttachMoney"
+                                     HelperText="Limite de gastos mensal"/>
                 </MudItem>
                 <MudItem xs="12">
-                    <MudCheckBox @bind-Value="Model.IsActive" Label="Ativo" Color="MudBlazor.Color.Success" />
+                    <MudSwitch @bind-Value="Model.IsActive" 
+                               Label="Centro de Custo Ativo" 
+                               Color="MudBlazor.Color.Success" />
                 </MudItem>
             </MudGrid>
+
+            <MudDivider Class="my-4" />
+
+            <MudItem xs="12">
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
+                    <strong>Dica:</strong> Centros de custo ajudam a organizar e controlar os gastos por departamento, projeto ou área da empresa.
+                </MudAlert>
+            </MudItem>
         </MudForm>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="Cancel">Cancelar</MudButton>
-        <MudButton Color="MudBlazor.Color.Primary" OnClick="Submit">Salvar</MudButton>
+        <MudButton OnClick="Cancel" Variant="Variant.Outlined">Cancelar</MudButton>
+        <MudButton Color="MudBlazor.Color.Primary" Variant="Variant.Filled" OnClick="Submit">
+            <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-1"/>
+            Salvar Centro de Custo
+        </MudButton>
     </DialogActions>
 </MudDialog>
 

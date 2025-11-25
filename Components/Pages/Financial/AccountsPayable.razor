@@ -218,7 +218,7 @@
         parameters.Add("Categories", categories);
         parameters.Add("CostCenters", costCenters);
 
-        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var options = new DialogOptions { CloseOnEscapeKey = true };
         var dialog = DialogService.Show<AccountPayableDialog>("Nova Conta a Pagar", parameters, options);
         var result = await dialog.Result;
 
@@ -270,7 +270,7 @@
         
         parameters.Add("Model", model);
 
-        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var options = new DialogOptions { CloseOnEscapeKey = true };
         var dialog = DialogService.Show<AccountPayableDialog>("Editar Conta a Pagar", parameters, options);
         var result = await dialog.Result;
 
