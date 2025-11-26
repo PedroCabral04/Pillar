@@ -4,17 +4,37 @@
 
 @inject IDashboardService Dashboard
 
-<ChartWidget Definition="Definition" Data="_data" />
+<ChartWidget Definition="Definition" Data="_data" RefreshToken="RefreshToken" />
 
 @code {
     [Parameter] public required DashboardWidgetDefinition Definition { get; set; }
     [Parameter] public DashboardQuery? Query { get; set; }
+    [Parameter] public long RefreshToken { get; set; }
+    
     private ChartDataResponse? _data;
+    private long _lastRefreshToken = -1;
+    private DashboardQuery? _lastQuery;
 
     protected override async Task OnParametersSetAsync()
     {
-        // naive: load on parameter set. Improve with memoization by (provider, widget, query)
+        // Verifica se houve mudança real nos parâmetros
+        var queryChanged = !QueryEquals(_lastQuery, Query);
+        var tokenChanged = _lastRefreshToken != RefreshToken;
+        
+        if (!queryChanged && !tokenChanged && _data != null)
+            return;
+        
+        _lastRefreshToken = RefreshToken;
+        _lastQuery = Query;
+        
         var q = Query ?? new DashboardQuery { From = DateTime.UtcNow.AddMonths(-6), To = DateTime.UtcNow };
         _data = await Dashboard.QueryAsync(Definition, q);
+    }
+    
+    private static bool QueryEquals(DashboardQuery? a, DashboardQuery? b)
+    {
+        if (a == null && b == null) return true;
+        if (a == null || b == null) return false;
+        return a.From == b.From && a.To == b.To && a.TopN == b.TopN;
     }
 }
