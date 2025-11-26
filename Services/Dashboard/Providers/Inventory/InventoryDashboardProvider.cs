@@ -126,8 +126,8 @@ public class InventoryDashboardProvider : IDashboardWidgetProvider
 
     private async Task<ChartDataResponse> GetStockMovementsAsync(DashboardQuery query, CancellationToken ct)
     {
-        var startDate = query.From ?? DateTime.Now.AddMonths(-11).Date;
-        var endDate = query.To ?? DateTime.Now.Date;
+        var startDate = (query.From ?? DateTime.Now.AddMonths(-11).Date).ToUniversalTime();
+        var endDate = (query.To ?? DateTime.Now.Date).ToUniversalTime();
 
         var movements = await _context.StockMovements
             .Where(m => m.MovementDate >= startDate && m.MovementDate <= endDate)

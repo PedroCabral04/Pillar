@@ -77,7 +77,10 @@
         else
         {
             <MudItem xs="12">
-                <MudDropContainer T="WidgetVm" @ref="_dropContainer" Items="_widgetVms" ItemDropped="OnWidgetDropped" Class="d-flex flex-wrap" Style="gap:16px;">
+                <MudDropContainer T="WidgetVm" @ref="_dropContainer" Items="_widgetVms" ItemsSelector="@((item, dropzone) => dropzone == "dashboard-widgets")" ItemDropped="OnWidgetDropped">
+                    <ChildContent>
+                        <MudDropZone T="WidgetVm" Identifier="dashboard-widgets" Class="d-flex flex-wrap" Style="gap:16px; width:100%;" AllowReorder="true" />
+                    </ChildContent>
                     <ItemRenderer>
                         <MudItem xs="12" md="6" lg="4">
                             <div class="dashboard-widget-item" style="cursor: grab;">
@@ -153,18 +156,24 @@
         try
         {
             var layout = await Api.GetAsync<DashboardLayout>("api/dashboard/layout");
-            if (layout != null)
+            
+            if (layout != null && layout.Widgets != null && layout.Widgets.Any())
             {
                 _widgetVms = layout.Widgets
                     .OrderBy(w => w.Order)
                     .Select(wcfg =>
                     {
                         var def = _widgets.FirstOrDefault(d => d.ProviderKey == wcfg.ProviderKey && d.WidgetKey == wcfg.WidgetKey);
-                        if (def == null) return null;
+                        if (def == null) 
+                        {
+                            return null;
+                        }
 
                         // Respect role restrictions on client as well (server already filters, but keep safety)
                         if (def.RequiredRoles != null && def.RequiredRoles.Length > 0 && !_userRoles.Intersect(def.RequiredRoles).Any())
+                        {
                             return null;
+                        }
 
                         return new WidgetVm
                         {

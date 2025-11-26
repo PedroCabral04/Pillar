@@ -26,7 +26,7 @@ using erp.Services.Sales;
 using erp.Services.Seeding;
 using System.Reflection;
 using Microsoft.Extensions.Options;
-// using ApexCharts; // TODO: Instalar pacote ApexCharts se necessário
+using ApexCharts;
 
 // Prefer using DotNetEnv to load .env into environment variables in dev.
 // This keeps the bootstrap simple and delegates parsing to a tested library.
@@ -230,7 +230,7 @@ builder.Services.AddMudServices(config =>
     config.SnackbarConfiguration.ShowTransitionDuration = 200;
     config.SnackbarConfiguration.SnackbarVariant = MudBlazor.Variant.Filled;
 });
-// builder.Services.AddApexCharts(); // TODO: Instalar pacote ApexCharts se necessário
+builder.Services.AddApexCharts();
 builder.Services.AddBlazoredLocalStorage();
 
 // Antiforgery hardening (used by UseAntiforgery)
@@ -289,10 +289,19 @@ builder.Services.AddHttpClient<IApiService, ApiService>((serviceProvider, client
     {
         // Fallback for cases where HttpContext is not available
         // This should work for most dev scenarios
-        client.BaseAddress = new Uri("https://localhost:7051");
+        client.BaseAddress = new Uri("http://localhost:5121");
     }
     
     client.Timeout = TimeSpan.FromSeconds(30);
+}).ConfigurePrimaryHttpMessageHandler(() =>
+{
+    var handler = new HttpClientHandler();
+    // In development, ignore SSL certificate errors
+    if (builder.Environment.IsDevelopment())
+    {
+        handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true;
+    }
+    return handler;
 });
 
 builder.Services.AddScoped<INotificationService, NotificationService>();
@@ -303,6 +312,7 @@ builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IDashboardWidgetProvider, SalesDashboardProvider>();
 builder.Services.AddScoped<IDashboardWidgetProvider, FinanceDashboardProvider>();
 builder.Services.AddScoped<IDashboardWidgetProvider, erp.Services.Dashboard.Providers.Inventory.InventoryDashboardProvider>();
+builder.Services.AddScoped<IDashboardWidgetProvider, erp.Services.Dashboard.Providers.HR.HRDashboardProvider>();
 builder.Services.AddScoped<erp.Services.DashboardCustomization.IDashboardLayoutService, erp.Services.DashboardCustomization.DashboardLayoutService>();
 // Validation services
 builder.Services.AddScoped<erp.Services.Validation.IUserValidationService, erp.Services.Validation.UserValidationService>();
