@@ -105,3 +105,38 @@ public class PaymentMethodSalesReportItemDto
     public int TotalSales { get; set; }
     public decimal TotalAmount { get; set; }
 }
+
+/// <summary>
+/// DTO for sales heatmap report (by day of week and hour)
+/// </summary>
+public class SalesHeatmapReportDto
+{
+    public List<SalesHeatmapSeriesDto> Series { get; set; } = new();
+    public SalesHeatmapSummaryDto Summary { get; set; } = new();
+}
+
+public class SalesHeatmapSeriesDto
+{
+    public string Name { get; set; } = string.Empty; // Day name: "Segunda", "Terça", etc.
+    public List<SalesHeatmapDataPoint> Data { get; set; } = new();
+}
+
+public class SalesHeatmapDataPoint
+{
+    public string X { get; set; } = string.Empty; // Hour: "08:00", "09:00", etc.
+    public int Y { get; set; } // Sales count
+    public decimal Revenue { get; set; } // Revenue for that hour
+}
+
+public class SalesHeatmapSummaryDto
+{
+    public int TotalSales { get; set; }
+    public decimal TotalRevenue { get; set; }
+    public string PeakDay { get; set; } = string.Empty;
+    public string PeakHour { get; set; } = string.Empty;
+    public int PeakSalesCount { get; set; }
+    public decimal PeakRevenue { get; set; }
+    public string LowestDay { get; set; } = string.Empty;
+    public string LowestHour { get; set; } = string.Empty;
+    public decimal AverageSalesPerHour { get; set; }
+}

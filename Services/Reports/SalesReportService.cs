@@ -218,4 +218,104 @@ public class SalesReportService : ISalesReportService
             query = query.Where(s => s.PaymentMethod == filter.PaymentMethod);
         // ProductId only applies in product-specific report
     }
+
+    public async Task<SalesHeatmapReportDto> GenerateSalesHeatmapAsync(SalesReportFilterDto filter)
+    {
+        try
+        {
+            var salesQuery = _context.Sales
+                .Where(s => s.Status != "Cancelada")
+                .AsNoTracking()
+                .AsQueryable();
+
+            ApplyCommonFilters(ref salesQuery, filter);
+
+            var sales = await salesQuery
+                .Select(s => new { s.SaleDate, s.TotalAmount })
+                .ToListAsync();
+
+            // Brazilian Portuguese day names
+            var dayNames = new Dictionary<DayOfWeek, string>
+            {
+                { DayOfWeek.Sunday, "Domingo" },
+                { DayOfWeek.Monday, "Segunda" },
+                { DayOfWeek.Tuesday, "Terça" },
+                { DayOfWeek.Wednesday, "Quarta" },
+                { DayOfWeek.Thursday, "Quinta" },
+                { DayOfWeek.Friday, "Sexta" },
+                { DayOfWeek.Saturday, "Sábado" }
+            };
+
+            // Group by day of week and hour
+            var groupedData = sales
+                .GroupBy(s => new { DayOfWeek = s.SaleDate.DayOfWeek, Hour = s.SaleDate.Hour })
+                .Select(g => new
+                {
+                    g.Key.DayOfWeek,
+                    g.Key.Hour,
+                    SalesCount = g.Count(),
+                    Revenue = g.Sum(x => x.TotalAmount)
+                })
+                .ToList();
+
+            // Build heatmap series (one per day, starting from Monday)
+            var series = new List<SalesHeatmapSeriesDto>();
+            var orderedDays = new[] 
+            { 
+                DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, 
+                DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday 
+            };
+
+            foreach (var day in orderedDays)
+            {
+                var daySeries = new SalesHeatmapSeriesDto
+                {
+                    Name = dayNames[day],
+                    Data = new List<SalesHeatmapDataPoint>()
+                };
+
+                // Create data points for each hour (0-23)
+                for (int hour = 0; hour < 24; hour++)
+                {
+                    var hourData = groupedData.FirstOrDefault(g => g.DayOfWeek == day && g.Hour == hour);
+                    daySeries.Data.Add(new SalesHeatmapDataPoint
+                    {
+                        X = $"{hour:D2}:00",
+                        Y = hourData?.SalesCount ?? 0,
+                        Revenue = hourData?.Revenue ?? 0
+                    });
+                }
+
+                series.Add(daySeries);
+            }
+
+            // Calculate summary
+            var peakData = groupedData.OrderByDescending(g => g.SalesCount).FirstOrDefault();
+            var lowestData = groupedData.Where(g => g.SalesCount > 0).OrderBy(g => g.SalesCount).FirstOrDefault();
+
+            var summary = new SalesHeatmapSummaryDto
+            {
+                TotalSales = sales.Count,
+                TotalRevenue = sales.Sum(s => s.TotalAmount),
+                PeakDay = peakData != null ? dayNames[peakData.DayOfWeek] : "-",
+                PeakHour = peakData != null ? $"{peakData.Hour:D2}:00" : "-",
+                PeakSalesCount = peakData?.SalesCount ?? 0,
+                PeakRevenue = peakData?.Revenue ?? 0,
+                LowestDay = lowestData != null ? dayNames[lowestData.DayOfWeek] : "-",
+                LowestHour = lowestData != null ? $"{lowestData.Hour:D2}:00" : "-",
+                AverageSalesPerHour = groupedData.Any() ? (decimal)groupedData.Average(g => g.SalesCount) : 0
+            };
+
+            return new SalesHeatmapReportDto
+            {
+                Series = series,
+                Summary = summary
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao gerar mapa de calor de vendas");
+            throw;
+        }
+    }
 }

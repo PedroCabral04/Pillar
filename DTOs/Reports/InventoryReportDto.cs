@@ -106,3 +106,46 @@ public class InventoryValuationSummaryDto
     public decimal TotalPotentialProfit { get; set; }
     public decimal AverageProfitMargin { get; set; }
 }
+
+/// <summary>
+/// DTO for ABC Curve (Pareto) analysis report
+/// </summary>
+public class ABCCurveReportDto
+{
+    public List<ABCCurveItemDto> Items { get; set; } = new();
+    public ABCCurveSummaryDto Summary { get; set; } = new();
+}
+
+public class ABCCurveItemDto
+{
+    public int ProductId { get; set; }
+    public string Sku { get; set; } = string.Empty;
+    public string ProductName { get; set; } = string.Empty;
+    public string Category { get; set; } = string.Empty;
+    public int QuantitySold { get; set; }
+    public decimal TotalRevenue { get; set; }
+    public decimal RevenuePercentage { get; set; }
+    public decimal CumulativePercentage { get; set; }
+    public string Classification { get; set; } = string.Empty; // A, B, C
+}
+
+public class ABCCurveSummaryDto
+{
+    public int TotalProducts { get; set; }
+    public decimal TotalRevenue { get; set; }
+    
+    // Class A: Products contributing to first 80% of revenue
+    public int ClassACount { get; set; }
+    public decimal ClassARevenue { get; set; }
+    public decimal ClassAPercentage { get; set; }
+    
+    // Class B: Products contributing to next 15% of revenue (80-95%)
+    public int ClassBCount { get; set; }
+    public decimal ClassBRevenue { get; set; }
+    public decimal ClassBPercentage { get; set; }
+    
+    // Class C: Products contributing to remaining 5% of revenue (95-100%)
+    public int ClassCCount { get; set; }
+    public decimal ClassCRevenue { get; set; }
+    public decimal ClassCPercentage { get; set; }
+}

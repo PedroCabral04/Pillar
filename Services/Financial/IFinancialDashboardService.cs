@@ -4,5 +4,5 @@ namespace erp.Services.Financial;
 
 public interface IFinancialDashboardService
 {
-    Task<FinancialDashboardDto> GetDashboardDataAsync(DateTime? startDate = null, DateTime? endDate = null);
+    Task<FinancialDashboardDto> GetDashboardDataAsync(DateTime? startDate = null, DateTime? endDate = null, decimal initialBalance = 0);
 }

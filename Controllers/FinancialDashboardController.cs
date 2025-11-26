@@ -22,11 +22,11 @@ public class FinancialDashboardController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<FinancialDashboardDto>> GetDashboardData()
+    public async Task<ActionResult<FinancialDashboardDto>> GetDashboardData([FromQuery] decimal initialBalance = 0)
     {
         try
         {
-            var data = await _dashboardService.GetDashboardDataAsync();
+            var data = await _dashboardService.GetDashboardDataAsync(initialBalance: initialBalance);
             return Ok(data);
         }
         catch (Exception ex)

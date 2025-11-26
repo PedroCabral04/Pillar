@@ -6,6 +6,11 @@ namespace erp.Services.Reports;
 
 public class InventoryReportService : IInventoryReportService
 {
+    // ABC Curve (Pareto) analysis thresholds
+    private const decimal ClassAThreshold = 80m;  // First 80% of revenue
+    private const decimal ClassBThreshold = 95m;  // 80% to 95% of revenue
+    // Class C: remaining 5% (95% to 100%)
+
     private readonly ApplicationDbContext _context;
     private readonly ILogger<InventoryReportService> _logger;
 
@@ -215,6 +220,124 @@ public class InventoryReportService : IInventoryReportService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Erro ao gerar relatório de avaliação de estoque");
+            throw;
+        }
+    }
+
+    public async Task<ABCCurveReportDto> GenerateABCCurveReportAsync(InventoryReportFilterDto filter)
+    {
+        try
+        {
+            // Get sales data grouped by product
+            var salesQuery = _context.SaleItems
+                .Include(si => si.Product)
+                    .ThenInclude(p => p.Category)
+                .Include(si => si.Sale)
+                .Where(si => si.Sale.Status != "Cancelada")
+                .AsQueryable();
+
+            // Apply date filters
+            if (filter.StartDate.HasValue)
+            {
+                var startDate = filter.StartDate.Value.ToUniversalTime();
+                salesQuery = salesQuery.Where(si => si.Sale.SaleDate >= startDate);
+            }
+
+            if (filter.EndDate.HasValue)
+            {
+                var endDate = filter.EndDate.Value.ToUniversalTime();
+                salesQuery = salesQuery.Where(si => si.Sale.SaleDate <= endDate);
+            }
+
+            if (filter.CategoryId.HasValue)
+            {
+                salesQuery = salesQuery.Where(si => si.Product.CategoryId == filter.CategoryId.Value);
+            }
+
+            // Group by product and calculate revenue
+            var productSales = await salesQuery
+                .GroupBy(si => new 
+                { 
+                    si.ProductId, 
+                    si.Product.Sku, 
+                    si.Product.Name, 
+                    CategoryName = si.Product.Category != null ? si.Product.Category.Name : "Sem categoria" 
+                })
+                .Select(g => new
+                {
+                    g.Key.ProductId,
+                    g.Key.Sku,
+                    g.Key.Name,
+                    g.Key.CategoryName,
+                    QuantitySold = (int)g.Sum(si => si.Quantity),
+                    TotalRevenue = g.Sum(si => si.Total)
+                })
+                .OrderByDescending(x => x.TotalRevenue)
+                .ToListAsync();
+
+            var totalRevenue = productSales.Sum(x => x.TotalRevenue);
+
+            // Calculate percentages and classifications
+            var items = new List<ABCCurveItemDto>();
+            decimal cumulativePercentage = 0;
+
+            foreach (var product in productSales)
+            {
+                var revenuePercentage = totalRevenue > 0 ? (product.TotalRevenue / totalRevenue) * 100 : 0;
+                cumulativePercentage += revenuePercentage;
+
+                // Classify based on cumulative percentage thresholds
+                string classification;
+                if (cumulativePercentage <= ClassAThreshold)
+                    classification = "A";
+                else if (cumulativePercentage <= ClassBThreshold)
+                    classification = "B";
+                else
+                    classification = "C";
+
+                items.Add(new ABCCurveItemDto
+                {
+                    ProductId = product.ProductId,
+                    Sku = product.Sku,
+                    ProductName = product.Name,
+                    Category = product.CategoryName,
+                    QuantitySold = product.QuantitySold,
+                    TotalRevenue = product.TotalRevenue,
+                    RevenuePercentage = revenuePercentage,
+                    CumulativePercentage = cumulativePercentage,
+                    Classification = classification
+                });
+            }
+
+            // Calculate summary
+            var classAItems = items.Where(i => i.Classification == "A").ToList();
+            var classBItems = items.Where(i => i.Classification == "B").ToList();
+            var classCItems = items.Where(i => i.Classification == "C").ToList();
+
+            var summary = new ABCCurveSummaryDto
+            {
+                TotalProducts = items.Count,
+                TotalRevenue = totalRevenue,
+                ClassACount = classAItems.Count,
+                ClassARevenue = classAItems.Sum(i => i.TotalRevenue),
+                ClassAPercentage = totalRevenue > 0 ? (classAItems.Sum(i => i.TotalRevenue) / totalRevenue) * 100 : 0,
+                ClassBCount = classBItems.Count,
+                ClassBRevenue = classBItems.Sum(i => i.TotalRevenue),
+                ClassBPercentage = totalRevenue > 0 ? (classBItems.Sum(i => i.TotalRevenue) / totalRevenue) * 100 : 0,
+                ClassCCount = classCItems.Count,
+                ClassCRevenue = classCItems.Sum(i => i.TotalRevenue),
+                ClassCPercentage = totalRevenue > 0 ? (classCItems.Sum(i => i.TotalRevenue) / totalRevenue) * 100 : 0
+            };
+
+            return new ABCCurveReportDto
+            {
+                Items = items,
+                Summary = summary
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao gerar relatório de curva ABC");
             throw;
         }
     }

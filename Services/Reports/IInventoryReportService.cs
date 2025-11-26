@@ -7,4 +7,5 @@ public interface IInventoryReportService
     Task<StockLevelsReportDto> GenerateStockLevelsReportAsync(InventoryReportFilterDto filter);
     Task<StockMovementReportDto> GenerateStockMovementReportAsync(InventoryReportFilterDto filter);
     Task<InventoryValuationReportDto> GenerateInventoryValuationReportAsync(InventoryReportFilterDto filter);
+    Task<ABCCurveReportDto> GenerateABCCurveReportAsync(InventoryReportFilterDto filter);
 }

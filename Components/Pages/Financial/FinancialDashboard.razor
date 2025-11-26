@@ -5,10 +5,22 @@
 <PageTitle>Dashboard Financeiro - Pillar ERP</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="mt-4">
-    <MudText Typo="Typo.h4" Class="mb-4">
-        <MudIcon Icon="@Icons.Material.Filled.Dashboard" Class="mr-2" />
-        Dashboard Financeiro
-    </MudText>
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudText Typo="Typo.h4">
+            <MudIcon Icon="@Icons.Material.Filled.Dashboard" Class="mr-2" />
+            Dashboard Financeiro
+        </MudText>
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudNumericField T="decimal" @bind-Value="_initialBalance" Label="Saldo Inicial (R$)" 
+                             Variant="Variant.Outlined" Format="N2" Style="width: 180px;"
+                             Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.AttachMoney"
+                             HelperText="Saldo atual em caixa" />
+            <MudButton Variant="Variant.Filled" Color="MudBlazor.Color.Primary" OnClick="LoadDashboardData" 
+                       StartIcon="@Icons.Material.Filled.Refresh">
+                Atualizar
+            </MudButton>
+        </MudStack>
+    </MudStack>
 
     @if (isLoading)
     {
@@ -86,6 +98,67 @@
                 </MudPaper>
             </MudItem>
 
+            <!-- Cash Flow Alerts Banner -->
+            @if (dashboardData.CashFlowAlerts.Any())
+            {
+                <MudItem xs="12">
+                    <MudAlert Severity="@(dashboardData.CashFlowAlerts.Any(a => a.Severity == "Critical") ? Severity.Error : Severity.Warning)" 
+                              Variant="Variant.Filled" Dense="true" Class="mb-0">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                            <MudStack>
+                                <MudText Typo="Typo.subtitle1">
+                                    <MudIcon Icon="@Icons.Material.Filled.Warning" Class="mr-1" Size="Size.Small" />
+                                    Alerta de Fluxo de Caixa: @dashboardData.CashFlowAlerts.Count dia(s) com saldo negativo projetado
+                                </MudText>
+                                <MudText Typo="Typo.body2">
+                                    Primeiro dia crítico: @dashboardData.CashFlowAlerts.First().Date.ToString("dd/MM/yyyy") 
+                                    (Saldo projetado: @dashboardData.CashFlowAlerts.First().ProjectedBalance.ToString("C2"))
+                                </MudText>
+                            </MudStack>
+                            <MudButton Variant="Variant.Text" Color="MudBlazor.Color.Inherit" Size="Size.Small"
+                                       OnClick="() => _showAlertDetails = !_showAlertDetails">
+                                @(_showAlertDetails ? "Ocultar" : "Ver Detalhes")
+                            </MudButton>
+                        </MudStack>
+                    </MudAlert>
+                </MudItem>
+                
+                @if (_showAlertDetails)
+                {
+                    <MudItem xs="12">
+                        <MudPaper Class="pa-4" Elevation="2">
+                            <MudText Typo="Typo.subtitle1" Class="mb-2">Dias com Saldo Negativo Projetado</MudText>
+                            <MudSimpleTable Dense="true" Hover="true" Style="overflow-x: auto;">
+                                <thead>
+                                    <tr>
+                                        <th>Data</th>
+                                        <th>Saldo Projetado</th>
+                                        <th>Déficit</th>
+                                        <th>Severidade</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var alert in dashboardData.CashFlowAlerts.Take(10))
+                                    {
+                                        <tr>
+                                            <td>@alert.Date.ToString("dd/MM/yyyy (ddd)")</td>
+                                            <td style="color: #F44336; font-weight: bold;">@alert.ProjectedBalance.ToString("C2")</td>
+                                            <td>@alert.Shortfall.ToString("C2")</td>
+                                            <td>
+                                                <MudChip T="string" Size="Size.Small" 
+                                                         Color="@(alert.Severity == "Critical" ? MudBlazor.Color.Error : MudBlazor.Color.Warning)">
+                                                    @(alert.Severity == "Critical" ? "Crítico" : "Atenção")
+                                                </MudChip>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </MudSimpleTable>
+                        </MudPaper>
+                    </MudItem>
+                }
+            }
+
             <!-- Charts Row -->
             <MudItem xs="12" md="8">
                 <MudPaper Class="pa-4" Elevation="3">
@@ -110,6 +183,14 @@
                                              XValue="@(e => e.Date.ToString("dd/MM"))"
                                              YValue="@(e => e.Expense)"
                                              Color="#F44336" />
+
+                            <ApexPointSeries TItem="CashFlowItemDto"
+                                             Items="dashboardData.CashFlowProjection"
+                                             Name="Saldo Acumulado"
+                                             SeriesType="SeriesType.Line"
+                                             XValue="@(e => e.Date.ToString("dd/MM"))"
+                                             YValue="@(e => e.CumulativeBalance)"
+                                             Color="#2196F3" />
                         </ApexChart>
                     }
                     else
@@ -189,6 +270,8 @@
 
     private FinancialDashboardDto? dashboardData;
     private bool isLoading = false;
+    private decimal _initialBalance = 0;
+    private bool _showAlertDetails = false;
 
     private ApexChartOptions<CashFlowItemDto> options = new();
     private ApexChartOptions<AgingListItemDto> donutOptions = new();
@@ -222,11 +305,45 @@
         {
             new YAxis
             {
+                Title = new AxisTitle { Text = "Receitas / Despesas (R$)" },
                 Labels = new YAxisLabels
                 {
                     Formatter = @"function (value) {
                         return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
                     }"
+                }
+            },
+            new YAxis
+            {
+                Opposite = true,
+                Title = new AxisTitle { Text = "Saldo Acumulado (R$)" },
+                Labels = new YAxisLabels
+                {
+                    Formatter = @"function (value) {
+                        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+                    }"
+                }
+            }
+        };
+        options.Stroke = new Stroke
+        {
+            Width = new List<double> { 0, 0, 3 },
+            Curve = Curve.Smooth
+        };
+        options.Annotations = new Annotations
+        {
+            Yaxis = new List<AnnotationsYAxis>
+            {
+                new AnnotationsYAxis
+                {
+                    Y = 0,
+                    BorderColor = "#FF5722",
+                    StrokeDashArray = 4,
+                    Label = new Label 
+                    { 
+                        Text = "Saldo Zero",
+                        Style = new Style { Background = "#FF5722", Color = "#fff" }
+                    }
                 }
             }
         };
@@ -274,7 +391,7 @@
         isLoading = true;
         try
         {
-            dashboardData = await ApiService.GetAsync<FinancialDashboardDto>("api/financial-dashboard");
+            dashboardData = await ApiService.GetAsync<FinancialDashboardDto>($"api/financial-dashboard?initialBalance={_initialBalance}");
         }
         catch (Exception ex)
         {
