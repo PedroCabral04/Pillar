@@ -170,7 +170,7 @@
             { x => x.IsEdit, false }
         };
 
-        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium};
         var dialog = await DialogService.ShowAsync<DepartmentDialog>("Novo Departamento", parameters, options);
         var result = await dialog.Result;
 
@@ -189,7 +189,7 @@
             { x => x.DepartmentId, department.Id }
         };
 
-        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = false };
         var dialog = await DialogService.ShowAsync<DepartmentDialog>("Editar Departamento", parameters, options);
         var result = await dialog.Result;
 

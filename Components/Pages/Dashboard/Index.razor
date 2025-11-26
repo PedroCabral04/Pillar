@@ -18,78 +18,84 @@
 @inject ISnackbar Snackbar
 @inject PreferenceService PreferenceService
 
-<MudStack Spacing="3" Class="dashboard-section">
+<PageTitle>Dashboard - Pillar ERP</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
     <!-- Greeting Section -->
-    <MudPaper Class="pa-4" Elevation="2">
-        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-            <MudStack Spacing="1">
-                <MudText Typo="Typo.h4">@_greeting, @_userName!</MudText>
+    <MudPaper Class="pa-4 mb-4" Elevation="2">
+        <MudGrid>
+            <MudItem xs="12" sm="8">
+                <MudText Typo="Typo.h4" Class="mb-1">@_greeting, @_userName!</MudText>
                 <MudText Typo="Typo.body2" Color="Color.Secondary">@DateTime.Now.ToString("dddd, dd 'de' MMMM 'de' yyyy")</MudText>
-            </MudStack>
-            <MudIcon Icon="@_greetingIcon" Size="Size.Large" Color="Color.Primary" />
-        </MudStack>
+            </MudItem>
+            <MudItem xs="12" sm="4" Class="d-flex align-center justify-end">
+                <MudIcon Icon="@_greetingIcon" Size="Size.Large" Color="Color.Primary" />
+            </MudItem>
+        </MudGrid>
     </MudPaper>
 
     <!-- Date Range Filters -->
-    <MudPaper Class="pa-3">
-        <MudGrid>
-            <MudItem xs="12" sm="6" md="4">
+    <MudPaper Class="pa-4 mb-4" Elevation="1">
+        <MudGrid AlignItems="MudBlazor.AlignItems.Center">
+            <MudItem xs="12" md="4">
                 <MudDateRangePicker @bind-DateRange="_range" 
-                                    Label="Período Personalizado" 
-                                    Dense="true"
-                                    Variant="Variant.Outlined" />
+                                    Label="Período" 
+                                    Variant="Variant.Outlined"
+                                    DateFormat="dd/MM/yyyy" />
             </MudItem>
-            <MudItem xs="12" sm="6" md="8">
-                <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Style="height: 100%;">
-                    <MudText Typo="Typo.body2" Style="white-space: nowrap;">Presets:</MudText>
-                    <MudChipSet T="string" @bind-SelectedChip="_selectedPreset" Filter="true" Mandatory="false">
-                        <MudChip T="string" Text="Hoje" Color="Color.Primary" Value="@("today")" OnClick="() => ApplyPreset(DatePreset.Today)" />
-                        <MudChip T="string" Text="Ontem" Color="Color.Primary" Value="@("yesterday")" OnClick="() => ApplyPreset(DatePreset.Yesterday)" />
-                        <MudChip T="string" Text="Últimos 7 dias" Color="Color.Primary" Value="@("week")" OnClick="() => ApplyPreset(DatePreset.Last7Days)" />
-                        <MudChip T="string" Text="Últimos 30 dias" Color="Color.Primary" Value="@("month")" OnClick="() => ApplyPreset(DatePreset.Last30Days)" />
-                        <MudChip T="string" Text="Este mês" Color="Color.Primary" Value="@("thisMonth")" OnClick="() => ApplyPreset(DatePreset.ThisMonth)" />
-                        <MudChip T="string" Text="Último mês" Color="Color.Primary" Value="@("lastMonth")" OnClick="() => ApplyPreset(DatePreset.LastMonth)" />
-                    </MudChipSet>
+            <MudItem xs="12" md="8">
+                <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center" Class="flex-wrap">
+                    <MudChip T="string" Text="Hoje" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined" OnClick="() => ApplyPreset(DatePreset.Today)" />
+                    <MudChip T="string" Text="Ontem" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined" OnClick="() => ApplyPreset(DatePreset.Yesterday)" />
+                    <MudChip T="string" Text="7 dias" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined" OnClick="() => ApplyPreset(DatePreset.Last7Days)" />
+                    <MudChip T="string" Text="30 dias" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined" OnClick="() => ApplyPreset(DatePreset.Last30Days)" />
+                    <MudChip T="string" Text="Este mês" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined" OnClick="() => ApplyPreset(DatePreset.ThisMonth)" />
+                    <MudChip T="string" Text="Mês anterior" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined" OnClick="() => ApplyPreset(DatePreset.LastMonth)" />
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.Refresh" OnClick="RefreshWidgets" Class="ml-2">
+                        Atualizar
+                    </MudButton>
                 </MudStack>
             </MudItem>
         </MudGrid>
     </MudPaper>
 
-    <MudGrid Class="mt-2" GutterSize="GutterSize.Small">
-        @if (_widgetVms is null)
-        {
-            @for (var i = 0; i < 4; i++)
+    <!-- Widgets Grid -->
+    @if (_widgetVms is null)
+    {
+        <MudGrid Spacing="3">
+            @for (var i = 0; i < 6; i++)
             {
                 <MudItem xs="12" md="6" lg="4">
-                    <MudSkeleton Height="320px" Width="100%" />
+                    <MudPaper Class="pa-4" Elevation="1">
+                        <MudSkeleton Width="60%" Height="24px" Class="mb-2" />
+                        <MudSkeleton Width="100%" Height="280px" />
+                    </MudPaper>
                 </MudItem>
             }
-        }
-        else if (!_widgetVms.Any())
-        {
-            <MudItem xs="12">
-                <MudPaper Class="pa-4">
-                    <MudText Typo="Typo.h6">Nenhum widget disponível</MudText>
-                    <MudText Typo="Typo.body2" Color="Color.Secondary">Adicione widgets ao seu painel ou peça ao administrador para liberar widgets para seu papel.</MudText>
-                </MudPaper>
-            </MudItem>
-        }
-        else
-        {
-            <MudItem xs="12">
-                <MudDropContainer T="WidgetVm" @ref="_dropContainer" Items="_widgetVms" ItemDropped="OnWidgetDropped" Class="d-flex flex-wrap" Style="gap:16px;">
-                    <ItemRenderer>
-                        <MudItem xs="12" md="6" lg="4">
-                            <div class="dashboard-widget-item" style="cursor: grab;">
-                                <erp.Components.Shared.Charts.WidgetHost Definition="context.Definition" Query="context.Query" />
-                            </div>
-                        </MudItem>
-                    </ItemRenderer>
-                </MudDropContainer>
-            </MudItem>
-        }
-    </MudGrid>
-</MudStack>
+        </MudGrid>
+    }
+    else if (!_widgetVms.Any())
+    {
+        <MudPaper Class="pa-6 text-center" Elevation="1">
+            <MudIcon Icon="@Icons.Material.Filled.Dashboard" Size="Size.Large" Color="Color.Secondary" Class="mb-3" />
+            <MudText Typo="Typo.h5" Class="mb-2">Nenhum widget disponível</MudText>
+            <MudText Typo="Typo.body1" Color="Color.Secondary">
+                Adicione widgets ao seu painel ou peça ao administrador para liberar widgets para seu papel.
+            </MudText>
+        </MudPaper>
+    }
+    else
+    {
+        <MudGrid Spacing="3">
+            @foreach (var widget in _widgetVms)
+            {
+                <MudItem xs="12" md="6" lg="4">
+                    <erp.Components.Shared.Charts.WidgetHost Definition="widget.Definition" Query="widget.Query" RefreshToken="_refreshToken" />
+                </MudItem>
+            }
+        </MudGrid>
+    }
+</MudContainer>
 
 <!-- Onboarding Tour -->
 <erp.Components.Shared.OnboardingTour @ref="_tourComponent"
@@ -100,7 +106,8 @@
     private List<DashboardWidgetDefinition>? _widgets;
     private List<WidgetVm>? _widgetVms;
     private DateRange _range = new(DateTime.Today.AddMonths(-1), DateTime.Today);
-    private MudChip<string>? _selectedPreset;
+    private long _refreshToken = 0;
+    private bool _isRefreshing = false;
     
     private string _greeting = "";
     private string _greetingIcon = Icons.Material.Filled.WbSunny;
@@ -109,11 +116,17 @@
     private string[] _userRoles = Array.Empty<string>();
     
     private erp.Components.Shared.OnboardingTour? _tourComponent;
-    private MudDropContainer<WidgetVm>? _dropContainer;
 
     protected override async Task OnInitializedAsync()
     {
-        // Set greeting based on time of day
+        SetGreeting();
+        await LoadUserInfo();
+        await LoadWidgets();
+        await InitializeTourAsync();
+    }
+    
+    private void SetGreeting()
+    {
         var hour = DateTime.Now.Hour;
         if (hour >= 5 && hour < 12)
         {
@@ -130,8 +143,10 @@
             _greeting = "Boa noite";
             _greetingIcon = Icons.Material.Filled.DarkMode;
         }
-
-        // Get user info
+    }
+    
+    private async Task LoadUserInfo()
+    {
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
         if (user.Identity?.IsAuthenticated == true)
@@ -144,16 +159,20 @@
             _userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
             _userRoles = user.FindAll(ClaimTypes.Role).Select(c => c.Value).ToArray();
         }
-
-        // Load dashboard widgets (already filtered by server by role)
-        var list = await Dashboard.GetWidgetsAsync();
-        _widgets = list.ToList();
-
-        // Load user's saved layout and build VM list (merge layout + definitions)
+    }
+    
+    private async Task LoadWidgets()
+    {
         try
         {
+            // Load dashboard widgets (already filtered by server by role)
+            var list = await Dashboard.GetWidgetsAsync();
+            _widgets = list.ToList();
+
+            // Load user's saved layout and build VM list
             var layout = await Api.GetAsync<DashboardLayout>("api/dashboard/layout");
-            if (layout != null)
+            
+            if (layout?.Widgets?.Any() == true)
             {
                 _widgetVms = layout.Widgets
                     .OrderBy(w => w.Order)
@@ -162,8 +181,8 @@
                         var def = _widgets.FirstOrDefault(d => d.ProviderKey == wcfg.ProviderKey && d.WidgetKey == wcfg.WidgetKey);
                         if (def == null) return null;
 
-                        // Respect role restrictions on client as well (server already filters, but keep safety)
-                        if (def.RequiredRoles != null && def.RequiredRoles.Length > 0 && !_userRoles.Intersect(def.RequiredRoles).Any())
+                        // Respect role restrictions on client as well
+                        if (def.RequiredRoles?.Length > 0 && !_userRoles.Intersect(def.RequiredRoles).Any())
                             return null;
 
                         return new WidgetVm
@@ -180,27 +199,61 @@
             else
             {
                 // Fallback: build from available definitions
-                _widgetVms = _widgets.Select(d => new WidgetVm { Definition = d, Config = new WidgetConfiguration { WidgetId = $"{d.ProviderKey}_{d.WidgetKey}_default", ProviderKey = d.ProviderKey, WidgetKey = d.WidgetKey, Order = 0, Row = 0, Column = 0 }, Query = new DashboardQuery { From = _range.Start, To = _range.End } }).ToList();
+                _widgetVms = _widgets.Select(d => new WidgetVm 
+                { 
+                    Definition = d, 
+                    Config = new WidgetConfiguration 
+                    { 
+                        WidgetId = $"{d.ProviderKey}_{d.WidgetKey}_default", 
+                        ProviderKey = d.ProviderKey, 
+                        WidgetKey = d.WidgetKey, 
+                        Order = 0 
+                    }, 
+                    Query = new DashboardQuery { From = _range.Start, To = _range.End } 
+                }).ToList();
+            }
+
+            // Filter by user preferences if any are selected
+            var preferredWidgets = PreferenceService.CurrentPreferences.Dashboard.Widgets;
+            if (preferredWidgets?.Any() == true)
+            {
+                _widgetVms = _widgetVms?
+                    .Where(vm => preferredWidgets.Contains(vm.Definition.Title))
+                    .ToList();
             }
         }
         catch (Exception ex)
         {
             // If layout endpoint fails, still show definitions
-            _widgetVms = _widgets.Select(d => new WidgetVm { Definition = d, Config = new WidgetConfiguration { WidgetId = $"{d.ProviderKey}_{d.WidgetKey}_default", ProviderKey = d.ProviderKey, WidgetKey = d.WidgetKey, Order = 0, Row = 0, Column = 0 }, Query = new DashboardQuery { From = _range.Start, To = _range.End } }).ToList();
-            Console.WriteLine($"Warning loading dashboard layout: {ex.Message}");
+            if (_widgets != null)
+            {
+                _widgetVms = _widgets.Select(d => new WidgetVm 
+                { 
+                    Definition = d, 
+                    Config = new WidgetConfiguration 
+                    { 
+                        WidgetId = $"{d.ProviderKey}_{d.WidgetKey}_default", 
+                        ProviderKey = d.ProviderKey, 
+                        WidgetKey = d.WidgetKey, 
+                        Order = 0 
+                    }, 
+                    Query = new DashboardQuery { From = _range.Start, To = _range.End } 
+                }).ToList();
+            }
+            Console.WriteLine($"Warning loading dashboard: {ex.Message}");
         }
-
-        // Filter by user preferences if any are selected
-        var preferredWidgets = PreferenceService.CurrentPreferences.Dashboard.Widgets;
-        if (preferredWidgets != null && preferredWidgets.Any())
-        {
-            _widgetVms = _widgetVms?
-                .Where(vm => preferredWidgets.Contains(vm.Definition.Title))
-                .ToList();
-        }
+    }
+    
+    private async Task RefreshWidgets()
+    {
+        _widgetVms = null;
+        StateHasChanged();
         
-        // Check if should show dashboard tour
-        await InitializeTourAsync();
+        // Update query dates for all widgets
+        await LoadWidgets();
+        StateHasChanged();
+        
+        Snackbar.Add("Dashboard atualizado!", Severity.Success);
     }
     
     private async Task InitializeTourAsync()
@@ -214,26 +267,15 @@
             
         var progress = await OnboardingService.GetUserProgressAsync(_userId, "dashboard-tour");
         
-        // Mostra o tour se não foi completado ainda
         if (progress == null || !progress.IsCompleted)
         {
-            // Pequeno delay para garantir que a página foi renderizada
             await Task.Delay(500);
             await _tourComponent.StartTour("dashboard-tour");
         }
     }
     
-    private async Task HandleTourComplete(string tourId)
-    {
-        // Tour completion is already handled by the OnboardingTour component
-        await Task.CompletedTask;
-    }
-    
-    private async Task HandleTourSkip(string tourId)
-    {
-        // Tour skip is already handled by the OnboardingTour component
-        await Task.CompletedTask;
-    }
+    private Task HandleTourComplete(string tourId) => Task.CompletedTask;
+    private Task HandleTourSkip(string tourId) => Task.CompletedTask;
 
     private enum DatePreset
     {
@@ -245,10 +287,12 @@
         LastMonth
     }
 
-    private void ApplyPreset(DatePreset preset)
+    private async Task ApplyPreset(DatePreset preset)
     {
+        if (_isRefreshing) return;
+        
         var today = DateTime.Today;
-        _range = preset switch
+        var newRange = preset switch
         {
             DatePreset.Today => new DateRange(today, today),
             DatePreset.Yesterday => new DateRange(today.AddDays(-1), today.AddDays(-1)),
@@ -261,32 +305,34 @@
             ),
             _ => _range
         };
-        StateHasChanged();
-    }
-
-    private async Task OnWidgetDropped(MudItemDropInfo<WidgetVm> info)
-    {
-        if (info?.Item is null || _widgetVms is null)
+        
+        // Se o range não mudou, não faz nada
+        if (newRange.Start == _range.Start && newRange.End == _range.End)
             return;
-
-        try
+            
+        _range = newRange;
+        await UpdateWidgetQueries();
+    }
+    
+    private async Task UpdateWidgetQueries()
+    {
+        if (_widgetVms == null) return;
+        
+        _isRefreshing = true;
+        
+        // Criar novos objetos Query para forçar a detecção de mudança
+        foreach (var vm in _widgetVms)
         {
-            // Build new order from current VM list
-            var orderList = _widgetVms.Select(v => v.Config.WidgetId).ToList();
-            var resp = await Api.PostAsJsonAsync("api/dashboard/layout/widgets/reorder", orderList);
-            if (!resp.IsSuccessStatusCode)
-            {
-                Snackbar?.Add("Erro ao reordenar widgets. As alterações não foram salvas.", Severity.Warning);
-            }
-            else
-            {
-                Snackbar?.Add("Ordem do painel atualizada.", Severity.Success);
-            }
+            vm.Query = new DashboardQuery { From = _range.Start, To = _range.End };
         }
-        catch (Exception ex)
-        {
-            Snackbar?.Add($"Erro ao salvar ordem: {ex.Message}", Severity.Error);
-        }
+        
+        // Incrementar token para forçar refresh nos WidgetHost
+        _refreshToken++;
+        StateHasChanged();
+        
+        // Pequeno delay para evitar múltiplos cliques rápidos
+        await Task.Delay(100);
+        _isRefreshing = false;
     }
 
     private class WidgetVm

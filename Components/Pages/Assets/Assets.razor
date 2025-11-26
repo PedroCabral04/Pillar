@@ -211,8 +211,8 @@
         var options = new DialogOptions
         {
             CloseOnEscapeKey = true,
-            MaxWidth = MaxWidth.Large,
-            FullWidth = true
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = false
         };
 
         var dialog = await DialogService.ShowAsync<AssetForm>("Adicionar Ativo", options);
@@ -235,8 +235,8 @@
         var options = new DialogOptions
         {
             CloseOnEscapeKey = true,
-            MaxWidth = MaxWidth.Large,
-            FullWidth = true
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = false
         };
 
         var dialog = await DialogService.ShowAsync<AssetForm>("Editar Ativo", parameters, options);

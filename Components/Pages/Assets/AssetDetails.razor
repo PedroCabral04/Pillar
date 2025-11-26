@@ -311,7 +311,7 @@ else if (_asset != null)
         var options = new DialogOptions 
         { 
             MaxWidth = MaxWidth.Medium, 
-            FullWidth = true 
+            FullWidth = false 
         };
 
         var dialog = await DialogService.ShowAsync<TransferRequestDialog>(
@@ -338,7 +338,7 @@ else if (_asset != null)
         var options = new DialogOptions 
         { 
             MaxWidth = MaxWidth.Medium, 
-            FullWidth = true 
+            FullWidth = false 
         };
 
         var dialog = await DialogService.ShowAsync<TransferApprovalDialog>(

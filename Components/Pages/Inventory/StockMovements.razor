@@ -219,8 +219,8 @@
         var options = new DialogOptions 
         { 
             CloseOnEscapeKey = true,
-            MaxWidth = MaxWidth.Large,
-            FullWidth = true
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = false
         };
         
         var dialog = await DialogService.ShowAsync<CreateStockMovementDialog>("Nova Movimentação", options);

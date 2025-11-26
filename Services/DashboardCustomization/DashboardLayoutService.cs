@@ -1,5 +1,8 @@
+using erp.Data;
 using erp.DTOs.Dashboard;
+using erp.Models.Dashboard;
 using erp.Services.Dashboard;
+using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
 namespace erp.Services.DashboardCustomization;
@@ -15,45 +18,90 @@ public interface IDashboardLayoutService
     Task ResetToDefaultAsync(string userId);
     List<WidgetCatalogItem> GetAvailableWidgets(string[] userRoles);
     Task<string[]?> GetWidgetRolesAsync(string providerKey, string widgetKey);
-    Task SetWidgetRolesAsync(string providerKey, string widgetKey, string[]? roles);
+    Task SetWidgetRolesAsync(string providerKey, string widgetKey, string[]? roles, int? modifiedByUserId = null);
 }
 
 public class DashboardLayoutService : IDashboardLayoutService
 {
+    private readonly ApplicationDbContext _context;
     private readonly IDashboardRegistry _registry;
-    private readonly Dictionary<string, DashboardLayout> _layoutCache = new();
-    private readonly Dictionary<string, string[]?> _widgetRoleOverrides = new(StringComparer.OrdinalIgnoreCase);
-    private readonly string _overridesFilePath;
-    private readonly object _fileLock = new();
-
-    public DashboardLayoutService(IDashboardRegistry registry)
+    private static readonly JsonSerializerOptions _jsonOptions = new()
     {
+        PropertyNameCaseInsensitive = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
+    public DashboardLayoutService(ApplicationDbContext context, IDashboardRegistry registry)
+    {
+        _context = context;
         _registry = registry;
-        // Persist role overrides to a simple JSON file next to the app base directory
-        var baseDir = AppContext.BaseDirectory ?? Directory.GetCurrentDirectory();
-        _overridesFilePath = Path.Combine(baseDir, "widgetRoleOverrides.json");
-        LoadOverridesFromFile();
     }
 
-    public Task<DashboardLayout> GetUserLayoutAsync(string userId)
+    public async Task<DashboardLayout> GetUserLayoutAsync(string userId)
     {
-        if (_layoutCache.TryGetValue(userId, out var layout))
+        if (!int.TryParse(userId, out var userIdInt))
         {
-            return Task.FromResult(layout);
+            return CreateDefaultLayout(userId);
         }
 
-        // Create default layout
-        layout = CreateDefaultLayout(userId);
-        _layoutCache[userId] = layout;
-        return Task.FromResult(layout);
+        var dbLayout = await _context.UserDashboardLayouts
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.UserId == userIdInt);
+
+        if (dbLayout == null)
+        {
+            // Create default layout and save to database
+            var defaultLayout = CreateDefaultLayout(userId);
+            await SaveUserLayoutAsync(userId, defaultLayout);
+            return defaultLayout;
+        }
+
+        var widgets = DeserializeWidgets(dbLayout.LayoutJson);
+        
+        return new DashboardLayout
+        {
+            UserId = userId,
+            LayoutType = dbLayout.LayoutType,
+            Columns = dbLayout.Columns,
+            Widgets = widgets,
+            LastModified = dbLayout.LastModified
+        };
     }
 
-    public Task SaveUserLayoutAsync(string userId, DashboardLayout layout)
+    public async Task SaveUserLayoutAsync(string userId, DashboardLayout layout)
     {
-        layout.UserId = userId;
-        layout.LastModified = DateTime.UtcNow;
-        _layoutCache[userId] = layout;
-        return Task.CompletedTask;
+        if (!int.TryParse(userId, out var userIdInt))
+        {
+            return;
+        }
+
+        var dbLayout = await _context.UserDashboardLayouts
+            .FirstOrDefaultAsync(x => x.UserId == userIdInt);
+
+        var widgetsJson = JsonSerializer.Serialize(layout.Widgets, _jsonOptions);
+
+        if (dbLayout == null)
+        {
+            dbLayout = new UserDashboardLayout
+            {
+                UserId = userIdInt,
+                LayoutJson = widgetsJson,
+                LayoutType = layout.LayoutType,
+                Columns = layout.Columns,
+                CreatedAt = DateTime.UtcNow,
+                LastModified = DateTime.UtcNow
+            };
+            _context.UserDashboardLayouts.Add(dbLayout);
+        }
+        else
+        {
+            dbLayout.LayoutJson = widgetsJson;
+            dbLayout.LayoutType = layout.LayoutType;
+            dbLayout.Columns = layout.Columns;
+            dbLayout.LastModified = DateTime.UtcNow;
+        }
+
+        await _context.SaveChangesAsync();
     }
 
     public async Task<WidgetConfiguration?> AddWidgetAsync(string userId, string providerKey, string widgetKey, int? row = null, int? column = null)
@@ -148,6 +196,22 @@ public class DashboardLayoutService : IDashboardLayoutService
 
     public async Task ResetToDefaultAsync(string userId)
     {
+        if (!int.TryParse(userId, out var userIdInt))
+        {
+            return;
+        }
+
+        // Delete existing layout
+        var existingLayout = await _context.UserDashboardLayouts
+            .FirstOrDefaultAsync(x => x.UserId == userIdInt);
+        
+        if (existingLayout != null)
+        {
+            _context.UserDashboardLayouts.Remove(existingLayout);
+            await _context.SaveChangesAsync();
+        }
+
+        // Create and save default layout
         var defaultLayout = CreateDefaultLayout(userId);
         await SaveUserLayoutAsync(userId, defaultLayout);
     }
@@ -157,11 +221,25 @@ public class DashboardLayoutService : IDashboardLayoutService
         var catalog = new List<WidgetCatalogItem>();
         var definitions = _registry.ListAll();
 
+        // Load all role overrides from database
+        var overrides = _context.WidgetRoleConfigurations
+            .AsNoTracking()
+            .ToDictionary(
+                x => $"{x.ProviderKey}__{x.WidgetKey}",
+                x => x.RolesJson,
+                StringComparer.OrdinalIgnoreCase
+            );
+
         foreach (var def in definitions)
         {
-            // Apply overrides if present
-            var key = GetOverrideKey(def.ProviderKey, def.WidgetKey);
-            var overridden = _widgetRoleOverrides.TryGetValue(key, out var oroles) ? oroles : def.RequiredRoles;
+            var key = $"{def.ProviderKey}__{def.WidgetKey}";
+            string[]? effectiveRoles = def.RequiredRoles;
+
+            // Apply database override if present
+            if (overrides.TryGetValue(key, out var rolesJson) && !string.IsNullOrEmpty(rolesJson))
+            {
+                effectiveRoles = JsonSerializer.Deserialize<string[]>(rolesJson, _jsonOptions);
+            }
 
             catalog.Add(new WidgetCatalogItem
             {
@@ -170,82 +248,60 @@ public class DashboardLayoutService : IDashboardLayoutService
                 Title = def.Title,
                 Description = def.Description ?? "Dashboard widget",
                 Icon = def.Icon,
-                Category = def.ProviderKey, // Use provider key as category
+                Category = def.ProviderKey,
                 RequiresConfiguration = false,
-                RequiredRoles = overridden
+                RequiredRoles = effectiveRoles
             });
         }
 
         return catalog;
     }
 
-    public Task<string[]?> GetWidgetRolesAsync(string providerKey, string widgetKey)
+    public async Task<string[]?> GetWidgetRolesAsync(string providerKey, string widgetKey)
     {
-        var key = GetOverrideKey(providerKey, widgetKey);
-        if (_widgetRoleOverrides.TryGetValue(key, out var roles))
-            return Task.FromResult(roles);
+        var config = await _context.WidgetRoleConfigurations
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.ProviderKey == providerKey && x.WidgetKey == widgetKey);
 
+        if (config != null && !string.IsNullOrEmpty(config.RolesJson))
+        {
+            return JsonSerializer.Deserialize<string[]>(config.RolesJson, _jsonOptions);
+        }
+
+        // Fall back to provider's default
         var def = _registry.Find(providerKey, widgetKey);
-        return Task.FromResult(def?.RequiredRoles);
+        return def?.RequiredRoles;
     }
 
-    public Task SetWidgetRolesAsync(string providerKey, string widgetKey, string[]? roles)
+    public async Task SetWidgetRolesAsync(string providerKey, string widgetKey, string[]? roles, int? modifiedByUserId = null)
     {
-        var key = GetOverrideKey(providerKey, widgetKey);
-        if (roles == null || roles.Length == 0)
+        var config = await _context.WidgetRoleConfigurations
+            .FirstOrDefaultAsync(x => x.ProviderKey == providerKey && x.WidgetKey == widgetKey);
+
+        var rolesJson = roles != null && roles.Length > 0
+            ? JsonSerializer.Serialize(roles, _jsonOptions)
+            : null;
+
+        if (config == null)
         {
-            // Remove override to fall back to provider default
-            if (_widgetRoleOverrides.ContainsKey(key))
+            config = new WidgetRoleConfiguration
             {
-                _widgetRoleOverrides.Remove(key);
-                SaveOverridesToFile();
-            }
-            return Task.CompletedTask;
+                ProviderKey = providerKey,
+                WidgetKey = widgetKey,
+                RolesJson = rolesJson,
+                LastModified = DateTime.UtcNow,
+                ModifiedByUserId = modifiedByUserId
+            };
+            _context.WidgetRoleConfigurations.Add(config);
+        }
+        else
+        {
+            config.RolesJson = rolesJson;
+            config.LastModified = DateTime.UtcNow;
+            config.ModifiedByUserId = modifiedByUserId;
         }
 
-        _widgetRoleOverrides[key] = roles;
-        SaveOverridesToFile();
-        return Task.CompletedTask;
-    }
-
-    private string GetOverrideKey(string provider, string widget) => $"{provider}__{widget}";
-
-    private void LoadOverridesFromFile()
-    {
-        try
-        {
-            if (!File.Exists(_overridesFilePath)) return;
-            lock (_fileLock)
-            {
-                var json = File.ReadAllText(_overridesFilePath);
-                var dict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string[]?>>(json, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                if (dict != null)
-                {
-                    foreach (var kv in dict)
-                        _widgetRoleOverrides[kv.Key] = kv.Value;
-                }
-            }
-        }
-        catch
-        {
-            // ignore file errors; fall back to defaults
-        }
-    }
-
-    private void SaveOverridesToFile()
-    {
-        try
-        {
-            lock (_fileLock)
-            {
-                var json = System.Text.Json.JsonSerializer.Serialize(_widgetRoleOverrides, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
-                File.WriteAllText(_overridesFilePath, json);
-            }
-        }
-        catch
-        {
-            // ignore persistence errors for now
-        }
+        await _context.SaveChangesAsync();
     }
 
     private DashboardLayout CreateDefaultLayout(string userId)
@@ -258,8 +314,8 @@ public class DashboardLayoutService : IDashboardLayoutService
             Widgets = new List<WidgetConfiguration>()
         };
 
-        // Add some default widgets
-        var definitions = _registry.ListAll().Take(6); // Limit to first 6 widgets
+        // Add default widgets - take first 6 from all available providers
+        var definitions = _registry.ListAll().Take(6);
         int order = 0;
         int row = 0;
         int col = 0;
@@ -289,6 +345,18 @@ public class DashboardLayoutService : IDashboardLayoutService
         }
 
         return layout;
+    }
+
+    private List<WidgetConfiguration> DeserializeWidgets(string json)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<List<WidgetConfiguration>>(json, _jsonOptions) ?? new List<WidgetConfiguration>();
+        }
+        catch
+        {
+            return new List<WidgetConfiguration>();
+        }
     }
 
     private int CalculateNextRow(DashboardLayout layout)

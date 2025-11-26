@@ -201,7 +201,7 @@
             { x => x.IsEdit, false }
         };
 
-        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = false };
         var dialog = await DialogService.ShowAsync<PositionDialog>("Novo Cargo", parameters, options);
         var result = await dialog.Result;
 
@@ -220,7 +220,7 @@
             { x => x.PositionId, position.Id }
         };
 
-        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = false };
         var dialog = await DialogService.ShowAsync<PositionDialog>("Editar Cargo", parameters, options);
         var result = await dialog.Result;
 

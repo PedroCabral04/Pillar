@@ -2,42 +2,102 @@
 @using erp.Models.Financial
 
 <MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Category" Color="MudBlazor.Color.Primary" Size="MudBlazor.Size.Large" />
+            <MudText Typo="Typo.h6">Categoria Financeira</MudText>
+        </MudStack>
+    </TitleContent>
     <DialogContent>
-        <MudForm @ref="form" @bind-IsValid="@success">
-            <MudGrid>
+        <MudForm @ref="form" @bind-IsValid="@success" Class="pa-2">
+            <MudGrid Spacing="3">
                 <MudItem xs="12" sm="6">
-                    <MudTextField @bind-Value="Model.Name" Label="Nome" Required="true" RequiredError="Nome é obrigatório" />
+                    <MudTextField @bind-Value="Model.Name" 
+                                  Label="Nome" 
+                                  Required="true" 
+                                  RequiredError="Nome é obrigatório" 
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Label"
+                                  HelperText="Nome descritivo da categoria"/>
                 </MudItem>
                 <MudItem xs="12" sm="6">
-                    <MudTextField @bind-Value="Model.Code" Label="Código" Required="true" RequiredError="Código é obrigatório" HelperText="Ex: 1.01" />
+                    <MudTextField @bind-Value="Model.Code" 
+                                  Label="Código" 
+                                  Required="true" 
+                                  RequiredError="Código é obrigatório" 
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Tag"
+                                  HelperText="Ex: 1.01, 2.03.01"
+                                  Placeholder="1.01"/>
                 </MudItem>
                 <MudItem xs="12" sm="6">
-                    <MudSelect T="CategoryType" Label="Tipo" @bind-Value="Model.Type" AnchorOrigin="Origin.BottomCenter">
-                        <MudSelectItem Value="@CategoryType.Revenue">Receita</MudSelectItem>
-                        <MudSelectItem Value="@CategoryType.Expense">Despesa</MudSelectItem>
+                    <MudSelect T="CategoryType" 
+                               Label="Tipo" 
+                               @bind-Value="Model.Type" 
+                               Variant="Variant.Outlined"
+                               Adornment="Adornment.Start"
+                               AdornmentIcon="@Icons.Material.Filled.SwapVert"
+                               AnchorOrigin="Origin.BottomCenter">
+                        <MudSelectItem Value="@CategoryType.Revenue">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Color="MudBlazor.Color.Success" Size="MudBlazor.Size.Small"/>
+                                <MudText>Receita</MudText>
+                            </MudStack>
+                        </MudSelectItem>
+                        <MudSelectItem Value="@CategoryType.Expense">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudIcon Icon="@Icons.Material.Filled.TrendingDown" Color="MudBlazor.Color.Error" Size="MudBlazor.Size.Small"/>
+                                <MudText>Despesa</MudText>
+                            </MudStack>
+                        </MudSelectItem>
                     </MudSelect>
                 </MudItem>
                 <MudItem xs="12" sm="6">
-                    <MudSelect T="int?" Label="Categoria Pai" @bind-Value="Model.ParentCategoryId" AnchorOrigin="Origin.BottomCenter" Clearable="true">
-                        <MudSelectItem T="int?" Value="null">Nenhuma</MudSelectItem>
-                        @foreach (var cat in Categories.Where(c => c.Id != (Model as UpdateFinancialCategoryDto)?.Id)) // Avoid self-reference if updating (simple check)
+                    <MudSelect T="int?" 
+                               Label="Categoria Pai" 
+                               @bind-Value="Model.ParentCategoryId" 
+                               Variant="Variant.Outlined"
+                               Adornment="Adornment.Start"
+                               AdornmentIcon="@Icons.Material.Filled.Folder"
+                               Clearable="true"
+                               HelperText="Deixe em branco para categoria raiz"
+                               AnchorOrigin="Origin.BottomCenter">
+                        <MudSelectItem T="int?" Value="null">Nenhuma (Raiz)</MudSelectItem>
+                        @foreach (var cat in Categories.Where(c => c.Id != (Model as UpdateFinancialCategoryDto)?.Id))
                         {
                             <MudSelectItem T="int?" Value="@cat.Id">@cat.Name (@cat.Code)</MudSelectItem>
                         }
                     </MudSelect>
                 </MudItem>
                 <MudItem xs="12">
-                    <MudTextField @bind-Value="Model.Description" Label="Descrição" Lines="3" />
+                    <MudTextField @bind-Value="Model.Description" 
+                                  Label="Descrição" 
+                                  Lines="3" 
+                                  Variant="Variant.Outlined"
+                                  HelperText="Descrição detalhada da categoria (opcional)"/>
                 </MudItem>
                 <MudItem xs="12">
-                    <MudCheckBox @bind-Value="Model.IsActive" Label="Ativa" Color="MudBlazor.Color.Success" />
+                    <MudSwitch @bind-Value="Model.IsActive" 
+                               Label="Categoria Ativa" 
+                               Color="MudBlazor.Color.Success" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
+                        <strong>Dica:</strong> O código segue o padrão hierárquico. Exemplo: 1 (Receitas) → 1.01 (Vendas) → 1.01.01 (Vendas à Vista)
+                    </MudAlert>
                 </MudItem>
             </MudGrid>
         </MudForm>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="Cancel">Cancelar</MudButton>
-        <MudButton Color="MudBlazor.Color.Primary" OnClick="Submit">Salvar</MudButton>
+        <MudButton OnClick="Cancel" Variant="Variant.Outlined">Cancelar</MudButton>
+        <MudButton Color="MudBlazor.Color.Primary" Variant="Variant.Filled" OnClick="Submit">
+            <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-1"/>
+            Salvar Categoria
+        </MudButton>
     </DialogActions>
 </MudDialog>
 

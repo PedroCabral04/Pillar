@@ -24,7 +24,7 @@
 
 <MudThemeProvider @ref="@_mudThemeProvider" @bind-IsDarkMode="ThemeService.IsDarkMode" Theme="@ThemeService.Theme" />
 <MudPopoverProvider />
-<MudDialogProvider />
+<MudDialogProvider MaxWidth="MaxWidth.Medium" FullWidth="true" CloseOnEscapeKey="true" CloseButton="true"/>
 <MudSnackbarProvider />
 
 @if (PreferenceService.CurrentPreferences.Ui.ReduceMotion)
@@ -74,9 +74,9 @@
 
                 <MudSpacer />
                 
-                <MudHidden Breakpoint="Breakpoint.SmAndDown">
+                @* <MudHidden Breakpoint="Breakpoint.SmAndDown">
                     <MudTextField @bind-Value="@_searchString" Placeholder="Pesquisar..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="MudBlazor.Size.Medium" Class="mt-0 mx-4" Variant="Variant.Outlined" Margin="Margin.Dense" Style="background-color: var(--mud-palette-background); border-radius: 8px; width: 300px;" />
-                </MudHidden>
+                </MudHidden> *@
 
                 <AuthorizeView>
                     <Authorized Context="auth">
@@ -273,7 +273,7 @@
             { "UserId", userId },
             { "TourId", tourId }
         };
-        var options = new DialogOptions { CloseOnEscapeKey = false, BackdropClick = false, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var options = new DialogOptions { CloseOnEscapeKey = false, BackdropClick = false, MaxWidth = MaxWidth.Medium, FullWidth = false };
 
         await DialogService.ShowAsync<erp.Components.Shared.OnboardingWizard>("Continuar tour", parameters, options);
         OnboardingResumeService.ClearPendingResume();
@@ -416,7 +416,7 @@
                         CloseOnEscapeKey = false,
                         BackdropClick = false,
                         MaxWidth = MaxWidth.Medium,
-                        FullWidth = true
+                        FullWidth = false
                     };
                     
                     var parameters = new DialogParameters

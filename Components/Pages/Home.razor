@@ -7,7 +7,7 @@
 
 <PageTitle>Início - Pillar ERP</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-4">
     @if (_isLoading)
     {
         <MudProgressLinear Color="MudBlazor.Color.Primary" Indeterminate="true" />
@@ -19,7 +19,7 @@
             <MudGrid>
                 <MudItem xs="12" md="8">
                     <MudText Typo="Typo.h3" Style="color: white; font-weight: 600;" Class="mb-2">
-                        Olá, @_userName! <span class="wave-emoji" aria-hidden="true">👋</span>
+                        Olá, @_userName!
                     </MudText>
                     <MudText Typo="Typo.h6" Style="color: rgba(255,255,255,0.9);">
                         Bem-vindo ao Pillar ERP - Seu sistema de gestão empresarial
@@ -129,37 +129,6 @@
 
     .cursor-pointer {
         cursor: pointer;
-    }
-
-    /* Emoji separada para permitir animações (exemplo) */
-    .wave-emoji {
-        display: inline-block;
-        transform-origin: 50% 70%;
-        /* mantém a acessibilidade; o emoji é decorativo aqui */
-        /* Animação contínua: maior amplitude, mais suave e repetição infinita */
-        animation: wave 2600ms ease-in-out infinite;
-    }
-
-    /* Se preferir animação apenas ao passar o mouse, comente a linha `animation` acima e use a regra abaixo */
-    /* .wave-emoji:hover { animation: wave 1800ms ease-in-out; } */
-
-    /* Respeita preferências de redução de movimento */
-    @@media (prefers-reduced-motion: reduce) {
-        .wave-emoji {
-            animation: none !important;
-            transform: none !important;
-        }
-    }
-
-    /* Keyframes para o movimento de aceno (maior ângulo e suavidade) */
-    @@keyframes wave {
-        0% { transform: rotate(0deg); }
-        10% { transform: rotate(22deg); }
-        30% { transform: rotate(-16deg); }
-        50% { transform: rotate(18deg); }
-        70% { transform: rotate(-8deg); }
-        90% { transform: rotate(12deg); }
-        100% { transform: rotate(0deg); }
     }
 </style>
 

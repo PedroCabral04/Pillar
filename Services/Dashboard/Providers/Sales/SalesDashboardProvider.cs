@@ -65,8 +65,8 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
 
     private async Task<ChartDataResponse> GetSalesByMonthAsync(DashboardQuery query, CancellationToken ct)
     {
-        var startDate = query.From ?? DateTime.Now.AddMonths(-11).Date;
-        var endDate = query.To ?? DateTime.Now.Date;
+        var startDate = (query.From ?? DateTime.Now.AddMonths(-11).Date).ToUniversalTime();
+        var endDate = (query.To ?? DateTime.Now.Date).ToUniversalTime();
 
         var salesByMonth = await _context.Sales
             .Where(s => s.Status == "Finalizada" && 
@@ -117,8 +117,8 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
 
     private async Task<ChartDataResponse> GetTopProductsAsync(DashboardQuery query, CancellationToken ct)
     {
-        var startDate = query.From ?? DateTime.Now.AddMonths(-1).Date;
-        var endDate = query.To ?? DateTime.Now.Date;
+        var startDate = (query.From ?? DateTime.Now.AddMonths(-1).Date).ToUniversalTime();
+        var endDate = (query.To ?? DateTime.Now.Date).ToUniversalTime();
 
         var topProducts = await _context.SaleItems
             .Include(i => i.Sale)
@@ -159,8 +159,8 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
 
     private async Task<ChartDataResponse> GetSalesByStatusAsync(DashboardQuery query, CancellationToken ct)
     {
-        var startDate = query.From ?? DateTime.Now.AddMonths(-1).Date;
-        var endDate = query.To ?? DateTime.Now.Date;
+        var startDate = (query.From ?? DateTime.Now.AddMonths(-1).Date).ToUniversalTime();
+        var endDate = (query.To ?? DateTime.Now.Date).ToUniversalTime();
 
         var salesByStatus = await _context.Sales
             .Where(s => s.SaleDate >= startDate && s.SaleDate <= endDate)
