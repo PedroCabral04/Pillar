@@ -157,6 +157,23 @@ public class ChatbotService : IChatbotService
         builder.Plugins.AddFromObject(
             new SystemPlugin(), 
             "SystemPlugin");
+        
+        // Novos plugins
+        builder.Plugins.AddFromObject(
+            ActivatorUtilities.CreateInstance<AssetsPlugin>(serviceProvider), 
+            "AssetsPlugin");
+        
+        builder.Plugins.AddFromObject(
+            ActivatorUtilities.CreateInstance<CustomersPlugin>(serviceProvider), 
+            "CustomersPlugin");
+        
+        builder.Plugins.AddFromObject(
+            ActivatorUtilities.CreateInstance<SuppliersPlugin>(serviceProvider), 
+            "SuppliersPlugin");
+        
+        builder.Plugins.AddFromObject(
+            ActivatorUtilities.CreateInstance<PayrollPlugin>(serviceProvider), 
+            "PayrollPlugin");
 
         _kernel = builder.Build();
     }
