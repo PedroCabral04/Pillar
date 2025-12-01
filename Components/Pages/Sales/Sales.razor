@@ -93,27 +93,37 @@
             <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">@context.Status</MudChip>
         </MudTd>
         <MudTd DataLabel="Ações" Style="text-align: center">
-            <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
-                           Size="Size.Small"
-                           Href="@($"/sales/{context.Id}")"
-                           Title="Ver detalhes"/>
+            <MudTooltip Text="Ver detalhes">
+                <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
+                               Size="Size.Small"
+                               Href="@($"/sales/{context.Id}")"
+                               aria-label="@($"Ver detalhes da venda {context.SaleNumber}")" />
+            </MudTooltip>
             @if (context.Status == "Pendente")
             {
-                <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" 
-                               Size="Size.Small"
-                               Color="Color.Success"
-                               OnClick="@(() => FinalizeSale(context))"
-                               Title="Finalizar venda"/>
-                <MudIconButton Icon="@Icons.Material.Filled.Cancel" 
-                               Size="Size.Small" 
-                               Color="Color.Error"
-                               OnClick="@(() => CancelSale(context))"
-                               Title="Cancelar"/>
+                <MudTooltip Text="Finalizar venda">
+                    <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" 
+                                   Size="Size.Small"
+                                   Color="Color.Success"
+                                   OnClick="@(() => FinalizeSale(context))"
+                                   aria-label="@($"Finalizar venda {context.SaleNumber}")" />
+                </MudTooltip>
+                <MudTooltip Text="Cancelar venda">
+                    <MudIconButton Icon="@Icons.Material.Filled.Cancel" 
+                                   Size="Size.Small" 
+                                   Color="Color.Error"
+                                   OnClick="@(() => CancelSale(context))"
+                                   aria-label="@($"Cancelar venda {context.SaleNumber}")" />
+                </MudTooltip>
             }
         </MudTd>
     </RowTemplate>
     <NoRecordsContent>
-        <MudText>Nenhuma venda encontrada</MudText>
+        <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="pa-8">
+            <MudIcon Icon="@Icons.Material.Filled.ReceiptLong" Size="Size.Large" Color="Color.Default" Class="mb-2" />
+            <MudText Typo="Typo.h6" Color="Color.Default">Nenhuma venda encontrada</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Registre uma nova venda clicando no botão acima</MudText>
+        </MudStack>
     </NoRecordsContent>
     <LoadingContent>
         <MudText>Carregando...</MudText>

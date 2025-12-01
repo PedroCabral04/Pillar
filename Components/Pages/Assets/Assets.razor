@@ -177,23 +177,33 @@
                 <MudText Typo="Typo.body2">@(context.Location ?? "-")</MudText>
             </MudTd>
             <MudTd DataLabel="Ações" Style="text-align: center">
-                <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
-                               Size="Size.Small"
-                               Href="@($"/assets/{context.Id}")"
-                               Title="Ver detalhes"/>
-                <MudIconButton Icon="@Icons.Material.Filled.Edit" 
-                               Size="Size.Small"
-                               OnClick="@(() => OpenEditDialog(context.Id))"
-                               Title="Editar"/>
-                <MudIconButton Icon="@Icons.Material.Filled.Delete" 
-                               Size="Size.Small" 
-                               Color="Color.Error"
-                               OnClick="@(() => DeleteAsset(context.Id))"
-                               Title="Excluir"/>
+                <MudTooltip Text="Ver detalhes">
+                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
+                                   Size="Size.Small"
+                                   Href="@($"/assets/{context.Id}")"
+                                   aria-label="@($"Ver detalhes do ativo {context.Name}")" />
+                </MudTooltip>
+                <MudTooltip Text="Editar">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                                   Size="Size.Small"
+                                   OnClick="@(() => OpenEditDialog(context.Id))"
+                                   aria-label="@($"Editar ativo {context.Name}")" />
+                </MudTooltip>
+                <MudTooltip Text="Excluir">
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                   Size="Size.Small" 
+                                   Color="Color.Error"
+                                   OnClick="@(() => DeleteAsset(context.Id))"
+                                   aria-label="@($"Excluir ativo {context.Name}")" />
+                </MudTooltip>
             </MudTd>
         </RowTemplate>
         <NoRecordsContent>
-            <MudText>Nenhum ativo encontrado</MudText>
+            <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="pa-8">
+                <MudIcon Icon="@Icons.Material.Filled.Inventory2" Size="Size.Large" Color="Color.Default" Class="mb-2" />
+                <MudText Typo="Typo.h6" Color="Color.Default">Nenhum ativo encontrado</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Adicione um novo ativo clicando no botão acima</MudText>
+            </MudStack>
         </NoRecordsContent>
     </MudTable>
 </MudPaper>
@@ -310,24 +320,41 @@
 
     private async Task DeleteAsset(int assetId)
     {
-        try
+        var asset = _assets.FirstOrDefault(a => a.Id == assetId);
+        var assetName = asset?.Name ?? "este ativo";
+        
+        var parameters = new DialogParameters
         {
-            var result = await ApiService.DeleteAsync($"/api/assets/{assetId}");
-            if (result != null && result.IsSuccessStatusCode)
-            {
-                Snackbar.Add("Ativo excluído com sucesso", Severity.Success);
-                await LoadStatistics();
-                await LoadAssets();
-            }
-            else
-            {
-                Snackbar.Add("Erro ao excluir ativo", Severity.Error);
-            }
-        }
-        catch (Exception ex)
+            { "ContentText", $"Tem certeza que deseja excluir o ativo '{assetName}'? Esta ação não pode ser desfeita." },
+            { "ButtonText", "Excluir" },
+            { "Color", Color.Error }
+        };
+
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small };
+        var dialog = await DialogService.ShowAsync<erp.Components.Shared.Dialogs.ConfirmDialog>("Confirmar Exclusão", parameters, options);
+        var dialogResult = await dialog.Result;
+
+        if (dialogResult != null && !dialogResult.Canceled)
         {
-            Logger.LogError(ex, "Erro ao excluir ativo {AssetId}", assetId);
-            Snackbar.Add($"Erro ao excluir ativo: {ex.Message}", Severity.Error);
+            try
+            {
+                var result = await ApiService.DeleteAsync($"/api/assets/{assetId}");
+                if (result != null && result.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("Ativo excluído com sucesso", Severity.Success);
+                    await LoadStatistics();
+                    await LoadAssets();
+                }
+                else
+                {
+                    Snackbar.Add("Erro ao excluir ativo", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Erro ao excluir ativo {AssetId}", assetId);
+                Snackbar.Add($"Erro ao excluir ativo: {ex.Message}", Severity.Error);
+            }
         }
     }
 

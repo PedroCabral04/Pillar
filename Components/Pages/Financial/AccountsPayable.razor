@@ -61,7 +61,7 @@
             <RowTemplate>
                 <MudTd DataLabel="Fornecedor">@context.SupplierName</MudTd>
                 <MudTd DataLabel="Nota Fiscal">@context.InvoiceNumber</MudTd>
-                <MudTd DataLabel="Vencimento">@context.DueDate.ToShortDateString()</MudTd>
+                <MudTd DataLabel="Vencimento">@context.DueDate.ToBrazilianDate()</MudTd>
                 <MudTd DataLabel="Valor">@context.RemainingAmount.ToString("C2")</MudTd>
                 <MudTd DataLabel="Status">
                             <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">
@@ -76,25 +76,29 @@
                     @if (context.Status != AccountStatus.Paid && context.Status != AccountStatus.Cancelled)
                     {
                         <MudTooltip Text="Pagar">
-                            <MudIconButton Icon="@Icons.Material.Filled.AttachMoney" Size="Size.Small" Color="MudBlazor.Color.Success" OnClick="@(() => OpenPayDialog(context))" Disabled="@(context.RequiresApproval && !context.ApprovedByUserId.HasValue)" />
+                            <MudIconButton Icon="@Icons.Material.Filled.AttachMoney" Size="Size.Small" Color="MudBlazor.Color.Success" OnClick="@(() => OpenPayDialog(context))" Disabled="@(context.RequiresApproval && !context.ApprovedByUserId.HasValue)" aria-label="@($"Pagar conta {context.InvoiceNumber}")" />
                         </MudTooltip>
                     }
                     @if (context.RequiresApproval && !context.ApprovedByUserId.HasValue)
                     {
                          <MudTooltip Text="Aprovar">
-                            <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="MudBlazor.Color.Info" OnClick="@(() => ApproveAccount(context))" />
+                            <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="MudBlazor.Color.Info" OnClick="@(() => ApproveAccount(context))" aria-label="@($"Aprovar conta {context.InvoiceNumber}")" />
                         </MudTooltip>
                     }
                     <MudTooltip Text="Editar">
-                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => OpenEditDialog(context))" Disabled="@(context.Status == AccountStatus.Paid)" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => OpenEditDialog(context))" Disabled="@(context.Status == AccountStatus.Paid)" aria-label="@($"Editar conta {context.InvoiceNumber}")" />
                     </MudTooltip>
                     <MudTooltip Text="Excluir">
-                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="MudBlazor.Color.Error" OnClick="@(() => DeleteAccount(context))" Disabled="@(context.Status == AccountStatus.Paid)" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="MudBlazor.Color.Error" OnClick="@(() => DeleteAccount(context))" Disabled="@(context.Status == AccountStatus.Paid)" aria-label="@($"Excluir conta {context.InvoiceNumber}")" />
                     </MudTooltip>
                 </MudTd>
             </RowTemplate>
             <NoRecordsContent>
-                <MudText>Nenhuma conta encontrada.</MudText>
+                <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="pa-8">
+                    <MudIcon Icon="@Icons.Material.Filled.Receipt" Size="Size.Large" Color="MudBlazor.Color.Default" Class="mb-2" />
+                    <MudText Typo="Typo.h6" Color="MudBlazor.Color.Default">Nenhuma conta encontrada</MudText>
+                    <MudText Typo="Typo.body2" Color="MudBlazor.Color.Secondary">Adicione uma nova conta a pagar clicando no botão acima</MudText>
+                </MudStack>
             </NoRecordsContent>
             <PagerContent>
                 <MudTablePager />
