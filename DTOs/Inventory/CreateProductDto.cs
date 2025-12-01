@@ -52,6 +52,9 @@ public class CreateProductDto
     [Range(0, double.MaxValue, ErrorMessage = "Estoque máximo deve ser positivo")]
     public decimal MaximumStock { get; set; } = 0;
     
+    [Range(0, double.MaxValue, ErrorMessage = "Estoque inicial deve ser positivo")]
+    public decimal CurrentStock { get; set; } = 0;
+    
     [Range(0, double.MaxValue, ErrorMessage = "Ponto de reposição deve ser positivo")]
     public decimal ReorderPoint { get; set; } = 0;
     

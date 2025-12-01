@@ -159,6 +159,25 @@
                     <!-- Aba: Estoque -->
                     <MudTabPanel Text="Estoque" Icon="@Icons.Material.Filled.Warehouse">
                         <MudGrid Spacing="3">
+                            <MudItem xs="12">
+                                <MudAlert Severity="Severity.Info" Variant="Variant.Text" Dense="true" Class="mb-2">
+                                    <MudIcon Icon="@Icons.Material.Filled.Info" Size="MudBlazor.Size.Small" Class="mr-1"/>
+                                    O estoque inicial é opcional. Você pode gerenciar o estoque posteriormente através de movimentações.
+                                </MudAlert>
+                            </MudItem>
+                            
+                            <MudItem xs="12" md="6">
+                                <MudNumericField T="decimal?"
+                                                Label="Estoque Inicial (opcional)"
+                                                @bind-Value="_initialStock"
+                                                Min="0"
+                                                Step="1"
+                                                Variant="Variant.Outlined"
+                                                Adornment="Adornment.Start"
+                                                AdornmentIcon="@Icons.Material.Filled.Inventory"
+                                                HelperText="Deixe em branco para iniciar com 0"/>
+                            </MudItem>
+                            
                             <MudItem xs="12" md="6">
                                 <MudNumericField T="decimal"
                                                 Label="Estoque Mínimo"
@@ -376,6 +395,7 @@
     private bool _saving = false;
     private CreateProductDto _newProduct = new();
     private List<ProductCategoryDto> _categories = new();
+    private decimal? _initialStock;
     
     protected override async Task OnInitializedAsync()
     {
@@ -450,6 +470,12 @@
         _saving = true;
         try
         {
+            // Definir estoque inicial se informado
+            if (_initialStock.HasValue && _initialStock.Value > 0)
+            {
+                _newProduct.CurrentStock = _initialStock.Value;
+            }
+            
             var result = await ApiService.PostAsync<ProductDto>("/api/products", _newProduct);
             
             if (result != null)
