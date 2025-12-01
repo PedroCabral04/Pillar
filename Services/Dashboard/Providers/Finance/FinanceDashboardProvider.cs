@@ -81,6 +81,17 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
             Icon = "mdi-account-group",
             Unit = "R$",
             RequiredRoles = new[] { "Financeiro", "Vendas", "Administrador" }
+        },
+        new DashboardWidgetDefinition
+        {
+            ProviderKey = Key,
+            WidgetKey = "cashflow-alerts",
+            Title = "Alertas Fluxo de Caixa",
+            Description = "Dias projetados com saldo negativo",
+            ChartType = DashboardChartType.Bar,
+            Icon = "mdi-alert-circle",
+            Unit = "R$",
+            RequiredRoles = new[] { "Financeiro", "Gerente", "Administrador" }
         }
     };
 
@@ -94,6 +105,7 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
             "aging-analysis" => await GetAgingAnalysisAsync(query, ct),
             "top-suppliers" => await GetTopSuppliersAsync(query, ct),
             "top-customers" => await GetTopCustomersAsync(query, ct),
+            "cashflow-alerts" => await GetCashflowAlertsAsync(query, ct),
             _ => throw new KeyNotFoundException($"Widget '{widgetKey}' not found in provider '{Key}'.")
         };
     }
@@ -252,6 +264,44 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
                 new() { Name = "Total Vendas", Data = dashboardData.TopCustomers.Select(x => x.TotalAmount).ToList() }
             },
             Subtitle = $"Top {dashboardData.TopCustomers.Count} clientes"
+        };
+    }
+
+    private async Task<ChartDataResponse> GetCashflowAlertsAsync(DashboardQuery query, CancellationToken ct)
+    {
+        var dashboardData = await _financialService.GetDashboardDataAsync();
+        var alerts = dashboardData.CashFlowAlerts;
+
+        if (!alerts.Any())
+        {
+            return new ChartDataResponse
+            {
+                Categories = new List<string> { "Sem alertas" },
+                Series = new List<ChartSeriesDto> { new() { Name = "Saldo", Data = new List<decimal> { 0 } } },
+                Subtitle = "✅ Nenhum dia com saldo negativo projetado"
+            };
+        }
+
+        // Show up to 10 days with negative balance
+        var topAlerts = alerts.Take(10).ToList();
+        var categories = topAlerts.Select(a => a.Date.ToString("dd/MM")).ToList();
+        var balances = topAlerts.Select(a => Math.Abs(a.ProjectedBalance)).ToList();
+
+        var criticalCount = alerts.Count(a => a.Severity == "Critical");
+        var warningCount = alerts.Count(a => a.Severity == "Warning");
+        
+        var severityText = criticalCount > 0 
+            ? $"⚠️ {criticalCount} crítico(s), {warningCount} alerta(s)"
+            : $"⚠️ {warningCount} alerta(s)";
+
+        return new ChartDataResponse
+        {
+            Categories = categories,
+            Series = new List<ChartSeriesDto>
+            {
+                new() { Name = "Déficit Projetado", Data = balances }
+            },
+            Subtitle = $"{alerts.Count} dia(s) com saldo negativo | {severityText}"
         };
     }
 }
