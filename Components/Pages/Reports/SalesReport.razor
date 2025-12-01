@@ -5,19 +5,24 @@
 @using Microsoft.AspNetCore.Authorization
 @using Color = MudBlazor.Color
 @using Size = MudBlazor.Size
+@using ApexCharts
 @inject IApiService ApiService
 @inject ISnackbar Snackbar
 @inject IJSRuntime JS
 
 <PageTitle>Relatórios de Vendas - Pillar ERP</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-4">
     <MudBreadcrumbs Items="_breadcrumbItems" Class="mb-4" />
     
     <MudText Typo="Typo.h4" GutterBottom="true">
         <MudIcon Icon="@Icons.Material.Filled.ShoppingCart" Class="mr-2" />
         Relatório de Vendas
     </MudText>
+
+    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
+        <!-- General Sales Tab -->
+        <MudTabPanel Text="Relatório Geral" Icon="@Icons.Material.Filled.Receipt">
 
     <!-- Filters Card -->
     <MudCard Elevation="3" Class="mb-4">
@@ -168,10 +173,138 @@
                     <PagerContent>
                         <MudTablePager PageSizeOptions="new int[]{10, 25, 50, 100}" />
                     </PagerContent>
-                </MudTable>
+                    </MudTable>
             </MudCardContent>
         </MudCard>
     }
+        </MudTabPanel>
+
+        <!-- Sales Heatmap Tab -->
+        <MudTabPanel Text="Mapa de Calor" Icon="@Icons.Material.Filled.CalendarViewWeek">
+            <MudCard Elevation="3" Class="mb-4">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Mapa de Calor de Vendas</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            Analise os horários de pico para otimizar a escala de funcionários
+                        </MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudGrid>
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudDatePicker Label="Data Início" @bind-Date="_heatmapFilter.StartDate" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudDatePicker Label="Data Fim" @bind-Date="_heatmapFilter.EndDate" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudSelect T="string" Label="Métrica" @bind-Value="_heatmapMetric" Variant="Variant.Outlined">
+                                <MudSelectItem Value="@("count")">Quantidade de Vendas</MudSelectItem>
+                                <MudSelectItem Value="@("revenue")">Faturamento</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadHeatmapReport" StartIcon="@Icons.Material.Filled.Search" Class="mt-4">
+                                Gerar Mapa
+                            </MudButton>
+                        </MudItem>
+                    </MudGrid>
+                </MudCardContent>
+            </MudCard>
+
+            @if (_loadingHeatmap)
+            {
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+            }
+
+            @if (_heatmapReport != null)
+            {
+                <!-- Summary Cards -->
+                <MudGrid Class="mb-4">
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-4" Elevation="3">
+                            <MudText Typo="Typo.subtitle2" Color="Color.Primary">Total de Vendas</MudText>
+                            <MudText Typo="Typo.h5">@_heatmapReport.Summary.TotalSales</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-4" Elevation="3">
+                            <MudText Typo="Typo.subtitle2" Color="Color.Success">Faturamento Total</MudText>
+                            <MudText Typo="Typo.h5">@_heatmapReport.Summary.TotalRevenue.ToString("C2")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-4" Elevation="3" Style="background-color: #E8F5E9;">
+                            <MudText Typo="Typo.subtitle2" Color="Color.Success">
+                                <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Small" /> Pico de Vendas
+                            </MudText>
+                            <MudText Typo="Typo.h6">@_heatmapReport.Summary.PeakDay @_heatmapReport.Summary.PeakHour</MudText>
+                            <MudText Typo="Typo.body2">@_heatmapReport.Summary.PeakSalesCount vendas (@_heatmapReport.Summary.PeakRevenue.ToString("C2"))</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-4" Elevation="3">
+                            <MudText Typo="Typo.subtitle2" Color="Color.Info">Média por Hora</MudText>
+                            <MudText Typo="Typo.h5">@_heatmapReport.Summary.AverageSalesPerHour.ToString("N1") vendas</MudText>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+
+                <!-- Heatmap Chart -->
+                <MudCard Elevation="3">
+                    <MudCardContent>
+                        @if (_heatmapReport.Series.Any())
+                        {
+                            <ApexChart TItem="SalesHeatmapDataPoint"
+                                       Title="@(_heatmapMetric == "count" ? "Vendas por Dia da Semana e Hora" : "Faturamento por Dia da Semana e Hora")"
+                                       Options="_heatmapChartOptions"
+                                       Height="350">
+                                @foreach (var series in _heatmapReport.Series)
+                                {
+                                    <ApexPointSeries TItem="SalesHeatmapDataPoint"
+                                                     Items="series.Data"
+                                                     Name="@series.Name"
+                                                     SeriesType="SeriesType.Heatmap"
+                                                     XValue="@(e => e.X)"
+                                                     YValue="@(e => _heatmapMetric == "count" ? e.Y : (int)e.Revenue)" />
+                                }
+                            </ApexChart>
+                        }
+                        else
+                        {
+                            <MudText>Sem dados para o período selecionado.</MudText>
+                        }
+                    </MudCardContent>
+                </MudCard>
+
+                <!-- Insights Card -->
+                <MudCard Elevation="3" Class="mt-4">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">
+                                <MudIcon Icon="@Icons.Material.Filled.Lightbulb" Class="mr-2" />
+                                Insights para Escala de Funcionários
+                            </MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudList T="string" Dense="true">
+                            <MudListItem Icon="@Icons.Material.Filled.Schedule">
+                                <MudText><strong>Horário de pico:</strong> @_heatmapReport.Summary.PeakDay às @_heatmapReport.Summary.PeakHour - Considere aumentar a equipe neste período</MudText>
+                            </MudListItem>
+                            <MudListItem Icon="@Icons.Material.Filled.WarningAmber">
+                                <MudText><strong>Horário mais fraco:</strong> @_heatmapReport.Summary.LowestDay às @_heatmapReport.Summary.LowestHour - Oportunidade para reduzir custos ou investir em promoções</MudText>
+                            </MudListItem>
+                            <MudListItem Icon="@Icons.Material.Filled.Analytics">
+                                <MudText><strong>Média:</strong> @_heatmapReport.Summary.AverageSalesPerHour.ToString("N1") vendas por hora - Use como base para dimensionamento</MudText>
+                            </MudListItem>
+                        </MudList>
+                    </MudCardContent>
+                </MudCard>
+            }
+        </MudTabPanel>
+    </MudTabs>
 </MudContainer>
 
 @code {
@@ -188,9 +321,87 @@
         EndDate = DateTime.Today
     };
 
+    private SalesReportFilterDto _heatmapFilter = new()
+    {
+        StartDate = DateTime.Today.AddMonths(-3),
+        EndDate = DateTime.Today
+    };
+
     private SalesReportResultDto? _report;
+    private SalesHeatmapReportDto? _heatmapReport;
     private bool _loading = false;
+    private bool _loadingHeatmap = false;
     private string _searchString = "";
+    private string _heatmapMetric = "count";
+
+    // Heatmap chart options
+    private ApexChartOptions<SalesHeatmapDataPoint> _heatmapChartOptions = new()
+    {
+        Chart = new Chart
+        {
+            Toolbar = new Toolbar { Show = false },
+            Background = "transparent"
+        },
+        DataLabels = new ApexCharts.DataLabels { Enabled = false },
+        PlotOptions = new PlotOptions
+        {
+            Heatmap = new PlotOptionsHeatmap
+            {
+                Radius = 2,
+                EnableShades = true,
+                ShadeIntensity = 0.5
+            }
+        },
+        Xaxis = new XAxis
+        {
+            Labels = new XAxisLabels
+            {
+                Rotate = -45,
+                Style = new AxisLabelStyle { FontSize = "10px" }
+            }
+        },
+        Legend = new Legend
+        {
+            Position = LegendPosition.Bottom
+        },
+        Colors = new List<string> { "#008FFB" },
+        Tooltip = new Tooltip
+        {
+            Y = new TooltipY
+            {
+                Formatter = @"function (value) {
+                    return value + ' vendas';
+                }"
+            }
+        }
+    };
+
+    private async Task LoadHeatmapReport()
+    {
+        try
+        {
+            _loadingHeatmap = true;
+            var response = await ApiService.PostAsync<SalesHeatmapReportDto>("/api/reports/sales/heatmap", _heatmapFilter);
+            
+            if (response != null)
+            {
+                _heatmapReport = response;
+                Snackbar.Add("Mapa de calor gerado com sucesso!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Erro ao gerar mapa de calor", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingHeatmap = false;
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {

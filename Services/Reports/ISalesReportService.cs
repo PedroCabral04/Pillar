@@ -8,4 +8,5 @@ public interface ISalesReportService
     Task<CustomerSalesReportResultDto> GenerateByCustomerReportAsync(SalesReportFilterDto filter);
     Task<ProductSalesReportResultDto> GenerateByProductReportAsync(SalesReportFilterDto filter);
     Task<PaymentMethodSalesReportResultDto> GenerateByPaymentMethodReportAsync(SalesReportFilterDto filter);
+    Task<SalesHeatmapReportDto> GenerateSalesHeatmapAsync(SalesReportFilterDto filter);
 }

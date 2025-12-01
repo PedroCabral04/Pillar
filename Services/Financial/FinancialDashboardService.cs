@@ -17,7 +17,7 @@ public class FinancialDashboardService : IFinancialDashboardService
         _receivableDao = receivableDao;
     }
 
-    public async Task<FinancialDashboardDto> GetDashboardDataAsync(DateTime? startDate = null, DateTime? endDate = null)
+    public async Task<FinancialDashboardDto> GetDashboardDataAsync(DateTime? startDate = null, DateTime? endDate = null, decimal initialBalance = 0)
     {
         var payables = await _payableDao.GetAllAsync();
         var receivables = await _receivableDao.GetAllAsync();
@@ -45,7 +45,7 @@ public class FinancialDashboardService : IFinancialDashboardService
         dto.ReceivablesCount = receivables.Count(x => x.Status != AccountStatus.Paid && x.Status != AccountStatus.Cancelled);
         dto.ReceivablesOverdueCount = receivables.Count(x => x.Status == AccountStatus.Overdue);
 
-        // Cash Flow Projection (Next 30 days)
+        // Cash Flow Projection (Next 30 days) with cumulative balance
         var today = DateTime.UtcNow.Date;
         var next30Days = today.AddDays(30);
         
@@ -59,15 +59,39 @@ public class FinancialDashboardService : IFinancialDashboardService
             .GroupBy(x => x.DueDate.Date)
             .ToDictionary(g => g.Key, g => g.Sum(x => x.RemainingAmount));
 
+        // Calculate cumulative balance starting from initial balance
+        decimal cumulativeBalance = initialBalance;
+        
         for (int i = 0; i <= 30; i++)
         {
             var date = today.AddDays(i);
-            dto.CashFlowProjection.Add(new CashFlowItemDto
+            var revenue = flowReceivables.ContainsKey(date) ? flowReceivables[date] : 0;
+            var expense = flowPayables.ContainsKey(date) ? flowPayables[date] : 0;
+            
+            cumulativeBalance += (revenue - expense);
+            
+            var cashFlowItem = new CashFlowItemDto
             {
                 Date = date,
-                Expense = flowPayables.ContainsKey(date) ? flowPayables[date] : 0,
-                Revenue = flowReceivables.ContainsKey(date) ? flowReceivables[date] : 0
-            });
+                Expense = expense,
+                Revenue = revenue,
+                CumulativeBalance = cumulativeBalance
+            };
+            
+            dto.CashFlowProjection.Add(cashFlowItem);
+            
+            // Add alert for negative balance days
+            if (cumulativeBalance < 0)
+            {
+                dto.CashFlowAlerts.Add(new CashFlowAlertDto
+                {
+                    Date = date,
+                    ProjectedBalance = cumulativeBalance,
+                    Shortfall = Math.Abs(cumulativeBalance),
+                    Severity = cumulativeBalance < -10000 ? "Critical" : "Warning",
+                    Message = $"Saldo projetado negativo de {cumulativeBalance:C2} em {date:dd/MM/yyyy}"
+                });
+            }
         }
 
         // Aging List

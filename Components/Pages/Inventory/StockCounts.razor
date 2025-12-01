@@ -13,7 +13,7 @@
 @inject IDialogService DialogService
 @inject NavigationManager Navigation
 
-<PageTitle>Contagens de Estoque</PageTitle>
+<PageTitle>Contagens de Estoque - Pillar ERP</PageTitle>
 
 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
     <MudText Typo="Typo.h4">Contagens de Estoque</MudText>
@@ -31,7 +31,7 @@
 }
 
 <MudTable T="StockCountDto" ServerData="ServerReload" 
-          Dense="false" Hover="true" Elevation="4" @ref="_table" Striped="true" Loading="@_loading">
+          Dense="false" Hover="true" Elevation="2" @ref="_table" Striped="true" Loading="@_loading">
     <ToolBarContent>
         <MudText Typo="Typo.h5">Histórico de Contagens</MudText>
         <MudSpacer/>
@@ -249,7 +249,7 @@
         { 
             CloseOnEscapeKey = true,
             MaxWidth = MaxWidth.Medium,
-            FullWidth = true
+            FullWidth = false
         };
         
         var dialog = await DialogService.ShowAsync<CreateStockCountDialog>("Nova Contagem", options);

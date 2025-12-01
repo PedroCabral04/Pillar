@@ -10,7 +10,7 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
-<PageTitle>Gerenciar Departamentos</PageTitle>
+<PageTitle>Gerenciar Departamentos - Pillar ERP</PageTitle>
 
 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
     <MudText Typo="Typo.h4">Gerenciar Departamentos</MudText>
@@ -31,7 +31,7 @@
           ServerData="ServerReload" 
           Dense="false" 
           Hover="true" 
-          Elevation="4" 
+          Elevation="2" 
           @ref="_table" 
           Striped="true"
           Loading="_loading">
@@ -170,7 +170,7 @@
             { x => x.IsEdit, false }
         };
 
-        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium};
         var dialog = await DialogService.ShowAsync<DepartmentDialog>("Novo Departamento", parameters, options);
         var result = await dialog.Result;
 
@@ -189,7 +189,7 @@
             { x => x.DepartmentId, department.Id }
         };
 
-        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = false };
         var dialog = await DialogService.ShowAsync<DepartmentDialog>("Editar Departamento", parameters, options);
         var result = await dialog.Result;
 

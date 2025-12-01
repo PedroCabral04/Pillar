@@ -15,7 +15,6 @@ public partial class ProductMapper
     
     // CreateProductDto -> Product (ignora campos calculados/automáticos)
     [MapperIgnoreTarget(nameof(Product.Id))]
-    [MapperIgnoreTarget(nameof(Product.CurrentStock))]
     [MapperIgnoreTarget(nameof(Product.CreatedAt))]
     [MapperIgnoreTarget(nameof(Product.UpdatedAt))]
     [MapperIgnoreTarget(nameof(Product.Category))]

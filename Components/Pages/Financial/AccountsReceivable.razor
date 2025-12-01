@@ -27,7 +27,7 @@
                  <MudSelect T="AccountStatus?" Label="Status" Value="statusFilter" ValueChanged="OnStatusChanged" Clearable="true">
                     @foreach (AccountStatus status in Enum.GetValues(typeof(AccountStatus)))
                     {
-                        <MudSelectItem Value="@((AccountStatus?)status)">@status.ToString()</MudSelectItem>
+                        <MudSelectItem Value="@((AccountStatus?)status)">@status.ToDisplayName()</MudSelectItem>
                     }
                 </MudSelect>
             </MudItem>
@@ -62,7 +62,7 @@
             <RowTemplate>
                 <MudTd DataLabel="Cliente">@context.CustomerName</MudTd>
                 <MudTd DataLabel="Nota Fiscal">@context.InvoiceNumber</MudTd>
-                <MudTd DataLabel="Vencimento">@context.DueDate.ToShortDateString()</MudTd>
+                <MudTd DataLabel="Vencimento">@context.DueDate.ToBrazilianDate()</MudTd>
                 <MudTd DataLabel="Valor">@context.RemainingAmount.ToString("C2")</MudTd>
                 <MudTd DataLabel="Status">
                         <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">
@@ -73,19 +73,23 @@
                     @if (context.Status != AccountStatus.Paid && context.Status != AccountStatus.Cancelled)
                     {
                         <MudTooltip Text="Receber">
-                            <MudIconButton Icon="@Icons.Material.Filled.AttachMoney" Size="Size.Small" Color="MudBlazor.Color.Success" OnClick="@(() => OpenReceiveDialog(context))" />
+                            <MudIconButton Icon="@Icons.Material.Filled.AttachMoney" Size="Size.Small" Color="MudBlazor.Color.Success" OnClick="@(() => OpenReceiveDialog(context))" aria-label="@($"Receber conta {context.InvoiceNumber}")" />
                         </MudTooltip>
                     }
                     <MudTooltip Text="Editar">
-                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => OpenEditDialog(context))" Disabled="@(context.Status == AccountStatus.Paid)" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => OpenEditDialog(context))" Disabled="@(context.Status == AccountStatus.Paid)" aria-label="@($"Editar conta {context.InvoiceNumber}")" />
                     </MudTooltip>
                     <MudTooltip Text="Excluir">
-                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="MudBlazor.Color.Error" OnClick="@(() => DeleteAccount(context))" Disabled="@(context.Status == AccountStatus.Paid)" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="MudBlazor.Color.Error" OnClick="@(() => DeleteAccount(context))" Disabled="@(context.Status == AccountStatus.Paid)" aria-label="@($"Excluir conta {context.InvoiceNumber}")" />
                     </MudTooltip>
                 </MudTd>
             </RowTemplate>
             <NoRecordsContent>
-                <MudText>Nenhuma conta encontrada.</MudText>
+                <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="pa-8">
+                    <MudIcon Icon="@Icons.Material.Filled.Receipt" Size="Size.Large" Color="MudBlazor.Color.Default" Class="mb-2" />
+                    <MudText Typo="Typo.h6" Color="MudBlazor.Color.Default">Nenhuma conta encontrada</MudText>
+                    <MudText Typo="Typo.body2" Color="MudBlazor.Color.Secondary">Adicione uma nova conta a receber clicando no botão acima</MudText>
+                </MudStack>
             </NoRecordsContent>
             <PagerContent>
                 <MudTablePager />
@@ -211,7 +215,7 @@
         parameters.Add("Categories", categories);
         parameters.Add("CostCenters", costCenters);
 
-        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var options = new DialogOptions { CloseOnEscapeKey = true };
         var dialog = DialogService.Show<AccountReceivableDialog>("Nova Conta a Receber", parameters, options);
         var result = await dialog.Result;
 
@@ -261,7 +265,7 @@
         
         parameters.Add("Model", model);
 
-        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var options = new DialogOptions { CloseOnEscapeKey = true };
         var dialog = DialogService.Show<AccountReceivableDialog>("Editar Conta a Receber", parameters, options);
         var result = await dialog.Result;
 
@@ -309,7 +313,7 @@
         parameters.Add("PaidAmount", account.RemainingAmount);
         parameters.Add("AmountLabel", "Valor Recebido");
         
-        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = false };
         var dialog = DialogService.Show<PaymentDialog>("Registrar Recebimento", parameters, options);
         var result = await dialog.Result;
 

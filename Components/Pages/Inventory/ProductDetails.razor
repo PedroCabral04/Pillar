@@ -1,0 +1,470 @@
+@page "/inventory/products/{Id:int}"
+@using erp.DTOs.Inventory
+@using erp.Services
+@using erp.Components.Shared.Dialogs.Inventory
+@using MudBlazor
+@using Size = MudBlazor.Size
+@using Color = MudBlazor.Color
+@attribute [Authorize]
+
+@inject IApiService ApiService
+@inject ILogger<ProductDetails> Logger
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager Navigation
+
+<PageTitle>@(_product?.Name ?? "Detalhes do Produto")</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
+    @if (_loading)
+    {
+        <MudStack AlignItems="AlignItems.Center" Class="pa-8">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Large"/>
+            <MudText Typo="Typo.h6" Color="Color.Secondary">Carregando produto...</MudText>
+        </MudStack>
+    }
+    else if (_product == null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudIcon Icon="@Icons.Material.Filled.Error"/>
+                <MudText>Produto não encontrado</MudText>
+            </MudStack>
+        </MudAlert>
+        <MudButton Variant="Variant.Filled" 
+                   Color="Color.Primary" 
+                   StartIcon="@Icons.Material.Filled.ArrowBack"
+                   Href="/inventory/products">
+            Voltar para Produtos
+        </MudButton>
+    }
+    else
+    {
+        <!-- Header -->
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start" Class="mb-4">
+            <MudStack Spacing="1">
+                <MudBreadcrumbs Items="_breadcrumbs" Class="pa-0"/>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudIcon Icon="@Icons.Material.Filled.Inventory2" Size="Size.Large" Color="Color.Primary"/>
+                    <MudText Typo="Typo.h4">@_product.Name</MudText>
+                    <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(_product.Status)" Variant="Variant.Filled">
+                        @GetStatusText(_product.Status)
+                    </MudChip>
+                </MudStack>
+            </MudStack>
+            <MudStack Row="true" Spacing="2">
+                <MudButton Variant="Variant.Outlined" 
+                           StartIcon="@Icons.Material.Filled.ArrowBack"
+                           Href="/inventory/products">
+                    Voltar
+                </MudButton>
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Primary" 
+                           StartIcon="@Icons.Material.Filled.Edit"
+                           OnClick="OpenEditDialog">
+                    Editar
+                </MudButton>
+            </MudStack>
+        </MudStack>
+
+        <MudGrid>
+            <!-- Coluna Principal -->
+            <MudItem xs="12" md="8">
+                <!-- Informações Básicas -->
+                <MudPaper Elevation="2" Class="pa-4 mb-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Info" Class="mr-2" Style="vertical-align: middle;"/>
+                        Informações Básicas
+                    </MudText>
+                    <MudDivider Class="mb-4"/>
+                    
+                    <MudGrid>
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">SKU</MudText>
+                            <MudText Typo="Typo.body1" Style="font-family: 'Roboto Mono', monospace; font-weight: 600;">@_product.Sku</MudText>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Código de Barras</MudText>
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudIcon Icon="@Icons.Material.Filled.QrCode" Size="Size.Small" Color="Color.Secondary"/>
+                                <MudText Typo="Typo.body1">@(string.IsNullOrEmpty(_product.Barcode) ? "-" : _product.Barcode)</MudText>
+                            </MudStack>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Categoria</MudText>
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Info">@_product.CategoryName</MudChip>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Unidade</MudText>
+                            <MudText Typo="Typo.body1">@_product.Unit</MudText>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Marca</MudText>
+                            <MudText Typo="Typo.body1">@(string.IsNullOrEmpty(_product.BrandName) ? "-" : _product.BrandName)</MudText>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Produto Ativo</MudText>
+                            <MudChip T="string" Size="Size.Small" Color="@(_product.IsActive ? Color.Success : Color.Error)" Variant="Variant.Filled">
+                                @(_product.IsActive ? "Sim" : "Não")
+                            </MudChip>
+                        </MudItem>
+                        @if (!string.IsNullOrEmpty(_product.Description))
+                        {
+                            <MudItem xs="12">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Descrição</MudText>
+                                <MudText Typo="Typo.body2">@_product.Description</MudText>
+                            </MudItem>
+                        }
+                        @if (!string.IsNullOrEmpty(_product.TechnicalSpecifications))
+                        {
+                            <MudItem xs="12">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Especificações Técnicas</MudText>
+                                <MudText Typo="Typo.body2">@_product.TechnicalSpecifications</MudText>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                </MudPaper>
+
+                <!-- Preços -->
+                <MudPaper Elevation="2" Class="pa-4 mb-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Class="mr-2" Style="vertical-align: middle;"/>
+                        Preços e Margem
+                    </MudText>
+                    <MudDivider Class="mb-4"/>
+                    
+                    <MudGrid>
+                        <MudItem xs="6" sm="4" md="3">
+                            <MudStack Spacing="1">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Preço de Custo</MudText>
+                                <MudText Typo="Typo.h6">@_product.CostPrice.ToString("C2")</MudText>
+                            </MudStack>
+                        </MudItem>
+                        <MudItem xs="6" sm="4" md="3">
+                            <MudStack Spacing="1">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Preço de Venda</MudText>
+                                <MudText Typo="Typo.h6" Style="font-weight: 600;">@_product.SalePrice.ToString("C2")</MudText>
+                            </MudStack>
+                        </MudItem>
+                        <MudItem xs="6" sm="4" md="3">
+                            <MudStack Spacing="1">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Preço Atacado</MudText>
+                                <MudText Typo="Typo.h6">@(_product.WholesalePrice?.ToString("C2") ?? "-")</MudText>
+                            </MudStack>
+                        </MudItem>
+                        <MudItem xs="6" sm="4" md="3">
+                            <MudStack Spacing="1">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Margem de Lucro</MudText>
+                                <MudChip T="string" Size="Size.Small" Color="@GetMarginColor(_product.ProfitMargin)" Variant="Variant.Filled">
+                                    @_product.ProfitMargin.ToString("N1")%
+                                </MudChip>
+                            </MudStack>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+
+                <!-- Informações Fiscais -->
+                <MudPaper Elevation="2" Class="pa-4 mb-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Receipt" Class="mr-2" Style="vertical-align: middle;"/>
+                        Informações Fiscais
+                    </MudText>
+                    <MudDivider Class="mb-4"/>
+                    
+                    <MudGrid>
+                        <MudItem xs="6" sm="4" md="3">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">NCM</MudText>
+                            <MudText Typo="Typo.body1" Style="font-family: monospace;">@(string.IsNullOrEmpty(_product.NcmCode) ? "-" : _product.NcmCode)</MudText>
+                        </MudItem>
+                        <MudItem xs="6" sm="4" md="3">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">CEST</MudText>
+                            <MudText Typo="Typo.body1" Style="font-family: monospace;">@(string.IsNullOrEmpty(_product.CestCode) ? "-" : _product.CestCode)</MudText>
+                        </MudItem>
+                        <MudItem xs="6" sm="4" md="3">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">ICMS</MudText>
+                            <MudText Typo="Typo.body1">@_product.IcmsRate.ToString("N2")%</MudText>
+                        </MudItem>
+                        <MudItem xs="6" sm="4" md="3">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">IPI</MudText>
+                            <MudText Typo="Typo.body1">@_product.IpiRate.ToString("N2")%</MudText>
+                        </MudItem>
+                        <MudItem xs="6" sm="4" md="3">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">PIS</MudText>
+                            <MudText Typo="Typo.body1">@_product.PisRate.ToString("N2")%</MudText>
+                        </MudItem>
+                        <MudItem xs="6" sm="4" md="3">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">COFINS</MudText>
+                            <MudText Typo="Typo.body1">@_product.CofinsRate.ToString("N2")%</MudText>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+
+                <!-- Dimensões -->
+                @if (_product.Weight.HasValue || _product.Length.HasValue || _product.Width.HasValue || _product.Height.HasValue)
+                {
+                    <MudPaper Elevation="2" Class="pa-4 mb-4">
+                        <MudText Typo="Typo.h6" Class="mb-3">
+                            <MudIcon Icon="@Icons.Material.Filled.Straighten" Class="mr-2" Style="vertical-align: middle;"/>
+                            Dimensões e Peso
+                        </MudText>
+                        <MudDivider Class="mb-4"/>
+                        
+                        <MudGrid>
+                            <MudItem xs="6" sm="4" md="3">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Peso</MudText>
+                                <MudText Typo="Typo.body1">@(_product.Weight?.ToString("N2") ?? "-") kg</MudText>
+                            </MudItem>
+                            <MudItem xs="6" sm="4" md="3">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Comprimento</MudText>
+                                <MudText Typo="Typo.body1">@(_product.Length?.ToString("N1") ?? "-") cm</MudText>
+                            </MudItem>
+                            <MudItem xs="6" sm="4" md="3">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Largura</MudText>
+                                <MudText Typo="Typo.body1">@(_product.Width?.ToString("N1") ?? "-") cm</MudText>
+                            </MudItem>
+                            <MudItem xs="6" sm="4" md="3">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Altura</MudText>
+                                <MudText Typo="Typo.body1">@(_product.Height?.ToString("N1") ?? "-") cm</MudText>
+                            </MudItem>
+                            <MudItem xs="6" sm="4" md="3">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Unidades por Caixa</MudText>
+                                <MudText Typo="Typo.body1">@_product.UnitsPerBox.ToString("N0")</MudText>
+                            </MudItem>
+                        </MudGrid>
+                    </MudPaper>
+                }
+            </MudItem>
+
+            <!-- Coluna Lateral -->
+            <MudItem xs="12" md="4">
+                <!-- Card de Estoque -->
+                <MudPaper Elevation="2" Class="pa-4 mb-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Inventory" Class="mr-2" Style="vertical-align: middle;"/>
+                        Estoque
+                    </MudText>
+                    <MudDivider Class="mb-4"/>
+                    
+                    <MudStack Spacing="3" AlignItems="AlignItems.Center">
+                        <MudPaper Elevation="0" Class="pa-4 rounded text-center" Style="width: 100%; background-color: var(--mud-palette-background-grey);">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Estoque Atual</MudText>
+                            <MudText Typo="Typo.h3" Color="@GetStockColor(_product)" Style="font-weight: 700;">
+                                @_product.CurrentStock.ToString("N0")
+                            </MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">@_product.Unit</MudText>
+                        </MudPaper>
+                        
+                        <MudStack Row="true" Justify="Justify.SpaceAround" Style="width: 100%;">
+                            <MudStack AlignItems="AlignItems.Center">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Mínimo</MudText>
+                                <MudText Typo="Typo.h6" Color="Color.Warning">@_product.MinimumStock.ToString("N0")</MudText>
+                            </MudStack>
+                            <MudStack AlignItems="AlignItems.Center">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Máximo</MudText>
+                                <MudText Typo="Typo.h6" Color="Color.Info">@_product.MaximumStock.ToString("N0")</MudText>
+                            </MudStack>
+                        </MudStack>
+                        
+                        @if (_product.CurrentStock <= 0)
+                        {
+                            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">
+                                <MudIcon Icon="@Icons.Material.Filled.Warning" Class="mr-1"/>
+                                Produto sem estoque!
+                            </MudAlert>
+                        }
+                        else if (_product.CurrentStock <= _product.MinimumStock)
+                        {
+                            <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
+                                <MudIcon Icon="@Icons.Material.Filled.TrendingDown" Class="mr-1"/>
+                                Estoque baixo - considere reabastecer
+                            </MudAlert>
+                        }
+                    </MudStack>
+                    
+                    <MudDivider Class="my-4"/>
+                    
+                    <MudStack Spacing="2">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Ponto de Reposição</MudText>
+                            <MudText Typo="Typo.body2">@_product.ReorderPoint.ToString("N0") @_product.Unit</MudText>
+                        </MudStack>
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Estoque de Segurança</MudText>
+                            <MudText Typo="Typo.body2">@_product.SafetyStock.ToString("N0") @_product.Unit</MudText>
+                        </MudStack>
+                        @if (!string.IsNullOrEmpty(_product.WarehouseLocation))
+                        {
+                            <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Localização</MudText>
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@_product.WarehouseLocation</MudChip>
+                            </MudStack>
+                        }
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Estoque Negativo</MudText>
+                            <MudText Typo="Typo.body2">@(_product.AllowNegativeStock ? "Permitido" : "Não permitido")</MudText>
+                        </MudStack>
+                    </MudStack>
+
+                    <MudDivider Class="my-4"/>
+
+                    <MudButton Variant="Variant.Outlined" 
+                               Color="Color.Primary" 
+                               FullWidth="true"
+                               StartIcon="@Icons.Material.Filled.SwapHoriz"
+                               Href="/inventory/stock-movements">
+                        Ver Movimentações
+                    </MudButton>
+                </MudPaper>
+
+                <!-- Informações do Sistema -->
+                <MudPaper Elevation="2" Class="pa-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.History" Class="mr-2" Style="vertical-align: middle;"/>
+                        Informações do Sistema
+                    </MudText>
+                    <MudDivider Class="mb-4"/>
+                    
+                    <MudStack Spacing="2">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Criado em</MudText>
+                            <MudText Typo="Typo.body2">@_product.CreatedAt.ToString("dd/MM/yyyy HH:mm")</MudText>
+                        </MudStack>
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Criado por</MudText>
+                            <MudText Typo="Typo.body2">@(string.IsNullOrEmpty(_product.CreatedByUserName) ? "-" : _product.CreatedByUserName)</MudText>
+                        </MudStack>
+                        @if (_product.UpdatedAt.HasValue)
+                        {
+                            <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Atualizado em</MudText>
+                                <MudText Typo="Typo.body2">@_product.UpdatedAt.Value.ToString("dd/MM/yyyy HH:mm")</MudText>
+                            </MudStack>
+                        }
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">ID do Produto</MudText>
+                            <MudText Typo="Typo.body2" Style="font-family: monospace;">#@_product.Id</MudText>
+                        </MudStack>
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</MudContainer>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private ProductDto? _product;
+    private bool _loading = true;
+    private List<BreadcrumbItem> _breadcrumbs = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProduct();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_product?.Id != Id)
+        {
+            await LoadProduct();
+        }
+    }
+
+    private async Task LoadProduct()
+    {
+        _loading = true;
+        try
+        {
+            _product = await ApiService.GetAsync<ProductDto>($"/api/products/{Id}");
+            
+            if (_product != null)
+            {
+                _breadcrumbs = new List<BreadcrumbItem>
+                {
+                    new("Início", href: "/", icon: Icons.Material.Filled.Home),
+                    new("Produtos", href: "/inventory/products", icon: Icons.Material.Filled.Inventory2),
+                    new(_product.Name, href: null, disabled: true)
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar produto {ProductId}", Id);
+            Snackbar.Add("Erro ao carregar produto", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenEditDialog()
+    {
+        if (_product == null) return;
+
+        var parameters = new DialogParameters
+        {
+            { "Product", _product }
+        };
+
+        var options = new DialogOptions
+        {
+            CloseOnEscapeKey = true,
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = false
+        };
+
+        var dialog = await DialogService.ShowAsync<EditProductDialog>("Editar Produto", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await LoadProduct();
+            Snackbar.Add("Produto atualizado!", Severity.Success);
+        }
+    }
+
+    private Color GetStatusColor(int status)
+    {
+        return status switch
+        {
+            0 => Color.Success,
+            1 => Color.Warning,
+            2 => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    private string GetStatusText(int status)
+    {
+        return status switch
+        {
+            0 => "Ativo",
+            1 => "Inativo",
+            2 => "Descontinuado",
+            _ => "Desconhecido"
+        };
+    }
+
+    private Color GetStockColor(ProductDto product)
+    {
+        if (product.CurrentStock <= 0)
+            return Color.Error;
+        if (product.CurrentStock <= product.MinimumStock)
+            return Color.Warning;
+        return Color.Success;
+    }
+
+    private Color GetMarginColor(decimal margin)
+    {
+        if (margin <= 0)
+            return Color.Error;
+        if (margin < 15)
+            return Color.Warning;
+        if (margin < 30)
+            return Color.Info;
+        return Color.Success;
+    }
+}

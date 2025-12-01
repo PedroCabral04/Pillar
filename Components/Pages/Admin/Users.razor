@@ -12,7 +12,7 @@
 @inject IDialogService DialogService
 @implements IDisposable;
 
-<PageTitle>Gerenciar Usuários</PageTitle>
+<PageTitle>Gerenciar Usuários - Pillar ERP</PageTitle>
 
 <MudSnackbarProvider/>
 
@@ -32,7 +32,7 @@
 }
 
 <MudTable T="UserDto" ServerData="new Func<TableState, CancellationToken, Task<TableData<UserDto>>>(ServerReload)" 
-          Dense="false" Hover="true" Elevation="4" @ref="_table" Striped='true'>
+          Dense="false" Hover="true" Elevation="2" @ref="_table" Striped='true'>
     <ToolBarContent>
         <MudText Typo="Typo.h5">Usuários Cadastrados</MudText>
         <MudSpacer/>
@@ -124,18 +124,26 @@
         </MudTd>
         <MudTd>
             <MudButtonGroup Variant="Variant.Outlined" Size="MudBlazor.Size.Small">
-                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="MudBlazor.Color.Info" 
-                               OnClick="@(() => ShowUserUpdateDialog(context.Id))" 
-                               Title="Editar usuário" />
-                <MudIconButton Icon="@(context.IsActive ? Icons.Material.Filled.PersonOff : Icons.Material.Filled.PersonAdd)" 
-                               Color="@(context.IsActive ? MudBlazor.Color.Warning : MudBlazor.Color.Success)" 
-                               OnClick="@(() => ToggleUserStatus(context))" 
-                               Title="@(context.IsActive ? "Desativar usuário" : "Ativar usuário")" />
+                <MudTooltip Text="Editar usuário">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="MudBlazor.Color.Info" 
+                                   OnClick="@(() => ShowUserUpdateDialog(context.Id))" 
+                                   aria-label="@($"Editar usuário {context.Username}")" />
+                </MudTooltip>
+                <MudTooltip Text="@(context.IsActive ? "Desativar usuário" : "Ativar usuário")">
+                    <MudIconButton Icon="@(context.IsActive ? Icons.Material.Filled.PersonOff : Icons.Material.Filled.PersonAdd)" 
+                                   Color="@(context.IsActive ? MudBlazor.Color.Warning : MudBlazor.Color.Success)" 
+                                   OnClick="@(() => ToggleUserStatus(context))" 
+                                   aria-label="@(context.IsActive ? $"Desativar usuário {context.Username}" : $"Ativar usuário {context.Username}")" />
+                </MudTooltip>
             </MudButtonGroup>
         </MudTd>    
     </RowTemplate>
     <NoRecordsContent>
-        <MudText>Nenhum usuário encontrado.</MudText>
+        <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="pa-8">
+            <MudIcon Icon="@Icons.Material.Filled.PersonSearch" Size="MudBlazor.Size.Large" Color="MudBlazor.Color.Default" Class="mb-2" />
+            <MudText Typo="Typo.h6" Color="MudBlazor.Color.Default">Nenhum usuário encontrado</MudText>
+            <MudText Typo="Typo.body2" Color="MudBlazor.Color.Secondary">Adicione um novo usuário clicando no botão acima</MudText>
+        </MudStack>
     </NoRecordsContent>
     <LoadingContent>
         <MudText>Carregando...</MudText>

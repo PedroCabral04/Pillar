@@ -1,18 +1,22 @@
 using Microsoft.EntityFrameworkCore;
 using erp.Data;
 using erp.DTOs.Dashboard;
+using erp.DTOs.Reports;
+using erp.Services.Reports;
 
 namespace erp.Services.Dashboard.Providers.Inventory;
 
 public class InventoryDashboardProvider : IDashboardWidgetProvider
 {
     private readonly ApplicationDbContext _context;
+    private readonly IInventoryReportService _inventoryReportService;
     public const string Key = "inventory";
     public string ProviderKey => Key;
 
-    public InventoryDashboardProvider(ApplicationDbContext context)
+    public InventoryDashboardProvider(ApplicationDbContext context, IInventoryReportService inventoryReportService)
     {
         _context = context;
+        _inventoryReportService = inventoryReportService;
     }
 
     public IEnumerable<DashboardWidgetDefinition> GetWidgets() => new[]
@@ -60,6 +64,17 @@ public class InventoryDashboardProvider : IDashboardWidgetProvider
             Icon = "mdi-currency-usd",
             Unit = "R$"
             , RequiredRoles = new[] { "Estoque", "Financeiro", "Administrador" }
+        },
+        new DashboardWidgetDefinition
+        {
+            ProviderKey = Key,
+            WidgetKey = "abc-curve",
+            Title = "Curva ABC (Pareto)",
+            Description = "Classificação de produtos por contribuição de receita",
+            ChartType = DashboardChartType.Donut,
+            Icon = "mdi-chart-arc",
+            Unit = "R$"
+            , RequiredRoles = new[] { "Estoque", "Financeiro", "Gerente", "Administrador" }
         }
     };
 
@@ -71,6 +86,7 @@ public class InventoryDashboardProvider : IDashboardWidgetProvider
             "low-stock-alert" => GetLowStockAlertAsync(query, ct),
             "stock-movements" => GetStockMovementsAsync(query, ct),
             "top-value-products" => GetTopValueProductsAsync(query, ct),
+            "abc-curve" => GetABCCurveAsync(query, ct),
             _ => throw new KeyNotFoundException($"Widget '{widgetKey}' not found in provider '{Key}'.")
         };
     }
@@ -126,8 +142,8 @@ public class InventoryDashboardProvider : IDashboardWidgetProvider
 
     private async Task<ChartDataResponse> GetStockMovementsAsync(DashboardQuery query, CancellationToken ct)
     {
-        var startDate = query.From ?? DateTime.Now.AddMonths(-11).Date;
-        var endDate = query.To ?? DateTime.Now.Date;
+        var startDate = (query.From ?? DateTime.Now.AddMonths(-11).Date).ToUniversalTime();
+        var endDate = (query.To ?? DateTime.Now.Date).ToUniversalTime();
 
         var movements = await _context.StockMovements
             .Where(m => m.MovementDate >= startDate && m.MovementDate <= endDate)
@@ -210,6 +226,48 @@ public class InventoryDashboardProvider : IDashboardWidgetProvider
                 new() { Name = "Valor em Estoque", Data = topProducts.Select(p => p.Value).ToList() }
             },
             Subtitle = "Top 10 produtos"
+        };
+    }
+
+    private async Task<ChartDataResponse> GetABCCurveAsync(DashboardQuery query, CancellationToken ct)
+    {
+        var filter = new InventoryReportFilterDto
+        {
+            StartDate = query.From ?? DateTime.Now.AddMonths(-6),
+            EndDate = query.To ?? DateTime.Now
+        };
+
+        var abcReport = await _inventoryReportService.GenerateABCCurveReportAsync(filter);
+        var summary = abcReport.Summary;
+
+        if (summary.TotalProducts == 0)
+        {
+            return new ChartDataResponse
+            {
+                Categories = new List<string> { "Sem dados" },
+                Series = new List<ChartSeriesDto> { new() { Name = "Receita", Data = new List<decimal> { 0 } } },
+                Subtitle = "Nenhum dado de vendas no período"
+            };
+        }
+
+        return new ChartDataResponse
+        {
+            Categories = new List<string> 
+            { 
+                $"Classe A ({summary.ClassACount} itens)", 
+                $"Classe B ({summary.ClassBCount} itens)", 
+                $"Classe C ({summary.ClassCCount} itens)" 
+            },
+            Series = new List<ChartSeriesDto>
+            {
+                new() { Name = "Receita", Data = new List<decimal> 
+                { 
+                    summary.ClassARevenue, 
+                    summary.ClassBRevenue, 
+                    summary.ClassCRevenue 
+                } }
+            },
+            Subtitle = $"Total: {summary.TotalRevenue:C2} | A: {summary.ClassAPercentage:N1}% | B: {summary.ClassBPercentage:N1}% | C: {summary.ClassCPercentage:N1}%"
         };
     }
 }

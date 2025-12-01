@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace erp.DTOs.Reports;
 
 /// <summary>
@@ -26,6 +28,13 @@ public class SalesReportResultDto
     public decimal TotalAmount => Summary.TotalRevenue;
     public decimal TotalDiscount => Summary.TotalDiscounts;
     public decimal AverageTicket => Summary.AverageTicket;
+    
+    /// <summary>
+    /// Deprecated: Use Items instead. This property is excluded from JSON serialization 
+    /// to prevent circular reference issues (Sale.Customer.Sales cycle).
+    /// </summary>
+    [JsonIgnore]
+    [Obsolete("Use Items instead. Raw EF entities cause circular reference issues during JSON serialization.")]
     public List<erp.Models.Sales.Sale> Sales { get; set; } = new();
 }
 
@@ -104,4 +113,39 @@ public class PaymentMethodSalesReportItemDto
     public string PaymentMethod { get; set; } = string.Empty;
     public int TotalSales { get; set; }
     public decimal TotalAmount { get; set; }
+}
+
+/// <summary>
+/// DTO for sales heatmap report (by day of week and hour)
+/// </summary>
+public class SalesHeatmapReportDto
+{
+    public List<SalesHeatmapSeriesDto> Series { get; set; } = new();
+    public SalesHeatmapSummaryDto Summary { get; set; } = new();
+}
+
+public class SalesHeatmapSeriesDto
+{
+    public string Name { get; set; } = string.Empty; // Day name: "Segunda", "Terça", etc.
+    public List<SalesHeatmapDataPoint> Data { get; set; } = new();
+}
+
+public class SalesHeatmapDataPoint
+{
+    public string X { get; set; } = string.Empty; // Hour: "08:00", "09:00", etc.
+    public int Y { get; set; } // Sales count
+    public decimal Revenue { get; set; } // Revenue for that hour
+}
+
+public class SalesHeatmapSummaryDto
+{
+    public int TotalSales { get; set; }
+    public decimal TotalRevenue { get; set; }
+    public string PeakDay { get; set; } = string.Empty;
+    public string PeakHour { get; set; } = string.Empty;
+    public int PeakSalesCount { get; set; }
+    public decimal PeakRevenue { get; set; }
+    public string LowestDay { get; set; } = string.Empty;
+    public string LowestHour { get; set; } = string.Empty;
+    public decimal AverageSalesPerHour { get; set; }
 }

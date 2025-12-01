@@ -650,6 +650,82 @@ namespace erp.Migrations
                     b.ToTable("AuditLogs", (string)null);
                 });
 
+            modelBuilder.Entity("erp.Models.Dashboard.UserDashboardLayout", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("Columns")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(3);
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("LastModified")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LayoutJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("LayoutType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("UserDashboardLayouts", (string)null);
+                });
+
+            modelBuilder.Entity("erp.Models.Dashboard.WidgetRoleConfiguration", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("LastModified")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("ModifiedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ProviderKey")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("RolesJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("WidgetKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ModifiedByUserId");
+
+                    b.HasIndex("ProviderKey", "WidgetKey")
+                        .IsUnique();
+
+                    b.ToTable("WidgetRoleConfigurations", (string)null);
+                });
+
             modelBuilder.Entity("erp.Models.Financial.AccountPayable", b =>
                 {
                     b.Property<int>("Id")
@@ -3239,6 +3315,27 @@ namespace erp.Migrations
                     b.Navigation("RequestedByUser");
 
                     b.Navigation("ToDepartment");
+                });
+
+            modelBuilder.Entity("erp.Models.Dashboard.UserDashboardLayout", b =>
+                {
+                    b.HasOne("erp.Models.Identity.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("erp.Models.Dashboard.WidgetRoleConfiguration", b =>
+                {
+                    b.HasOne("erp.Models.Identity.ApplicationUser", "ModifiedByUser")
+                        .WithMany()
+                        .HasForeignKey("ModifiedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("ModifiedByUser");
                 });
 
             modelBuilder.Entity("erp.Models.Financial.AccountPayable", b =>

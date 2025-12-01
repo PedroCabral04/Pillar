@@ -10,7 +10,7 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
-<PageTitle>Gerenciar Cargos</PageTitle>
+<PageTitle>Gerenciar Cargos - Pillar ERP</PageTitle>
 
 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
     <MudText Typo="Typo.h4">Gerenciar Cargos</MudText>
@@ -31,7 +31,7 @@
           ServerData="ServerReload" 
           Dense="false" 
           Hover="true" 
-          Elevation="4" 
+          Elevation="2" 
           @ref="_table" 
           Striped="true"
           Loading="_loading">
@@ -201,7 +201,7 @@
             { x => x.IsEdit, false }
         };
 
-        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = false };
         var dialog = await DialogService.ShowAsync<PositionDialog>("Novo Cargo", parameters, options);
         var result = await dialog.Result;
 
@@ -220,7 +220,7 @@
             { x => x.PositionId, position.Id }
         };
 
-        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = false };
         var dialog = await DialogService.ShowAsync<PositionDialog>("Editar Cargo", parameters, options);
         var result = await dialog.Result;
 

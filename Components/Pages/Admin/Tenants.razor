@@ -8,7 +8,7 @@
 @inject IDialogService DialogService
 @inject ILogger<Tenants> Logger
 
-<PageTitle>Tenants</PageTitle>
+<PageTitle>Tenants - Pillar ERP</PageTitle>
 
 <MudStack Spacing="3">
     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
@@ -131,7 +131,7 @@
 
     private async Task CreateTenant()
     {
-        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Large, FullWidth = true };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = false };
         var dialog = await DialogService.ShowAsync<TenantFormDialog>("Novo tenant", options);
         var result = await dialog.Result;
         if (result is { Canceled: false })
@@ -143,7 +143,7 @@
     private async Task EditTenant(TenantDto tenant)
     {
         var parameters = new DialogParameters<TenantFormDialog> { { x => x.Tenant, tenant }, { x => x.IsEdit, true } };
-        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Large, FullWidth = true };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = false };
         var dialog = await DialogService.ShowAsync<TenantFormDialog>($"Editar {tenant.Name}", parameters, options);
         var result = await dialog.Result;
         if (result is { Canceled: false })

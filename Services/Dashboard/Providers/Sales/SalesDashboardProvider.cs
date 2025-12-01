@@ -1,18 +1,22 @@
 using Microsoft.EntityFrameworkCore;
 using erp.Data;
 using erp.DTOs.Dashboard;
+using erp.DTOs.Reports;
+using erp.Services.Reports;
 
 namespace erp.Services.Dashboard.Providers.Sales;
 
 public class SalesDashboardProvider : IDashboardWidgetProvider
 {
     private readonly ApplicationDbContext _context;
+    private readonly ISalesReportService _salesReportService;
     public const string Key = "sales";
     public string ProviderKey => Key;
 
-    public SalesDashboardProvider(ApplicationDbContext context)
+    public SalesDashboardProvider(ApplicationDbContext context, ISalesReportService salesReportService)
     {
         _context = context;
+        _salesReportService = salesReportService;
     }
 
     public IEnumerable<DashboardWidgetDefinition> GetWidgets() => new[]
@@ -49,6 +53,17 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
             Icon = "mdi-chart-donut",
             Unit = "vendas"
             , RequiredRoles = new[] { "Vendas", "Administrador" }
+        },
+        new DashboardWidgetDefinition
+        {
+            ProviderKey = Key,
+            WidgetKey = "sales-peak-hours",
+            Title = "Horários de Pico de Vendas",
+            Description = "Análise de horários com maior volume de vendas",
+            ChartType = DashboardChartType.Bar,
+            Icon = "mdi-clock-time-eight",
+            Unit = "vendas"
+            , RequiredRoles = new[] { "Vendas", "Gerente", "Administrador" }
         }
     };
 
@@ -59,14 +74,15 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
             "sales-by-month" => GetSalesByMonthAsync(query, ct),
             "top-products" => GetTopProductsAsync(query, ct),
             "sales-by-status" => GetSalesByStatusAsync(query, ct),
+            "sales-peak-hours" => GetSalesPeakHoursAsync(query, ct),
             _ => throw new KeyNotFoundException($"Widget '{widgetKey}' not found in provider '{Key}'.")
         };
     }
 
     private async Task<ChartDataResponse> GetSalesByMonthAsync(DashboardQuery query, CancellationToken ct)
     {
-        var startDate = query.From ?? DateTime.Now.AddMonths(-11).Date;
-        var endDate = query.To ?? DateTime.Now.Date;
+        var startDate = (query.From ?? DateTime.Now.AddMonths(-11).Date).ToUniversalTime();
+        var endDate = (query.To ?? DateTime.Now.Date).ToUniversalTime();
 
         var salesByMonth = await _context.Sales
             .Where(s => s.Status == "Finalizada" && 
@@ -117,8 +133,8 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
 
     private async Task<ChartDataResponse> GetTopProductsAsync(DashboardQuery query, CancellationToken ct)
     {
-        var startDate = query.From ?? DateTime.Now.AddMonths(-1).Date;
-        var endDate = query.To ?? DateTime.Now.Date;
+        var startDate = (query.From ?? DateTime.Now.AddMonths(-1).Date).ToUniversalTime();
+        var endDate = (query.To ?? DateTime.Now.Date).ToUniversalTime();
 
         var topProducts = await _context.SaleItems
             .Include(i => i.Sale)
@@ -159,8 +175,8 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
 
     private async Task<ChartDataResponse> GetSalesByStatusAsync(DashboardQuery query, CancellationToken ct)
     {
-        var startDate = query.From ?? DateTime.Now.AddMonths(-1).Date;
-        var endDate = query.To ?? DateTime.Now.Date;
+        var startDate = (query.From ?? DateTime.Now.AddMonths(-1).Date).ToUniversalTime();
+        var endDate = (query.To ?? DateTime.Now.Date).ToUniversalTime();
 
         var salesByStatus = await _context.Sales
             .Where(s => s.SaleDate >= startDate && s.SaleDate <= endDate)
@@ -190,6 +206,67 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
                 new() { Name = "Vendas", Data = salesByStatus.Select(s => (decimal)s.Count).ToList() }
             },
             Subtitle = $"Total: {salesByStatus.Sum(s => s.Count)} vendas"
+        };
+    }
+
+    private async Task<ChartDataResponse> GetSalesPeakHoursAsync(DashboardQuery query, CancellationToken ct)
+    {
+        var filter = new SalesReportFilterDto
+        {
+            StartDate = query.From ?? DateTime.Now.AddMonths(-1),
+            EndDate = query.To ?? DateTime.Now
+        };
+
+        var heatmapReport = await _salesReportService.GenerateSalesHeatmapAsync(filter);
+        var summary = heatmapReport.Summary;
+
+        if (heatmapReport.Series.Count == 0)
+        {
+            return new ChartDataResponse
+            {
+                Categories = new List<string> { "Sem dados" },
+                Series = new List<ChartSeriesDto> { new() { Name = "Vendas", Data = new List<decimal> { 0 } } },
+                Subtitle = "Nenhuma venda no período"
+            };
+        }
+
+        // Aggregate sales by hour (summing all days)
+        var hourlyTotals = new Dictionary<string, int>();
+        
+        foreach (var daySeries in heatmapReport.Series)
+        {
+            foreach (var dataPoint in daySeries.Data)
+            {
+                if (!hourlyTotals.ContainsKey(dataPoint.X))
+                    hourlyTotals[dataPoint.X] = 0;
+                hourlyTotals[dataPoint.X] += dataPoint.Y;
+            }
+        }
+
+        // Get top 12 hours for readability, sorted by hour
+        var topHours = hourlyTotals
+            .OrderByDescending(kv => kv.Value)
+            .Take(12)
+            .OrderBy(kv => kv.Key)
+            .ToList();
+
+        var categories = topHours.Select(h => h.Key).ToList();
+        var values = topHours.Select(h => (decimal)h.Value).ToList();
+
+        // Find peak info
+        var peakHourEntry = hourlyTotals.OrderByDescending(kv => kv.Value).FirstOrDefault();
+        var peakDay = summary.PeakDay;
+        var peakHour = peakHourEntry.Key ?? "N/A";
+        var peakCount = peakHourEntry.Value;
+
+        return new ChartDataResponse
+        {
+            Categories = categories,
+            Series = new List<ChartSeriesDto>
+            {
+                new() { Name = "Vendas", Data = values }
+            },
+            Subtitle = $"Pico: {peakHour} ({peakCount:N0} vendas) | Dia mais movimentado: {peakDay}"
         };
     }
 }

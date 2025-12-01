@@ -112,26 +112,121 @@ public class ProductsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> GetProducts(
         [FromQuery] string? search = null,
+        [FromQuery] string? status = null,
+        [FromQuery] int? categoryId = null,
+        [FromQuery] bool? lowStock = null,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] bool sortDescending = false,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
         try
         {
+            // Parse status string to int if provided
+            int? statusInt = status?.ToLower() switch
+            {
+                "ativo" => 0,
+                "inativo" => 1,
+                "descontinuado" => 2,
+                _ => null
+            };
+
             var searchDto = new ProductSearchDto
             {
                 SearchTerm = search,
+                Status = statusInt,
+                CategoryId = categoryId,
+                LowStock = lowStock,
+                SortBy = sortBy ?? "Name",
+                SortDescending = sortDescending,
                 Page = page,
-                PageSize = pageSize,
-                SortBy = "Name",
-                SortDescending = false
+                PageSize = pageSize
             };
 
-            return await SearchProducts(searchDto);
+            var (products, totalCount) = await _inventoryService.SearchProductsAsync(searchDto);
+            
+            var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+            
+            return Ok(new
+            {
+                items = products,
+                total = totalCount,
+                page,
+                pageSize,
+                totalPages,
+                hasNextPage = page < totalPages,
+                hasPreviousPage = page > 1
+            });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Erro ao listar produtos");
             return StatusCode(500, new { message = "Erro ao listar produtos", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Obtém estatísticas gerais de produtos
+    /// </summary>
+    [HttpGet("statistics")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<ProductStatisticsDto>> GetStatistics()
+    {
+        try
+        {
+            var statistics = await _inventoryService.GetProductStatisticsAsync();
+            return Ok(statistics);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao obter estatísticas de produtos");
+            return StatusCode(500, new { message = "Erro ao obter estatísticas", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Exporta produtos para CSV
+    /// </summary>
+    [HttpGet("export")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> ExportProducts(
+        [FromQuery] string? search = null,
+        [FromQuery] string? status = null,
+        [FromQuery] int? categoryId = null,
+        [FromQuery] bool? lowStock = null,
+        [FromQuery] string format = "csv")
+    {
+        try
+        {
+            int? statusInt = status?.ToLower() switch
+            {
+                "ativo" => 0,
+                "inativo" => 1,
+                "descontinuado" => 2,
+                _ => null
+            };
+
+            var searchDto = new ProductSearchDto
+            {
+                SearchTerm = search,
+                Status = statusInt,
+                CategoryId = categoryId,
+                LowStock = lowStock
+            };
+
+            var bytes = await _inventoryService.ExportProductsAsync(searchDto, format);
+            
+            var fileName = $"produtos_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+            return File(bytes, "text/csv; charset=utf-8", fileName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao exportar produtos");
+            return StatusCode(500, new { message = "Erro ao exportar produtos", error = ex.Message });
         }
     }
 

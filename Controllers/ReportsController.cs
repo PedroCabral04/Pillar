@@ -85,6 +85,24 @@ public class ReportsController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Gera mapa de calor de vendas por hora e dia da semana
+    /// </summary>
+    [HttpPost("sales/heatmap")]
+    public async Task<ActionResult<SalesHeatmapReportDto>> GenerateSalesHeatmap([FromBody] SalesReportFilterDto filter)
+    {
+        try
+        {
+            var report = await _salesReportService.GenerateSalesHeatmapAsync(filter);
+            return Ok(report);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao gerar mapa de calor de vendas");
+            return StatusCode(500, new { message = "Erro ao gerar mapa de calor de vendas" });
+        }
+    }
+
     #endregion
 
     #region Financial Reports
@@ -220,6 +238,24 @@ public class ReportsController : ControllerBase
         {
             _logger.LogError(ex, "Erro ao gerar relatório de estoque");
             return StatusCode(500, new { message = "Erro ao gerar relatório de estoque" });
+        }
+    }
+
+    /// <summary>
+    /// Gera relatório de Curva ABC (Pareto)
+    /// </summary>
+    [HttpPost("inventory/abc-curve")]
+    public async Task<ActionResult<ABCCurveReportDto>> GenerateABCCurveReport([FromBody] InventoryReportFilterDto filter)
+    {
+        try
+        {
+            var report = await _inventoryReportService.GenerateABCCurveReportAsync(filter);
+            return Ok(report);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao gerar relatório de curva ABC");
+            return StatusCode(500, new { message = "Erro ao gerar relatório de curva ABC" });
         }
     }
 

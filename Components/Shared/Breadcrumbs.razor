@@ -66,12 +66,52 @@
     {
         return segment.ToLower() switch
         {
+            // Admin
             "dashboard" => "Dashboard",
             "admin" => "Administração",
             "users" => "Usuários",
+            "roles" => "Permissões",
+            "tenants" => "Inquilinos",
+            "audit" => "Auditoria",
+            
+            // Financeiro
+            "financial" => "Financeiro",
+            "payables" => "Contas a Pagar",
+            "receivables" => "Contas a Receber",
+            "suppliers" => "Fornecedores",
+            "categories" => index > 0 && allSegments[index - 1] == "financial" ? "Categorias Financeiras" : "Categorias",
+            "cost-centers" => "Centros de Custo",
+            
+            // Estoque
+            "inventory" => "Estoque",
+            "products" => "Produtos",
+            "stock-movements" => "Movimentações",
+            "stock-counts" => "Contagens",
+            "warehouses" => "Armazéns",
+            
+            // Vendas
+            "sales" => "Vendas",
+            "customers" => "Clientes",
+            
+            // Ativos
+            "assets" => "Ativos",
+            
+            // RH
+            "hr" => "Recursos Humanos",
+            "departments" => "Departamentos",
+            "positions" => "Cargos",
+            "payroll" => "Folha de Pagamento",
+            "time-tracking" => "Ponto",
+            
+            // Relatórios
+            "reports" => "Relatórios",
+            
+            // Configurações
             "kanban" => "Kanban",
             "settings" or "ajustes" => "Configurações",
+            "preferences" => "Preferências",
             "login" => "Login",
+            
             _ => segment.Length > 0 ? char.ToUpper(segment[0]) + segment.Substring(1) : segment
         };
     }
@@ -80,11 +120,51 @@
     {
         return segment.ToLower() switch
         {
+            // Admin
             "dashboard" => Icons.Material.Filled.Dashboard,
             "admin" => Icons.Material.Filled.AdminPanelSettings,
             "users" => Icons.Material.Filled.People,
+            "roles" => Icons.Material.Filled.Security,
+            "tenants" => Icons.Material.Filled.Business,
+            "audit" => Icons.Material.Filled.History,
+            
+            // Financeiro
+            "financial" => Icons.Material.Filled.AccountBalance,
+            "payables" => Icons.Material.Filled.CallMade,
+            "receivables" => Icons.Material.Filled.CallReceived,
+            "suppliers" => Icons.Material.Filled.LocalShipping,
+            "categories" => Icons.Material.Filled.Category,
+            "cost-centers" => Icons.Material.Filled.AccountTree,
+            
+            // Estoque
+            "inventory" => Icons.Material.Filled.Inventory,
+            "products" => Icons.Material.Filled.ShoppingCart,
+            "stock-movements" => Icons.Material.Filled.SwapHoriz,
+            "stock-counts" => Icons.Material.Filled.Checklist,
+            "warehouses" => Icons.Material.Filled.Warehouse,
+            
+            // Vendas
+            "sales" => Icons.Material.Filled.PointOfSale,
+            "customers" => Icons.Material.Filled.People,
+            
+            // Ativos
+            "assets" => Icons.Material.Filled.Inventory2,
+            
+            // RH
+            "hr" => Icons.Material.Filled.Badge,
+            "departments" => Icons.Material.Filled.CorporateFare,
+            "positions" => Icons.Material.Filled.Work,
+            "payroll" => Icons.Material.Filled.Payments,
+            "time-tracking" => Icons.Material.Filled.AccessTime,
+            
+            // Relatórios
+            "reports" => Icons.Material.Filled.Assessment,
+            
+            // Configurações
             "kanban" => Icons.Material.Filled.ViewKanban,
             "settings" or "ajustes" => Icons.Material.Filled.Settings,
+            "preferences" => Icons.Material.Filled.Tune,
+            
             _ => null
         };
     }

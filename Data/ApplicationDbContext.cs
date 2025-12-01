@@ -5,6 +5,7 @@ using erp.Models.TimeTracking;
 using erp.Models.Financial;
 using erp.Models.Payroll;
 using erp.Models.Tenancy;
+using erp.Models.Dashboard;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
@@ -73,6 +74,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     
     // Onboarding
     public DbSet<erp.Models.Onboarding.UserOnboardingProgress> UserOnboardingProgress { get; set; } = null!;
+    
+    // Dashboard
+    public DbSet<UserDashboardLayout> UserDashboardLayouts { get; set; } = null!;
+    public DbSet<WidgetRoleConfiguration> WidgetRoleConfigurations { get; set; } = null!;
     
     // Serviços injetados para auditoria
     private readonly IHttpContextAccessor? _httpContextAccessor;
@@ -575,6 +580,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
 
         // Time tracking / payroll configuration
         ConfigureTimeTrackingModels(modelBuilder);
+        
+        // Dashboard model configuration
+        ConfigureDashboardModels(modelBuilder);
 
         // Apply Global Query Filters for Multi-Tenancy
         // This ensures that queries only return data for the current tenant
@@ -1635,6 +1643,48 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .WithMany()
                 .HasForeignKey(x => x.UpdatedById)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private void ConfigureDashboardModels(ModelBuilder modelBuilder)
+    {
+        // UserDashboardLayout
+        modelBuilder.Entity<UserDashboardLayout>(layout =>
+        {
+            layout.ToTable("UserDashboardLayouts");
+            layout.HasKey(x => x.Id);
+            
+            layout.Property(x => x.LayoutJson).HasColumnType("jsonb").IsRequired();
+            layout.Property(x => x.LayoutType).HasMaxLength(20).IsRequired();
+            layout.Property(x => x.Columns).HasDefaultValue(3);
+            layout.Property(x => x.LastModified).IsRequired();
+            layout.Property(x => x.CreatedAt).IsRequired();
+            
+            layout.HasIndex(x => x.UserId).IsUnique();
+            
+                layout.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+        
+        // WidgetRoleConfiguration
+        modelBuilder.Entity<WidgetRoleConfiguration>(config =>
+        {
+            config.ToTable("WidgetRoleConfigurations");
+            config.HasKey(x => x.Id);
+            
+            config.Property(x => x.ProviderKey).HasMaxLength(50).IsRequired();
+            config.Property(x => x.WidgetKey).HasMaxLength(100).IsRequired();
+            config.Property(x => x.RolesJson).HasColumnType("jsonb");
+            config.Property(x => x.LastModified).IsRequired();
+            
+            config.HasIndex(x => new { x.ProviderKey, x.WidgetKey }).IsUnique();
+            
+            config.HasOne(x => x.ModifiedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.ModifiedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 }

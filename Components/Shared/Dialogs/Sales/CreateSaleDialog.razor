@@ -2,11 +2,13 @@
 @using erp.DTOs.Sales
 @using erp.DTOs.Inventory
 @using erp.Services
+@using erp.Components.Shared.Dialogs
 @inject ISnackbar Snackbar
 @inject IApiService ApiService
+@inject IDialogService DialogService
 @inject ILogger<CreateSaleDialog> Logger
 
-<MudDialog Class="create-sale-dialog" Style="min-width: 800px; max-width: 90vw;">
+<MudDialog>
     <TitleContent>
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
             <MudIcon Icon="@Icons.Material.Filled.ShoppingCart" Color="MudBlazor.Color.Primary" Size="MudBlazor.Size.Large" />
@@ -252,6 +254,13 @@
     private Dictionary<int, ProductDto?> _selectedProducts = new();
     private DateTime? _saleDate = DateTime.Now;
     
+    // Track dirty state for unsaved changes warning
+    private bool _isDirty => _selectedCustomer != null 
+        || _newSale.Items.Any() 
+        || _newSale.DiscountAmount > 0 
+        || !string.IsNullOrWhiteSpace(_newSale.Notes)
+        || !string.IsNullOrWhiteSpace(_newSale.PaymentMethod);
+    
     protected override async Task OnInitializedAsync()
     {
         _loading = true;
@@ -348,8 +357,27 @@
         return GetItemsTotal() - GetTotalDiscount();
     }
     
-    private void Cancel()
+    private async Task Cancel()
     {
+        if (_isDirty)
+        {
+            var parameters = new DialogParameters
+            {
+                { "ContentText", "Você tem alterações não salvas. Deseja descartar as alterações?" },
+                { "ButtonText", "Descartar" },
+                { "Color", MudBlazor.Color.Warning }
+            };
+
+            var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small };
+            var dialog = await DialogService.ShowAsync<ConfirmDialog>("Alterações não salvas", parameters, options);
+            var result = await dialog.Result;
+
+            if (result == null || result.Canceled)
+            {
+                return; // Stay in the dialog
+            }
+        }
+        
         MudDialog.Cancel();
     }
     

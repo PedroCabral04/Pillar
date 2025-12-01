@@ -5,7 +5,7 @@
 @inject IApiService ApiService
 @inject ILogger<CreateProductDialog> Logger
 
-<MudDialog Class="create-product-dialog" Style="min-width: 900px; max-width: 95vw; max-height: 90vh;">
+<MudDialog>
     <TitleContent>
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
             <MudIcon Icon="@Icons.Material.Filled.Inventory" Color="MudBlazor.Color.Primary" Size="MudBlazor.Size.Large" />
@@ -23,10 +23,10 @@
         else
         {
             <MudForm @ref="_form" Class="pa-2">
-                <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true">
+                <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4" Style="min-height: 420px;" Color="MudBlazor.Color.Primary">
                     <!-- Aba: Informações Básicas -->
                     <MudTabPanel Text="Informações Básicas" Icon="@Icons.Material.Filled.Info">
-                        <MudGrid Spacing="3" Class="mt-2">
+                        <MudGrid Spacing="3">
                             <MudItem xs="12" md="4">
                                 <MudTextField T="string"
                                              Label="SKU"
@@ -109,7 +109,7 @@
                     
                     <!-- Aba: Preços -->
                     <MudTabPanel Text="Preços" Icon="@Icons.Material.Filled.AttachMoney">
-                        <MudGrid Spacing="3" Class="mt-2">
+                        <MudGrid Spacing="3">
                             <MudItem xs="12" md="4">
                                 <MudNumericField T="decimal"
                                                 Label="Preço de Custo"
@@ -158,7 +158,26 @@
                     
                     <!-- Aba: Estoque -->
                     <MudTabPanel Text="Estoque" Icon="@Icons.Material.Filled.Warehouse">
-                        <MudGrid Spacing="3" Class="mt-2">
+                        <MudGrid Spacing="3">
+                            <MudItem xs="12">
+                                <MudAlert Severity="Severity.Info" Variant="Variant.Text" Dense="true" Class="mb-2">
+                                    <MudIcon Icon="@Icons.Material.Filled.Info" Size="MudBlazor.Size.Small" Class="mr-1"/>
+                                    O estoque inicial é opcional. Você pode gerenciar o estoque posteriormente através de movimentações.
+                                </MudAlert>
+                            </MudItem>
+                            
+                            <MudItem xs="12" md="6">
+                                <MudNumericField T="decimal?"
+                                                Label="Estoque Inicial (opcional)"
+                                                @bind-Value="_initialStock"
+                                                Min="0"
+                                                Step="1"
+                                                Variant="Variant.Outlined"
+                                                Adornment="Adornment.Start"
+                                                AdornmentIcon="@Icons.Material.Filled.Inventory"
+                                                HelperText="Deixe em branco para iniciar com 0"/>
+                            </MudItem>
+                            
                             <MudItem xs="12" md="6">
                                 <MudNumericField T="decimal"
                                                 Label="Estoque Mínimo"
@@ -218,7 +237,7 @@
                     
                     <!-- Aba: Dimensões -->
                     <MudTabPanel Text="Dimensões" Icon="@Icons.Material.Filled.Straighten">
-                        <MudGrid Spacing="3" Class="mt-2">
+                        <MudGrid Spacing="3">
                             <MudItem xs="12" md="6">
                                 <MudNumericField T="decimal?"
                                                 Label="Peso (kg)"
@@ -276,7 +295,7 @@
                     
                     <!-- Aba: Fiscal -->
                     <MudTabPanel Text="Informações Fiscais" Icon="@Icons.Material.Filled.Receipt">
-                        <MudGrid Spacing="3" Class="mt-2">
+                        <MudGrid Spacing="3">
                             <MudItem xs="12" md="6">
                                 <MudTextField T="string"
                                              Label="NCM"
@@ -348,10 +367,21 @@
         }
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="Cancel" Variant="Variant.Outlined">Cancelar</MudButton>
-        <MudButton OnClick="Submit" Variant="Variant.Filled" Color="MudBlazor.Color.Primary" Disabled="@_loading">
-            <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-1"/>
-            Criar Produto
+        <MudButton OnClick="Cancel" Variant="Variant.Outlined" Disabled="@_saving">Cancelar</MudButton>
+        <MudButton OnClick="Submit" 
+                   Variant="Variant.Filled" 
+                   Color="MudBlazor.Color.Primary" 
+                   Disabled="@(_loading || _saving)">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="MudBlazor.Size.Small" Indeterminate="true" Class="mr-2"/>
+                <text>Salvando...</text>
+            }
+            else
+            {
+                <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-1"/>
+                <text>Criar Produto</text>
+            }
         </MudButton>
     </DialogActions>
 </MudDialog>
@@ -362,8 +392,10 @@
     
     private MudForm? _form;
     private bool _loading = false;
+    private bool _saving = false;
     private CreateProductDto _newProduct = new();
     private List<ProductCategoryDto> _categories = new();
+    private decimal? _initialStock;
     
     protected override async Task OnInitializedAsync()
     {
@@ -411,14 +443,39 @@
             await _form.Validate();
             if (!_form.IsValid)
             {
-                Snackbar.Add("Por favor, corrija os erros no formulário", Severity.Error);
+                Snackbar.Add("Por favor, corrija os erros no formulário", Severity.Warning);
                 return;
             }
         }
         
-        _loading = true;
+        // Validações adicionais
+        if (string.IsNullOrWhiteSpace(_newProduct.Sku))
+        {
+            Snackbar.Add("O SKU é obrigatório", Severity.Warning);
+            return;
+        }
+        
+        if (string.IsNullOrWhiteSpace(_newProduct.Name))
+        {
+            Snackbar.Add("O nome do produto é obrigatório", Severity.Warning);
+            return;
+        }
+        
+        if (_newProduct.CategoryId <= 0)
+        {
+            Snackbar.Add("Selecione uma categoria", Severity.Warning);
+            return;
+        }
+        
+        _saving = true;
         try
         {
+            // Definir estoque inicial se informado
+            if (_initialStock.HasValue && _initialStock.Value > 0)
+            {
+                _newProduct.CurrentStock = _initialStock.Value;
+            }
+            
             var result = await ApiService.PostAsync<ProductDto>("/api/products", _newProduct);
             
             if (result != null)
@@ -438,7 +495,7 @@
         }
         finally
         {
-            _loading = false;
+            _saving = false;
         }
     }
 

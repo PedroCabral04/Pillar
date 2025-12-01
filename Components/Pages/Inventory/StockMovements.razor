@@ -12,7 +12,7 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
-<PageTitle>Movimentações de Estoque</PageTitle>
+<PageTitle>Movimentações de Estoque - Pillar ERP</PageTitle>
 
 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
     <MudText Typo="Typo.h4">Movimentações de Estoque</MudText>
@@ -30,7 +30,7 @@
 }
 
 <MudTable T="StockMovementDto" ServerData="ServerReload" 
-          Dense="false" Hover="true" Elevation="4" @ref="_table" Striped="true" Loading="@_loading">
+          Dense="false" Hover="true" Elevation="2" @ref="_table" Striped="true" Loading="@_loading">
     <ToolBarContent>
         <MudText Typo="Typo.h5">Histórico de Movimentações</MudText>
         <MudSpacer/>
@@ -219,8 +219,8 @@
         var options = new DialogOptions 
         { 
             CloseOnEscapeKey = true,
-            MaxWidth = MaxWidth.Large,
-            FullWidth = true
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = false
         };
         
         var dialog = await DialogService.ShowAsync<CreateStockMovementDialog>("Nova Movimentação", options);

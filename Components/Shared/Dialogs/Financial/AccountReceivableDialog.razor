@@ -3,11 +3,29 @@
 @using erp.Models.Financial
 
 <MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.CallReceived" Color="MudBlazor.Color.Success" Size="MudBlazor.Size.Large" />
+            <MudText Typo="Typo.h6">Conta a Receber</MudText>
+        </MudStack>
+    </TitleContent>
     <DialogContent>
-        <MudForm @ref="form" @bind-IsValid="@success">
-            <MudGrid>
+        <MudForm @ref="form" @bind-IsValid="@success" Class="pa-2">
+            <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Person" Size="MudBlazor.Size.Small" Class="mr-1" />
+                Dados do Cliente
+            </MudText>
+            <MudGrid Spacing="3">
                 <MudItem xs="12" sm="6">
-                    <MudSelect T="int" Label="Cliente" @bind-Value="Model.CustomerId" Required="true" RequiredError="Cliente é obrigatório" AnchorOrigin="Origin.BottomCenter">
+                    <MudSelect T="int" 
+                               Label="Cliente" 
+                               @bind-Value="Model.CustomerId" 
+                               Required="true" 
+                               RequiredError="Cliente é obrigatório" 
+                               Variant="Variant.Outlined"
+                               Adornment="Adornment.Start"
+                               AdornmentIcon="@Icons.Material.Filled.Person"
+                               AnchorOrigin="Origin.BottomCenter">
                         @foreach (var customer in Customers)
                         {
                             <MudSelectItem Value="@customer.Id">@customer.Name</MudSelectItem>
@@ -15,31 +33,104 @@
                     </MudSelect>
                 </MudItem>
                 <MudItem xs="12" sm="6">
-                    <MudTextField @bind-Value="Model.InvoiceNumber" Label="Número da Nota" />
+                    <MudTextField @bind-Value="Model.InvoiceNumber" 
+                                  Label="Número da Nota" 
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Receipt"
+                                  HelperText="Número da nota fiscal (opcional)"/>
                 </MudItem>
-                
-                <MudItem xs="12" sm="6">
-                    <MudDatePicker Label="Data de Emissão" Date="@(Model.IssueDate == default ? DateTime.Today : Model.IssueDate)" DateChanged="@(d => Model.IssueDate = d ?? DateTime.Today)" />
-                </MudItem>
-                <MudItem xs="12" sm="6">
-                    <MudDatePicker Label="Data de Vencimento" Date="@(Model.DueDate == default ? DateTime.Today : Model.DueDate)" DateChanged="@(d => Model.DueDate = d ?? DateTime.Today)" Required="true" RequiredError="Data de vencimento é obrigatória" />
-                </MudItem>
+            </MudGrid>
 
-                <MudItem xs="12" sm="4">
-                    <MudNumericField @bind-Value="Model.OriginalAmount" Label="Valor Original" Format="C2" Required="true" RequiredError="Valor é obrigatório" Min="0.01M" />
-                </MudItem>
-                <MudItem xs="12" sm="4">
-                    <MudNumericField @bind-Value="Model.DiscountAmount" Label="Desconto" Format="C2" Min="0" />
-                </MudItem>
-                <MudItem xs="12" sm="4">
-                    <MudNumericField @bind-Value="Model.InterestAmount" Label="Juros" Format="C2" Min="0" />
-                </MudItem>
-                <MudItem xs="12" sm="4">
-                    <MudNumericField @bind-Value="Model.FineAmount" Label="Multa" Format="C2" Min="0" />
-                </MudItem>
+            <MudDivider Class="my-4" />
 
-                 <MudItem xs="12" sm="4">
-                    <MudSelect T="PaymentMethod" Label="Método de Pagamento" @bind-Value="Model.PaymentMethod" AnchorOrigin="Origin.BottomCenter">
+            <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.CalendarMonth" Size="MudBlazor.Size.Small" Class="mr-1" />
+                Datas
+            </MudText>
+            <MudGrid Spacing="3">
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker Label="Data de Emissão" 
+                                   Date="@(Model.IssueDate == default ? DateTime.Today : Model.IssueDate)" 
+                                   DateChanged="@(d => Model.IssueDate = d ?? DateTime.Today)" 
+                                   Variant="Variant.Outlined"
+                                   Adornment="Adornment.Start"
+                                   AdornmentIcon="@Icons.Material.Filled.CalendarToday"/>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker Label="Data de Vencimento" 
+                                   Date="@(Model.DueDate == default ? DateTime.Today : Model.DueDate)" 
+                                   DateChanged="@(d => Model.DueDate = d ?? DateTime.Today)" 
+                                   Required="true" 
+                                   RequiredError="Data de vencimento é obrigatória" 
+                                   Variant="Variant.Outlined"
+                                   Adornment="Adornment.Start"
+                                   AdornmentIcon="@Icons.Material.Filled.Event"/>
+                </MudItem>
+            </MudGrid>
+
+            <MudDivider Class="my-4" />
+
+            <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Size="MudBlazor.Size.Small" Class="mr-1" />
+                Valores
+            </MudText>
+            <MudGrid Spacing="3">
+                <MudItem xs="12" sm="6" md="3">
+                    <MudNumericField @bind-Value="Model.OriginalAmount" 
+                                     Label="Valor Original" 
+                                     Format="C2" 
+                                     Required="true" 
+                                     RequiredError="Valor é obrigatório" 
+                                     Min="0.01M" 
+                                     Variant="Variant.Outlined"
+                                     Adornment="Adornment.Start"
+                                     AdornmentIcon="@Icons.Material.Filled.AttachMoney"/>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudNumericField @bind-Value="Model.DiscountAmount" 
+                                     Label="Desconto" 
+                                     Format="C2" 
+                                     Min="0" 
+                                     Variant="Variant.Outlined"
+                                     Adornment="Adornment.Start"
+                                     AdornmentIcon="@Icons.Material.Filled.Discount"/>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudNumericField @bind-Value="Model.InterestAmount" 
+                                     Label="Juros" 
+                                     Format="C2" 
+                                     Min="0" 
+                                     Variant="Variant.Outlined"
+                                     Adornment="Adornment.Start"
+                                     AdornmentIcon="@Icons.Material.Filled.TrendingUp"/>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudNumericField @bind-Value="Model.FineAmount" 
+                                     Label="Multa" 
+                                     Format="C2" 
+                                     Min="0" 
+                                     Variant="Variant.Outlined"
+                                     Adornment="Adornment.Start"
+                                     AdornmentIcon="@Icons.Material.Filled.Warning"/>
+                </MudItem>
+            </MudGrid>
+
+            <MudDivider Class="my-4" />
+
+            <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Payment" Size="MudBlazor.Size.Small" Class="mr-1" />
+                Pagamento
+            </MudText>
+            <MudGrid Spacing="3">
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="PaymentMethod" 
+                               Label="Método de Pagamento" 
+                               @bind-Value="Model.PaymentMethod" 
+                               Variant="Variant.Outlined"
+                               Adornment="Adornment.Start"
+                               AdornmentIcon="@Icons.Material.Filled.Payment"
+                               AnchorOrigin="Origin.BottomCenter">
                         @foreach (PaymentMethod method in Enum.GetValues(typeof(PaymentMethod)))
                         {
                             <MudSelectItem Value="@method">@method.ToString()</MudSelectItem>
@@ -50,18 +141,41 @@
                 @if (Model.PaymentMethod == PaymentMethod.BankSlip)
                 {
                     <MudItem xs="12" sm="6">
-                        <MudTextField @bind-Value="Model.BankSlipNumber" Label="Código de Barras" />
+                        <MudTextField @bind-Value="Model.BankSlipNumber" 
+                                      Label="Código de Barras" 
+                                      Variant="Variant.Outlined"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.QrCode"/>
                     </MudItem>
                 }
                 @if (Model.PaymentMethod == PaymentMethod.Pix)
                 {
                     <MudItem xs="12" sm="6">
-                        <MudTextField @bind-Value="Model.PixKey" Label="Chave Pix" />
+                        <MudTextField @bind-Value="Model.PixKey" 
+                                      Label="Chave Pix" 
+                                      Variant="Variant.Outlined"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Pix"/>
                     </MudItem>
                 }
+            </MudGrid>
 
+            <MudDivider Class="my-4" />
+
+            <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Category" Size="MudBlazor.Size.Small" Class="mr-1" />
+                Classificação
+            </MudText>
+            <MudGrid Spacing="3">
                 <MudItem xs="12" sm="6">
-                    <MudSelect T="int?" Label="Categoria" @bind-Value="Model.CategoryId" AnchorOrigin="Origin.BottomCenter">
+                    <MudSelect T="int?" 
+                               Label="Categoria" 
+                               @bind-Value="Model.CategoryId" 
+                               Variant="Variant.Outlined"
+                               Adornment="Adornment.Start"
+                               AdornmentIcon="@Icons.Material.Filled.Category"
+                               Clearable="true"
+                               AnchorOrigin="Origin.BottomCenter">
                         <MudSelectItem T="int?" Value="null">Nenhuma</MudSelectItem>
                         @foreach (var category in Categories)
                         {
@@ -69,8 +183,15 @@
                         }
                     </MudSelect>
                 </MudItem>
-                 <MudItem xs="12" sm="6">
-                    <MudSelect T="int?" Label="Centro de Custo" @bind-Value="Model.CostCenterId" AnchorOrigin="Origin.BottomCenter">
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int?" 
+                               Label="Centro de Custo" 
+                               @bind-Value="Model.CostCenterId" 
+                               Variant="Variant.Outlined"
+                               Adornment="Adornment.Start"
+                               AdornmentIcon="@Icons.Material.Filled.AccountBalance"
+                               Clearable="true"
+                               AnchorOrigin="Origin.BottomCenter">
                         <MudSelectItem T="int?" Value="null">Nenhum</MudSelectItem>
                         @foreach (var center in CostCenters)
                         {
@@ -78,16 +199,44 @@
                         }
                     </MudSelect>
                 </MudItem>
+            </MudGrid>
 
+            <MudDivider Class="my-4" />
+
+            <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Notes" Size="MudBlazor.Size.Small" Class="mr-1" />
+                Observações
+            </MudText>
+            <MudGrid Spacing="3">
                 <MudItem xs="12">
-                    <MudTextField @bind-Value="Model.Notes" Label="Observações" Lines="3" />
+                    <MudTextField @bind-Value="Model.Notes" 
+                                  Label="Observações" 
+                                  Lines="3" 
+                                  Variant="Variant.Outlined"
+                                  HelperText="Anotações adicionais sobre esta conta"/>
                 </MudItem>
             </MudGrid>
         </MudForm>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="Cancel">Cancelar</MudButton>
-        <MudButton Color="MudBlazor.Color.Primary" OnClick="Submit">Salvar</MudButton>
+        <MudButton OnClick="Cancel" 
+                   Variant="Variant.Text" 
+                   Disabled="@_saving"
+                   StartIcon="@Icons.Material.Filled.Close">
+            Cancelar
+        </MudButton>
+        <MudButton Color="MudBlazor.Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@_saving">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="MudBlazor.Size.Small" Indeterminate="true" Class="mr-2" />
+                <text>Salvando...</text>
+            }
+            else
+            {
+                <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-1"/>
+                <text>Salvar</text>
+            }
+        </MudButton>
     </DialogActions>
 </MudDialog>
 
@@ -100,6 +249,7 @@
 
     private MudForm form;
     private bool success;
+    private bool _saving = false;
 
     protected override void OnInitialized()
     {
@@ -114,6 +264,11 @@
         await form.Validate();
         if (success)
         {
+            _saving = true;
+            StateHasChanged();
+            
+            await Task.Delay(100);
+            
             MudDialog.Close(DialogResult.Ok(Model));
         }
     }

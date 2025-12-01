@@ -2,6 +2,7 @@ using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using erp.DTOs.Reports;
+using erp.DTOs.Sales;
 
 namespace erp.Services.Reports;
 
@@ -12,6 +13,7 @@ public interface IPdfExportService
     byte[] ExportProfitLossReportToPdf(ProfitLossReportDto report, FinancialReportFilterDto filter);
     byte[] ExportStockLevelsReportToPdf(StockLevelsReportDto report, InventoryReportFilterDto filter);
     byte[] ExportHeadcountReportToPdf(HeadcountReportDto report, HRReportFilterDto filter);
+    byte[] ExportSaleToPdf(SaleDto sale, string? logoPath = null);
 }
 
 public class PdfExportService : IPdfExportService
@@ -481,6 +483,198 @@ public class PdfExportService : IPdfExportService
                 {
                     x.Span("Página ");
                     x.CurrentPageNumber();
+                });
+            });
+        });
+
+        return document.GeneratePdf();
+    }
+
+    public byte[] ExportSaleToPdf(SaleDto sale, string? logoPath = null)
+    {
+        var headerColor = Colors.Blue.Medium;
+        
+        var statusColor = sale.Status switch
+        {
+            "Pendente" => Colors.Orange.Medium,
+            "Finalizada" => Colors.Green.Medium,
+            "Cancelada" => Colors.Red.Medium,
+            _ => Colors.Grey.Medium
+        };
+
+        var document = Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A4);
+                page.Margin(2, Unit.Centimetre);
+                page.PageColor(Colors.White);
+                page.DefaultTextStyle(x => x.FontSize(10));
+
+                page.Header().Column(headerCol =>
+                {
+                    headerCol.Item().Row(row =>
+                    {
+                        row.RelativeItem().Column(logoCol =>
+                        {
+                            // Try to load logo if path provided
+                            if (!string.IsNullOrEmpty(logoPath) && File.Exists(logoPath))
+                            {
+                                try
+                                {
+                                    logoCol.Item().Height(50).Image(logoPath, ImageScaling.FitHeight);
+                                }
+                                catch
+                                {
+                                    logoCol.Item().Text("Pillar ERP").Bold().FontSize(24).FontColor(headerColor);
+                                }
+                            }
+                            else
+                            {
+                                logoCol.Item().Text("Pillar ERP").Bold().FontSize(24).FontColor(headerColor);
+                            }
+                            logoCol.Item().Text("Sistema de Gestão Empresarial").FontSize(10).FontColor(Colors.Grey.Medium);
+                        });
+
+                        row.RelativeItem().AlignRight().Column(saleCol =>
+                        {
+                            saleCol.Item().Text(sale.SaleNumber).Bold().FontSize(18).FontColor(headerColor);
+                            saleCol.Item().AlignRight().Background(statusColor).Padding(4)
+                                .Text(sale.Status).FontColor(Colors.White).FontSize(10).Bold();
+                        });
+                    });
+
+                    headerCol.Item().PaddingTop(10).LineHorizontal(2).LineColor(headerColor);
+                });
+
+                page.Content().PaddingVertical(15).Column(column =>
+                {
+                    column.Spacing(15);
+
+                    // Sale and Customer Info
+                    column.Item().Row(row =>
+                    {
+                        row.RelativeItem().Background(Colors.Grey.Lighten4).Padding(10).Column(infoCol =>
+                        {
+                            infoCol.Item().Text("Informações da Venda").Bold().FontSize(12).FontColor(headerColor);
+                            infoCol.Item().PaddingTop(5);
+                            infoCol.Item().Text($"Data da Venda: {sale.SaleDate:dd/MM/yyyy HH:mm}");
+                            infoCol.Item().Text($"Data de Criação: {sale.CreatedAt:dd/MM/yyyy HH:mm}");
+                            infoCol.Item().Text($"Pagamento: {sale.PaymentMethod ?? "Não informado"}");
+                        });
+
+                        row.ConstantItem(15);
+
+                        row.RelativeItem().Background(Colors.Grey.Lighten4).Padding(10).Column(infoCol =>
+                        {
+                            infoCol.Item().Text("Cliente e Vendedor").Bold().FontSize(12).FontColor(headerColor);
+                            infoCol.Item().PaddingTop(5);
+                            infoCol.Item().Text($"Cliente: {sale.CustomerName ?? "Não informado"}");
+                            infoCol.Item().Text($"Vendedor: {sale.UserName}");
+                        });
+                    });
+
+                    // Items Table
+                    column.Item().Text($"Itens da Venda ({sale.Items.Count} itens)").Bold().FontSize(12).FontColor(headerColor);
+                    
+                    column.Item().Table(table =>
+                    {
+                        table.ColumnsDefinition(columns =>
+                        {
+                            columns.ConstantColumn(60);   // SKU
+                            columns.RelativeColumn(2);     // Produto
+                            columns.ConstantColumn(50);   // Qtd
+                            columns.ConstantColumn(70);   // Preço Unit.
+                            columns.ConstantColumn(60);   // Desconto
+                            columns.ConstantColumn(80);   // Subtotal
+                        });
+
+                        // Header
+                        table.Header(header =>
+                        {
+                            header.Cell().Element(HeaderCellStyle).Text("SKU");
+                            header.Cell().Element(HeaderCellStyle).Text("Produto");
+                            header.Cell().Element(HeaderCellStyle).AlignRight().Text("Qtd");
+                            header.Cell().Element(HeaderCellStyle).AlignRight().Text("Preço Unit.");
+                            header.Cell().Element(HeaderCellStyle).AlignRight().Text("Desconto");
+                            header.Cell().Element(HeaderCellStyle).AlignRight().Text("Subtotal");
+
+                            static IContainer HeaderCellStyle(IContainer container)
+                            {
+                                return container
+                                    .DefaultTextStyle(x => x.SemiBold().FontColor(Colors.White))
+                                    .Background(Colors.Blue.Medium)
+                                    .PaddingVertical(6)
+                                    .PaddingHorizontal(4);
+                            }
+                        });
+
+                        // Rows
+                        foreach (var item in sale.Items)
+                        {
+                            table.Cell().Element(CellStyle).Text(item.ProductSku).FontSize(9);
+                            table.Cell().Element(CellStyle).Text(item.ProductName);
+                            table.Cell().Element(CellStyle).AlignRight().Text(item.Quantity.ToString("N2"));
+                            table.Cell().Element(CellStyle).AlignRight().Text(item.UnitPrice.ToString("C2"));
+                            table.Cell().Element(CellStyle).AlignRight().Text(item.Discount.ToString("C2"));
+                            table.Cell().Element(CellStyle).AlignRight().Text(item.Total.ToString("C2")).Bold();
+
+                            static IContainer CellStyle(IContainer container)
+                            {
+                                return container
+                                    .BorderBottom(1)
+                                    .BorderColor(Colors.Grey.Lighten2)
+                                    .PaddingVertical(5)
+                                    .PaddingHorizontal(4);
+                            }
+                        }
+                    });
+
+                    // Notes if any
+                    if (!string.IsNullOrWhiteSpace(sale.Notes))
+                    {
+                        column.Item().Background(Colors.Orange.Lighten4).BorderLeft(4).BorderColor(Colors.Orange.Medium).Padding(10).Column(notesCol =>
+                        {
+                            notesCol.Item().Text("Observações").Bold().FontColor(Colors.Orange.Darken2);
+                            notesCol.Item().PaddingTop(5).Text(sale.Notes);
+                        });
+                    }
+
+                    // Totals
+                    column.Item().AlignRight().Width(250).Background(headerColor).Padding(15).Column(totalsCol =>
+                    {
+                        totalsCol.Item().Row(row =>
+                        {
+                            row.RelativeItem().Text("Subtotal dos Itens").FontColor(Colors.White);
+                            row.ConstantItem(80).AlignRight().Text(sale.TotalAmount.ToString("C2")).FontColor(Colors.White);
+                        });
+                        totalsCol.Item().PaddingTop(5).Row(row =>
+                        {
+                            row.RelativeItem().Text("Desconto Geral").FontColor(Colors.White);
+                            row.ConstantItem(80).AlignRight().Text($"- {sale.DiscountAmount:C2}").FontColor(Colors.White);
+                        });
+                        totalsCol.Item().PaddingTop(8).LineHorizontal(1).LineColor(Colors.White);
+                        totalsCol.Item().PaddingTop(8).Row(row =>
+                        {
+                            row.RelativeItem().Text("TOTAL").Bold().FontSize(14).FontColor(Colors.White);
+                            row.ConstantItem(80).AlignRight().Text(sale.NetAmount.ToString("C2")).Bold().FontSize(14).FontColor(Colors.White);
+                        });
+                    });
+                });
+
+                page.Footer().Column(footerCol =>
+                {
+                    footerCol.Item().LineHorizontal(1).LineColor(Colors.Grey.Lighten2);
+                    footerCol.Item().PaddingTop(5).Row(row =>
+                    {
+                        row.RelativeItem().Text($"Documento gerado em {DateTime.Now:dd/MM/yyyy HH:mm}").FontSize(8).FontColor(Colors.Grey.Medium);
+                        row.RelativeItem().AlignCenter().Text("Pillar ERP").FontSize(8).FontColor(Colors.Grey.Medium);
+                        row.RelativeItem().AlignRight().Text(x =>
+                        {
+                            x.Span("Página ").FontSize(8).FontColor(Colors.Grey.Medium);
+                            x.CurrentPageNumber().FontSize(8).FontColor(Colors.Grey.Medium);
+                        });
+                    });
                 });
             });
         });

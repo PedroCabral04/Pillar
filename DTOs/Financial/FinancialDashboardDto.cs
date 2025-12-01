@@ -24,6 +24,7 @@ public class FinancialDashboardDto
     public int PayablesOverdueCount { get; set; }
     
     public List<CashFlowItemDto> CashFlowProjection { get; set; } = new();
+    public List<CashFlowAlertDto> CashFlowAlerts { get; set; } = new();
     public List<AgingListItemDto> ReceivablesAgingList { get; set; } = new();
     public List<AgingListItemDto> PayablesAgingList { get; set; } = new();
     public List<TopCustomerSupplierDto> TopCustomers { get; set; } = new();
@@ -39,6 +40,20 @@ public class CashFlowItemDto
     public decimal Revenue { get; set; }
     public decimal Expense { get; set; }
     public decimal Balance => Revenue - Expense;
+    public decimal CumulativeBalance { get; set; }
+    public bool IsNegative => CumulativeBalance < 0;
+}
+
+/// <summary>
+/// DTO for cash flow alert (negative balance days)
+/// </summary>
+public class CashFlowAlertDto
+{
+    public DateTime Date { get; set; }
+    public decimal ProjectedBalance { get; set; }
+    public decimal Shortfall { get; set; }
+    public string Severity { get; set; } = "Warning"; // Warning, Critical
+    public string Message { get; set; } = string.Empty;
 }
 
 /// <summary>

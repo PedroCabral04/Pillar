@@ -14,6 +14,12 @@ public interface IInventoryService
     Task<bool> DeleteProductAsync(int id);
     Task<bool> BulkUpdatePricesAsync(BulkUpdatePriceDto dto);
     
+    // Statistics
+    Task<ProductStatisticsDto> GetProductStatisticsAsync();
+    
+    // Export
+    Task<byte[]> ExportProductsAsync(ProductSearchDto search, string format);
+    
     // Category operations
     Task<(IEnumerable<ProductCategoryDto> Categories, int TotalCount)> GetCategoriesAsync(
         string? search = null, 

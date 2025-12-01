@@ -1,85 +1,596 @@
 @using erp.DTOs.Dashboard
 @using ApexCharts
 @using MudBlazor
+@using System.Globalization
 
-<MudPaper Class="pa-4" Elevation="1">
-    <div class="d-flex align-center justify-space-between mb-2">
-        <div class="d-flex align-center gap-2">
-            @if (!string.IsNullOrWhiteSpace(Definition.Icon))
+<MudPaper Class="chart-widget" Elevation="0" Style="@_paperStyle">
+    @* Header com métrica principal *@
+    <div class="chart-widget-header">
+        <div class="d-flex align-center justify-space-between flex-wrap gap-2">
+            <div class="d-flex align-center gap-3">
+                <div>
+                    <MudText Typo="Typo.subtitle1" Class="chart-title">@Definition.Title</MudText>
+                    @if (!string.IsNullOrWhiteSpace(Definition.Description))
+                    {
+                        <MudText Typo="Typo.caption" Class="chart-description">@Definition.Description</MudText>
+                    }
+                </div>
+            </div>
+            
+            @if (Data is not null && _seriesData.Count > 0 && !IsPieOrDonut)
             {
-                <MudIcon Icon="@Definition.Icon" Size="@MudBlazor.Size.Medium" Class="text-secondary" />
+                <div class="chart-metric-badge">
+                    <MudText Typo="Typo.h6" Class="chart-total-value">@FormatValue(_totalValue)</MudText>
+                    @if (!string.IsNullOrWhiteSpace(Definition.Unit))
+                    {
+                        <MudText Typo="Typo.caption" Class="chart-unit">@Definition.Unit</MudText>
+                    }
+                </div>
             }
-            <MudText Typo="Typo.h6">@Definition.Title</MudText>
         </div>
+        
         @if (!string.IsNullOrWhiteSpace(Data?.Subtitle))
         {
-            <MudText Typo="Typo.caption" Class="text-secondary">@Data.Subtitle</MudText>
+            <MudText Typo="Typo.body2" Class="chart-subtitle mt-2">@Data.Subtitle</MudText>
         }
     </div>
 
-    @if (Data is null)
-    {
-        <MudSkeleton Width="100%" Height="240px" Animation="Animation.Pulse" />
-    }
-    else
-    {
-        @switch (Definition.ChartType)
+    @* Conteúdo do gráfico *@
+    <div class="chart-widget-content">
+        @if (Data is null)
         {
-            case DashboardChartType.Bar:
-                <ApexChart TItem="DataPoint" Height="280">
-                    @foreach (var s in _seriesData)
-                    {
-                        <ApexPointSeries TItem="DataPoint" Items="@s.Items" Name="@s.Name" SeriesType="SeriesType.Bar" XValue="e => e.Category" YValue="e => e.Value" />
-                    }
-                </ApexChart>
-                break;
-            case DashboardChartType.Line:
-                <ApexChart TItem="DataPoint" Height="280">
-                    @foreach (var s in _seriesData)
-                    {
-                        <ApexPointSeries TItem="DataPoint" Items="@s.Items" Name="@s.Name" SeriesType="SeriesType.Line" XValue="e => e.Category" YValue="e => e.Value" />
-                    }
-                </ApexChart>
-                break;
-            case DashboardChartType.Area:
-                <ApexChart TItem="DataPoint" Height="280">
-                    @foreach (var s in _seriesData)
-                    {
-                        <ApexPointSeries TItem="DataPoint" Items="@s.Items" Name="@s.Name" SeriesType="SeriesType.Area" XValue="e => e.Category" YValue="e => e.Value" />
-                    }
-                </ApexChart>
-                break;
-            case DashboardChartType.Donut:
-                <ApexChart TItem="DataPoint" Height="280">
-                    @foreach (var s in _seriesData)
-                    {
-                        <ApexPointSeries TItem="DataPoint" Items="@s.Items" Name="@s.Name" SeriesType="SeriesType.Donut" XValue="e => e.Category" YValue="e => e.Value" />
-                    }
-                </ApexChart>
-                break;
-            case DashboardChartType.Pie:
-                <ApexChart TItem="DataPoint" Height="280">
-                    @foreach (var s in _seriesData)
-                    {
-                        <ApexPointSeries TItem="DataPoint" Items="@s.Items" Name="@s.Name" SeriesType="SeriesType.Pie" XValue="e => e.Category" YValue="e => e.Value" />
-                    }
-                </ApexChart>
-                break;
+            @* Skeleton loading elegante *@
+            <div class="chart-loading-container">
+                <div class="chart-skeleton">
+                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="20px" Width="60%" Class="mb-3" />
+                    <div class="d-flex align-end justify-space-around gap-2" style="height: 200px;">
+                        @for (int i = 0; i < 6; i++)
+                        {
+                            var height = 40 + (i % 3) * 50;
+                            <MudSkeleton SkeletonType="SkeletonType.Rectangle" 
+                                         Height="@($"{height}px")" 
+                                         Width="40px" 
+                                         Animation="Animation.Wave" />
+                        }
+                    </div>
+                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="16px" Width="80%" Class="mt-3 mx-auto" />
+                </div>
+                <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary" Class="mt-3">
+                    <MudIcon Icon="@Icons.Material.Outlined.AutoGraph" Size="MudBlazor.Size.Small" Class="mr-1" Style="vertical-align: middle;" />
+                    Carregando dados...
+                </MudText>
+            </div>
         }
-    }
+        else if (_seriesData.Count == 0)
+        {
+            @* Estado vazio informativo *@
+            <div class="chart-empty-container">
+                <div class="empty-state-icon">
+                    <MudIcon Icon="@GetEmptyStateIcon()" Size="MudBlazor.Size.Large" />
+                </div>
+                <MudText Typo="Typo.subtitle2" Class="mt-3" Style="font-weight: 500;">Nenhum dado encontrado</MudText>
+                <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary" Class="mt-1" Style="max-width: 200px; text-align: center;">
+                    Ainda não há registros para exibir neste período
+                </MudText>
+            </div>
+        }
+        else
+        {
+            <div class="chart-container">
+                @switch (Definition.ChartType)
+                {
+                    case DashboardChartType.Bar:
+                        <ApexChart @key="_chartKey" TItem="DataPoint" Height="@_chartHeight" Options="@_barOptions">
+                            @foreach (var s in _seriesData)
+                            {
+                                <ApexPointSeries TItem="DataPoint" Items="@s.Items" Name="@s.Name" SeriesType="SeriesType.Bar" XValue="e => e.Category" YValue="e => e.Value" />
+                            }
+                        </ApexChart>
+                        break;
+                    case DashboardChartType.Line:
+                        <ApexChart @key="_chartKey" TItem="DataPoint" Height="@_chartHeight" Options="@_lineOptions">
+                            @foreach (var s in _seriesData)
+                            {
+                                <ApexPointSeries TItem="DataPoint" Items="@s.Items" Name="@s.Name" SeriesType="SeriesType.Line" XValue="e => e.Category" YValue="e => e.Value" />
+                            }
+                        </ApexChart>
+                        break;
+                    case DashboardChartType.Area:
+                        <ApexChart @key="_chartKey" TItem="DataPoint" Height="@_chartHeight" Options="@_areaOptions">
+                            @foreach (var s in _seriesData)
+                            {
+                                <ApexPointSeries TItem="DataPoint" Items="@s.Items" Name="@s.Name" SeriesType="SeriesType.Area" XValue="e => e.Category" YValue="e => e.Value" />
+                            }
+                        </ApexChart>
+                        break;
+                    case DashboardChartType.Donut:
+                        <ApexChart @key="_chartKey" TItem="DataPoint" Height="@_chartHeight" Options="@_donutOptions">
+                            <ApexPointSeries TItem="DataPoint" Items="@_seriesData.First().Items" Name="@_seriesData.First().Name" SeriesType="SeriesType.Donut" XValue="e => e.Category" YValue="e => e.Value" />
+                        </ApexChart>
+                        break;
+                    case DashboardChartType.Pie:
+                        <ApexChart @key="_chartKey" TItem="DataPoint" Height="@_chartHeight" Options="@_pieOptions">
+                            <ApexPointSeries TItem="DataPoint" Items="@_seriesData.First().Items" Name="@_seriesData.First().Name" SeriesType="SeriesType.Pie" XValue="e => e.Category" YValue="e => e.Value" />
+                        </ApexChart>
+                        break;
+                }
+            </div>
+            
+            @* Legenda customizada para múltiplas séries (não Pie/Donut) *@
+            @if (_seriesData.Count > 1 && !IsPieOrDonut)
+            {
+                <div class="chart-legend">
+                    @for (int i = 0; i < _seriesData.Count; i++)
+                    {
+                        var series = _seriesData[i];
+                        var color = _chartColors[i % _chartColors.Count];
+                        <div class="legend-item">
+                            <span class="legend-dot" style="background-color: @color;"></span>
+                            <span class="legend-label">@series.Name</span>
+                            <span class="legend-value">@FormatValue(series.Items.Sum(x => x.Value))</span>
+                        </div>
+                    }
+                </div>
+            }
+        }
+    </div>
 </MudPaper>
+
+<style>
+    .chart-widget {
+        height: 100%;
+        min-height: 400px;
+        border-radius: 16px;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        border: 1px solid rgba(var(--mud-palette-lines-default-rgb), 0.12);
+        background: var(--mud-palette-surface);
+        transition: box-shadow 0.2s ease, transform 0.2s ease;
+    }
+    
+    .chart-widget:hover {
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+    }
+    
+    .chart-widget-header {
+        flex-shrink: 0;
+        margin-bottom: 16px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid rgba(var(--mud-palette-lines-default-rgb), 0.08);
+    }
+    
+    .chart-icon-avatar {
+        box-shadow: 0 4px 12px rgba(var(--mud-palette-primary-rgb), 0.25);
+    }
+    
+    .chart-title {
+        font-weight: 600;
+        color: var(--mud-palette-text-primary);
+        line-height: 1.3;
+    }
+    
+    .chart-description {
+        color: var(--mud-palette-text-secondary);
+        font-size: 0.75rem;
+        margin-top: 2px;
+    }
+    
+    .chart-subtitle {
+        color: var(--mud-palette-text-secondary);
+        background: rgba(var(--mud-palette-primary-rgb), 0.06);
+        padding: 6px 12px;
+        border-radius: 8px;
+        display: inline-block;
+        font-size: 0.8rem;
+    }
+    
+    .chart-metric-badge {
+        text-align: right;
+        background: linear-gradient(135deg, rgba(var(--mud-palette-primary-rgb), 0.1) 0%, rgba(var(--mud-palette-primary-rgb), 0.05) 100%);
+        padding: 8px 16px;
+        border-radius: 12px;
+        border: 1px solid rgba(var(--mud-palette-primary-rgb), 0.15);
+    }
+    
+    .chart-total-value {
+        font-weight: 700;
+        color: var(--mud-palette-primary);
+        line-height: 1.2;
+    }
+    
+    .chart-unit {
+        color: var(--mud-palette-text-secondary);
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .chart-widget-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+    }
+    
+    .chart-loading-container,
+    .chart-empty-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+    }
+    
+    .chart-skeleton {
+        width: 100%;
+        max-width: 320px;
+    }
+    
+    .empty-state-icon {
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        background: rgba(var(--mud-palette-text-secondary-rgb), 0.08);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--mud-palette-text-secondary);
+    }
+    
+    .chart-container {
+        flex: 1;
+        min-height: 0;
+        width: 100%;
+    }
+    
+    .chart-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        justify-content: center;
+        padding-top: 12px;
+        margin-top: 8px;
+        border-top: 1px solid rgba(var(--mud-palette-lines-default-rgb), 0.08);
+    }
+    
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 16px;
+        background: rgba(var(--mud-palette-background-grey-rgb), 0.5);
+        font-size: 0.75rem;
+    }
+    
+    .legend-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+    
+    .legend-label {
+        color: var(--mud-palette-text-secondary);
+    }
+    
+    .legend-value {
+        font-weight: 600;
+        color: var(--mud-palette-text-primary);
+    }
+    
+    /* Customização do ApexCharts */
+    .chart-widget :deep(.apexcharts-tooltip) {
+        background: var(--mud-palette-surface) !important;
+        border: 1px solid rgba(var(--mud-palette-lines-default-rgb), 0.2) !important;
+        border-radius: 8px !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+    }
+    
+    .chart-widget :deep(.apexcharts-tooltip-title) {
+        background: rgba(var(--mud-palette-primary-rgb), 0.08) !important;
+        border-bottom: 1px solid rgba(var(--mud-palette-lines-default-rgb), 0.1) !important;
+        font-weight: 600 !important;
+    }
+    
+    .chart-widget :deep(.apexcharts-xaxis-label),
+    .chart-widget :deep(.apexcharts-yaxis-label) {
+        fill: var(--mud-palette-text-secondary) !important;
+        font-size: 11px !important;
+    }
+    
+    .chart-widget :deep(.apexcharts-legend-text) {
+        color: var(--mud-palette-text-primary) !important;
+        font-size: 12px !important;
+    }
+    
+    .chart-widget :deep(.apexcharts-gridline) {
+        stroke: rgba(var(--mud-palette-lines-default-rgb), 0.08) !important;
+    }
+</style>
 
 @code {
     [Parameter] public required DashboardWidgetDefinition Definition { get; set; }
     [Parameter] public ChartDataResponse? Data { get; set; }
+    [Parameter] public long RefreshToken { get; set; }
 
     private List<SeriesItems> _seriesData = new();
+    private decimal _totalValue;
+    private const int _chartHeight = 260;
+    private string _chartKey = Guid.NewGuid().ToString();
+    
+    private readonly string _paperStyle = "height: 100%; min-height: 400px;";
+    
+    // Paleta de cores harmoniosa e acessível (WCAG AA)
+    private readonly List<string> _chartColors = new()
+    {
+        "#6366F1", // Indigo
+        "#10B981", // Emerald  
+        "#F59E0B", // Amber
+        "#EF4444", // Red
+        "#8B5CF6", // Violet
+        "#06B6D4", // Cyan
+        "#EC4899", // Pink
+        "#84CC16"  // Lime
+    };
+    
+    private bool IsPieOrDonut => Definition.ChartType is DashboardChartType.Pie or DashboardChartType.Donut;
+    
+    private ApexChartOptions<DataPoint> _barOptions = null!;
+    private ApexChartOptions<DataPoint> _lineOptions = null!;
+    private ApexChartOptions<DataPoint> _areaOptions = null!;
+    private ApexChartOptions<DataPoint> _donutOptions = null!;
+    private ApexChartOptions<DataPoint> _pieOptions = null!;
+
+    protected override void OnInitialized()
+    {
+        InitializeChartOptions();
+    }
+
+    private void InitializeChartOptions()
+    {
+        var baseTooltip = new Tooltip
+        {
+            Enabled = true,
+            Theme = Mode.Dark,
+            Style = new TooltipStyle { FontSize = "12px" }
+        };
+        
+        var baseXAxis = new XAxis
+        {
+            Labels = new XAxisLabels 
+            { 
+                Style = new AxisLabelStyle { FontSize = "11px" },
+                Rotate = -45,
+                RotateAlways = false
+            },
+            AxisTicks = new AxisTicks { Show = false }
+        };
+        
+        var baseYAxis = new List<YAxis>
+        {
+            new YAxis
+            {
+                Labels = new YAxisLabels 
+                { 
+                    Style = new AxisLabelStyle { FontSize = "11px" }
+                }
+            }
+        };
+        
+        var baseGrid = new Grid
+        {
+            BorderColor = "rgba(0,0,0,0.06)",
+            StrokeDashArray = 4,
+            Xaxis = new GridXAxis { Lines = new Lines { Show = false } },
+            Yaxis = new GridYAxis { Lines = new Lines { Show = true } }
+        };
+        
+        _barOptions = new ApexChartOptions<DataPoint>
+        {
+            Chart = new Chart 
+            { 
+                Toolbar = new Toolbar { Show = false }, 
+                Background = "transparent",
+                Animations = new Animations 
+                { 
+                    Enabled = true, 
+                    Speed = 500,
+                    DynamicAnimation = new DynamicAnimation { Enabled = true, Speed = 350 }
+                },
+                FontFamily = "inherit"
+            },
+            PlotOptions = new PlotOptions 
+            { 
+                Bar = new PlotOptionsBar 
+                { 
+                    BorderRadius = 6,
+                    BorderRadiusApplication = BorderRadiusApplication.End,
+                    Horizontal = false,
+                    ColumnWidth = "60%",
+                    DataLabels = new PlotOptionsBarDataLabels { Position = BarDataLabelPosition.Top }
+                } 
+            },
+            DataLabels = new ApexCharts.DataLabels { Enabled = false },
+            Colors = _chartColors,
+            Tooltip = baseTooltip,
+            Xaxis = baseXAxis,
+            Yaxis = baseYAxis,
+            Grid = baseGrid
+        };
+        
+        _lineOptions = new ApexChartOptions<DataPoint>
+        {
+            Chart = new Chart 
+            { 
+                Toolbar = new Toolbar { Show = false }, 
+                Background = "transparent",
+                Animations = new Animations 
+                { 
+                    Enabled = true, 
+                    Speed = 500,
+                    DynamicAnimation = new DynamicAnimation { Enabled = true, Speed = 350 }
+                },
+                FontFamily = "inherit"
+            },
+            Stroke = new Stroke { Curve = Curve.Smooth, Width = 3 },
+            Markers = new Markers 
+            { 
+                Size = 5,
+                StrokeWidth = 0,
+                Hover = new MarkersHover { Size = 7 }
+            },
+            DataLabels = new ApexCharts.DataLabels { Enabled = false },
+            Colors = _chartColors,
+            Tooltip = baseTooltip,
+            Xaxis = baseXAxis,
+            Yaxis = baseYAxis,
+            Grid = baseGrid
+        };
+        
+        _areaOptions = new ApexChartOptions<DataPoint>
+        {
+            Chart = new Chart 
+            { 
+                Toolbar = new Toolbar { Show = false }, 
+                Background = "transparent",
+                Animations = new Animations 
+                { 
+                    Enabled = true, 
+                    Speed = 500,
+                    DynamicAnimation = new DynamicAnimation { Enabled = true, Speed = 350 }
+                },
+                FontFamily = "inherit"
+            },
+            Stroke = new Stroke { Curve = Curve.Smooth, Width = 2 },
+            Fill = new Fill 
+            { 
+                Type = new List<FillType> { FillType.Gradient },
+                Gradient = new FillGradient
+                {
+                    ShadeIntensity = 1,
+                    OpacityFrom = 0.45,
+                    OpacityTo = 0.05,
+                    Stops = new List<double> { 0, 100 }
+                }
+            },
+            Markers = new Markers 
+            { 
+                Size = 4,
+                StrokeWidth = 0,
+                Hover = new MarkersHover { Size = 6 }
+            },
+            DataLabels = new ApexCharts.DataLabels { Enabled = false },
+            Colors = _chartColors,
+            Tooltip = baseTooltip,
+            Xaxis = baseXAxis,
+            Yaxis = baseYAxis,
+            Grid = baseGrid
+        };
+        
+        _donutOptions = new ApexChartOptions<DataPoint>
+        {
+            Chart = new Chart 
+            { 
+                Toolbar = new Toolbar { Show = false }, 
+                Background = "transparent",
+                Animations = new Animations 
+                { 
+                    Enabled = true, 
+                    Speed = 500,
+                    AnimateGradually = new AnimateGradually { Enabled = true, Delay = 100 }
+                },
+                FontFamily = "inherit"
+            },
+            PlotOptions = new PlotOptions 
+            { 
+                Pie = new PlotOptionsPie 
+                { 
+                    Donut = new PlotOptionsDonut 
+                    { 
+                        Size = "68%",
+                        Labels = new DonutLabels
+                        {
+                            Show = true,
+                            Name = new DonutLabelName { Show = true, FontSize = "14px", FontWeight = "600" },
+                            Value = new DonutLabelValue { Show = true, FontSize = "22px", FontWeight = "700" },
+                            Total = new DonutLabelTotal 
+                            { 
+                                Show = true, 
+                                Label = "Total", 
+                                FontSize = "13px",
+                                FontWeight = "500"
+                            }
+                        }
+                    },
+                    ExpandOnClick = true
+                } 
+            },
+            DataLabels = new ApexCharts.DataLabels 
+            { 
+                Enabled = false
+            },
+            Legend = new Legend 
+            { 
+                Position = LegendPosition.Bottom, 
+                FontSize = "12px",
+                HorizontalAlign = ApexCharts.Align.Center,
+                ItemMargin = new LegendItemMargin { Horizontal = 8, Vertical = 4 }
+            },
+            Colors = _chartColors,
+            Tooltip = new Tooltip { Enabled = true }
+        };
+        
+        _pieOptions = new ApexChartOptions<DataPoint>
+        {
+            Chart = new Chart 
+            { 
+                Toolbar = new Toolbar { Show = false }, 
+                Background = "transparent",
+                Animations = new Animations 
+                { 
+                    Enabled = true, 
+                    Speed = 500,
+                    AnimateGradually = new AnimateGradually { Enabled = true, Delay = 100 }
+                },
+                FontFamily = "inherit"
+            },
+            PlotOptions = new PlotOptions
+            {
+                Pie = new PlotOptionsPie { ExpandOnClick = true }
+            },
+            DataLabels = new ApexCharts.DataLabels 
+            { 
+                Enabled = true,
+                Style = new DataLabelsStyle { FontSize = "12px", FontWeight = "500" },
+                DropShadow = new DropShadow { Enabled = false }
+            },
+            Legend = new Legend 
+            { 
+                Position = LegendPosition.Bottom, 
+                FontSize = "12px",
+                HorizontalAlign = ApexCharts.Align.Center,
+                ItemMargin = new LegendItemMargin { Horizontal = 8, Vertical = 4 }
+            },
+            Colors = _chartColors,
+            Tooltip = new Tooltip { Enabled = true }
+        };
+    }
 
     protected override void OnParametersSet()
     {
         _seriesData.Clear();
+        _totalValue = 0;
+        
+        // Gera nova key para forçar re-renderização do ApexChart
+        _chartKey = $"{Definition.WidgetKey}_{RefreshToken}_{DateTime.UtcNow.Ticks}";
+        
         if (Data?.Series is null || Data.Series.Count == 0) return;
+        
         var categories = Data.Categories ?? Enumerable.Range(1, Data.Series.Max(s => s.Data.Count)).Select(i => i.ToString()).ToList();
+        
         foreach (var s in Data.Series)
         {
             var items = new List<DataPoint>();
@@ -90,7 +601,37 @@
             }
             _seriesData.Add(new SeriesItems(s.Name, items));
         }
+        
+        _totalValue = _seriesData.SelectMany(s => s.Items).Sum(x => x.Value);
     }
+    
+    private string FormatValue(decimal value)
+    {
+        var unit = Definition.Unit?.ToLowerInvariant() ?? "";
+        
+        return unit switch
+        {
+            "r$" or "brl" or "reais" => value.ToString("C2", new CultureInfo("pt-BR")),
+            "%" or "percent" or "percentual" => $"{value:N1}%",
+            "un" or "unidades" or "qtd" => value >= 1000 
+                ? $"{value / 1000:N1}k" 
+                : value.ToString("N0", new CultureInfo("pt-BR")),
+            _ => value >= 1_000_000 
+                ? $"{value / 1_000_000:N2}M"
+                : value >= 1000 
+                    ? $"{value / 1000:N1}k" 
+                    : value.ToString("N2", new CultureInfo("pt-BR"))
+        };
+    }
+    
+    private string GetEmptyStateIcon() => Definition.ChartType switch
+    {
+        DashboardChartType.Bar => Icons.Material.Outlined.BarChart,
+        DashboardChartType.Line => Icons.Material.Outlined.ShowChart,
+        DashboardChartType.Area => Icons.Material.Outlined.AreaChart,
+        DashboardChartType.Donut or DashboardChartType.Pie => Icons.Material.Outlined.DonutLarge,
+        _ => Icons.Material.Outlined.InsertChart
+    };
 
     public class DataPoint
     {

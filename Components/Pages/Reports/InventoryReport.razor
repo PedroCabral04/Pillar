@@ -5,13 +5,14 @@
 @using Microsoft.AspNetCore.Authorization
 @using Color = MudBlazor.Color
 @using Size = MudBlazor.Size
+@using ApexCharts
 @inject IApiService ApiService
 @inject ISnackbar Snackbar
 @inject IJSRuntime JS
 
 <PageTitle>Relatórios de Estoque - Pillar ERP</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-4">
     <MudText Typo="Typo.h4" GutterBottom="true">
         <MudIcon Icon="@Icons.Material.Filled.Inventory" Class="mr-2" />
         Relatórios de Estoque
@@ -21,6 +22,140 @@
     </MudText>
 
     <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
+        <!-- ABC Curve (Pareto) Tab -->
+        <MudTabPanel Text="Curva ABC" Icon="@Icons.Material.Filled.ShowChart">
+            <MudCard Elevation="3" Class="mb-4">
+                <MudCardContent>
+                    <MudGrid>
+                        <MudItem xs="12" md="4">
+                            <MudDatePicker Label="Data Início" @bind-Date="_abcFilter.StartDate" />
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudDatePicker Label="Data Fim" @bind-Date="_abcFilter.EndDate" />
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadABCCurveReport" StartIcon="@Icons.Material.Filled.Search" Class="mt-4">
+                                Gerar Análise
+                            </MudButton>
+                        </MudItem>
+                    </MudGrid>
+                </MudCardContent>
+            </MudCard>
+
+            @if (_loadingABC)
+            {
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+            }
+
+            @if (_abcReport != null)
+            {
+                <MudCard Elevation="3" Class="mb-4">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Análise de Curva ABC (Pareto)</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                A regra 80/20: aproximadamente 20% dos produtos geram 80% do faturamento
+                            </MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <!-- Summary Cards -->
+                        <MudGrid Class="mb-4">
+                            <MudItem xs="12" sm="4">
+                                <MudPaper Class="pa-4" Elevation="0" Style="background-color: #E8F5E9; border-left: 4px solid #4CAF50;">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Success">Classe A - Itens Vitais</MudText>
+                                    <MudText Typo="Typo.h5">@_abcReport.Summary.ClassACount produtos</MudText>
+                                    <MudText Typo="Typo.body2">@_abcReport.Summary.ClassARevenue.ToString("C2") (@_abcReport.Summary.ClassAPercentage.ToString("N1")% do faturamento)</MudText>
+                                </MudPaper>
+                            </MudItem>
+                            <MudItem xs="12" sm="4">
+                                <MudPaper Class="pa-4" Elevation="0" Style="background-color: #FFF8E1; border-left: 4px solid #FFC107;">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Warning">Classe B - Itens Importantes</MudText>
+                                    <MudText Typo="Typo.h5">@_abcReport.Summary.ClassBCount produtos</MudText>
+                                    <MudText Typo="Typo.body2">@_abcReport.Summary.ClassBRevenue.ToString("C2") (@_abcReport.Summary.ClassBPercentage.ToString("N1")% do faturamento)</MudText>
+                                </MudPaper>
+                            </MudItem>
+                            <MudItem xs="12" sm="4">
+                                <MudPaper Class="pa-4" Elevation="0" Style="background-color: #FFEBEE; border-left: 4px solid #F44336;">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Error">Classe C - Itens Triviais</MudText>
+                                    <MudText Typo="Typo.h5">@_abcReport.Summary.ClassCCount produtos</MudText>
+                                    <MudText Typo="Typo.body2">@_abcReport.Summary.ClassCRevenue.ToString("C2") (@_abcReport.Summary.ClassCPercentage.ToString("N1")% do faturamento)</MudText>
+                                </MudPaper>
+                            </MudItem>
+                        </MudGrid>
+
+                        <!-- Pareto Chart -->
+                        @if (_abcReport.Items.Any())
+                        {
+                            <MudPaper Class="pa-4 mb-4" Elevation="0">
+                                <ApexChart TItem="ABCCurveItemDto"
+                                           Title="Gráfico de Pareto - Faturamento por Produto"
+                                           Options="_paretoChartOptions"
+                                           Height="400">
+
+                                    <ApexPointSeries TItem="ABCCurveItemDto"
+                                                     Items="_abcReport.Items.Take(20)"
+                                                     Name="Faturamento"
+                                                     SeriesType="SeriesType.Bar"
+                                                     XValue="@(e => TruncateName(e.ProductName, 15))"
+                                                     YValue="@(e => e.TotalRevenue)"
+                                                     OrderBy="e => e.X" />
+
+                                    <ApexPointSeries TItem="ABCCurveItemDto"
+                                                     Items="_abcReport.Items.Take(20)"
+                                                     Name="% Acumulado"
+                                                     SeriesType="SeriesType.Line"
+                                                     XValue="@(e => TruncateName(e.ProductName, 15))"
+                                                     YValue="@(e => e.CumulativePercentage)"
+                                                     OrderBy="e => e.X" />
+                                </ApexChart>
+                            </MudPaper>
+                        }
+
+                        <!-- Products Table -->
+                        <MudTable Items="_abcReport.Items" Class="mt-4" Hover="true" Striped="true" Dense="true" 
+                                  Filter="new Func<ABCCurveItemDto, bool>(FilterABCItems)">
+                            <ToolBarContent>
+                                <MudTextField @bind-Value="_abcSearchString" Placeholder="Buscar produtos" Adornment="Adornment.Start"
+                                              AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0" Immediate="true" />
+                                <MudSpacer />
+                                <MudChipSet T="string" SelectionMode="SelectionMode.MultiSelection" @bind-SelectedValues="_selectedClasses">
+                                    <MudChip Value="@("A")" Color="Color.Success" Variant="Variant.Outlined">Classe A</MudChip>
+                                    <MudChip Value="@("B")" Color="Color.Warning" Variant="Variant.Outlined">Classe B</MudChip>
+                                    <MudChip Value="@("C")" Color="Color.Error" Variant="Variant.Outlined">Classe C</MudChip>
+                                </MudChipSet>
+                            </ToolBarContent>
+                            <HeaderContent>
+                                <MudTh>SKU</MudTh>
+                                <MudTh>Produto</MudTh>
+                                <MudTh>Categoria</MudTh>
+                                <MudTh>Qtd Vendida</MudTh>
+                                <MudTh><MudTableSortLabel SortBy="new Func<ABCCurveItemDto, object>(x => x.TotalRevenue)">Faturamento</MudTableSortLabel></MudTh>
+                                <MudTh>% Individual</MudTh>
+                                <MudTh>% Acumulado</MudTh>
+                                <MudTh>Classe</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="SKU">@context.Sku</MudTd>
+                                <MudTd DataLabel="Produto">@context.ProductName</MudTd>
+                                <MudTd DataLabel="Categoria">@context.Category</MudTd>
+                                <MudTd DataLabel="Qtd Vendida">@context.QuantitySold</MudTd>
+                                <MudTd DataLabel="Faturamento">@context.TotalRevenue.ToString("C2")</MudTd>
+                                <MudTd DataLabel="% Individual">@context.RevenuePercentage.ToString("N2")%</MudTd>
+                                <MudTd DataLabel="% Acumulado">@context.CumulativePercentage.ToString("N2")%</MudTd>
+                                <MudTd DataLabel="Classe">
+                                    <MudChip T="string" Size="Size.Small" Color="@GetClassColor(context.Classification)">@context.Classification</MudChip>
+                                </MudTd>
+                            </RowTemplate>
+                            <PagerContent>
+                                <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }"/>
+                            </PagerContent>
+                        </MudTable>
+                    </MudCardContent>
+                </MudCard>
+            }
+        </MudTabPanel>
+
         <!-- Stock Levels Tab -->
         <MudTabPanel Text="Níveis de Estoque" Icon="@Icons.Material.Filled.Inventory2">
             <MudCard Elevation="3" Class="mb-4">
@@ -290,16 +425,131 @@
     private InventoryReportFilterDto _stockLevelsFilter = new() { OnlyLowStock = false };
     private InventoryReportFilterDto _stockMovementFilter = new() { StartDate = DateTime.Now.AddMonths(-1), EndDate = DateTime.Now };
     private InventoryReportFilterDto _valuationFilter = new();
+    private InventoryReportFilterDto _abcFilter = new() { StartDate = DateTime.Now.AddMonths(-3), EndDate = DateTime.Now };
     
     private StockLevelsReportDto? _stockLevelsReport;
     private StockMovementReportDto? _stockMovementReport;
     private InventoryValuationReportDto? _valuationReport;
+    private ABCCurveReportDto? _abcReport;
     
     private bool _loadingStockLevels;
     private bool _loadingStockMovement;
     private bool _loadingValuation;
+    private bool _loadingABC;
 
     private string _searchString = "";
+    private string _abcSearchString = "";
+    private IReadOnlyCollection<string> _selectedClasses = new List<string> { "A", "B", "C" };
+
+    // Pareto chart options
+    private ApexChartOptions<ABCCurveItemDto> _paretoChartOptions = new()
+    {
+        Chart = new Chart
+        {
+            Toolbar = new Toolbar { Show = false }
+        },
+        PlotOptions = new PlotOptions
+        {
+            Bar = new PlotOptionsBar
+            {
+                Horizontal = false,
+                ColumnWidth = "60%"
+            }
+        },
+        Stroke = new Stroke
+        {
+            Width = new List<double> { 0, 3 }
+        },
+        Yaxis = new List<YAxis>
+        {
+            new YAxis
+            {
+                Title = new AxisTitle { Text = "Faturamento (R$)" },
+                Labels = new YAxisLabels
+                {
+                    Formatter = @"function (value) {
+                        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(value);
+                    }"
+                }
+            },
+            new YAxis
+            {
+                Opposite = true,
+                Title = new AxisTitle { Text = "% Acumulado" },
+                Min = 0,
+                Max = 100,
+                Labels = new YAxisLabels
+                {
+                    Formatter = @"function (value) { return value.toFixed(0) + '%'; }"
+                }
+            }
+        },
+        Tooltip = new Tooltip
+        {
+            Shared = true,
+            Intersect = false
+        },
+        Colors = new List<string> { "#4CAF50", "#FF9800" }
+    };
+
+    private async Task LoadABCCurveReport()
+    {
+        try
+        {
+            _loadingABC = true;
+            var response = await ApiService.PostAsync<ABCCurveReportDto>("/api/reports/inventory/abc-curve", _abcFilter);
+            
+            if (response != null)
+            {
+                _abcReport = response;
+                Snackbar.Add("Análise de Curva ABC gerada com sucesso!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Erro ao gerar análise de curva ABC", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingABC = false;
+        }
+    }
+
+    private bool FilterABCItems(ABCCurveItemDto item)
+    {
+        // Filter by class selection
+        if (_selectedClasses.Any() && !_selectedClasses.Contains(item.Classification))
+            return false;
+
+        // Filter by search string
+        if (string.IsNullOrWhiteSpace(_abcSearchString))
+            return true;
+        if (item.ProductName.Contains(_abcSearchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (item.Sku.Contains(_abcSearchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (item.Category.Contains(_abcSearchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        return false;
+    }
+
+    private Color GetClassColor(string classification) => classification switch
+    {
+        "A" => Color.Success,
+        "B" => Color.Warning,
+        "C" => Color.Error,
+        _ => Color.Default
+    };
+
+    private string TruncateName(string name, int maxLength)
+    {
+        if (string.IsNullOrEmpty(name)) return name;
+        return name.Length <= maxLength ? name : name.Substring(0, maxLength) + "...";
+    }
 
     private async Task LoadStockLevelsReport()
     {

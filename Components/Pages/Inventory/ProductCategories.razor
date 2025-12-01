@@ -12,7 +12,7 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
-<PageTitle>Categorias de Produtos</PageTitle>
+<PageTitle>Categorias de Produtos - Pillar ERP</PageTitle>
 
 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
     <MudText Typo="Typo.h4">Gerenciar Categorias</MudText>
@@ -30,7 +30,7 @@
 }
 
 <MudTable T="ProductCategoryDto" ServerData="ServerReload" 
-          Dense="false" Hover="true" Elevation="4" @ref="_table" Striped="true" Loading="@_loading">
+          Dense="false" Hover="true" Elevation="2" @ref="_table" Striped="true" Loading="@_loading">
     <ToolBarContent>
         <MudText Typo="Typo.h5">Categorias Cadastradas</MudText>
         <MudSpacer/>
@@ -199,7 +199,7 @@
         { 
             CloseOnEscapeKey = true,
             MaxWidth = MaxWidth.Medium,
-            FullWidth = true
+            FullWidth = false
         };
         
         var dialog = await DialogService.ShowAsync<CreateProductCategoryDialog>("Nova Categoria", options);
@@ -222,7 +222,7 @@
         { 
             CloseOnEscapeKey = true,
             MaxWidth = MaxWidth.Medium,
-            FullWidth = true
+            FullWidth = false
         };
         
         var dialog = await DialogService.ShowAsync<EditProductCategoryDialog>("Editar Categoria", parameters, options);

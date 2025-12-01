@@ -1,16 +1,289 @@
-.pillar-sidebar { min-width: 0; }
-.pillar-sidebar .sidebar-header { display:flex; align-items:center; justify-content:space-between; }
-.pillar-sidebar .menu-toggle { margin-left:auto; }
-.pillar-sidebar .section-title { color: var(--mud-palette-text-secondary); text-transform: uppercase; letter-spacing: .08em; }
-.pillar-sidebar .mini-root { display:flex; flex-direction:column; align-items:stretch ;min-width: 64px; width: 64px; flex-shrink: 0; }
-.pillar-sidebar .mud-nav-link { border-radius:8px; }
-.pillar-sidebar .mud-nav-link.active { background: rgba(0,0,0,0.06); }
-:root.dark .pillar-sidebar .mud-nav-link.active { background: rgba(255,255,255,0.08); }
-.pillar-sidebar .mud-nav-link:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 2px; }
-.pillar-sidebar .mud-icon-button:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 2px; border-radius:8px; }
-.pillar-sidebar { overflow: hidden; }
+/* ========================================
+   Pillar Sidebar - Estilos Modernos
+   ======================================== */
 
-.pillar-sidebar * { transition: none !important; }
-.full-wrapper { width: 260px; transition: width 200ms ease; overflow: hidden; }
+.pillar-sidebar {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
 
-.full-wrapper.closing { width: 65px; }
+.sidebar-nav-menu {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* ========================================
+   Search Container
+   ======================================== */
+
+.sidebar-search-container {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: inherit;
+}
+
+.sidebar-search-field {
+    border-radius: 8px;
+}
+
+.sidebar-search-field ::deep .mud-input-outlined-border {
+    border-radius: 8px;
+}
+
+/* ========================================
+   Section Titles
+   ======================================== */
+
+.section-title {
+    color: var(--mud-palette-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+    font-size: 0.7rem;
+    display: flex;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+/* ========================================
+   Navigation Items
+   ======================================== */
+
+.nav-item,
+.nav-subitem {
+    border-radius: 8px !important;
+    margin: 2px 4px;
+    transition: all 0.15s ease-out;
+}
+
+.nav-item:hover,
+.nav-subitem:hover {
+    background: rgba(var(--tenant-primary-rgb, 89, 74, 226), 0.08);
+    transform: translateX(2px);
+}
+
+.nav-item.active,
+.nav-subitem.active,
+::deep .mud-nav-link.active {
+    background: rgba(var(--tenant-primary-rgb, 89, 74, 226), 0.12) !important;
+    font-weight: 600;
+}
+
+::deep .mud-nav-link:focus-visible {
+    outline: 2px solid var(--mud-palette-primary);
+    outline-offset: 2px;
+}
+
+/* ========================================
+   Nav Groups
+   ======================================== */
+
+.nav-group {
+    margin: 2px 4px;
+}
+
+.nav-group ::deep .mud-nav-group-header {
+    border-radius: 8px;
+    transition: all 0.15s ease-out;
+}
+
+.nav-group ::deep .mud-nav-group-header:hover {
+    background: rgba(var(--tenant-primary-rgb, 89, 74, 226), 0.08);
+}
+
+.nav-group ::deep .mud-collapse-container {
+    padding-left: 8px;
+}
+
+/* Admin group special styling */
+.admin-group ::deep .mud-nav-group-header {
+    border-left: 3px solid var(--mud-palette-warning);
+}
+
+/* ========================================
+   Pinned Items
+   ======================================== */
+
+.pinned-item,
+.search-result-item {
+    transition: background 0.15s ease-out;
+}
+
+.pinned-item:hover,
+.search-result-item:hover {
+    background: rgba(var(--tenant-primary-rgb, 89, 74, 226), 0.04);
+}
+
+/* ========================================
+   Favorites Section
+   ======================================== */
+
+.favorites-section .section-title {
+    color: var(--mud-palette-warning);
+}
+
+/* ========================================
+   Search Results
+   ======================================== */
+
+.search-results {
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+}
+
+.search-empty-state {
+    opacity: 0.7;
+}
+
+/* ========================================
+   Footer Section
+   ======================================== */
+
+.footer-section {
+    margin-top: auto;
+    padding-top: 8px;
+}
+
+.logout-item:hover {
+    background: rgba(var(--mud-palette-error-rgb, 244, 67, 54), 0.08) !important;
+}
+
+.logout-item:hover ::deep .mud-icon-root {
+    color: var(--mud-palette-error);
+}
+
+/* ========================================
+   Mini Mode
+   ======================================== */
+
+.mini-root {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    min-width: 64px;
+    width: 64px;
+    flex-shrink: 0;
+    padding: 8px 0;
+    height: 100%;
+}
+
+.mini-nav-item {
+    margin: 2px 8px;
+    border-radius: 8px !important;
+    transition: all 0.15s ease-out;
+}
+
+.mini-nav-item:hover {
+    background: rgba(var(--tenant-primary-rgb, 89, 74, 226), 0.12);
+    transform: scale(1.05);
+}
+
+.mini-nav-item ::deep .mud-nav-link-icon {
+    margin: 0 auto;
+}
+
+.mini-spacer {
+    flex: 1;
+}
+
+.logout-mini:hover {
+    background: rgba(var(--mud-palette-error-rgb, 244, 67, 54), 0.12) !important;
+}
+
+/* ========================================
+   Full Mode Wrapper
+   ======================================== */
+
+.full-wrapper {
+    width: 260px;
+    transition: width 200ms ease-out, opacity 150ms ease-out;
+    overflow: hidden;
+}
+
+.full-wrapper.closing {
+    width: 65px;
+    opacity: 0.5;
+}
+
+.full-wrapper.open {
+    opacity: 1;
+}
+
+/* ========================================
+   Icon Buttons
+   ======================================== */
+
+::deep .mud-icon-button:focus-visible {
+    outline: 2px solid var(--mud-palette-primary);
+    outline-offset: 2px;
+    border-radius: 8px;
+}
+
+/* ========================================
+   Dark Mode Adjustments
+   ======================================== */
+
+:root.dark .pillar-sidebar .nav-item.active,
+:root.dark .pillar-sidebar .nav-subitem.active,
+:root.dark .pillar-sidebar ::deep .mud-nav-link.active {
+    background: rgba(255, 255, 255, 0.12) !important;
+}
+
+:root.dark .pillar-sidebar .nav-item:hover,
+:root.dark .pillar-sidebar .nav-subitem:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+:root.dark .pillar-sidebar .pinned-item:hover,
+:root.dark .pillar-sidebar .search-result-item:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+:root.dark .pillar-sidebar .mini-nav-item:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+/* ========================================
+   Scrollbar
+   ======================================== */
+
+.pillar-sidebar::-webkit-scrollbar {
+    width: 4px;
+}
+
+.pillar-sidebar::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+}
+
+.pillar-sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.25);
+}
+
+:root.dark .pillar-sidebar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+:root.dark .pillar-sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+/* ========================================
+   Reduced Motion
+   ======================================== */
+
+@media (prefers-reduced-motion: reduce) {
+    .pillar-sidebar *,
+    .nav-item,
+    .nav-subitem,
+    .mini-nav-item,
+    .full-wrapper {
+        transition: none !important;
+        transform: none !important;
+    }
+}

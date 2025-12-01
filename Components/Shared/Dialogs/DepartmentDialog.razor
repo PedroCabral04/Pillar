@@ -70,11 +70,20 @@
         </MudForm>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="Cancel">Cancelar</MudButton>
-        <MudButton Color="MudBlazor.Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="_processing">
+        <MudButton OnClick="Cancel" 
+                   Variant="Variant.Text"
+                   StartIcon="@Icons.Material.Filled.Close">
+            Cancelar
+        </MudButton>
+        <MudButton Color="MudBlazor.Color.Primary" 
+                   Variant="Variant.Filled" 
+                   OnClick="Submit" 
+                   Disabled="_processing"
+                   StartIcon="@(_processing ? null : Icons.Material.Filled.Save)">
             @if (_processing)
             {
-                <MudProgressCircular Size="MudBlazor.Size.Small" Indeterminate="true"/>
+                <MudProgressCircular Size="MudBlazor.Size.Small" Indeterminate="true" Class="mr-2"/>
+                <text>Salvando...</text>
             }
             else
             {

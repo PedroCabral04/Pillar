@@ -5,8 +5,17 @@
         <MudText>@ContentText</MudText>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="Cancel">Cancelar</MudButton>
-        <MudButton Color="@Color" Variant="Variant.Filled" OnClick="Submit">@ButtonText</MudButton>
+        <MudButton OnClick="Cancel" 
+                   Variant="Variant.Text"
+                   StartIcon="@Icons.Material.Filled.Close">
+            Cancelar
+        </MudButton>
+        <MudButton Color="@Color" 
+                   Variant="Variant.Filled" 
+                   OnClick="Submit"
+                   StartIcon="@Icons.Material.Filled.Check">
+            @ButtonText
+        </MudButton>
     </DialogActions>
 </MudDialog>
 

@@ -13,28 +13,57 @@ public class SystemPlugin
     {
         return @"🤖 Sou o assistente virtual do Pillar ERP! Posso ajudar você com:
 
-📦 **Produtos:**
-- Listar todos os produtos
-- Buscar produtos por nome ou SKU
+📦 **Produtos & Estoque:**
+- Listar e buscar produtos
 - Cadastrar novos produtos
-- Verificar estoque de produtos
+- Verificar níveis de estoque
 
 💰 **Vendas:**
 - Listar vendas recentes
 - Criar novas vendas
-- Consultar detalhes de vendas
-- Calcular totais de vendas por período
+- Consultar detalhes e totais por período
 
-📊 **Exemplos de comandos:**
-- ""Mostrar todos os produtos""
-- ""Buscar produto notebook""
-- ""Cadastrar produto chamado Mouse sem fio, SKU MOUSE001, preço 59.90""
-- ""Criar venda para João Silva, email joao@email.com, produto MOUSE001, quantidade 2""
-- ""Quanto tenho em estoque do produto MOUSE001?""
-- ""Mostrar as últimas 5 vendas""
-- ""Qual o total de vendas entre 2025-01-01 e 2025-01-31?""
+👥 **Clientes:**
+- Buscar clientes por nome, CPF/CNPJ ou email
+- Cadastrar novos clientes
+- Consultar histórico de clientes
 
-💡 Dica: Use linguagem natural! Entendo suas solicitações de forma intuitiva.";
+🏢 **Fornecedores:**
+- Buscar e listar fornecedores
+- Cadastrar novos fornecedores
+- Consultar CNPJ na Receita Federal
+- Consultar endereço por CEP
+
+📊 **Financeiro:**
+- Contas a pagar e receber
+- Resumo de fluxo de caixa
+- Contas em atraso
+
+🖥️ **Ativos (Patrimônio):**
+- Listar todos os ativos da empresa
+- Buscar ativos por código ou nome
+- Ver ativos atribuídos a funcionários
+- Manutenções agendadas e em atraso
+- Estatísticas do patrimônio
+
+💼 **Folha de Pagamento:**
+- Listar períodos de folha
+- Resumo mensal e anual
+- Períodos pendentes (cálculo, aprovação, pagamento)
+
+👔 **Recursos Humanos:**
+- Buscar funcionários
+- Listar membros por departamento
+
+💡 **Exemplos de comandos:**
+- ""Listar todos os ativos""
+- ""Buscar cliente João Silva""
+- ""Consultar CNPJ 12.345.678/0001-00""
+- ""Mostrar folha de pagamento de 2024""
+- ""Quais manutenções estão em atraso?""
+- ""Cadastrar fornecedor XYZ LTDA, CNPJ 12345678000100""
+
+Use linguagem natural! Entendo suas solicitações de forma intuitiva.";
     }
 
     [KernelFunction, Description("Retorna a data e hora atual")]
@@ -57,6 +86,12 @@ Sistema de gestão empresarial modular e integrado.
 - ✅ Gestão de Produtos
 - ✅ Controle de Estoque
 - ✅ Gestão de Vendas
+- ✅ Gestão de Clientes
+- ✅ Gestão de Fornecedores
+- ✅ Contas a Pagar/Receber
+- ✅ Gestão de Ativos (Patrimônio)
+- ✅ Folha de Pagamento
+- ✅ Recursos Humanos
 - ✅ Kanban Pessoal
 - ✅ Preferências do Usuário
 
