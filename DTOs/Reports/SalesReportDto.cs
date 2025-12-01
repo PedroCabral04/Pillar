@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace erp.DTOs.Reports;
 
 /// <summary>
@@ -26,6 +28,13 @@ public class SalesReportResultDto
     public decimal TotalAmount => Summary.TotalRevenue;
     public decimal TotalDiscount => Summary.TotalDiscounts;
     public decimal AverageTicket => Summary.AverageTicket;
+    
+    /// <summary>
+    /// Deprecated: Use Items instead. This property is excluded from JSON serialization 
+    /// to prevent circular reference issues (Sale.Customer.Sales cycle).
+    /// </summary>
+    [JsonIgnore]
+    [Obsolete("Use Items instead. Raw EF entities cause circular reference issues during JSON serialization.")]
     public List<erp.Models.Sales.Sale> Sales { get; set; } = new();
 }
 

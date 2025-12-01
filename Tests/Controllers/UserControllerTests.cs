@@ -552,32 +552,33 @@ public class UserControllerTests
     }
 
     [Fact]
-    public async Task ValidateEmail_WithExcludedUserId_ReturnsOk()
-        [Fact]
-        public async Task ValidateEmail_IgnoresUsersFromOtherTenant()
+    public async Task ValidateEmail_IgnoresUsersFromOtherTenant()
+    {
+        // Arrange
+        var email = "tenant@test.com";
+        var otherTenantUser = new ApplicationUser
         {
-            // Arrange
-            var email = "tenant@test.com";
-            var otherTenantUser = new ApplicationUser
-            {
-                Id = 10,
-                Email = email,
-                NormalizedEmail = email.ToUpperInvariant(),
-                TenantId = 20
-            };
+            Id = 10,
+            Email = email,
+            NormalizedEmail = email.ToUpperInvariant(),
+            TenantId = 20
+        };
 
-            SetUsersQueryable(new List<ApplicationUser> { otherTenantUser });
-            SetTenantClaim(10);
+        SetUsersQueryable(new List<ApplicationUser> { otherTenantUser });
+        SetTenantClaim(10);
 
-            // Act
-            var result = await _controller.ValidateEmail(email);
+        // Act
+        var result = await _controller.ValidateEmail(email);
 
-            // Assert
-            var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
-            var response = okResult.Value as ValidationResponse;
-            response.Should().NotBeNull();
-            response!.IsAvailable.Should().BeTrue();
-        }
+        // Assert
+        var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var response = okResult.Value as ValidationResponse;
+        response.Should().NotBeNull();
+        response!.IsAvailable.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ValidateEmail_WithExcludedUserId_ReturnsOk()
     {
         // Arrange
         var email = "test@test.com";
