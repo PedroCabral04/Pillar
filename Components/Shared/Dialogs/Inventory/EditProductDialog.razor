@@ -387,10 +387,21 @@
         }
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="Cancel" Variant="Variant.Outlined">Cancelar</MudButton>
-        <MudButton OnClick="Submit" Variant="Variant.Filled" Color="MudBlazor.Color.Primary" Disabled="@_loading">
-            <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-1" />
-            Salvar Alterações
+        <MudButton OnClick="Cancel" Variant="Variant.Text" Disabled="@_saving">Cancelar</MudButton>
+        <MudButton OnClick="Submit" 
+                   Variant="Variant.Filled" 
+                   Color="MudBlazor.Color.Primary" 
+                   Disabled="@(_loading || _saving)">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="MudBlazor.Size.Small" Indeterminate="true" Class="mr-2"/>
+                <text>Salvando...</text>
+            }
+            else
+            {
+                <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-1" />
+                <text>Salvar Alterações</text>
+            }
         </MudButton>
     </DialogActions>
 </MudDialog>
@@ -404,6 +415,7 @@
 
     private MudForm? _form;
     private bool _loading;
+    private bool _saving;
     private List<ProductCategoryDto> _categories = new();
     private UpdateProductDto _updateProduct = new();
 
@@ -507,12 +519,31 @@
             await _form.Validate();
             if (!_form.IsValid)
             {
-                Snackbar.Add("Por favor, corrija os erros no formulário", Severity.Error);
+                Snackbar.Add("Por favor, corrija os erros no formulário", Severity.Warning);
                 return;
             }
         }
 
-        _loading = true;
+        // Validações adicionais
+        if (string.IsNullOrWhiteSpace(_updateProduct.Sku))
+        {
+            Snackbar.Add("O SKU é obrigatório", Severity.Warning);
+            return;
+        }
+        
+        if (string.IsNullOrWhiteSpace(_updateProduct.Name))
+        {
+            Snackbar.Add("O nome do produto é obrigatório", Severity.Warning);
+            return;
+        }
+        
+        if (_updateProduct.CategoryId <= 0)
+        {
+            Snackbar.Add("Selecione uma categoria", Severity.Warning);
+            return;
+        }
+
+        _saving = true;
         try
         {
             var result = await ApiService.PutAsync<ProductDto>($"/api/products/{_updateProduct.Id}", _updateProduct);
@@ -534,7 +565,7 @@
         }
         finally
         {
-            _loading = false;
+            _saving = false;
         }
     }
 

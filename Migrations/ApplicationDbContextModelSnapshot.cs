@@ -2233,7 +2233,7 @@ namespace erp.Migrations
                     b.HasIndex("UserId", "TourId")
                         .IsUnique();
 
-                    b.ToTable("UserOnboardingProgress");
+                    b.ToTable("UserOnboardingProgress", (string)null);
                 });
 
             modelBuilder.Entity("erp.Models.Payroll.PayrollComponent", b =>
@@ -2282,7 +2282,7 @@ namespace erp.Migrations
 
                     b.HasIndex("PayrollResultId");
 
-                    b.ToTable("PayrollComponents");
+                    b.ToTable("PayrollComponents", (string)null);
                 });
 
             modelBuilder.Entity("erp.Models.Payroll.PayrollResult", b =>
@@ -2383,7 +2383,7 @@ namespace erp.Migrations
 
                     b.HasIndex("UpdatedById");
 
-                    b.ToTable("PayrollResults");
+                    b.ToTable("PayrollResults", (string)null);
                 });
 
             modelBuilder.Entity("erp.Models.Payroll.PayrollSlip", b =>
@@ -2440,7 +2440,7 @@ namespace erp.Migrations
 
                     b.HasIndex("UpdatedById");
 
-                    b.ToTable("PayrollSlips");
+                    b.ToTable("PayrollSlips", (string)null);
                 });
 
             modelBuilder.Entity("erp.Models.Payroll.PayrollTaxBracket", b =>
@@ -2480,7 +2480,7 @@ namespace erp.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("PayrollTaxBrackets");
+                    b.ToTable("PayrollTaxBrackets", (string)null);
                 });
 
             modelBuilder.Entity("erp.Models.Role", b =>
@@ -2502,7 +2502,7 @@ namespace erp.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Roles");
+                    b.ToTable("Roles", (string)null);
                 });
 
             modelBuilder.Entity("erp.Models.Sales.Customer", b =>
@@ -3111,7 +3111,7 @@ namespace erp.Migrations
                     b.HasIndex("Email")
                         .IsUnique();
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("erp.Models.UserRole", b =>
@@ -3126,7 +3126,7 @@ namespace erp.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("UserRoles");
+                    b.ToTable("UserRoles", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<int>", b =>

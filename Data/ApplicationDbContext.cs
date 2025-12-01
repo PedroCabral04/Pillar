@@ -1662,7 +1662,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             
             layout.HasIndex(x => x.UserId).IsUnique();
             
-            layout.HasOne(x => x.User)
+                layout.HasOne(x => x.User)
                 .WithMany()
                 .HasForeignKey(x => x.UserId)
                 .OnDelete(DeleteBehavior.Cascade);

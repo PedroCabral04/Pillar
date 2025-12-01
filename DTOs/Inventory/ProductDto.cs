@@ -81,3 +81,18 @@ public class ProductSupplierDto
     public decimal MinimumOrderQuantity { get; set; }
     public bool IsPreferred { get; set; }
 }
+
+/// <summary>
+/// Estatísticas gerais de produtos para exibição em dashboard/KPIs
+/// </summary>
+public class ProductStatisticsDto
+{
+    public int TotalProducts { get; set; }
+    public int ActiveProducts { get; set; }
+    public int InactiveProducts { get; set; }
+    public int LowStockProducts { get; set; }
+    public int OutOfStockProducts { get; set; }
+    public int OverstockProducts { get; set; }
+    public decimal TotalStockValue { get; set; }
+    public int TotalCategories { get; set; }
+}

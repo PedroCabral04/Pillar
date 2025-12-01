@@ -637,4 +637,82 @@ public class InventoryService : IInventoryService
 
         return (warehouses, totalCount);
     }
+
+    public async Task<ProductStatisticsDto> GetProductStatisticsAsync()
+    {
+        var products = await _context.Products.ToListAsync();
+        var categories = await _context.ProductCategories.CountAsync();
+
+        return new ProductStatisticsDto
+        {
+            TotalProducts = products.Count,
+            ActiveProducts = products.Count(p => p.IsActive && p.Status == ProductStatus.Active),
+            InactiveProducts = products.Count(p => !p.IsActive || p.Status == ProductStatus.Inactive),
+            LowStockProducts = products.Count(p => p.CurrentStock > 0 && p.CurrentStock <= p.MinimumStock),
+            OutOfStockProducts = products.Count(p => p.CurrentStock <= 0),
+            OverstockProducts = products.Count(p => p.CurrentStock > p.MaximumStock && p.MaximumStock > 0),
+            TotalStockValue = products.Sum(p => p.CurrentStock * p.CostPrice),
+            TotalCategories = categories
+        };
+    }
+
+    public async Task<byte[]> ExportProductsAsync(ProductSearchDto search, string format)
+    {
+        // Buscar todos os produtos sem paginação para exportação
+        search.Page = 1;
+        search.PageSize = int.MaxValue;
+        
+        var (products, _) = await SearchProductsAsync(search);
+        var productList = products.ToList();
+
+        if (format.ToLower() == "csv")
+        {
+            return GenerateCsv(productList);
+        }
+        
+        // Default: retorna CSV
+        return GenerateCsv(productList);
+    }
+
+    private byte[] GenerateCsv(List<ProductDto> products)
+    {
+        var sb = new System.Text.StringBuilder();
+        
+        // Header
+        sb.AppendLine("SKU;Código de Barras;Nome;Categoria;Unidade;Estoque Atual;Estoque Mínimo;Estoque Máximo;Preço de Custo;Preço de Venda;Margem de Lucro;Status;Ativo");
+        
+        // Data
+        foreach (var p in products)
+        {
+            var statusText = p.Status switch
+            {
+                0 => "Ativo",
+                1 => "Inativo",
+                2 => "Descontinuado",
+                _ => "Desconhecido"
+            };
+            
+            sb.AppendLine($"{Escape(p.Sku)};{Escape(p.Barcode)};{Escape(p.Name)};{Escape(p.CategoryName)};{p.Unit};{p.CurrentStock:N2};{p.MinimumStock:N2};{p.MaximumStock:N2};{p.CostPrice:N2};{p.SalePrice:N2};{p.ProfitMargin:N2}%;{statusText};{(p.IsActive ? "Sim" : "Não")}");
+        }
+        
+        // Use UTF-8 with BOM for Excel compatibility
+        var preamble = System.Text.Encoding.UTF8.GetPreamble();
+        var content = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+        var result = new byte[preamble.Length + content.Length];
+        preamble.CopyTo(result, 0);
+        content.CopyTo(result, preamble.Length);
+        
+        return result;
+    }
+
+    private static string Escape(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return string.Empty;
+        // Escape quotes and wrap in quotes if contains separator or quotes
+        if (value.Contains(';') || value.Contains('"') || value.Contains('\n'))
+        {
+            return $"\"{value.Replace("\"", "\"\"")}\"";
+        }
+        return value;
+    }
 }
