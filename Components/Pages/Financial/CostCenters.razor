@@ -71,7 +71,7 @@
                                 <MudStack Row="true" Justify="Justify.SpaceBetween">
                                     <MudText Typo="Typo.body2">Orçamento Mensal:</MudText>
                                     <MudText Typo="Typo.body2" Style="font-weight: 600;">
-                                        @costCenter.MonthlyBudget.Value.ToString("C")
+                                        @Currency.Format(costCenter.MonthlyBudget.Value)
                                     </MudText>
                                 </MudStack>
                             </MudStack>
@@ -107,6 +107,7 @@
     [Inject] private IApiService ApiService { get; set; } = null!;
     [Inject] private ISnackbar Snackbar { get; set; } = null!;
     [Inject] private IDialogService DialogService { get; set; } = null!;
+    [Inject] private CurrencyFormatService Currency { get; set; } = null!;
 
     private List<CostCenterDto> costCenters = new();
     private List<UserDto> users = new();

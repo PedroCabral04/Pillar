@@ -9,6 +9,7 @@
 @inject IApiService ApiService
 @inject ISnackbar Snackbar
 @inject IJSRuntime JS
+@inject CurrencyFormatService Currency
 
 <PageTitle>Relatórios de Vendas - Pillar ERP</PageTitle>
 
@@ -102,25 +103,25 @@
                     <MudItem xs="12" sm="6" md="3">
                         <MudPaper Class="pa-4" Elevation="0">
                             <MudText Typo="Typo.subtitle2" Color="Color.Success">Receita Total</MudText>
-                            <MudText Typo="Typo.h5">@_report.Summary.TotalRevenue.ToString("C2")</MudText>
+                            <MudText Typo="Typo.h5">@Currency.Format(_report.Summary.TotalRevenue)</MudText>
                         </MudPaper>
                     </MudItem>
                     <MudItem xs="12" sm="6" md="3">
                         <MudPaper Class="pa-4" Elevation="0">
                             <MudText Typo="Typo.subtitle2" Color="Color.Warning">Descontos</MudText>
-                            <MudText Typo="Typo.h5">@_report.Summary.TotalDiscounts.ToString("C2")</MudText>
+                            <MudText Typo="Typo.h5">@Currency.Format(_report.Summary.TotalDiscounts)</MudText>
                         </MudPaper>
                     </MudItem>
                     <MudItem xs="12" sm="6" md="3">
                         <MudPaper Class="pa-4" Elevation="0">
                             <MudText Typo="Typo.subtitle2" Color="Color.Info">Receita Líquida</MudText>
-                            <MudText Typo="Typo.h5">@_report.Summary.NetRevenue.ToString("C2")</MudText>
+                            <MudText Typo="Typo.h5">@Currency.Format(_report.Summary.NetRevenue)</MudText>
                         </MudPaper>
                     </MudItem>
                     <MudItem xs="12" sm="6" md="4">
                         <MudPaper Class="pa-4" Elevation="0">
                             <MudText Typo="Typo.subtitle2">Ticket Médio</MudText>
-                            <MudText Typo="Typo.h6">@_report.Summary.AverageTicket.ToString("C2")</MudText>
+                            <MudText Typo="Typo.h6">@Currency.Format(_report.Summary.AverageTicket)</MudText>
                         </MudPaper>
                     </MudItem>
                     <MudItem xs="12" sm="6" md="4">
@@ -162,9 +163,9 @@
                         <MudTd DataLabel="Data">@context.SaleDate.ToString("dd/MM/yyyy")</MudTd>
                         <MudTd DataLabel="Cliente">@context.CustomerName</MudTd>
                         <MudTd DataLabel="Vendedor">@context.SalespersonName</MudTd>
-                        <MudTd DataLabel="Total">@context.TotalAmount.ToString("C2")</MudTd>
-                        <MudTd DataLabel="Desconto">@context.DiscountAmount.ToString("C2")</MudTd>
-                        <MudTd DataLabel="Líquido"><strong>@context.NetAmount.ToString("C2")</strong></MudTd>
+                        <MudTd DataLabel="Total">@Currency.Format(context.TotalAmount)</MudTd>
+                        <MudTd DataLabel="Desconto">@Currency.Format(context.DiscountAmount)</MudTd>
+                        <MudTd DataLabel="Líquido"><strong>@Currency.Format(context.NetAmount)</strong></MudTd>
                         <MudTd DataLabel="Status">
                             <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">@context.Status</MudChip>
                         </MudTd>
@@ -231,7 +232,7 @@
                     <MudItem xs="12" sm="6" md="3">
                         <MudPaper Class="pa-4" Elevation="3">
                             <MudText Typo="Typo.subtitle2" Color="Color.Success">Faturamento Total</MudText>
-                            <MudText Typo="Typo.h5">@_heatmapReport.Summary.TotalRevenue.ToString("C2")</MudText>
+                            <MudText Typo="Typo.h5">@Currency.Format(_heatmapReport.Summary.TotalRevenue)</MudText>
                         </MudPaper>
                     </MudItem>
                     <MudItem xs="12" sm="6" md="3">
@@ -240,7 +241,7 @@
                                 <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Small" /> Pico de Vendas
                             </MudText>
                             <MudText Typo="Typo.h6">@_heatmapReport.Summary.PeakDay @_heatmapReport.Summary.PeakHour</MudText>
-                            <MudText Typo="Typo.body2">@_heatmapReport.Summary.PeakSalesCount vendas (@_heatmapReport.Summary.PeakRevenue.ToString("C2"))</MudText>
+                            <MudText Typo="Typo.body2">@_heatmapReport.Summary.PeakSalesCount vendas (@Currency.Format(_heatmapReport.Summary.PeakRevenue))</MudText>
                         </MudPaper>
                     </MudItem>
                     <MudItem xs="12" sm="6" md="3">

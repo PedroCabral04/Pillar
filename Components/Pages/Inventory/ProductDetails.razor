@@ -12,6 +12,7 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject NavigationManager Navigation
+@inject CurrencyFormatService Currency
 
 <PageTitle>@(_product?.Name ?? "Detalhes do Produto")</PageTitle>
 
@@ -137,19 +138,19 @@
                         <MudItem xs="6" sm="4" md="3">
                             <MudStack Spacing="1">
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">Preço de Custo</MudText>
-                                <MudText Typo="Typo.h6">@_product.CostPrice.ToString("C2")</MudText>
+                                <MudText Typo="Typo.h6">@Currency.Format(_product.CostPrice)</MudText>
                             </MudStack>
                         </MudItem>
                         <MudItem xs="6" sm="4" md="3">
                             <MudStack Spacing="1">
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">Preço de Venda</MudText>
-                                <MudText Typo="Typo.h6" Style="font-weight: 600;">@_product.SalePrice.ToString("C2")</MudText>
+                                <MudText Typo="Typo.h6" Style="font-weight: 600;">@Currency.Format(_product.SalePrice)</MudText>
                             </MudStack>
                         </MudItem>
                         <MudItem xs="6" sm="4" md="3">
                             <MudStack Spacing="1">
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">Preço Atacado</MudText>
-                                <MudText Typo="Typo.h6">@(_product.WholesalePrice?.ToString("C2") ?? "-")</MudText>
+                                <MudText Typo="Typo.h6">@Currency.Format(_product.WholesalePrice)</MudText>
                             </MudStack>
                         </MudItem>
                         <MudItem xs="6" sm="4" md="3">

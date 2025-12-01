@@ -267,7 +267,7 @@ public class InventoryDashboardProvider : IDashboardWidgetProvider
                     summary.ClassCRevenue 
                 } }
             },
-            Subtitle = $"Total: {summary.TotalRevenue:C2} | A: {summary.ClassAPercentage:N1}% | B: {summary.ClassBPercentage:N1}% | C: {summary.ClassCPercentage:N1}%"
+            Subtitle = $"Total: {CurrencyFormatService.FormatStatic(summary.TotalRevenue)} | A: {summary.ClassAPercentage:N1}% | B: {summary.ClassBPercentage:N1}% | C: {summary.ClassCPercentage:N1}%"
         };
     }
 }

@@ -1,5 +1,6 @@
 @page "/financial/dashboard"
 @using erp.DTOs.Financial
+@using erp.Services
 @attribute [Authorize]
 
 <PageTitle>Dashboard Financeiro - Pillar ERP</PageTitle>
@@ -38,9 +39,9 @@
                             <MudChip T="string" Size="Size.Small" Color="MudBlazor.Color.Success">Receitas</MudChip>
                         </MudStack>
                         <MudText Typo="Typo.h6" Color="Color.Secondary">Contas a Receber</MudText>
-                        <MudText Typo="Typo.h4">@dashboardData.TotalReceivablePending.ToString("C2")</MudText>
+                        <MudText Typo="Typo.h4">@Currency.Format(dashboardData.TotalReceivablePending)</MudText>
                         <MudText Typo="Typo.caption" Color="Color.Error">
-                            Vencidas: @dashboardData.TotalReceivableOverdue.ToString("C2") (@dashboardData.ReceivablesOverdueCount)
+                            Vencidas: @Currency.Format(dashboardData.TotalReceivableOverdue) (@dashboardData.ReceivablesOverdueCount)
                         </MudText>
                     </MudStack>
                 </MudPaper>
@@ -54,9 +55,9 @@
                             <MudChip T="string" Size="Size.Small" Color="MudBlazor.Color.Error">Despesas</MudChip>
                         </MudStack>
                         <MudText Typo="Typo.h6" Color="Color.Secondary">Contas a Pagar</MudText>
-                        <MudText Typo="Typo.h4">@dashboardData.TotalPayablePending.ToString("C2")</MudText>
+                        <MudText Typo="Typo.h4">@Currency.Format(dashboardData.TotalPayablePending)</MudText>
                         <MudText Typo="Typo.caption" Color="Color.Error">
-                            Vencidas: @dashboardData.TotalPayableOverdue.ToString("C2") (@dashboardData.PayablesOverdueCount)
+                            Vencidas: @Currency.Format(dashboardData.TotalPayableOverdue) (@dashboardData.PayablesOverdueCount)
                         </MudText>
                     </MudStack>
                 </MudPaper>
@@ -71,7 +72,7 @@
                         </MudStack>
                         <MudText Typo="Typo.h6" Color="Color.Secondary">Saldo Previsto</MudText>
                         <MudText Typo="Typo.h4" Color="@(dashboardData.ForecastedBalance >= 0 ? MudBlazor.Color.Success : MudBlazor.Color.Error)">
-                            @dashboardData.ForecastedBalance.ToString("C2")
+                            @Currency.Format(dashboardData.ForecastedBalance)
                         </MudText>
                         <MudText Typo="Typo.caption">
                             (Recebíveis - Pagáveis)
@@ -89,7 +90,7 @@
                         </MudStack>
                         <MudText Typo="Typo.h6" Color="Color.Secondary">Saldo Realizado</MudText>
                         <MudText Typo="Typo.h4" Color="@(dashboardData.CashBalance >= 0 ? MudBlazor.Color.Success : MudBlazor.Color.Error)">
-                            @dashboardData.CashBalance.ToString("C2")
+                            @Currency.Format(dashboardData.CashBalance)
                         </MudText>
                          <MudText Typo="Typo.caption">
                             (Recebido - Pago)
@@ -112,7 +113,7 @@
                                 </MudText>
                                 <MudText Typo="Typo.body2">
                                     Primeiro dia crítico: @dashboardData.CashFlowAlerts.First().Date.ToString("dd/MM/yyyy") 
-                                    (Saldo projetado: @dashboardData.CashFlowAlerts.First().ProjectedBalance.ToString("C2"))
+                                    (Saldo projetado: @Currency.Format(dashboardData.CashFlowAlerts.First().ProjectedBalance))
                                 </MudText>
                             </MudStack>
                             <MudButton Variant="Variant.Text" Color="MudBlazor.Color.Inherit" Size="Size.Small"
@@ -142,8 +143,8 @@
                                     {
                                         <tr>
                                             <td>@alert.Date.ToString("dd/MM/yyyy (ddd)")</td>
-                                            <td style="color: #F44336; font-weight: bold;">@alert.ProjectedBalance.ToString("C2")</td>
-                                            <td>@alert.Shortfall.ToString("C2")</td>
+                                            <td style="color: #F44336; font-weight: bold;">@Currency.Format(alert.ProjectedBalance)</td>
+                                            <td>@Currency.Format(alert.Shortfall)</td>
                                             <td>
                                                 <MudChip T="string" Size="Size.Small" 
                                                          Color="@(alert.Severity == "Critical" ? MudBlazor.Color.Error : MudBlazor.Color.Warning)">
@@ -237,7 +238,7 @@
                         <RowTemplate>
                             <MudTd>@context.Name</MudTd>
                             <MudTd>@context.TransactionCount</MudTd>
-                            <MudTd>@context.TotalAmount.ToString("C2")</MudTd>
+                            <MudTd>@Currency.Format(context.TotalAmount)</MudTd>
                         </RowTemplate>
                     </MudTable>
                 </MudPaper>
@@ -255,7 +256,7 @@
                         <RowTemplate>
                             <MudTd>@context.Name</MudTd>
                             <MudTd>@context.TransactionCount</MudTd>
-                            <MudTd>@context.TotalAmount.ToString("C2")</MudTd>
+                            <MudTd>@Currency.Format(context.TotalAmount)</MudTd>
                         </RowTemplate>
                     </MudTable>
                 </MudPaper>
@@ -267,6 +268,7 @@
 @code {
     [Inject] private IApiService ApiService { get; set; } = null!;
     [Inject] private ISnackbar Snackbar { get; set; } = null!;
+    [Inject] private CurrencyFormatService Currency { get; set; } = null!;
 
     private FinancialDashboardDto? dashboardData;
     private bool isLoading = false;

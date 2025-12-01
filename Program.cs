@@ -270,6 +270,7 @@ builder.Services.AddDbContextFactory<ApplicationDbContext>((serviceProvider, opt
 builder.Services.AddScoped<IUserDao, UserDao>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<PreferenceService>();
+builder.Services.AddScoped<CurrencyFormatService>();
 builder.Services.AddScoped<ThemeService>();
 
 // Register HttpClient for ApiService with proper configuration

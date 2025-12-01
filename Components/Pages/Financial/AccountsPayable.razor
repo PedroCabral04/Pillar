@@ -62,7 +62,7 @@
                 <MudTd DataLabel="Fornecedor">@context.SupplierName</MudTd>
                 <MudTd DataLabel="Nota Fiscal">@context.InvoiceNumber</MudTd>
                 <MudTd DataLabel="Vencimento">@context.DueDate.ToBrazilianDate()</MudTd>
-                <MudTd DataLabel="Valor">@context.RemainingAmount.ToString("C2")</MudTd>
+                <MudTd DataLabel="Valor">@Currency.Format(context.RemainingAmount)</MudTd>
                 <MudTd DataLabel="Status">
                             <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">
                         @context.StatusDescription
@@ -111,6 +111,7 @@
     [Inject] private IApiService ApiService { get; set; } = null!;
     [Inject] private ISnackbar Snackbar { get; set; } = null!;
     [Inject] private IDialogService DialogService { get; set; } = null!;
+    [Inject] private CurrencyFormatService Currency { get; set; } = null!;
 
     private MudTable<AccountPayableDto> table;
     private string searchTerm = "";

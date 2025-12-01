@@ -56,10 +56,10 @@ public class PdfExportService : IPdfExportService
                         {
                             summaryCol.Item().Text("Resumo").Bold().FontSize(14);
                             summaryCol.Item().Text($"Total de Vendas: {report.Summary.TotalSales}");
-                            summaryCol.Item().Text($"Receita Total: {report.Summary.TotalRevenue:C2}");
-                            summaryCol.Item().Text($"Descontos: {report.Summary.TotalDiscounts:C2}");
-                            summaryCol.Item().Text($"Receita Líquida: {report.Summary.NetRevenue:C2}");
-                            summaryCol.Item().Text($"Ticket Médio: {report.Summary.AverageTicket:C2}");
+                            summaryCol.Item().Text($"Receita Total: {CurrencyFormatService.FormatStatic(report.Summary.TotalRevenue)}");
+                            summaryCol.Item().Text($"Descontos: {CurrencyFormatService.FormatStatic(report.Summary.TotalDiscounts)}");
+                            summaryCol.Item().Text($"Receita Líquida: {CurrencyFormatService.FormatStatic(report.Summary.NetRevenue)}");
+                            summaryCol.Item().Text($"Ticket Médio: {CurrencyFormatService.FormatStatic(report.Summary.AverageTicket)}");
                         });
 
                         // Table
@@ -96,7 +96,7 @@ public class PdfExportService : IPdfExportService
                                 table.Cell().Element(CellStyle).Text(item.SaleNumber);
                                 table.Cell().Element(CellStyle).Text(item.CustomerName);
                                 table.Cell().Element(CellStyle).Text(item.SaleDate.ToString("dd/MM/yyyy"));
-                                table.Cell().Element(CellStyle).Text(item.NetAmount.ToString("C2"));
+                                table.Cell().Element(CellStyle).Text(CurrencyFormatService.FormatStatic(item.NetAmount));
                                 table.Cell().Element(CellStyle).Text(item.Status);
 
                                 static IContainer CellStyle(IContainer container)
@@ -148,11 +148,11 @@ public class PdfExportService : IPdfExportService
                         column.Item().Background(Colors.Grey.Lighten3).Padding(10).Column(summaryCol =>
                         {
                             summaryCol.Item().Text("Resumo Financeiro").Bold().FontSize(14);
-                            summaryCol.Item().Text($"Total Receitas: {report.Summary.TotalRevenue:C2}");
-                            summaryCol.Item().Text($"Total Despesas: {report.Summary.TotalExpenses:C2}");
-                            summaryCol.Item().Text($"Fluxo de Caixa Líquido: {report.Summary.NetCashFlow:C2}").Bold();
-                            summaryCol.Item().Text($"Contas a Receber Pendentes: {report.Summary.PendingReceivables:C2}");
-                            summaryCol.Item().Text($"Contas a Pagar Pendentes: {report.Summary.PendingPayables:C2}");
+                            summaryCol.Item().Text($"Total Receitas: {CurrencyFormatService.FormatStatic(report.Summary.TotalRevenue)}");
+                            summaryCol.Item().Text($"Total Despesas: {CurrencyFormatService.FormatStatic(report.Summary.TotalExpenses)}");
+                            summaryCol.Item().Text($"Fluxo de Caixa Líquido: {CurrencyFormatService.FormatStatic(report.Summary.NetCashFlow)}").Bold();
+                            summaryCol.Item().Text($"Contas a Receber Pendentes: {CurrencyFormatService.FormatStatic(report.Summary.PendingReceivables)}");
+                            summaryCol.Item().Text($"Contas a Pagar Pendentes: {CurrencyFormatService.FormatStatic(report.Summary.PendingPayables)}");
                         });
 
                         // Table
@@ -188,7 +188,7 @@ public class PdfExportService : IPdfExportService
                                 table.Cell().Element(CellStyle).Text(item.Description);
                                 table.Cell().Element(CellStyle).Text(item.Type);
                                 table.Cell().Element(CellStyle).Text(item.Category);
-                                table.Cell().Element(CellStyle).Text(item.Amount.ToString("C2"));
+                                table.Cell().Element(CellStyle).Text(CurrencyFormatService.FormatStatic(item.Amount));
 
                                 static IContainer CellStyle(IContainer container)
                                 {
@@ -245,22 +245,22 @@ public class PdfExportService : IPdfExportService
                             });
 
                             table.Cell().Text("Receita Total").Bold();
-                            table.Cell().AlignRight().Text(report.TotalRevenue.ToString("C2"));
+                            table.Cell().AlignRight().Text(CurrencyFormatService.FormatStatic(report.TotalRevenue));
 
                             table.Cell().Text("(-) Custo dos Produtos Vendidos");
-                            table.Cell().AlignRight().Text(report.CostOfGoodsSold.ToString("C2"));
+                            table.Cell().AlignRight().Text(CurrencyFormatService.FormatStatic(report.CostOfGoodsSold));
 
                             table.Cell().Text("(=) Lucro Bruto").Bold();
-                            table.Cell().AlignRight().Text(report.GrossProfit.ToString("C2")).Bold();
+                            table.Cell().AlignRight().Text(CurrencyFormatService.FormatStatic(report.GrossProfit)).Bold();
 
                             table.Cell().Text("(-) Despesas Operacionais");
-                            table.Cell().AlignRight().Text(report.OperatingExpenses.ToString("C2"));
+                            table.Cell().AlignRight().Text(CurrencyFormatService.FormatStatic(report.OperatingExpenses));
 
                             table.Cell().Text("(=) Resultado Operacional").Bold();
-                            table.Cell().AlignRight().Text(report.OperatingIncome.ToString("C2")).Bold();
+                            table.Cell().AlignRight().Text(CurrencyFormatService.FormatStatic(report.OperatingIncome)).Bold();
 
                             table.Cell().Text("(=) Lucro Líquido").Bold().FontSize(12);
-                            table.Cell().AlignRight().Text(report.NetIncome.ToString("C2")).Bold().FontSize(12);
+                            table.Cell().AlignRight().Text(CurrencyFormatService.FormatStatic(report.NetIncome)).Bold().FontSize(12);
                         });
 
                         // Margins
@@ -293,7 +293,7 @@ public class PdfExportService : IPdfExportService
                                 foreach (var expense in report.ExpensesByCategory)
                                 {
                                     table.Cell().Text(expense.Category);
-                                    table.Cell().Text(expense.Amount.ToString("C2"));
+                                    table.Cell().Text(CurrencyFormatService.FormatStatic(expense.Amount));
                                     table.Cell().Text(expense.Percentage.ToString("F1") + "%");
                                 }
                             });
@@ -341,7 +341,7 @@ public class PdfExportService : IPdfExportService
                             row.RelativeItem().Text($"Sem Estoque: {report.Summary.ProductsOutOfStock}");
                         });
 
-                        column.Item().Text($"Valor Total do Estoque: {report.Summary.TotalInventoryValue:C2}").Bold().FontSize(12);
+                        column.Item().Text($"Valor Total do Estoque: {CurrencyFormatService.FormatStatic(report.Summary.TotalInventoryValue)}").Bold().FontSize(12);
 
                         // Table
                         column.Item().Table(table =>
@@ -377,8 +377,8 @@ public class PdfExportService : IPdfExportService
                                 table.Cell().Text(item.Category);
                                 table.Cell().Text($"{item.CurrentStock:N2} {item.Unit}");
                                 table.Cell().Text($"{item.MinimumStock:N2}");
-                                table.Cell().Text(item.CostPrice.ToString("C2"));
-                                table.Cell().Text(item.TotalValue.ToString("C2"));
+                                table.Cell().Text(CurrencyFormatService.FormatStatic(item.CostPrice));
+                                table.Cell().Text(CurrencyFormatService.FormatStatic(item.TotalValue));
                                 table.Cell().Text(item.Status);
                             }
                         });
@@ -615,9 +615,9 @@ public class PdfExportService : IPdfExportService
                             table.Cell().Element(CellStyle).Text(item.ProductSku).FontSize(9);
                             table.Cell().Element(CellStyle).Text(item.ProductName);
                             table.Cell().Element(CellStyle).AlignRight().Text(item.Quantity.ToString("N2"));
-                            table.Cell().Element(CellStyle).AlignRight().Text(item.UnitPrice.ToString("C2"));
-                            table.Cell().Element(CellStyle).AlignRight().Text(item.Discount.ToString("C2"));
-                            table.Cell().Element(CellStyle).AlignRight().Text(item.Total.ToString("C2")).Bold();
+                            table.Cell().Element(CellStyle).AlignRight().Text(CurrencyFormatService.FormatStatic(item.UnitPrice));
+                            table.Cell().Element(CellStyle).AlignRight().Text(CurrencyFormatService.FormatStatic(item.Discount));
+                            table.Cell().Element(CellStyle).AlignRight().Text(CurrencyFormatService.FormatStatic(item.Total)).Bold();
 
                             static IContainer CellStyle(IContainer container)
                             {
@@ -646,18 +646,18 @@ public class PdfExportService : IPdfExportService
                         totalsCol.Item().Row(row =>
                         {
                             row.RelativeItem().Text("Subtotal dos Itens").FontColor(Colors.White);
-                            row.ConstantItem(80).AlignRight().Text(sale.TotalAmount.ToString("C2")).FontColor(Colors.White);
+                            row.ConstantItem(80).AlignRight().Text(CurrencyFormatService.FormatStatic(sale.TotalAmount)).FontColor(Colors.White);
                         });
                         totalsCol.Item().PaddingTop(5).Row(row =>
                         {
                             row.RelativeItem().Text("Desconto Geral").FontColor(Colors.White);
-                            row.ConstantItem(80).AlignRight().Text($"- {sale.DiscountAmount:C2}").FontColor(Colors.White);
+                            row.ConstantItem(80).AlignRight().Text($"- {CurrencyFormatService.FormatStatic(sale.DiscountAmount)}").FontColor(Colors.White);
                         });
                         totalsCol.Item().PaddingTop(8).LineHorizontal(1).LineColor(Colors.White);
                         totalsCol.Item().PaddingTop(8).Row(row =>
                         {
                             row.RelativeItem().Text("TOTAL").Bold().FontSize(14).FontColor(Colors.White);
-                            row.ConstantItem(80).AlignRight().Text(sale.NetAmount.ToString("C2")).Bold().FontSize(14).FontColor(Colors.White);
+                            row.ConstantItem(80).AlignRight().Text(CurrencyFormatService.FormatStatic(sale.NetAmount)).Bold().FontSize(14).FontColor(Colors.White);
                         });
                     });
                 });

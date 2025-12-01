@@ -14,6 +14,7 @@
 @inject IDialogService DialogService
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
+@inject CurrencyFormatService Currency
 
 <PageTitle>Detalhes da Venda</PageTitle>
 
@@ -165,10 +166,10 @@ else if (_sale != null)
                     </MudTd>
                     <MudTd DataLabel="Produto">@context.ProductName</MudTd>
                     <MudTd DataLabel="Quantidade" Style="text-align: right">@context.Quantity.ToString("N2")</MudTd>
-                    <MudTd DataLabel="Preço Unit." Style="text-align: right">@context.UnitPrice.ToString("C2")</MudTd>
-                    <MudTd DataLabel="Desconto" Style="text-align: right">@context.Discount.ToString("C2")</MudTd>
+                    <MudTd DataLabel="Preço Unit." Style="text-align: right">@Currency.Format(context.UnitPrice)</MudTd>
+                    <MudTd DataLabel="Desconto" Style="text-align: right">@Currency.Format(context.Discount)</MudTd>
                     <MudTd DataLabel="Subtotal" Style="text-align: right">
-                        <MudText Typo="Typo.body2" Style="font-weight: 600">@context.Total.ToString("C2")</MudText>
+                        <MudText Typo="Typo.body2" Style="font-weight: 600">@Currency.Format(context.Total)</MudText>
                     </MudTd>
                 </RowTemplate>
             </MudTable>
@@ -201,16 +202,16 @@ else if (_sale != null)
                     <MudStack Spacing="2" Style="color: white;">
                         <MudStack Row="true" Justify="Justify.SpaceBetween">
                             <MudText Typo="Typo.body1">Subtotal dos Itens</MudText>
-                            <MudText Typo="Typo.body1">@_sale.TotalAmount.ToString("C2")</MudText>
+                            <MudText Typo="Typo.body1">@Currency.Format(_sale.TotalAmount)</MudText>
                         </MudStack>
                         <MudStack Row="true" Justify="Justify.SpaceBetween">
                             <MudText Typo="Typo.body1">Desconto Geral</MudText>
-                            <MudText Typo="Typo.body1">- @_sale.DiscountAmount.ToString("C2")</MudText>
+                            <MudText Typo="Typo.body1">- @Currency.Format(_sale.DiscountAmount)</MudText>
                         </MudStack>
                         <MudDivider Light="true"/>
                         <MudStack Row="true" Justify="Justify.SpaceBetween">
                             <MudText Typo="Typo.h5" Style="font-weight: bold;">TOTAL</MudText>
-                            <MudText Typo="Typo.h5" Style="font-weight: bold;">@_sale.NetAmount.ToString("C2")</MudText>
+                            <MudText Typo="Typo.h5" Style="font-weight: bold;">@Currency.Format(_sale.NetAmount)</MudText>
                         </MudStack>
                     </MudStack>
                 </MudCardContent>
@@ -376,9 +377,9 @@ else if (_sale != null)
             sb.AppendLine($"                    <td style='font-family: monospace;'>{item.ProductSku}</td>");
             sb.AppendLine($"                    <td>{item.ProductName}</td>");
             sb.AppendLine($"                    <td>{item.Quantity:N2}</td>");
-            sb.AppendLine($"                    <td>{item.UnitPrice:C2}</td>");
-            sb.AppendLine($"                    <td>{item.Discount:C2}</td>");
-            sb.AppendLine($"                    <td style='font-weight: 600;'>{item.Total:C2}</td>");
+            sb.AppendLine($"                    <td>{CurrencyFormatService.FormatStatic(item.UnitPrice)}</td>");
+            sb.AppendLine($"                    <td>{CurrencyFormatService.FormatStatic(item.Discount)}</td>");
+            sb.AppendLine($"                    <td style='font-weight: 600;'>{CurrencyFormatService.FormatStatic(item.Total)}</td>");
             sb.AppendLine("                </tr>");
         }
         
@@ -400,15 +401,15 @@ else if (_sale != null)
         sb.AppendLine("        <div class='totals-box'>");
         sb.AppendLine("            <div class='total-row'>");
         sb.AppendLine("                <span>Subtotal dos Itens</span>");
-        sb.AppendLine($"                <span>{sale.TotalAmount:C2}</span>");
+        sb.AppendLine($"                <span>{CurrencyFormatService.FormatStatic(sale.TotalAmount)}</span>");
         sb.AppendLine("            </div>");
         sb.AppendLine("            <div class='total-row'>");
         sb.AppendLine("                <span>Desconto Geral</span>");
-        sb.AppendLine($"                <span>- {sale.DiscountAmount:C2}</span>");
+        sb.AppendLine($"                <span>- {CurrencyFormatService.FormatStatic(sale.DiscountAmount)}</span>");
         sb.AppendLine("            </div>");
         sb.AppendLine("            <div class='total-row final'>");
         sb.AppendLine("                <span>TOTAL</span>");
-        sb.AppendLine($"                <span>{sale.NetAmount:C2}</span>");
+        sb.AppendLine($"                <span>{CurrencyFormatService.FormatStatic(sale.NetAmount)}</span>");
         sb.AppendLine("            </div>");
         sb.AppendLine("        </div>");
         sb.AppendLine("    </div>");

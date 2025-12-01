@@ -12,6 +12,7 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject IJSRuntime JS
+@inject CurrencyFormatService Currency
 
 <PageTitle>Produtos - Pillar ERP</PageTitle>
 
@@ -264,7 +265,7 @@
                     </MudTooltip>
                 </MudTd>
                 <MudTd DataLabel="Preço" Style="text-align: right">
-                    <MudText Typo="Typo.body2" Style="font-weight: 500;">@context.SalePrice.ToString("C2")</MudText>
+                    <MudText Typo="Typo.body2" Style="font-weight: 500;">@Currency.Format(context.SalePrice)</MudText>
                     @if (context.ProfitMargin > 0)
                     {
                         <MudText Typo="Typo.caption" Color="Color.Success">

@@ -89,7 +89,7 @@ public class FinancialDashboardService : IFinancialDashboardService
                     ProjectedBalance = cumulativeBalance,
                     Shortfall = Math.Abs(cumulativeBalance),
                     Severity = cumulativeBalance < -10000 ? "Critical" : "Warning",
-                    Message = $"Saldo projetado negativo de {cumulativeBalance:C2} em {date:dd/MM/yyyy}"
+                    Message = $"Saldo projetado negativo de {CurrencyFormatService.FormatStatic(cumulativeBalance)} em {date:dd/MM/yyyy}"
                 });
             }
         }

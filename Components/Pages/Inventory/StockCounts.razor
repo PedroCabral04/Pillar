@@ -12,6 +12,7 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject NavigationManager Navigation
+@inject CurrencyFormatService Currency
 
 <PageTitle>Contagens de Estoque - Pillar ERP</PageTitle>
 
@@ -110,7 +111,7 @@
         </MudTd>
         <MudTd DataLabel="Valor" Style="text-align: right">
             <MudText Typo="Typo.body2" Style="@GetDifferenceStyle(context.TotalDifferenceValue)">
-                @context.TotalDifferenceValue.ToString("C2")
+                @Currency.Format(context.TotalDifferenceValue)
             </MudText>
         </MudTd>
         <MudTd DataLabel="Status">

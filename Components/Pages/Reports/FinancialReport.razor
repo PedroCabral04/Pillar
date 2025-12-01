@@ -8,6 +8,7 @@
 @inject IApiService ApiService
 @inject ISnackbar Snackbar
 @inject IJSRuntime JS
+@inject CurrencyFormatService Currency
 
 <PageTitle>Relatórios Financeiros - Pillar ERP</PageTitle>
 
@@ -69,19 +70,19 @@
                             <MudItem xs="12" sm="4">
                                 <MudPaper Class="pa-4" Elevation="0">
                                     <MudText Typo="Typo.subtitle2" Color="Color.Success">Total Receitas</MudText>
-                                    <MudText Typo="Typo.h5">@_cashFlowReport.Summary.TotalRevenue.ToString("C2")</MudText>
+                                    <MudText Typo="Typo.h5">@Currency.Format(_cashFlowReport.Summary.TotalRevenue)</MudText>
                                 </MudPaper>
                             </MudItem>
                             <MudItem xs="12" sm="4">
                                 <MudPaper Class="pa-4" Elevation="0">
                                     <MudText Typo="Typo.subtitle2" Color="Color.Error">Total Despesas</MudText>
-                                    <MudText Typo="Typo.h5">@_cashFlowReport.Summary.TotalExpenses.ToString("C2")</MudText>
+                                    <MudText Typo="Typo.h5">@Currency.Format(_cashFlowReport.Summary.TotalExpenses)</MudText>
                                 </MudPaper>
                             </MudItem>
                             <MudItem xs="12" sm="4">
                                 <MudPaper Class="pa-4" Elevation="0">
                                     <MudText Typo="Typo.subtitle2" Color="Color.Info">Fluxo de Caixa Líquido</MudText>
-                                    <MudText Typo="Typo.h5">@_cashFlowReport.Summary.NetCashFlow.ToString("C2")</MudText>
+                                    <MudText Typo="Typo.h5">@Currency.Format(_cashFlowReport.Summary.NetCashFlow)</MudText>
                                 </MudPaper>
                             </MudItem>
                         </MudGrid>
@@ -102,7 +103,7 @@
                                 <MudTd DataLabel="Categoria">@context.Category</MudTd>
                                 <MudTd DataLabel="Valor">
                                     <MudText Color="@(context.Type == "Receita" ? Color.Success : Color.Error)">
-                                        @context.Amount.ToString("C2")
+                                        @Currency.Format(context.Amount)
                                     </MudText>
                                 </MudTd>
                                 <MudTd DataLabel="Status">@context.Status</MudTd>
@@ -161,28 +162,28 @@
                             <tbody>
                                 <tr>
                                     <td><strong>Receitas Operacionais</strong></td>
-                                    <td class="text-end"><strong>@_profitLossReport.TotalRevenue.ToString("C2")</strong></td>
+                                    <td class="text-end"><strong>@Currency.Format(_profitLossReport.TotalRevenue)</strong></td>
                                 </tr>
                                 <tr>
                                     <td class="pl-4">Receita de Vendas</td>
-                                    <td class="text-end">@_profitLossReport.TotalRevenue.ToString("C2")</td>
+                                    <td class="text-end">@Currency.Format(_profitLossReport.TotalRevenue)</td>
                                 </tr>
                                 <tr>
                                     <td><strong>Custos e Despesas</strong></td>
-                                    <td class="text-end"><strong>@_profitLossReport.OperatingExpenses.ToString("C2")</strong></td>
+                                    <td class="text-end"><strong>@Currency.Format(_profitLossReport.OperatingExpenses)</strong></td>
                                 </tr>
                                 @foreach (var category in _profitLossReport.ExpensesByCategory)
                                 {
                                     <tr>
                                         <td class="pl-4">@category.Category</td>
-                                        <td class="text-end">@category.Amount.ToString("C2")</td>
+                                        <td class="text-end">@Currency.Format(category.Amount)</td>
                                     </tr>
                                 }
                                 <tr style="border-top: 2px solid;">
                                     <td><strong>Lucro Líquido</strong></td>
                                     <td class="text-end">
                                         <MudText Color="@(_profitLossReport.NetIncome >= 0 ? Color.Success : Color.Error)" Typo="Typo.h6">
-                                            <strong>@_profitLossReport.NetIncome.ToString("C2")</strong>
+                                            <strong>@Currency.Format(_profitLossReport.NetIncome)</strong>
                                         </MudText>
                                     </td>
                                 </tr>
@@ -245,15 +246,15 @@
                                     <tbody>
                                         <tr>
                                             <td><strong>Total Ativos</strong></td>
-                                            <td class="text-end"><strong>@_balanceSheetReport.TotalAssets.ToString("C2")</strong></td>
+                                            <td class="text-end"><strong>@Currency.Format(_balanceSheetReport.TotalAssets)</strong></td>
                                         </tr>
                                         <tr>
                                             <td class="pl-4">Ativos Circulantes</td>
-                                            <td class="text-end">@_balanceSheetReport.CurrentAssets.ToString("C2")</td>
+                                            <td class="text-end">@Currency.Format(_balanceSheetReport.CurrentAssets)</td>
                                         </tr>
                                         <tr>
                                             <td class="pl-4">Ativos Fixos</td>
-                                            <td class="text-end">@_balanceSheetReport.FixedAssets.ToString("C2")</td>
+                                            <td class="text-end">@Currency.Format(_balanceSheetReport.FixedAssets)</td>
                                         </tr>
                                     </tbody>
                                 </MudSimpleTable>
@@ -264,19 +265,19 @@
                                     <tbody>
                                         <tr>
                                             <td><strong>Total Passivos</strong></td>
-                                            <td class="text-end"><strong>@_balanceSheetReport.TotalLiabilities.ToString("C2")</strong></td>
+                                            <td class="text-end"><strong>@Currency.Format(_balanceSheetReport.TotalLiabilities)</strong></td>
                                         </tr>
                                         <tr>
                                             <td class="pl-4">Passivos Circulantes</td>
-                                            <td class="text-end">@_balanceSheetReport.CurrentLiabilities.ToString("C2")</td>
+                                            <td class="text-end">@Currency.Format(_balanceSheetReport.CurrentLiabilities)</td>
                                         </tr>
                                         <tr>
                                             <td class="pl-4">Passivos de Longo Prazo</td>
-                                            <td class="text-end">@_balanceSheetReport.LongTermLiabilities.ToString("C2")</td>
+                                            <td class="text-end">@Currency.Format(_balanceSheetReport.LongTermLiabilities)</td>
                                         </tr>
                                         <tr style="border-top: 2px solid;">
                                             <td><strong>Patrimônio Líquido</strong></td>
-                                            <td class="text-end"><strong>@_balanceSheetReport.Equity.ToString("C2")</strong></td>
+                                            <td class="text-end"><strong>@Currency.Format(_balanceSheetReport.Equity)</strong></td>
                                         </tr>
                                     </tbody>
                                 </MudSimpleTable>
