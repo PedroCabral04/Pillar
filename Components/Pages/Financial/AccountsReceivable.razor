@@ -27,7 +27,7 @@
                  <MudSelect T="AccountStatus?" Label="Status" Value="statusFilter" ValueChanged="OnStatusChanged" Clearable="true">
                     @foreach (AccountStatus status in Enum.GetValues(typeof(AccountStatus)))
                     {
-                        <MudSelectItem Value="@((AccountStatus?)status)">@status.ToString()</MudSelectItem>
+                        <MudSelectItem Value="@((AccountStatus?)status)">@status.ToDisplayName()</MudSelectItem>
                     }
                 </MudSelect>
             </MudItem>

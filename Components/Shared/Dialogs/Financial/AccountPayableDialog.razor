@@ -1,5 +1,6 @@
 @using erp.DTOs.Financial
 @using erp.Models.Financial
+@using erp.Extensions
 
 <MudDialog>
     <TitleContent>
@@ -132,7 +133,7 @@
                                AnchorOrigin="Origin.BottomCenter">
                         @foreach (PaymentMethod method in Enum.GetValues(typeof(PaymentMethod)))
                         {
-                            <MudSelectItem Value="@method">@method.ToString()</MudSelectItem>
+                            <MudSelectItem Value="@method">@method.ToDisplayName()</MudSelectItem>
                         }
                     </MudSelect>
                 </MudItem>
@@ -224,10 +225,18 @@
         </MudForm>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="Cancel" Variant="Variant.Outlined">Cancelar</MudButton>
-        <MudButton Color="MudBlazor.Color.Primary" Variant="Variant.Filled" OnClick="Submit">
-            <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-1"/>
-            Salvar
+        <MudButton OnClick="Cancel" Variant="Variant.Outlined" Disabled="@_saving">Cancelar</MudButton>
+        <MudButton Color="MudBlazor.Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@_saving">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="MudBlazor.Size.Small" Indeterminate="true" Class="mr-2" />
+                <text>Salvando...</text>
+            }
+            else
+            {
+                <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-1"/>
+                <text>Salvar</text>
+            }
         </MudButton>
     </DialogActions>
 </MudDialog>
@@ -241,6 +250,7 @@
 
     private MudForm form;
     private bool success;
+    private bool _saving = false;
 
     protected override void OnInitialized()
     {
@@ -255,6 +265,12 @@
         await form.Validate();
         if (success)
         {
+            _saving = true;
+            StateHasChanged();
+            
+            // Simula um pequeno delay para UX
+            await Task.Delay(100);
+            
             MudDialog.Close(DialogResult.Ok(Model));
         }
     }
