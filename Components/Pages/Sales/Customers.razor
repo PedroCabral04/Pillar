@@ -31,7 +31,7 @@
 }
 
 <MudTable T="CustomerDto" ServerData="ServerReload" 
-          Dense="false" Hover="true" Elevation="4" @ref="_table" Striped="true" Loading="@_loading">
+          Dense="false" Hover="true" Elevation="2" @ref="_table" Striped="true" Loading="@_loading">
     <ToolBarContent>
         <MudText Typo="Typo.h5">Clientes Cadastrados</MudText>
         <MudSpacer/>
@@ -208,7 +208,8 @@
             { "Color", Color.Warning }
         };
 
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirmar inativação", parameters);
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirmar inativação", parameters, options);
         var result = await dialog.Result;
 
         if (result != null && !result.Canceled)

@@ -452,7 +452,8 @@ else if (_sale != null)
             { "Color", Color.Success }
         };
 
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Finalizar Venda", parameters);
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Finalizar Venda", parameters, options);
         var result = await dialog.Result;
 
         if (result != null && !result.Canceled)
@@ -482,7 +483,8 @@ else if (_sale != null)
             { "Color", Color.Error }
         };
 
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Cancelar Venda", parameters);
+        var options2 = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Cancelar Venda", parameters, options2);
         var result = await dialog.Result;
 
         if (result != null && !result.Canceled)

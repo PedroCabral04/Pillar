@@ -368,7 +368,8 @@
                 { "Color", MudBlazor.Color.Warning }
             };
 
-            var dialog = await DialogService.ShowAsync<ConfirmDialog>("Alterações não salvas", parameters);
+            var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small };
+            var dialog = await DialogService.ShowAsync<ConfirmDialog>("Alterações não salvas", parameters, options);
             var result = await dialog.Result;
 
             if (result == null || result.Canceled)

@@ -556,8 +556,9 @@
             { "Color", Color.Error }
         };
 
+        var optionsConfirm = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small };
         var dialog = await DialogService.ShowAsync<erp.Components.Shared.Dialogs.ConfirmDialog>(
-            "Confirmar exclusão", parameters);
+            "Confirmar exclusão", parameters, optionsConfirm);
         var result = await dialog.Result;
 
         if (result != null && !result.Canceled)

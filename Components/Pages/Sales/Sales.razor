@@ -32,7 +32,7 @@
 }
 
 <MudTable T="SaleDto" ServerData="ServerReload" 
-          Dense="false" Hover="true" Elevation="4" @ref="_table" Striped="true" Loading="@_loading">
+          Dense="false" Hover="true" Elevation="2" @ref="_table" Striped="true" Loading="@_loading">
     <ToolBarContent>
         <MudText Typo="Typo.h5">Vendas Registradas</MudText>
         <MudSpacer/>
@@ -247,7 +247,8 @@
             { "Color", Color.Success }
         };
 
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Finalizar Venda", parameters);
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Finalizar Venda", parameters, options);
         var result = await dialog.Result;
 
         if (result != null && !result.Canceled)
@@ -275,7 +276,8 @@
             { "Color", Color.Error }
         };
 
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Cancelar Venda", parameters);
+        var options2 = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Cancelar Venda", parameters, options2);
         var result = await dialog.Result;
 
         if (result != null && !result.Canceled)
