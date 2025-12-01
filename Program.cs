@@ -609,7 +609,7 @@ using (var scope = app.Services.CreateScope())
                     CREATE UNIQUE INDEX IF NOT EXISTS ""IX_WidgetRoleConfigurations_ProviderKey_WidgetKey"" ON ""WidgetRoleConfigurations"" (""ProviderKey"", ""WidgetKey"");
                     
                     INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"") VALUES
-                    ('20251126112516_AddDashboardEntities', '9.0.5')
+                    ('20251126112516_AddDashboardEntities', '9.0.0')
                     ON CONFLICT DO NOTHING;
                 ");
                 Console.WriteLine("[DB] Dashboard tables created successfully.");
