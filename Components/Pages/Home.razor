@@ -38,7 +38,7 @@
         <MudGrid>
             <!-- Dashboard -->
             <MudItem xs="12" sm="6" md="4">
-                <MudCard Elevation="2" Class="cursor-pointer hover-card" @onclick="@(() => NavigateTo("/dashboard"))">
+                <MudCard Elevation="2" Class="cursor-pointer hover-card" @onclick="@(() => NavigateTo("/dashboard"))" role="button" aria-label="Ir para Dashboard - Visualize métricas e indicadores do seu negócio em tempo real" tabindex="0">
                     <MudCardContent Class="pa-6">
                         <div class="d-flex align-center mb-3">
                             <MudIcon Icon="@Icons.Material.Filled.Dashboard" Size="MudBlazor.Size.Large" Color="MudBlazor.Color.Primary" Class="mr-3" />
@@ -53,7 +53,7 @@
 
             <!-- Kanban -->
             <MudItem xs="12" sm="6" md="4">
-                <MudCard Elevation="2" Class="cursor-pointer hover-card" @onclick="@(() => NavigateTo("/kanban"))">
+                <MudCard Elevation="2" Class="cursor-pointer hover-card" @onclick="@(() => NavigateTo("/kanban"))" role="button" aria-label="Ir para Kanban - Organize suas tarefas e projetos de forma visual e colaborativa" tabindex="0">
                     <MudCardContent Class="pa-6">
                         <div class="d-flex align-center mb-3">
                             <MudIcon Icon="@Icons.Material.Filled.ViewKanban" Size="MudBlazor.Size.Large" Color="MudBlazor.Color.Success" Class="mr-3" />
@@ -70,7 +70,7 @@
             @if (_isAdmin)
             {
                 <MudItem xs="12" sm="6" md="4">
-                    <MudCard Elevation="2" Class="cursor-pointer hover-card" @onclick="@(() => NavigateTo("/admin/users"))">
+                    <MudCard Elevation="2" Class="cursor-pointer hover-card" @onclick="@(() => NavigateTo("/admin/users"))" role="button" aria-label="Ir para Administração - Gerencie usuários, permissões e configurações do sistema" tabindex="0">
                         <MudCardContent Class="pa-6">
                             <div class="d-flex align-center mb-3">
                                 <MudIcon Icon="@Icons.Material.Filled.AdminPanelSettings" Size="MudBlazor.Size.Large" Color="MudBlazor.Color.Warning" Class="mr-3" />
@@ -86,7 +86,7 @@
 
             <!-- Configurações -->
             <MudItem xs="12" sm="6" md="4">
-                <MudCard Elevation="2" Class="cursor-pointer hover-card" @onclick="@(() => NavigateTo("/settings"))">
+                <MudCard Elevation="2" Class="cursor-pointer hover-card" @onclick="@(() => NavigateTo("/settings"))" role="button" aria-label="Ir para Configurações - Personalize sua experiência e ajuste suas preferências" tabindex="0">
                     <MudCardContent Class="pa-6">
                         <div class="d-flex align-center mb-3">
                             <MudIcon Icon="@Icons.Material.Filled.Settings" Size="MudBlazor.Size.Large" Color="MudBlazor.Color.Info" Class="mr-3" />
@@ -116,21 +116,6 @@
         </MudPaper>
     }
 </MudContainer>
-
-<style>
-    .hover-card {
-        transition: all 0.3s ease;
-    }
-
-    .hover-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 8px 16px rgba(0,0,0,0.15) !important;
-    }
-
-    .cursor-pointer {
-        cursor: pointer;
-    }
-</style>
 
 @code {
     private bool _isLoading = true;

@@ -9,10 +9,12 @@
 @using Color = MudBlazor.Color
 @using Size = MudBlazor.Size
 @using erp.Services.Dashboard
+@using Microsoft.AspNetCore.Components.Authorization
 @inject ISnackbar Snackbar
 @inject IDashboardService DashboardService
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
-<PageTitle>Configurações</PageTitle>
+<PageTitle>Configurações - Pillar ERP</PageTitle>
 
 <MudText Typo="Typo.h3" GutterBottom="true">Configurações</MudText>
 <MudText Typo="Typo.body1" GutterBottom="true">Personalize a plataforma de acordo com suas preferências</MudText>
@@ -21,7 +23,53 @@
     <MudItem xs="12" md="8">
         <MudTabs Position="Position.Top" Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-2" Outlined="true">
     <MudTabPanel Text="Perfil" Icon="@Icons.Material.Filled.Person">
-        <MudText Typo="Typo.body2">Configurações de perfil serão adicionadas aqui.</MudText>
+        <MudStack Row="false" Spacing="3">
+            <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid var(--mud-palette-divider);">
+                <MudStack Row="true" Spacing="4" AlignItems="AlignItems.Center">
+                    <MudAvatar Size="Size.Large" Color="Color.Primary" Style="width: 80px; height: 80px; font-size: 2rem;">
+                        @(_userName?.Length > 0 ? _userName[0].ToString().ToUpper() : "U")
+                    </MudAvatar>
+                    <MudStack Spacing="1">
+                        <MudText Typo="Typo.h5" Style="font-weight: 600;">@_userName</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">@_userEmail</MudText>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">
+                            @string.Join(", ", _userRoles)
+                        </MudChip>
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+
+            <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid var(--mud-palette-divider);">
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.Info" Class="mr-2" />
+                    Informações da Conta
+                </MudText>
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Nome de Usuário</MudText>
+                        <MudText Typo="Typo.body1">@_userName</MudText>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">E-mail</MudText>
+                        <MudText Typo="Typo.body1">@_userEmail</MudText>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Funções</MudText>
+                        <MudText Typo="Typo.body1">@string.Join(", ", _userRoles)</MudText>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success">Ativo</MudChip>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                <MudText Typo="Typo.body2">
+                    Para alterar sua senha ou informações pessoais, entre em contato com o administrador do sistema.
+                </MudText>
+            </MudAlert>
+        </MudStack>
     </MudTabPanel>
 
     <MudTabPanel Text="Segurança" Icon="@Icons.Material.Filled.Security">
@@ -163,7 +211,7 @@
                     <MudTextField T="string" Label="Campo:direção (ex.: Nome:asc)" Variant="Variant.Outlined" Class="w-50"
                                   Value="@row.Sort"
                                   ValueChanged="@(v => { row.Sort = v; SyncDefaultSortDict(); })" />
-                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="MudBlazor.Color.Error" OnClick="() => RemoveDefaultSortRow(row)" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="MudBlazor.Color.Error" OnClick="() => RemoveDefaultSortRow(row)" aria-label="Remover ordenação" />
                 </MudStack>
             }
             <MudButton Variant="Variant.Outlined" Color="MudBlazor.Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AddDefaultSortRow">Adicionar</MudButton>
@@ -179,7 +227,7 @@
                     <MudTextField T="string" Label="Colunas (separadas por vírgula)" Variant="Variant.Outlined" Class="w-50"
                                   Value="@row.ColumnsCsv"
                                   ValueChanged="@(v => { row.ColumnsCsv = v; SyncVisibleColumnsDict(); })" />
-                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="MudBlazor.Color.Error" OnClick="() => RemoveVisibleColumnsRow(row)" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="MudBlazor.Color.Error" OnClick="() => RemoveVisibleColumnsRow(row)" aria-label="Remover colunas" />
                 </MudStack>
             }
             <MudButton Variant="Variant.Outlined" Color="MudBlazor.Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AddVisibleColumnsRow">Adicionar</MudButton>
@@ -353,12 +401,35 @@
     private List<string> AvailableWidgets { get; set; } = new();
     private string NewWidgetName { get; set; } = string.Empty;
 
+    // User profile info
+    private string _userName = "Usuário";
+    private string _userEmail = "";
+    private List<string> _userRoles = new();
+
     // Helpers to edit dictionary preferences in a simple list form
     private List<DefaultSortRow> DefaultSortRows = new();
     private List<VisibleColumnsRow> VisibleColumnsRows = new();
 
     protected override async Task OnInitializedAsync()
     {
+        // Load user profile info
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            if (user.Identity?.IsAuthenticated == true)
+            {
+                _userName = user.Identity.Name ?? "Usuário";
+                _userEmail = user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value ?? "";
+                _userRoles = user.Claims
+                    .Where(c => c.Type == System.Security.Claims.ClaimTypes.Role)
+                    .Select(c => c.Value)
+                    .ToList();
+                if (!_userRoles.Any()) _userRoles.Add("Usuário");
+            }
+        }
+        catch { }
+
         // Seed rows from current preferences for editing
         var ds = PreferenceService.CurrentPreferences.Tables.DefaultSortPerModule;
         if (ds != null)

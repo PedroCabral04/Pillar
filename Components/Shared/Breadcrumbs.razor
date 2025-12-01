@@ -79,7 +79,7 @@
             "payables" => "Contas a Pagar",
             "receivables" => "Contas a Receber",
             "suppliers" => "Fornecedores",
-            "categories" => "Índice" == "financial" ? "Categorias Financeiras" : "Categorias",
+            "categories" => index > 0 && allSegments[index - 1] == "financial" ? "Categorias Financeiras" : "Categorias",
             "cost-centers" => "Centros de Custo",
             
             // Estoque

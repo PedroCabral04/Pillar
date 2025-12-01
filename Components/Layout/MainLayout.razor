@@ -60,7 +60,8 @@
                                Color="MudBlazor.Color.Inherit"
                                Edge="Edge.Start"
                                OnClick="@ToggleDrawer"
-                               Class="mr-3" />
+                               Class="mr-3"
+                               aria-label="@(_isSidebarLocked ? "Recolher menu lateral" : "Expandir menu lateral")" />
                 
                 <div class="d-flex align-center">
                     <MudAvatar Size="MudBlazor.Size.Medium"
