@@ -9,6 +9,7 @@ using erp.Models.Dashboard;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
+using System.Reflection;
 using System.Text.Json;
 
 namespace erp.Data;
@@ -112,6 +113,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         SetAuditProperties();
         SetTenantId();
         
+        // Força detecção de mudanças antes de capturar snapshots
+        ChangeTracker.DetectChanges();
+        
         // Captura snapshots (apenas dados serializados, não referências)
         var auditSnapshots = CaptureAuditSnapshots();
         
@@ -145,6 +149,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     {
         SetAuditProperties();
         SetTenantId();
+        
+        // Força detecção de mudanças antes de capturar snapshots
+        ChangeTracker.DetectChanges();
         
         var auditSnapshots = CaptureAuditSnapshots();
         
@@ -231,6 +238,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         var ipAddress = GetCurrentIpAddress();
         var userAgent = GetCurrentUserAgent();
         var timestamp = DateTime.UtcNow;
+        var currentTenantId = _tenantContextAccessor?.Current?.TenantId ?? 0;
 
         foreach (var entry in auditableEntries)
         {
@@ -245,6 +253,13 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             if (!action.HasValue)
                 continue;
 
+            // Obtém TenantId da entidade se ela implementar IMustHaveTenant
+            var entityTenantId = currentTenantId;
+            if (entry.Entity is IMustHaveTenant tenantEntity)
+            {
+                entityTenantId = tenantEntity.TenantId > 0 ? tenantEntity.TenantId : currentTenantId;
+            }
+
             var snapshot = new AuditSnapshot
             {
                 EntityName = entry.Entity.GetType().Name,
@@ -254,7 +269,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 IpAddress = ipAddress,
                 UserAgent = userAgent,
                 Timestamp = timestamp,
-                NeedsIdUpdate = entry.State == EntityState.Added
+                NeedsIdUpdate = entry.State == EntityState.Added,
+                TenantId = entityTenantId
             };
 
             // Captura EntityId (pode ser temporário para Added)
@@ -272,20 +288,26 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 }
             }
 
+            // Captura descrição legível da entidade
+            snapshot.EntityDescription = GetEntityDescription(entry.Entity);
+
             // Serializa valores conforme a operação
             if (entry.State == EntityState.Modified)
             {
                 snapshot.OldValues = SerializeOriginalValues(entry);
                 snapshot.NewValues = SerializeCurrentValues(entry);
                 snapshot.ChangedProperties = SerializeChangedProperties(entry);
+                snapshot.References = SerializeReferences(entry, useCurrentValues: true);
             }
             else if (entry.State == EntityState.Deleted)
             {
                 snapshot.OldValues = SerializeOriginalValues(entry);
+                snapshot.References = SerializeReferences(entry, useCurrentValues: false);
             }
             else if (entry.State == EntityState.Added)
             {
                 snapshot.NewValues = SerializeCurrentValues(entry);
+                snapshot.References = SerializeReferences(entry, useCurrentValues: true);
             }
 
             snapshots.Add(snapshot);
@@ -295,12 +317,151 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     }
     
     /// <summary>
+    /// Obtém uma descrição legível da entidade (nome, título, etc)
+    /// </summary>
+    private string? GetEntityDescription(object entity)
+    {
+        var entityType = entity.GetType();
+        
+        // Lista de propriedades comuns que representam a descrição da entidade
+        var descriptionPropertyNames = new[] { "Name", "FullName", "Title", "Description", "Sku", "SaleNumber", "InvoiceNumber", "AssetCode" };
+        
+        foreach (var propName in descriptionPropertyNames)
+        {
+            var property = entityType.GetProperty(propName);
+            if (property != null && property.PropertyType == typeof(string))
+            {
+                var value = property.GetValue(entity) as string;
+                if (!string.IsNullOrEmpty(value))
+                    return value;
+            }
+        }
+        
+        return null;
+    }
+    
+    /// <summary>
+    /// Serializa referências legíveis para FKs
+    /// </summary>
+    private string? SerializeReferences(EntityEntry entry, bool useCurrentValues)
+    {
+        var references = new Dictionary<string, string?>();
+        var entityType = entry.Entity.GetType();
+        
+        // Mapeia propriedades FK para suas entidades de navegação
+        foreach (var navigation in entry.Navigations)
+        {
+            if (navigation.Metadata.IsCollection)
+                continue;
+                
+            var navigationValue = navigation.CurrentValue;
+            if (navigationValue == null)
+                continue;
+            
+            var navType = navigationValue.GetType();
+            var fkPropertyName = navigation.Metadata.Name + "Id";
+            
+            // Tenta obter descrição legível da entidade referenciada
+            var description = GetEntityDescription(navigationValue);
+            if (!string.IsNullOrEmpty(description))
+            {
+                references[navigation.Metadata.Name] = description;
+            }
+        }
+        
+        // Tenta também obter referências via propriedades FK sem navegação carregada
+        foreach (var property in entry.Properties.Where(p => p.Metadata.IsForeignKey()))
+        {
+            var fkName = property.Metadata.Name;
+            var fkValue = useCurrentValues ? property.CurrentValue : property.OriginalValue;
+            
+            if (fkValue != null && !references.ContainsKey(fkName.Replace("Id", "")))
+            {
+                // Armazena o ID como fallback se não tiver navegação
+                var navName = fkName.EndsWith("Id") ? fkName[..^2] : fkName;
+                if (!references.ContainsKey(navName))
+                {
+                    // Tenta buscar a descrição da entidade referenciada no contexto
+                    var refDescription = TryGetReferenceDescription(fkName, fkValue);
+                    if (refDescription != null)
+                    {
+                        references[navName] = refDescription;
+                    }
+                }
+            }
+        }
+        
+        return references.Any() ? JsonSerializer.Serialize(references) : null;
+    }
+    
+    /// <summary>
+    /// Tenta obter descrição da entidade referenciada pelo FK
+    /// </summary>
+    private string? TryGetReferenceDescription(string fkPropertyName, object? fkValue)
+    {
+        if (fkValue == null) return null;
+        
+        try
+        {
+            // Mapeamento de FKs conhecidas para suas entidades
+            return fkPropertyName switch
+            {
+                "SupplierId" => Suppliers.Local.FirstOrDefault(s => s.Id == (int)fkValue)?.Name 
+                    ?? Suppliers.Find((int)fkValue)?.Name,
+                "CustomerId" => Customers.Local.FirstOrDefault(c => c.Id == (int)fkValue)?.Name 
+                    ?? Customers.Find((int)fkValue)?.Name,
+                "CategoryId" => FinancialCategories.Local.FirstOrDefault(c => c.Id == (int)fkValue)?.Name 
+                    ?? FinancialCategories.Find((int)fkValue)?.Name,
+                "CostCenterId" => CostCenters.Local.FirstOrDefault(c => c.Id == (int)fkValue)?.Name 
+                    ?? CostCenters.Find((int)fkValue)?.Name,
+                "DepartmentId" => Departments.Local.FirstOrDefault(d => d.Id == (int)fkValue)?.Name 
+                    ?? Departments.Find((int)fkValue)?.Name,
+                "PositionId" => Positions.Local.FirstOrDefault(p => p.Id == (int)fkValue)?.Title 
+                    ?? Positions.Find((int)fkValue)?.Title,
+                "WarehouseId" => Warehouses.Local.FirstOrDefault(w => w.Id == (int)fkValue)?.Name 
+                    ?? Warehouses.Find((int)fkValue)?.Name,
+                "TenantId" => Tenants.Local.FirstOrDefault(t => t.Id == (int)fkValue)?.Name 
+                    ?? Tenants.Find((int)fkValue)?.Name,
+                "ProductId" => Products.Local.FirstOrDefault(p => p.Id == (int)fkValue)?.Name 
+                    ?? Products.Find((int)fkValue)?.Name,
+                "AssetId" => Assets.Local.FirstOrDefault(a => a.Id == (int)fkValue)?.Name 
+                    ?? Assets.Find((int)fkValue)?.Name,
+                _ => null
+            };
+        }
+        catch
+        {
+            return null;
+        }
+    }
+    
+    /// <summary>
+    /// Verifica se uma propriedade deve ser excluída da auditoria
+    /// </summary>
+    private bool ShouldExcludeFromAudit(PropertyInfo property)
+    {
+        return property.GetCustomAttribute<AuditExcludeAttribute>() != null;
+    }
+    
+    /// <summary>
+    /// Verifica se uma propriedade EF deve ser excluída da auditoria
+    /// </summary>
+    private bool ShouldExcludeFromAudit(PropertyEntry property)
+    {
+        var clrProperty = property.Metadata.PropertyInfo;
+        if (clrProperty == null) return false;
+        
+        return ShouldExcludeFromAudit(clrProperty);
+    }
+    
+    /// <summary>
     /// Classe auxiliar para snapshot de auditoria (sem manter EntityEntry)
     /// </summary>
     private class AuditSnapshot
     {
         public string EntityName { get; set; } = string.Empty;
         public string? EntityId { get; set; }
+        public string? EntityDescription { get; set; }
         public AuditAction Action { get; set; }
         public int? UserId { get; set; }
         public string? UserName { get; set; }
@@ -310,6 +471,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         public string? OldValues { get; set; }
         public string? NewValues { get; set; }
         public string? ChangedProperties { get; set; }
+        public string? References { get; set; }
+        public int TenantId { get; set; }
         
         // Para atualizar ID após inserção
         public bool NeedsIdUpdate { get; set; }
@@ -324,6 +487,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             {
                 EntityName = EntityName,
                 EntityId = EntityId ?? "0",
+                EntityDescription = EntityDescription,
                 Action = Action,
                 UserId = UserId,
                 UserName = UserName,
@@ -332,7 +496,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 Timestamp = Timestamp,
                 OldValues = OldValues,
                 NewValues = NewValues,
-                ChangedProperties = ChangedProperties
+                ChangedProperties = ChangedProperties,
+                References = References,
+                TenantId = TenantId
             };
             return _auditLog;
         }
@@ -359,10 +525,14 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     {
         var values = new Dictionary<string, object?>();
         
-        foreach (var property in entry.Properties.Where(p => !p.Metadata.IsPrimaryKey()))
+        foreach (var property in entry.Properties)
         {
-            // Ignora propriedades de navegação
-            if (property.Metadata.IsForeignKey() || property.Metadata.IsKey())
+            // Ignora chaves primárias
+            if (property.Metadata.IsPrimaryKey())
+                continue;
+            
+            // Ignora propriedades marcadas com [AuditExclude]
+            if (ShouldExcludeFromAudit(property))
                 continue;
                 
             values[property.Metadata.Name] = property.OriginalValue;
@@ -378,10 +548,14 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     {
         var values = new Dictionary<string, object?>();
         
-        foreach (var property in entry.Properties.Where(p => !p.Metadata.IsPrimaryKey()))
+        foreach (var property in entry.Properties)
         {
-            // Ignora propriedades de navegação
-            if (property.Metadata.IsForeignKey() || property.Metadata.IsKey())
+            // Ignora chaves primárias
+            if (property.Metadata.IsPrimaryKey())
+                continue;
+                
+            // Ignora propriedades marcadas com [AuditExclude]
+            if (ShouldExcludeFromAudit(property))
                 continue;
                 
             values[property.Metadata.Name] = property.CurrentValue;
@@ -395,15 +569,52 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     /// </summary>
     private string? SerializeChangedProperties(EntityEntry entry)
     {
-        var changedProperties = entry.Properties
-            .Where(p => p.IsModified && !p.Metadata.IsPrimaryKey())
-            .Select(p => new
+        var changedProperties = new List<object>();
+        
+        foreach (var property in entry.Properties)
+        {
+            // Ignora chaves primárias e propriedades excluídas
+            if (property.Metadata.IsPrimaryKey() || ShouldExcludeFromAudit(property))
+                continue;
+            
+            var originalValue = property.OriginalValue;
+            var currentValue = property.CurrentValue;
+            
+            // Verifica se houve mudança de várias formas
+            bool hasChanged = property.IsModified;
+            
+            // Se não está marcado como modificado, verifica comparando valores
+            if (!hasChanged)
             {
-                PropertyName = p.Metadata.Name,
-                OldValue = p.OriginalValue,
-                NewValue = p.CurrentValue
-            })
-            .ToList();
+                // Ambos null = sem mudança
+                if (originalValue == null && currentValue == null)
+                    continue;
+                    
+                // Um null e outro não = mudança
+                if (originalValue == null || currentValue == null)
+                {
+                    hasChanged = true;
+                }
+                else
+                {
+                    // Compara usando ToString para evitar problemas com tipos de referência
+                    hasChanged = !string.Equals(
+                        originalValue.ToString(), 
+                        currentValue.ToString(), 
+                        StringComparison.Ordinal);
+                }
+            }
+            
+            if (hasChanged)
+            {
+                changedProperties.Add(new
+                {
+                    PropertyName = property.Metadata.Name,
+                    OldValue = originalValue,
+                    NewValue = currentValue
+                });
+            }
+        }
 
         return changedProperties.Any() ? JsonSerializer.Serialize(changedProperties) : null;
     }
@@ -1511,6 +1722,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             
             a.Property(x => x.EntityName).HasMaxLength(100).IsRequired();
             a.Property(x => x.EntityId).HasMaxLength(100).IsRequired();
+            a.Property(x => x.EntityDescription).HasMaxLength(500);
             a.Property(x => x.Action).HasMaxLength(20).IsRequired();
             a.Property(x => x.UserName).HasMaxLength(200);
             a.Property(x => x.IpAddress).HasMaxLength(45);
@@ -1522,6 +1734,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             a.Property(x => x.OldValues).HasColumnType("jsonb");
             a.Property(x => x.NewValues).HasColumnType("jsonb");
             a.Property(x => x.ChangedProperties).HasColumnType("jsonb");
+            a.Property(x => x.References).HasColumnType("jsonb");
             
             // Índices compostos otimizados para queries comuns
             // Índice para histórico de entidade (timeline de uma entidade específica)
@@ -1539,6 +1752,22 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             // Índice para busca geral por entidade e tipo de ação
             a.HasIndex(x => new { x.EntityName, x.Action, x.Timestamp })
                 .HasDatabaseName("idx_audit_entity_action_timeline");
+            
+            // Índice para filtro por tenant
+            a.HasIndex(x => new { x.TenantId, x.Timestamp })
+                .HasDatabaseName("idx_audit_tenant_timeline");
+            
+            // Índice combinado para tenant + entidade
+            a.HasIndex(x => new { x.TenantId, x.EntityName, x.Timestamp })
+                .HasDatabaseName("idx_audit_tenant_entity_timeline");
+            
+            // Query filter para multi-tenancy
+            a.HasQueryFilter(log => 
+                _tenantContextAccessor == null || 
+                _tenantContextAccessor.Current == null || 
+                !_tenantContextAccessor.Current.TenantId.HasValue || 
+                log.TenantId == 0 || // Logs sem tenant (sistema)
+                log.TenantId == _tenantContextAccessor.Current.TenantId.GetValueOrDefault());
         });
     }
 

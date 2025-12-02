@@ -153,4 +153,62 @@ public static class BrazilianDocumentValidator
 
         return Regex.Replace(document, @"[^\d]", "");
     }
+
+    /// <summary>
+    /// Formats a document dynamically as the user types.
+    /// Applies CPF mask (000.000.000-00) for up to 11 digits,
+    /// switches to CNPJ mask (00.000.000/0000-00) for more than 11 digits.
+    /// </summary>
+    public static string FormatDocumentDynamic(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return string.Empty;
+
+        // Keep only digits, max 14
+        var digits = Regex.Replace(input, @"[^\d]", "");
+        if (digits.Length > 14)
+            digits = digits[..14];
+
+        if (digits.Length == 0)
+            return string.Empty;
+
+        if (digits.Length <= 11)
+        {
+            // CPF format: 000.000.000-00
+            var result = digits;
+            if (digits.Length > 3)
+                result = digits[..3] + "." + digits[3..];
+            if (digits.Length > 6)
+                result = digits[..3] + "." + digits[3..6] + "." + digits[6..];
+            if (digits.Length > 9)
+                result = digits[..3] + "." + digits[3..6] + "." + digits[6..9] + "-" + digits[9..];
+            return result;
+        }
+        else
+        {
+            // CNPJ format: 00.000.000/0000-00
+            var result = digits[..2];
+            if (digits.Length > 2)
+                result += "." + digits[2..Math.Min(5, digits.Length)];
+            if (digits.Length > 5)
+                result += "." + digits[5..Math.Min(8, digits.Length)];
+            if (digits.Length > 8)
+                result += "/" + digits[8..Math.Min(12, digits.Length)];
+            if (digits.Length > 12)
+                result += "-" + digits[12..];
+            return result;
+        }
+    }
+
+    /// <summary>
+    /// Extracts only digits from input and limits to maxLength
+    /// </summary>
+    public static string ExtractDigits(string input, int maxLength = 14)
+    {
+        if (string.IsNullOrEmpty(input))
+            return string.Empty;
+
+        var digits = Regex.Replace(input, @"[^\d]", "");
+        return digits.Length > maxLength ? digits[..maxLength] : digits;
+    }
 }

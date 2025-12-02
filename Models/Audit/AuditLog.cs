@@ -6,10 +6,15 @@ namespace erp.Models.Audit;
 /// <summary>
 /// Entidade que armazena logs de auditoria de todas as operações no sistema
 /// </summary>
-public class AuditLog
+public class AuditLog : IMustHaveTenant
 {
     [Key]
     public long Id { get; set; }
+    
+    /// <summary>
+    /// ID do tenant ao qual este log pertence (multi-tenancy)
+    /// </summary>
+    public int TenantId { get; set; }
     
     /// <summary>
     /// Nome da entidade auditada (ex: "Product", "Customer", "Sale")
@@ -24,6 +29,12 @@ public class AuditLog
     [Required]
     [MaxLength(100)]
     public string EntityId { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// Descrição legível da entidade (ex: nome do produto, nome do cliente)
+    /// </summary>
+    [MaxLength(500)]
+    public string? EntityDescription { get; set; }
     
     /// <summary>
     /// Tipo de ação realizada
@@ -56,10 +67,16 @@ public class AuditLog
     public string? NewValues { get; set; }
     
     /// <summary>
-    /// Lista das propriedades que foram alteradas
+    /// Lista das propriedades que foram alteradas com valores legíveis
     /// </summary>
     [Column(TypeName = "jsonb")]
     public string? ChangedProperties { get; set; }
+    
+    /// <summary>
+    /// Referências legíveis para FKs (ex: {"SupplierId": "Fornecedor ABC", "CategoryId": "Eletrônicos"})
+    /// </summary>
+    [Column(TypeName = "jsonb")]
+    public string? References { get; set; }
     
     /// <summary>
     /// Timestamp da operação (UTC)
