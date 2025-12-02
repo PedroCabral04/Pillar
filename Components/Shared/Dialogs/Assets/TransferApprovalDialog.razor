@@ -236,12 +236,12 @@
 
             if (_approvalAction == "approve")
             {
-                result = await ApiService.PutAsync<AssetTransferDto>($"/api/assets/transfers/{TransferId}/approve", null);
+                result = await ApiService.PutAsync<AssetTransferDto>($"/api/assets/transfers/{TransferId}/approve", new { });
                 Snackbar.Add("Transferência aprovada com sucesso", Severity.Success);
             }
             else if (_approvalAction == "reject")
             {
-                result = await ApiService.PutAsync<AssetTransferDto>($"/api/assets/transfers/{TransferId}/reject", _rejectionReason);
+                result = await ApiService.PutAsync<AssetTransferDto>($"/api/assets/transfers/{TransferId}/reject", new { Reason = _rejectionReason });
                 Snackbar.Add("Transferência rejeitada", Severity.Info);
             }
 

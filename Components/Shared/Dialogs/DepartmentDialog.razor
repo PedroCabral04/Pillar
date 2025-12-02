@@ -152,15 +152,15 @@
         }
     }
 
-    private async Task<IEnumerable<string>> ValidateValue(object model, string propertyName)
+    private Task<IEnumerable<string>> ValidateValue(object model, string propertyName)
     {
         if (propertyName == nameof(_model.Name))
         {
             if (string.IsNullOrWhiteSpace(_model.Name))
-                return new[] { "Nome é obrigatório" };
+                return Task.FromResult<IEnumerable<string>>(new[] { "Nome é obrigatório" });
         }
 
-        return Array.Empty<string>();
+        return Task.FromResult<IEnumerable<string>>(Array.Empty<string>());
     }
 
     private async Task Submit()

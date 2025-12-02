@@ -17,23 +17,23 @@ public class User
     
     [Required(ErrorMessage = "Nome de usuário é obrigatório")]
     [StringLength(50, MinimumLength = 3, ErrorMessage = "Nome de usuário deve ter entre 3 e 50 caracteres")]
-    public string Username { get; set; }
+    public string Username { get; set; } = string.Empty;
     
     [Required(ErrorMessage = "E-mail é obrigatório")]
     [EmailAddress(ErrorMessage = "Formato de e-mail inválido")]
     [StringLength(100, ErrorMessage = "E-mail não pode exceder 100 caracteres")]
-    public string Email { get; set; }
+    public string Email { get; set; } = string.Empty;
     
     [Required]
     [Phone]
     [StringLength(11, ErrorMessage = "Telefone inválido")]
-    public string Phone { get; set; }
+    public string Phone { get; set; } = string.Empty;
     
     [Required]
     [JsonIgnore] 
     [Column(TypeName = "varchar(255)")]
     [Comment("Hash BCrypt da senha do usuário")]
-    public string PasswordHash { get; set; }
+    public string PasswordHash { get; set; } = string.Empty;
     
     [JsonIgnore]
     public DateTime? PasswordChangedAt { get; set; }

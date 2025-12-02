@@ -102,11 +102,11 @@
 </MudDialog>
 
 @code {
-    [CascadingParameter] IMudDialogInstance MudDialog { get; set; }
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
     [Parameter] public CreateFinancialCategoryDto Model { get; set; } = new() { Name = "", Code = "" };
     [Parameter] public List<FinancialCategoryDto> Categories { get; set; } = new();
 
-    private MudForm form;
+    private MudForm form = null!;
     private bool success;
 
     private void Cancel() => MudDialog.Cancel();

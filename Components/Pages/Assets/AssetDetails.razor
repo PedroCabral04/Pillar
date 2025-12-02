@@ -322,7 +322,7 @@ else if (_asset != null)
         );
 
         var result = await dialog.Result;
-        if (!result.Canceled)
+        if (result is { Canceled: false })
         {
             await LoadTransferHistory();
             Snackbar.Add("Solicitação de transferência criada com sucesso", Severity.Success);
@@ -348,8 +348,8 @@ else if (_asset != null)
             options
         );
 
-        var result = await dialog.Result;
-        if (!result.Canceled)
+        var result2 = await dialog.Result;
+        if (result2 is { Canceled: false })
         {
             await LoadTransferHistory();
             await LoadAssetDetails();

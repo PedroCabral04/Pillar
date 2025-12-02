@@ -10,88 +10,90 @@
 
 <PageTitle>Tenants - Pillar ERP</PageTitle>
 
-<MudStack Spacing="3">
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-        <MudStack Spacing="1">
-            <MudText Typo="Typo.h4">Tenants</MudText>
-            <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Secondary">Gerenciamento de empresas, provisionamento e status de bancos.</MudText>
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
+    <MudStack Spacing="3">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+            <MudStack Spacing="1">
+                <MudText Typo="Typo.h4">Tenants</MudText>
+                <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Secondary">Gerenciamento de empresas, provisionamento e status de bancos.</MudText>
+            </MudStack>
+            <MudButton Variant="Variant.Filled" Color="MudBlazor.Color.Primary" StartIcon="@Icons.Material.Filled.AddBusiness" OnClick="CreateTenant">
+                Novo tenant
+            </MudButton>
         </MudStack>
-        <MudButton Variant="Variant.Filled" Color="MudBlazor.Color.Primary" StartIcon="@Icons.Material.Filled.AddBusiness" OnClick="CreateTenant">
-            Novo tenant
-        </MudButton>
-    </MudStack>
 
-    @if (!string.IsNullOrWhiteSpace(_loadError))
-    {
-        <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
-    }
+        @if (!string.IsNullOrWhiteSpace(_loadError))
+        {
+            <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
+        }
 
-    <MudPaper Elevation="1" Class="pa-4">
-        <MudStack Spacing="2">
-            <MudTextField @bind-Value="_search" Placeholder="Filtrar por nome, slug, região ou contato" Variant="Variant.Outlined" Immediate="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" />
-            <MudTable Items="@FilteredTenants" Hover="true" Dense="true">
-                <HeaderContent>
-                    <MudTh>Empresa</MudTh>
-                    <MudTh>Status</MudTh>
-                    <MudTh>Contato</MudTh>
-                    <MudTh>Região</MudTh>
-                    <MudTh>Provisionamento</MudTh>
-                    <MudTh Align="Align.Right">Ações</MudTh>
-                </HeaderContent>
-                <RowTemplate>
-                    <MudTd DataLabel="Empresa">
-                        <MudStack>
-                            <MudText Typo="Typo.body1">@context.Name</MudText>
-                            <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">Slug: @context.Slug</MudText>
-                            @if (context.IsDemo)
+        <MudPaper Elevation="1" Class="pa-4">
+            <MudStack Spacing="2">
+                <MudTextField @bind-Value="_search" Placeholder="Filtrar por nome, slug, região ou contato" Variant="Variant.Outlined" Immediate="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" />
+                <MudTable Items="@FilteredTenants" Hover="true" Dense="true">
+                    <HeaderContent>
+                        <MudTh>Empresa</MudTh>
+                        <MudTh>Status</MudTh>
+                        <MudTh>Contato</MudTh>
+                        <MudTh>Região</MudTh>
+                        <MudTh>Provisionamento</MudTh>
+                        <MudTh Align="Align.Right">Ações</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Empresa">
+                            <MudStack>
+                                <MudText Typo="Typo.body1">@context.Name</MudText>
+                                <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">Slug: @context.Slug</MudText>
+                                @if (context.IsDemo)
+                                {
+                                    <MudChip T="string" Color="MudBlazor.Color.Info" Variant="Variant.Outlined" Size="MudBlazor.Size.Small">Demo</MudChip>
+                                }
+                            </MudStack>
+                        </MudTd>
+                        <MudTd DataLabel="Status">
+                            <MudChip T="string" Color="@GetStatusColor(context.Status)" Variant="Variant.Filled" Size="MudBlazor.Size.Small">@GetStatusLabel(context.Status)</MudChip>
+                            @if (!string.IsNullOrWhiteSpace(context.DatabaseName))
                             {
-                                <MudChip T="string" Color="MudBlazor.Color.Info" Variant="Variant.Outlined" Size="MudBlazor.Size.Small">Demo</MudChip>
+                                <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">BD: @context.DatabaseName</MudText>
                             }
-                        </MudStack>
-                    </MudTd>
-                    <MudTd DataLabel="Status">
-                        <MudChip T="string" Color="@GetStatusColor(context.Status)" Variant="Variant.Filled" Size="MudBlazor.Size.Small">@GetStatusLabel(context.Status)</MudChip>
-                        @if (!string.IsNullOrWhiteSpace(context.DatabaseName))
-                        {
-                            <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">BD: @context.DatabaseName</MudText>
-                        }
-                    </MudTd>
-                    <MudTd DataLabel="Contato">
-                        <MudText Typo="Typo.subtitle2">@context.PrimaryContactName</MudText>
-                        <MudText Typo="Typo.caption">@context.PrimaryContactEmail</MudText>
-                        <MudText Typo="Typo.caption">@context.PrimaryContactPhone</MudText>
-                    </MudTd>
-                    <MudTd DataLabel="Região">@context.Region</MudTd>
-                    <MudTd DataLabel="Provisionamento">
-                        <MudStack>
-                            <MudText Typo="Typo.caption">@((context.ConnectionString is null) ? "Template" : "Custom")</MudText>
-                            <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">
-                                @if (context.ActivatedAt.HasValue)
-                                {
-                                    <text>Ativado em @context.ActivatedAt.Value.ToString("dd/MM/yyyy HH:mm")</text>
-                                }
-                                else
-                                {
-                                    <text>Aguardando provisionamento</text>
-                                }
-                            </MudText>
-                        </MudStack>
-                    </MudTd>
-                    <MudTd Align="Align.Right">
-                        <MudButtonGroup Variant="Variant.Text" Dense="true">
-                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="MudBlazor.Color.Info" Title="Editar" OnClick="@(() => EditTenant(context))" />
-                            <MudIconButton Icon="@Icons.Material.Filled.Storage" Color="MudBlazor.Color.Primary" Title="Provisionar" OnClick="@(() => ProvisionTenant(context))" Disabled="_provisioningIds.Contains(context.Id)" />
-                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="MudBlazor.Color.Error" Title="Excluir" Disabled="true" />
-                        </MudButtonGroup>
-                    </MudTd>
-                </RowTemplate>
-                <NoRecordsContent>
-                    <MudText>Nenhum tenant encontrado.</MudText>
-                </NoRecordsContent>
-            </MudTable>
-        </MudStack>
-    </MudPaper>
-</MudStack>
+                        </MudTd>
+                        <MudTd DataLabel="Contato">
+                            <MudText Typo="Typo.subtitle2">@context.PrimaryContactName</MudText>
+                            <MudText Typo="Typo.caption">@context.PrimaryContactEmail</MudText>
+                            <MudText Typo="Typo.caption">@context.PrimaryContactPhone</MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Região">@context.Region</MudTd>
+                        <MudTd DataLabel="Provisionamento">
+                            <MudStack>
+                                <MudText Typo="Typo.caption">@((context.ConnectionString is null) ? "Template" : "Custom")</MudText>
+                                <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">
+                                    @if (context.ActivatedAt.HasValue)
+                                    {
+                                        <text>Ativado em @context.ActivatedAt.Value.ToString("dd/MM/yyyy HH:mm")</text>
+                                    }
+                                    else
+                                    {
+                                        <text>Aguardando provisionamento</text>
+                                    }
+                                </MudText>
+                            </MudStack>
+                        </MudTd>
+                        <MudTd Align="Align.Right">
+                            <MudButtonGroup Variant="Variant.Text" Dense="true">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="MudBlazor.Color.Info" Title="Editar" OnClick="@(() => EditTenant(context))" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Storage" Color="MudBlazor.Color.Primary" Title="Provisionar" OnClick="@(() => ProvisionTenant(context))" Disabled="_provisioningIds.Contains(context.Id)" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="MudBlazor.Color.Error" Title="Excluir" Disabled="true" />
+                            </MudButtonGroup>
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        <MudText>Nenhum tenant encontrado.</MudText>
+                    </NoRecordsContent>
+                </MudTable>
+            </MudStack>
+        </MudPaper>
+    </MudStack>
+</MudContainer>
 
 @code {
     private List<TenantDto> _tenants = new();

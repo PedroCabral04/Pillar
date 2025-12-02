@@ -92,6 +92,11 @@ public class ProductsController : ControllerBase
     /// Lista produtos de forma simplificada (wrapper para busca)
     /// </summary>
     /// <param name="search">Termo de busca opcional</param>
+    /// <param name="status">Status do produto (ex.: "ativo", "inativo", "descontinuado")</param>
+    /// <param name="categoryId">ID da categoria para filtrar</param>
+    /// <param name="lowStock">Se true, retorna apenas produtos com estoque baixo</param>
+    /// <param name="sortBy">Campo para ordenação (ex.: "Name", "Price")</param>
+    /// <param name="sortDescending">Define se a ordenação é descendente</param>
     /// <param name="page">Número da página (inicia em 1)</param>
     /// <param name="pageSize">Quantidade de itens por página (padrão: 20)</param>
     /// <returns>Lista paginada de produtos</returns>

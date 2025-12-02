@@ -157,7 +157,7 @@ public class PayrollService : IPayrollService
             .FirstOrDefaultAsync(r => r.Id == resultId && r.PayrollPeriodId == periodId, cancellationToken)
             ?? throw new KeyNotFoundException("Resultado da folha não encontrado.");
 
-        if (result.PayrollPeriod!.Status is PayrollPeriodStatus.Draft)
+        if (result.PayrollPeriod?.Status is PayrollPeriodStatus.Draft)
         {
             throw new InvalidOperationException("Calcule a folha antes de gerar os holerites.");
         }

@@ -2,8 +2,8 @@ namespace erp.DTOs.Role;
 
 public class RoleDto {
     public int Id { get; set; }
-    public string Name { get; set; }
-    public string Abbreviation { get; set; }
+    public required string Name { get; set; }
+    public required string Abbreviation { get; set; }
 
     public override bool Equals(object? obj)
     {

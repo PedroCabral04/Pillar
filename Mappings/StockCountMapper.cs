@@ -10,10 +10,12 @@ namespace erp.Mappings;
 public partial class StockCountMapper
 {
     // StockCount -> StockCountDto
+    [UserMapping(Default = true)]
     public partial StockCountDto CountToCountDto(StockCount count);
     public partial IEnumerable<StockCountDto> CountsToCountDtos(IEnumerable<StockCount> counts);
     
     // StockCountItem -> StockCountItemDto
+    [UserMapping(Default = true)]
     public partial StockCountItemDto ItemToItemDto(StockCountItem item);
     public partial IEnumerable<StockCountItemDto> ItemsToItemDtos(IEnumerable<StockCountItem> items);
     

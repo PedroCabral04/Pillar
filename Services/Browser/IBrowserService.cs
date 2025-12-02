@@ -13,7 +13,7 @@ public interface IBrowserService
     Task<DeviceInfo> GetDeviceInfoAsync();
 
     /// <summary>
-    /// Check if current viewport is mobile (< 600px)
+    /// Check if current viewport is mobile (&lt; 600px)
     /// </summary>
     Task<bool> IsMobileAsync();
 

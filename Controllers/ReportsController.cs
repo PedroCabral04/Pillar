@@ -57,10 +57,24 @@ public class ReportsController : ControllerBase
     }
 
     /// <summary>
-    /// Exporta relatório de vendas em PDF ou Excel
+    /// Exporta relatório de vendas em PDF ou Excel (POST - para chamadas programáticas)
     /// </summary>
     [HttpPost("sales/export")]
     public async Task<IActionResult> ExportSalesReport([FromBody] SalesReportFilterDto filter)
+    {
+        return await ExportSalesReportInternal(filter);
+    }
+
+    /// <summary>
+    /// Exporta relatório de vendas em PDF ou Excel (GET - para download via browser)
+    /// </summary>
+    [HttpGet("sales/export")]
+    public async Task<IActionResult> ExportSalesReportGet([FromQuery] SalesReportFilterDto filter)
+    {
+        return await ExportSalesReportInternal(filter);
+    }
+
+    private async Task<IActionResult> ExportSalesReportInternal(SalesReportFilterDto filter)
     {
         try
         {
@@ -126,10 +140,24 @@ public class ReportsController : ControllerBase
     }
 
     /// <summary>
-    /// Exporta relatório de fluxo de caixa
+    /// Exporta relatório de fluxo de caixa (POST - para chamadas programáticas)
     /// </summary>
     [HttpPost("financial/cash-flow/export")]
     public async Task<IActionResult> ExportCashFlowReport([FromBody] FinancialReportFilterDto filter)
+    {
+        return await ExportCashFlowReportInternal(filter);
+    }
+
+    /// <summary>
+    /// Exporta relatório de fluxo de caixa (GET - para download via browser)
+    /// </summary>
+    [HttpGet("financial/cash-flow/export")]
+    public async Task<IActionResult> ExportCashFlowReportGet([FromQuery] FinancialReportFilterDto filter)
+    {
+        return await ExportCashFlowReportInternal(filter);
+    }
+
+    private async Task<IActionResult> ExportCashFlowReportInternal(FinancialReportFilterDto filter)
     {
         try
         {
@@ -173,10 +201,24 @@ public class ReportsController : ControllerBase
     }
 
     /// <summary>
-    /// Exporta DRE
+    /// Exporta DRE (POST - para chamadas programáticas)
     /// </summary>
     [HttpPost("financial/profit-loss/export")]
     public async Task<IActionResult> ExportProfitLossReport([FromBody] FinancialReportFilterDto filter)
+    {
+        return await ExportProfitLossReportInternal(filter);
+    }
+
+    /// <summary>
+    /// Exporta DRE (GET - para download via browser)
+    /// </summary>
+    [HttpGet("financial/profit-loss/export")]
+    public async Task<IActionResult> ExportProfitLossReportGet([FromQuery] FinancialReportFilterDto filter)
+    {
+        return await ExportProfitLossReportInternal(filter);
+    }
+
+    private async Task<IActionResult> ExportProfitLossReportInternal(FinancialReportFilterDto filter)
     {
         try
         {
@@ -260,10 +302,24 @@ public class ReportsController : ControllerBase
     }
 
     /// <summary>
-    /// Exporta relatório de níveis de estoque
+    /// Exporta relatório de níveis de estoque (POST - para chamadas programáticas)
     /// </summary>
     [HttpPost("inventory/stock-levels/export")]
     public async Task<IActionResult> ExportStockLevelsReport([FromBody] InventoryReportFilterDto filter)
+    {
+        return await ExportStockLevelsReportInternal(filter);
+    }
+
+    /// <summary>
+    /// Exporta relatório de níveis de estoque (GET - para download via browser)
+    /// </summary>
+    [HttpGet("inventory/stock-levels/export")]
+    public async Task<IActionResult> ExportStockLevelsReportGet([FromQuery] InventoryReportFilterDto filter)
+    {
+        return await ExportStockLevelsReportInternal(filter);
+    }
+
+    private async Task<IActionResult> ExportStockLevelsReportInternal(InventoryReportFilterDto filter)
     {
         try
         {
@@ -307,10 +363,24 @@ public class ReportsController : ControllerBase
     }
 
     /// <summary>
-    /// Exporta relatório de movimentação de estoque
+    /// Exporta relatório de movimentação de estoque (POST - para chamadas programáticas)
     /// </summary>
     [HttpPost("inventory/movements/export")]
     public async Task<IActionResult> ExportStockMovementReport([FromBody] InventoryReportFilterDto filter)
+    {
+        return await ExportStockMovementReportInternal(filter);
+    }
+
+    /// <summary>
+    /// Exporta relatório de movimentação de estoque (GET - para download via browser)
+    /// </summary>
+    [HttpGet("inventory/movements/export")]
+    public async Task<IActionResult> ExportStockMovementReportGet([FromQuery] InventoryReportFilterDto filter)
+    {
+        return await ExportStockMovementReportInternal(filter);
+    }
+
+    private async Task<IActionResult> ExportStockMovementReportInternal(InventoryReportFilterDto filter)
     {
         try
         {
@@ -403,10 +473,24 @@ public class ReportsController : ControllerBase
     }
 
     /// <summary>
-    /// Exporta relatório de headcount
+    /// Exporta relatório de headcount (POST - para chamadas programáticas)
     /// </summary>
     [HttpPost("hr/headcount/export")]
     public async Task<IActionResult> ExportHeadcountReport([FromBody] HRReportFilterDto filter)
+    {
+        return await ExportHeadcountReportInternal(filter);
+    }
+
+    /// <summary>
+    /// Exporta relatório de headcount (GET - para download via browser)
+    /// </summary>
+    [HttpGet("hr/headcount/export")]
+    public async Task<IActionResult> ExportHeadcountReportGet([FromQuery] HRReportFilterDto filter)
+    {
+        return await ExportHeadcountReportInternal(filter);
+    }
+
+    private async Task<IActionResult> ExportHeadcountReportInternal(HRReportFilterDto filter)
     {
         try
         {

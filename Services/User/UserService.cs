@@ -44,7 +44,7 @@ namespace erp.Services
             return phoneNumber.Replace("(", "").Replace(")", "").Replace("-", "").Replace(" ", "");
         }
 
-        public async Task<User> GetByIdAsync(int id)
+        public async Task<User?> GetByIdAsync(int id)
         {
             return await userDao.GetByIdAsync(id);
         }
@@ -100,7 +100,7 @@ namespace erp.Services
             }
         }
         
-        public async Task UpdateAsync(User user, string password = null!)
+        public async Task UpdateAsync(User user, string? password = null)
         {
             var existingUser = await userDao.GetByIdAsync(user.Id);
             

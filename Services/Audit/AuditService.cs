@@ -264,21 +264,52 @@ public class AuditService : IAuditService
 
     private static AuditLogDto MapToDto(AuditLog log)
     {
-        return new AuditLogDto
+        var dto = new AuditLogDto
         {
             Id = log.Id,
+            TenantId = log.TenantId,
             EntityName = log.EntityName,
             EntityId = log.EntityId,
+            EntityDescription = log.EntityDescription,
             Action = log.Action.ToString(),
             UserId = log.UserId,
             UserName = log.UserName,
             OldValues = log.OldValues,
             NewValues = log.NewValues,
             ChangedProperties = log.ChangedProperties,
+            References = log.References,
             Timestamp = log.Timestamp,
             IpAddress = log.IpAddress,
             UserAgent = log.UserAgent,
             AdditionalInfo = log.AdditionalInfo
         };
+        
+        // Parse ChangedProperties para facilitar exibição na UI
+        if (!string.IsNullOrEmpty(log.ChangedProperties))
+        {
+            try
+            {
+                dto.ParsedChangedProperties = JsonSerializer.Deserialize<List<PropertyChangeDto>>(log.ChangedProperties);
+            }
+            catch
+            {
+                // Ignora erros de parsing
+            }
+        }
+        
+        // Parse References para facilitar exibição na UI
+        if (!string.IsNullOrEmpty(log.References))
+        {
+            try
+            {
+                dto.ParsedReferences = JsonSerializer.Deserialize<Dictionary<string, string?>>(log.References);
+            }
+            catch
+            {
+                // Ignora erros de parsing
+            }
+        }
+        
+        return dto;
     }
 }

@@ -1,0 +1,256 @@
+@using erp.DTOs.Kanban
+@using erp.Services
+@using MudBlazor
+@inject IApiService Api
+@inject ISnackbar Snackbar
+
+<MudDialog Style="min-width: 450px;">
+    <TitleContent>
+        <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Dashboard" Color="MudBlazor.Color.Primary" />
+            <MudText Typo="Typo.h6">Meus Quadros</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            @* Criar novo quadro *@
+            <MudPaper Elevation="0" Class="pa-3" Style="background: var(--mud-palette-background-grey); border-radius: 8px;">
+                <MudStack Row Spacing="2" AlignItems="AlignItems.Center">
+                    <MudTextField @bind-Value="_newBoardName" 
+                                  Label="Nome do novo quadro" 
+                                  Variant="Variant.Outlined"
+                                  Dense="true"
+                                  Style="flex: 1;"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Add" />
+                    <MudButton Variant="Variant.Filled"
+                               Color="MudBlazor.Color.Primary"
+                               OnClick="CreateBoard"
+                               Disabled="@(string.IsNullOrWhiteSpace(_newBoardName) || _isCreating)">
+                        @if (_isCreating)
+                        {
+                            <MudProgressCircular Size="MudBlazor.Size.Small" Indeterminate="true" />
+                        }
+                        else
+                        {
+                            <span>Criar</span>
+                        }
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+
+            <MudDivider />
+
+            @* Lista de quadros *@
+            @if (_isLoading)
+            {
+                <MudProgressLinear Indeterminate="true" />
+            }
+            else if (_boards.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                    Nenhum quadro encontrado. Crie seu primeiro quadro!
+                </MudAlert>
+            }
+            else
+            {
+                <MudList T="KanbanBoardDto" Dense="true" Class="pa-0">
+                    @foreach (var board in _boards)
+                    {
+                        var isSelected = board.Id == CurrentBoardId;
+                        <MudListItem T="KanbanBoardDto" 
+                                     Class="@(isSelected ? "mud-primary-text" : "")"
+                                     Style="@(isSelected ? "background: var(--mud-palette-primary-lighten); border-radius: 8px;" : "border-radius: 8px;")">
+                            <ChildContent>
+                                @if (_editingBoardId == board.Id)
+                                {
+                                    <MudStack Row Spacing="2" AlignItems="AlignItems.Center" Style="width: 100%;">
+                                        <MudTextField @bind-Value="_editBoardName"
+                                                      Variant="Variant.Outlined"
+                                                      Dense="true"
+                                                      Style="flex: 1;" />
+                                        <MudIconButton Icon="@Icons.Material.Filled.Check"
+                                                       Color="MudBlazor.Color.Success"
+                                                       Size="MudBlazor.Size.Small"
+                                                       OnClick="SaveBoardEdit" />
+                                        <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                                       Size="MudBlazor.Size.Small"
+                                                       OnClick="CancelBoardEdit" />
+                                    </MudStack>
+                                }
+                                else
+                                {
+                                    <MudStack Row Spacing="2" AlignItems="AlignItems.Center" Style="width: 100%;">
+                                        <MudIcon Icon="@Icons.Material.Filled.ViewKanban" 
+                                                 Size="MudBlazor.Size.Small" 
+                                                 Color="@(isSelected ? MudBlazor.Color.Primary : MudBlazor.Color.Default)" />
+                                        <MudStack Spacing="0" Style="flex: 1; cursor: pointer;" @onclick="() => SelectBoard(board)">
+                                            <MudText Typo="Typo.body1">
+                                                <strong>@board.Name</strong>
+                                                @if (isSelected)
+                                                {
+                                                    <MudChip T="string" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Primary" Class="ml-2">Atual</MudChip>
+                                                }
+                                            </MudText>
+                                            <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">
+                                                Criado em @board.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy")
+                                            </MudText>
+                                        </MudStack>
+                                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                                       Size="MudBlazor.Size.Small"
+                                                       OnClick="@(() => StartBoardEdit(board))"
+                                                       Title="Renomear" />
+                                        @if (!isSelected)
+                                        {
+                                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                           Size="MudBlazor.Size.Small"
+                                                           Color="MudBlazor.Color.Error"
+                                                           OnClick="@(() => DeleteBoard(board))"
+                                                           Title="Excluir" />
+                                        }
+                                    </MudStack>
+                                }
+                            </ChildContent>
+                        </MudListItem>
+                    }
+                </MudList>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close" Variant="Variant.Text">Fechar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public int CurrentBoardId { get; set; }
+
+    private List<KanbanBoardDto> _boards = new();
+    private bool _isLoading = true;
+    private bool _isCreating;
+
+    private string _newBoardName = string.Empty;
+    private int? _editingBoardId;
+    private string _editBoardName = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBoards();
+    }
+
+    private async Task LoadBoards()
+    {
+        _isLoading = true;
+        try
+        {
+            var boards = await Api.GetAsync<List<KanbanBoardDto>>("api/kanban/boards");
+            _boards = boards ?? new();
+        }
+        catch { }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task CreateBoard()
+    {
+        if (string.IsNullOrWhiteSpace(_newBoardName)) return;
+
+        _isCreating = true;
+        try
+        {
+            var result = await Api.PostAsJsonAsync<CreateBoardRequest, KanbanBoardDto>(
+                "api/kanban/boards",
+                new CreateBoardRequest(_newBoardName.Trim()));
+
+            if (result is not null)
+            {
+                _boards.Add(result);
+                _newBoardName = string.Empty;
+                Snackbar.Add("Quadro criado!", Severity.Success);
+                // Automatically select the new board
+                SelectBoard(result);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isCreating = false;
+        }
+    }
+
+    private void StartBoardEdit(KanbanBoardDto board)
+    {
+        _editingBoardId = board.Id;
+        _editBoardName = board.Name;
+    }
+
+    private void CancelBoardEdit()
+    {
+        _editingBoardId = null;
+    }
+
+    private async Task SaveBoardEdit()
+    {
+        if (_editingBoardId is null || string.IsNullOrWhiteSpace(_editBoardName)) return;
+
+        try
+        {
+            var result = await Api.PutAsJsonAsync(
+                $"api/kanban/boards/{_editingBoardId}/name",
+                new RenameBoardRequest(_editBoardName.Trim()));
+
+            if (result.IsSuccessStatusCode)
+            {
+                var idx = _boards.FindIndex(b => b.Id == _editingBoardId);
+                if (idx >= 0)
+                {
+                    var old = _boards[idx];
+                    _boards[idx] = new KanbanBoardDto(_editingBoardId.Value, _editBoardName.Trim(), old.CreatedAt);
+                }
+                _editingBoardId = null;
+                Snackbar.Add("Quadro renomeado!", Severity.Success);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task DeleteBoard(KanbanBoardDto board)
+    {
+        try
+        {
+            var result = await Api.DeleteAsync($"api/kanban/boards/{board.Id}");
+            if (result.IsSuccessStatusCode)
+            {
+                _boards.RemoveAll(b => b.Id == board.Id);
+                Snackbar.Add("Quadro excluído!", Severity.Success);
+            }
+            else
+            {
+                var error = await result.Content.ReadAsStringAsync();
+                Snackbar.Add($"Erro: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void SelectBoard(KanbanBoardDto board)
+    {
+        MudDialog.Close(DialogResult.Ok(board.Id));
+    }
+
+    private void Close() => MudDialog.Cancel();
+}

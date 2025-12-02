@@ -10,6 +10,7 @@ namespace erp.Mappings;
 public partial class ProductMapper
 {
     // Product -> ProductDto
+    [UserMapping(Default = true)]
     public partial ProductDto ProductToProductDto(Product product);
     public partial IEnumerable<ProductDto> ProductsToProductDtos(IEnumerable<Product> products);
     

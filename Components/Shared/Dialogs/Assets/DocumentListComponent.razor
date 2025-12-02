@@ -40,22 +40,22 @@
         <!-- Document Type Tabs -->
         <MudTabs Elevation="0" Color="Color.Primary" @bind-ActivePanelIndex="_activeTab" Class="mb-3">
             <MudTabPanel Text="Todos" BadgeData="@_documents.Count">
-                <DocumentTable Documents="_documents"/>
+                @DocumentTable(_documents)
             </MudTabPanel>
             <MudTabPanel Text="Notas Fiscais" BadgeData="@GetDocumentCountByType(AssetDocumentType.Invoice)">
-                <DocumentTable Documents="@_documents.Where(d => d.Type == AssetDocumentType.Invoice).ToList()"/>
+                @DocumentTable(_documents.Where(d => d.Type == AssetDocumentType.Invoice).ToList())
             </MudTabPanel>
             <MudTabPanel Text="Manuais" BadgeData="@GetDocumentCountByType(AssetDocumentType.Manual)">
-                <DocumentTable Documents="@_documents.Where(d => d.Type == AssetDocumentType.Manual).ToList()"/>
+                @DocumentTable(_documents.Where(d => d.Type == AssetDocumentType.Manual).ToList())
             </MudTabPanel>
             <MudTabPanel Text="Garantias" BadgeData="@GetDocumentCountByType(AssetDocumentType.Warranty)">
-                <DocumentTable Documents="@_documents.Where(d => d.Type == AssetDocumentType.Warranty).ToList()"/>
+                @DocumentTable(_documents.Where(d => d.Type == AssetDocumentType.Warranty).ToList())
             </MudTabPanel>
             <MudTabPanel Text="Fotos" BadgeData="@GetDocumentCountByType(AssetDocumentType.Photo)">
-                <DocumentTable Documents="@_documents.Where(d => d.Type == AssetDocumentType.Photo).ToList()"/>
+                @DocumentTable(_documents.Where(d => d.Type == AssetDocumentType.Photo).ToList())
             </MudTabPanel>
             <MudTabPanel Text="Outros" BadgeData="@GetDocumentCountByType(AssetDocumentType.Other)">
-                <DocumentTable Documents="@_documents.Where(d => d.Type == AssetDocumentType.Other).ToList()"/>
+                @DocumentTable(_documents.Where(d => d.Type == AssetDocumentType.Other).ToList())
             </MudTabPanel>
         </MudTabs>
     }
@@ -109,7 +109,7 @@
         var dialog = await DialogService.ShowAsync<DocumentUploadDialog>("Upload de Documento", parameters, options);
         var result = await dialog.Result;
 
-        if (!result.Canceled)
+        if (result is { Canceled: false })
         {
             await LoadDocuments();
             await OnDocumentChanged.InvokeAsync();
@@ -144,7 +144,7 @@
         var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirmar Exclusão", parameters, optionsConfirm);
         var result = await dialog.Result;
 
-        if (!result.Canceled)
+        if (result is { Canceled: false })
         {
             try
             {

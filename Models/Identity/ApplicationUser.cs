@@ -2,12 +2,15 @@ using Microsoft.AspNetCore.Identity;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using erp.Models.Tenancy;
+using erp.Models.Audit;
 
 namespace erp.Models.Identity;
 
 public class ApplicationUser : IdentityUser<int>, erp.Models.Audit.IAuditable
 {
     public bool IsActive { get; set; } = true;
+    
+    [AuditExclude("Dados de preferências do usuário")]
     public string? PreferencesJson { get; set; }
     public int? TenantId { get; set; }
 
@@ -27,9 +30,11 @@ public class ApplicationUser : IdentityUser<int>, erp.Models.Audit.IAuditable
     public string? Name { get => FullName; set => FullName = value; }
     
     [MaxLength(14)]
+    [AuditExclude("Dado pessoal sensível - CPF")]
     public string? Cpf { get; set; }
     
     [MaxLength(20)]
+    [AuditExclude("Dado pessoal sensível - RG")]
     public string? Rg { get; set; }
     
     public DateTime? DateOfBirth { get; set; }
@@ -80,6 +85,7 @@ public class ApplicationUser : IdentityUser<int>, erp.Models.Audit.IAuditable
     public Position? Position { get; set; }
     
     [Column(TypeName = "decimal(18,2)")]
+    [AuditExclude("Dado sensível - Salário")]
     public decimal? Salary { get; set; }
     
     public DateTime? HireDate { get; set; }
@@ -94,21 +100,27 @@ public class ApplicationUser : IdentityUser<int>, erp.Models.Audit.IAuditable
     
     // Informações Bancárias
     [MaxLength(10)]
+    [AuditExclude("Dado bancário sensível")]
     public string? BankCode { get; set; }
     
     [MaxLength(100)]
+    [AuditExclude("Dado bancário sensível")]
     public string? BankName { get; set; }
     
     [MaxLength(10)]
+    [AuditExclude("Dado bancário sensível")]
     public string? BankAgency { get; set; }
     
     [MaxLength(20)]
+    [AuditExclude("Dado bancário sensível")]
     public string? BankAccount { get; set; }
     
     [MaxLength(10)]
+    [AuditExclude("Dado bancário sensível")]
     public string? BankAccountType { get; set; } // Corrente, Poupança
     
     [MaxLength(14)]
+    [AuditExclude("Dado bancário sensível - CPF titular")]
     public string? BankAccountCpf { get; set; }
     
     // Informações de Emergência
@@ -123,9 +135,11 @@ public class ApplicationUser : IdentityUser<int>, erp.Models.Audit.IAuditable
     
     // Documentos e Certificações
     [MaxLength(20)]
+    [AuditExclude("Documento trabalhista sensível")]
     public string? WorkCard { get; set; } // Carteira de Trabalho
     
     [MaxLength(20)]
+    [AuditExclude("Documento trabalhista sensível")]
     public string? PisNumber { get; set; }
     
     [MaxLength(200)]

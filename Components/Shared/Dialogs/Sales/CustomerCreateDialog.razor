@@ -1,5 +1,7 @@
 @using erp.DTOs.Sales
+@using erp.Models.Sales
 @using erp.Services
+@using erp.Services.Financial.Validation
 @using MudBlazor
 @using Size = MudBlazor.Size
 @using Color = MudBlazor.Color
@@ -21,26 +23,56 @@
                 Dados Principais
             </MudText>
             <MudGrid Spacing="3">
-                <MudItem xs="12" md="6">
-                    <MudTextField @bind-Value="_model.Document" 
-                                  Label="CPF/CNPJ" 
-                                  Required="true"
-                                  Immediate="true"
-                                  Variant="Variant.Outlined"
-                                  Placeholder="000.000.000-00 ou 00.000.000/0000-00"
-                                  Adornment="Adornment.Start"
-                                  AdornmentIcon="@Icons.Material.Filled.Badge"
-                                  HelperText="Digite o CPF ou CNPJ do cliente"/>
+                <MudItem xs="12" md="3">
+                    <MudSelect T="CustomerType"
+                               Value="_model.Type"
+                               ValueChanged="@OnTypeChanged"
+                               Label="Tipo"
+                               Variant="Variant.Outlined"
+                               AnchorOrigin="Origin.BottomCenter">
+                        <MudSelectItem Value="CustomerType.Individual">Pessoa Física</MudSelectItem>
+                        <MudSelectItem Value="CustomerType.Business">Pessoa Jurídica</MudSelectItem>
+                    </MudSelect>
                 </MudItem>
-                <MudItem xs="12" md="6">
+                <MudItem xs="12" md="3">
+                    <MudTextField @bind-Value="_model.Document"
+                                  Label="@_documentLabel"
+                                  Required="true"
+                                  Variant="Variant.Outlined"
+                                  Mask="@_documentMask"
+                                  Placeholder="@_documentPlaceholder"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Badge"/>
+                </MudItem>
+                <MudItem xs="12" md="3">
                     <MudTextField @bind-Value="_model.Name" 
-                                  Label="Nome/Razão Social" 
+                                  Label="@_nameLabel" 
                                   Required="true"
                                   Immediate="true"
                                   Variant="Variant.Outlined"
                                   Adornment="Adornment.Start"
-                                  AdornmentIcon="@Icons.Material.Filled.Person"
-                                  HelperText="Nome completo ou razão social"/>
+                                  AdornmentIcon="@Icons.Material.Filled.Person"/>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudTextField @bind-Value="_model.TradeName" 
+                                  Label="Nome Fantasia"
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Store"/>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudTextField @bind-Value="_model.StateRegistration" 
+                                  Label="Inscrição Estadual"
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Description"/>
+                </MudItem>
+                <MudItem xs="12" md="5">
+                    <MudTextField @bind-Value="_model.MunicipalRegistration" 
+                                  Label="Inscrição Municipal"
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Description"/>
                 </MudItem>
             </MudGrid>
 
@@ -51,7 +83,7 @@
                 Contato
             </MudText>
             <MudGrid Spacing="3">
-                <MudItem xs="12" md="6">
+                <MudItem xs="12" md="4">
                     <MudTextField @bind-Value="_model.Email" 
                                   Label="E-mail"
                                   InputType="InputType.Email"
@@ -75,6 +107,14 @@
                                   Placeholder="(00) 00000-0000"
                                   Adornment="Adornment.Start"
                                   AdornmentIcon="@Icons.Material.Filled.PhoneAndroid"/>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudTextField @bind-Value="_model.Website" 
+                                  Label="Website"
+                                  Variant="Variant.Outlined"
+                                  Placeholder="www.exemplo.com.br"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Language"/>
                 </MudItem>
             </MudGrid>
 
@@ -135,6 +175,69 @@
                         }
                     </MudSelect>
                 </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudTextField @bind-Value="_model.Country" 
+                                  Label="País"
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Flag"/>
+                </MudItem>
+            </MudGrid>
+
+            <MudDivider Class="my-4" />
+            
+            <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Payments" Size="Size.Small" Class="mr-1" />
+                Condições Comerciais
+            </MudText>
+            <MudGrid Spacing="3">
+                <MudItem xs="12" md="4">
+                    <MudNumericField @bind-Value="_model.CreditLimit" 
+                                     Label="Limite de Crédito"
+                                     Variant="Variant.Outlined"
+                                     Adornment="Adornment.Start"
+                                     AdornmentText="R$"
+                                     Format="N2"
+                                     Min="0"/>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudNumericField @bind-Value="_model.PaymentTermDays" 
+                                     Label="Prazo de Pagamento (dias)"
+                                     Variant="Variant.Outlined"
+                                     Adornment="Adornment.Start"
+                                     AdornmentIcon="@Icons.Material.Filled.CalendarMonth"
+                                     Min="0"/>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudSelect @bind-Value="_model.PaymentMethod" 
+                               Label="Forma de Pagamento"
+                               Variant="Variant.Outlined"
+                               Adornment="Adornment.Start"
+                               AdornmentIcon="@Icons.Material.Filled.Payment"
+                               AnchorOrigin="Origin.BottomCenter">
+                        <MudSelectItem Value="@("Dinheiro")">Dinheiro</MudSelectItem>
+                        <MudSelectItem Value="@("Cartão de Crédito")">Cartão de Crédito</MudSelectItem>
+                        <MudSelectItem Value="@("Cartão de Débito")">Cartão de Débito</MudSelectItem>
+                        <MudSelectItem Value="@("PIX")">PIX</MudSelectItem>
+                        <MudSelectItem Value="@("Boleto")">Boleto</MudSelectItem>
+                        <MudSelectItem Value="@("Transferência")">Transferência</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+
+            <MudDivider Class="my-4" />
+            
+            <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Notes" Size="Size.Small" Class="mr-1" />
+                Observações
+            </MudText>
+            <MudGrid Spacing="3">
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_model.Notes" 
+                                  Label="Observações"
+                                  Variant="Variant.Outlined"
+                                  Lines="3"/>
+                </MudItem>
             </MudGrid>
         </MudForm>
     </DialogContent>
@@ -162,6 +265,35 @@
     private CreateCustomerDto _model = new();
     private bool _processing = false;
 
+    // Máscara CPF/CNPJ baseada no tipo de pessoa
+    private PatternMask _cpfMask = new("000.000.000-00");
+    private PatternMask _cnpjMask = new("00.000.000/0000-00");
+    private IMask _documentMask = new PatternMask("000.000.000-00");
+    private string _documentLabel = "CPF";
+    private string _documentPlaceholder = "000.000.000-00";
+    private string _nameLabel = "Nome Completo";
+
+    private void OnTypeChanged(CustomerType type)
+    {
+        _model.Type = type;
+        _model.Document = string.Empty; // Limpa o documento ao trocar tipo
+        
+        if (type == CustomerType.Business)
+        {
+            _documentMask = _cnpjMask;
+            _documentLabel = "CNPJ";
+            _documentPlaceholder = "00.000.000/0000-00";
+            _nameLabel = "Razão Social";
+        }
+        else
+        {
+            _documentMask = _cpfMask;
+            _documentLabel = "CPF";
+            _documentPlaceholder = "000.000.000-00";
+            _nameLabel = "Nome Completo";
+        }
+    }
+
     private readonly string[] _brazilianStates = new[]
     {
         "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA",
@@ -181,6 +313,8 @@
         _processing = true;
         try
         {
+            // Ensure document contains only digits before submit
+            _model.Document = BrazilianDocumentValidator.RemoveFormatting(_model.Document);
             var customer = await ApiService.PostAsync<CustomerDto>("/api/sales/customers", _model);
             Snackbar.Add("Cliente criado com sucesso!", Severity.Success);
             MudDialog.Close(DialogResult.Ok(customer));

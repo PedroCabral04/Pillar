@@ -143,7 +143,7 @@
 
     private async Task PreviousStep()
     {
-        if (CurrentStepIndex <= 0) return;
+        if (CurrentTour == null || CurrentStepIndex <= 0) return;
 
         CurrentStepIndex--;
         CurrentStep = CurrentTour.Steps[CurrentStepIndex];
@@ -153,7 +153,7 @@
 
     private async Task CompleteTour()
     {
-        if (CurrentTour == null || string.IsNullOrEmpty(UserId)) return;
+        if (CurrentTour == null || CurrentStep == null || string.IsNullOrEmpty(UserId)) return;
 
         await OnboardingService.CompleteTourAsync(UserId, CurrentTour.Id);
         await OnTourCompleted.InvokeAsync(CurrentTour.Id);
