@@ -9,6 +9,7 @@
 @inject ILogger<Positions> Logger
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject CurrencyFormatService Currency
 
 <PageTitle>Gerenciar Cargos - Pillar ERP</PageTitle>
 
@@ -85,16 +86,16 @@
             @if (context.MinSalary.HasValue && context.MaxSalary.HasValue)
             {
                 <MudText Typo="Typo.body2">
-                    @context.MinSalary.Value.ToString("C") - @context.MaxSalary.Value.ToString("C")
+                    @Currency.Format(context.MinSalary.Value) - @Currency.Format(context.MaxSalary.Value)
                 </MudText>
             }
             else if (context.MinSalary.HasValue)
             {
-                <MudText Typo="Typo.body2">A partir de @context.MinSalary.Value.ToString("C")</MudText>
+                <MudText Typo="Typo.body2">A partir de @Currency.Format(context.MinSalary.Value)</MudText>
             }
             else if (context.MaxSalary.HasValue)
             {
-                <MudText Typo="Typo.body2">Até @context.MaxSalary.Value.ToString("C")</MudText>
+                <MudText Typo="Typo.body2">Até @Currency.Format(context.MaxSalary.Value)</MudText>
             }
             else
             {

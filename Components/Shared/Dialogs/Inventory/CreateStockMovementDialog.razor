@@ -4,6 +4,7 @@
 @inject ISnackbar Snackbar
 @inject IApiService ApiService
 @inject ILogger<CreateStockMovementDialog> Logger
+@inject CurrencyFormatService Currency
 
 <MudDialog>
     <TitleContent>
@@ -159,7 +160,7 @@
                                     @if (_newMovement.UnitCost > 0)
                                     {
                                         <MudText Typo="Typo.body2">
-                                            <strong>Custo Total:</strong> @(_newMovement.Quantity * _newMovement.UnitCost).ToString("C2")
+                                            <strong>Custo Total:</strong> @Currency.Format(_newMovement.Quantity * _newMovement.UnitCost)
                                         </MudText>
                                     }
                                 </MudStack>

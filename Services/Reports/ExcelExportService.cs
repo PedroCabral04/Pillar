@@ -372,7 +372,7 @@ public class ExcelExportService : IExcelExportService
         // Summary
         var summaryRow = 3;
         worksheet.Cells[$"A{summaryRow}"].Value = $"Total de Movimentações: {report.Summary.TotalMovements}";
-        worksheet.Cells[$"C{summaryRow}"].Value = $"Valor Total: {report.Summary.TotalValueMovements:C2}";
+        worksheet.Cells[$"C{summaryRow}"].Value = $"Valor Total: {CurrencyFormatService.FormatStatic(report.Summary.TotalValueMovements)}";
 
         // Headers
         var headerRow = summaryRow + 2;

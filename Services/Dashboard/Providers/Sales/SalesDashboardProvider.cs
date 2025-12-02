@@ -127,7 +127,7 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
             {
                 new() { Name = "Receita", Data = data }
             },
-            Subtitle = $"Total: {data.Sum(d => d):C2}"
+            Subtitle = $"Total: {CurrencyFormatService.FormatStatic(data.Sum(d => d))}"
         };
     }
 

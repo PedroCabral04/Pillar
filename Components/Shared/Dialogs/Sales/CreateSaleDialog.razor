@@ -7,6 +7,7 @@
 @inject IApiService ApiService
 @inject IDialogService DialogService
 @inject ILogger<CreateSaleDialog> Logger
+@inject CurrencyFormatService Currency
 
 <MudDialog>
     <TitleContent>
@@ -172,7 +173,7 @@
                                             </MudItem>
                                             <MudItem xs="12">
                                                 <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">
-                                                    <strong>Subtotal:</strong> @((item.Quantity * item.UnitPrice - item.Discount).ToString("C2"))
+                                                    <strong>Subtotal:</strong> @Currency.Format(item.Quantity * item.UnitPrice - item.Discount)
                                                 </MudText>
                                             </MudItem>
                                         </MudGrid>
@@ -211,12 +212,12 @@
                         <MudPaper Elevation="3" Class="pa-3" Style="background: var(--mud-palette-primary); color: white;">
                             <MudStack Spacing="1">
                                 <MudText Typo="Typo.caption">Total dos Itens</MudText>
-                                <MudText Typo="Typo.h6">@GetItemsTotal().ToString("C2")</MudText>
+                                <MudText Typo="Typo.h6">@Currency.Format(GetItemsTotal())</MudText>
                                 <MudDivider Light="true" Class="my-1"/>
                                 <MudText Typo="Typo.caption">Desconto Total</MudText>
-                                <MudText Typo="Typo.body2">@GetTotalDiscount().ToString("C2")</MudText>
+                                <MudText Typo="Typo.body2">@Currency.Format(GetTotalDiscount())</MudText>
                                 <MudDivider Light="true" Class="my-1"/>
-                                <MudText Typo="Typo.subtitle1" Style="font-weight: bold;">TOTAL: @GetNetTotal().ToString("C2")</MudText>
+                                <MudText Typo="Typo.subtitle1" Style="font-weight: bold;">TOTAL: @Currency.Format(GetNetTotal())</MudText>
                             </MudStack>
                         </MudPaper>
                     </MudItem>

@@ -9,6 +9,7 @@
 @inject IApiService ApiService
 @inject ISnackbar Snackbar
 @inject IJSRuntime JS
+@inject CurrencyFormatService Currency
 
 <PageTitle>Relatórios de Estoque - Pillar ERP</PageTitle>
 
@@ -65,21 +66,21 @@
                                 <MudPaper Class="pa-4" Elevation="0" Style="background-color: #E8F5E9; border-left: 4px solid #4CAF50;">
                                     <MudText Typo="Typo.subtitle2" Color="Color.Success">Classe A - Itens Vitais</MudText>
                                     <MudText Typo="Typo.h5">@_abcReport.Summary.ClassACount produtos</MudText>
-                                    <MudText Typo="Typo.body2">@_abcReport.Summary.ClassARevenue.ToString("C2") (@_abcReport.Summary.ClassAPercentage.ToString("N1")% do faturamento)</MudText>
+                                    <MudText Typo="Typo.body2">@Currency.Format(_abcReport.Summary.ClassARevenue) (@_abcReport.Summary.ClassAPercentage.ToString("N1")% do faturamento)</MudText>
                                 </MudPaper>
                             </MudItem>
                             <MudItem xs="12" sm="4">
                                 <MudPaper Class="pa-4" Elevation="0" Style="background-color: #FFF8E1; border-left: 4px solid #FFC107;">
                                     <MudText Typo="Typo.subtitle2" Color="Color.Warning">Classe B - Itens Importantes</MudText>
                                     <MudText Typo="Typo.h5">@_abcReport.Summary.ClassBCount produtos</MudText>
-                                    <MudText Typo="Typo.body2">@_abcReport.Summary.ClassBRevenue.ToString("C2") (@_abcReport.Summary.ClassBPercentage.ToString("N1")% do faturamento)</MudText>
+                                    <MudText Typo="Typo.body2">@Currency.Format(_abcReport.Summary.ClassBRevenue) (@_abcReport.Summary.ClassBPercentage.ToString("N1")% do faturamento)</MudText>
                                 </MudPaper>
                             </MudItem>
                             <MudItem xs="12" sm="4">
                                 <MudPaper Class="pa-4" Elevation="0" Style="background-color: #FFEBEE; border-left: 4px solid #F44336;">
                                     <MudText Typo="Typo.subtitle2" Color="Color.Error">Classe C - Itens Triviais</MudText>
                                     <MudText Typo="Typo.h5">@_abcReport.Summary.ClassCCount produtos</MudText>
-                                    <MudText Typo="Typo.body2">@_abcReport.Summary.ClassCRevenue.ToString("C2") (@_abcReport.Summary.ClassCPercentage.ToString("N1")% do faturamento)</MudText>
+                                    <MudText Typo="Typo.body2">@Currency.Format(_abcReport.Summary.ClassCRevenue) (@_abcReport.Summary.ClassCPercentage.ToString("N1")% do faturamento)</MudText>
                                 </MudPaper>
                             </MudItem>
                         </MudGrid>
@@ -140,7 +141,7 @@
                                 <MudTd DataLabel="Produto">@context.ProductName</MudTd>
                                 <MudTd DataLabel="Categoria">@context.Category</MudTd>
                                 <MudTd DataLabel="Qtd Vendida">@context.QuantitySold</MudTd>
-                                <MudTd DataLabel="Faturamento">@context.TotalRevenue.ToString("C2")</MudTd>
+                                <MudTd DataLabel="Faturamento">@Currency.Format(context.TotalRevenue)</MudTd>
                                 <MudTd DataLabel="% Individual">@context.RevenuePercentage.ToString("N2")%</MudTd>
                                 <MudTd DataLabel="% Acumulado">@context.CumulativePercentage.ToString("N2")%</MudTd>
                                 <MudTd DataLabel="Classe">
@@ -244,7 +245,7 @@
                                 <MudTd DataLabel="Categoria">@context.Category</MudTd>
                                 <MudTd DataLabel="Estoque Atual">@context.CurrentStock @context.Unit</MudTd>
                                 <MudTd DataLabel="Estoque Mínimo">@context.MinimumStock @context.Unit</MudTd>
-                                <MudTd DataLabel="Valor Total">@context.TotalValue.ToString("C2")</MudTd>
+                                <MudTd DataLabel="Valor Total">@Currency.Format(context.TotalValue)</MudTd>
                                 <MudTd DataLabel="Status">
                                     <MudChip T="string" Size="Size.Small" Color="@GetStockStatusColor(context.Status)">@context.Status</MudChip>
                                 </MudTd>
@@ -309,7 +310,7 @@
                             <MudItem xs="12" sm="6">
                                 <MudPaper Class="pa-4" Elevation="0">
                                     <MudText Typo="Typo.subtitle2" Color="Color.Info">Valor Total Movimentado</MudText>
-                                    <MudText Typo="Typo.h5">@_stockMovementReport.Summary.TotalValueMovements.ToString("C2")</MudText>
+                                    <MudText Typo="Typo.h5">@Currency.Format(_stockMovementReport.Summary.TotalValueMovements)</MudText>
                                 </MudPaper>
                             </MudItem>
                         </MudGrid>
@@ -329,8 +330,8 @@
                                 <MudTd DataLabel="Produto">@context.ProductName</MudTd>
                                 <MudTd DataLabel="Tipo">@context.Type</MudTd>
                                 <MudTd DataLabel="Quantidade">@context.Quantity @context.Unit</MudTd>
-                                <MudTd DataLabel="Custo Unitário">@context.UnitCost.ToString("C2")</MudTd>
-                                <MudTd DataLabel="Custo Total">@context.TotalCost.ToString("C2")</MudTd>
+                                <MudTd DataLabel="Custo Unitário">@Currency.Format(context.UnitCost)</MudTd>
+                                <MudTd DataLabel="Custo Total">@Currency.Format(context.TotalCost)</MudTd>
                                 <MudTd DataLabel="Usuário">@context.UserName</MudTd>
                             </RowTemplate>
                         </MudTable>
@@ -377,19 +378,19 @@
                             <MudItem xs="12" sm="4">
                                 <MudPaper Class="pa-4" Elevation="0">
                                     <MudText Typo="Typo.subtitle2" Color="Color.Primary">Valor de Custo</MudText>
-                                    <MudText Typo="Typo.h5">@_valuationReport.Summary.TotalCostValue.ToString("C2")</MudText>
+                                    <MudText Typo="Typo.h5">@Currency.Format(_valuationReport.Summary.TotalCostValue)</MudText>
                                 </MudPaper>
                             </MudItem>
                             <MudItem xs="12" sm="4">
                                 <MudPaper Class="pa-4" Elevation="0">
                                     <MudText Typo="Typo.subtitle2" Color="Color.Success">Valor de Venda</MudText>
-                                    <MudText Typo="Typo.h5">@_valuationReport.Summary.TotalSaleValue.ToString("C2")</MudText>
+                                    <MudText Typo="Typo.h5">@Currency.Format(_valuationReport.Summary.TotalSaleValue)</MudText>
                                 </MudPaper>
                             </MudItem>
                             <MudItem xs="12" sm="4">
                                 <MudPaper Class="pa-4" Elevation="0">
                                     <MudText Typo="Typo.subtitle2" Color="Color.Info">Lucro Potencial</MudText>
-                                    <MudText Typo="Typo.h5">@_valuationReport.Summary.TotalPotentialProfit.ToString("C2")</MudText>
+                                    <MudText Typo="Typo.h5">@Currency.Format(_valuationReport.Summary.TotalPotentialProfit)</MudText>
                                 </MudPaper>
                             </MudItem>
                         </MudGrid>
@@ -408,9 +409,9 @@
                                 <MudTd DataLabel="Categoria">@context.Category</MudTd>
                                 <MudTd DataLabel="Produtos">@context.ProductCount</MudTd>
                                 <MudTd DataLabel="Quantidade Total">@context.TotalQuantity.ToString("N2")</MudTd>
-                                <MudTd DataLabel="Valor de Custo">@context.TotalCostValue.ToString("C2")</MudTd>
-                                <MudTd DataLabel="Valor de Venda">@context.TotalSaleValue.ToString("C2")</MudTd>
-                                <MudTd DataLabel="Lucro Potencial"><MudText Color="Color.Success">@context.PotentialProfit.ToString("C2")</MudText></MudTd>
+                                <MudTd DataLabel="Valor de Custo">@Currency.Format(context.TotalCostValue)</MudTd>
+                                <MudTd DataLabel="Valor de Venda">@Currency.Format(context.TotalSaleValue)</MudTd>
+                                <MudTd DataLabel="Lucro Potencial"><MudText Color="Color.Success">@Currency.Format(context.PotentialProfit)</MudText></MudTd>
                                 <MudTd DataLabel="Margem">@context.ProfitMargin.ToString("P2")</MudTd>
                             </RowTemplate>
                         </MudTable>

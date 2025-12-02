@@ -13,6 +13,7 @@
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
 @inject IDialogService DialogService
+@inject CurrencyFormatService Currency
 
 <PageTitle>Detalhes do Ativo - @(_asset?.Name ?? "Carregando...")</PageTitle>
 
@@ -113,7 +114,7 @@ else if (_asset != null)
                             {
                                 <MudItem xs="12" md="6">
                                     <MudText Typo="Typo.caption" Color="Color.Secondary">Valor de Compra</MudText>
-                                    <MudText Typo="Typo.body1">@_asset.PurchaseValue.Value.ToString("C2")</MudText>
+                                    <MudText Typo="Typo.body1">@Currency.Format(_asset.PurchaseValue.Value)</MudText>
                                 </MudItem>
                             }
                             @if (!string.IsNullOrEmpty(_asset.Description))

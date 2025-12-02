@@ -140,7 +140,7 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
                 new() { Name = "Entradas", Data = revenues },
                 new() { Name = "Saídas", Data = expenses }
             },
-            Subtitle = $"Saldo projetado: {netTotal:C2}"
+            Subtitle = $"Saldo projetado: {CurrencyFormatService.FormatStatic(netTotal)}"
         };
     }
 
@@ -164,7 +164,7 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
                     } 
                 }
             },
-            Subtitle = $"Total: {dashboardData.TotalPayable:C2} | {dashboardData.PayablesCount} contas abertas"
+            Subtitle = $"Total: {CurrencyFormatService.FormatStatic(dashboardData.TotalPayable)} | {dashboardData.PayablesCount} contas abertas"
         };
     }
 
@@ -188,7 +188,7 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
                     } 
                 }
             },
-            Subtitle = $"Total: {dashboardData.TotalReceivable:C2} | {dashboardData.ReceivablesCount} contas abertas"
+            Subtitle = $"Total: {CurrencyFormatService.FormatStatic(dashboardData.TotalReceivable)} | {dashboardData.ReceivablesCount} contas abertas"
         };
     }
 
@@ -213,7 +213,7 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
                 new() { Name = "A Pagar Vencido", Data = payableData },
                 new() { Name = "A Receber Vencido", Data = receivableData }
             },
-            Subtitle = $"Total vencido: {totalOverdue:C2}"
+            Subtitle = $"Total vencido: {CurrencyFormatService.FormatStatic(totalOverdue)}"
         };
     }
 
