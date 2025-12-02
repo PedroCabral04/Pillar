@@ -16,197 +16,199 @@
 
 <PageTitle>Ativos - Pillar ERP</PageTitle>
 
-<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
-    <MudText Typo="Typo.h4">Gerenciar Ativos</MudText>
-        <MudButton Color="Color.Primary" 
-                   Variant="Variant.Filled" 
-                   StartIcon="@Icons.Material.Filled.Add"
-                   OnClick="OpenCreateDialog">
-            Adicionar Ativo
-        </MudButton>
-</MudStack>
-
-@if (_loadError != null)
-{
-    <MudAlert Severity="Severity.Error" Class="mb-4">@_loadError</MudAlert>
-}
-
-<!-- Statistics Cards -->
-@if (_statistics != null)
-{
-    <MudGrid Class="mb-4">
-        <MudItem xs="12" sm="6" md="3">
-            <MudCard>
-                <MudCardContent>
-                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                        <div>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">Total de Ativos</MudText>
-                            <MudText Typo="Typo.h5">@_statistics.TotalAssets</MudText>
-                        </div>
-                        <MudIcon Icon="@Icons.Material.Filled.Inventory" Color="Color.Primary" Size="Size.Large"/>
-                    </MudStack>
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudCard>
-                <MudCardContent>
-                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                        <div>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">Disponíveis</MudText>
-                            <MudText Typo="Typo.h5">@_statistics.AvailableAssets</MudText>
-                        </div>
-                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large"/>
-                    </MudStack>
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudCard>
-                <MudCardContent>
-                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                        <div>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">Em Uso</MudText>
-                            <MudText Typo="Typo.h5">@_statistics.AssignedAssets</MudText>
-                        </div>
-                        <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Color="Color.Info" Size="Size.Large"/>
-                    </MudStack>
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudCard>
-                <MudCardContent>
-                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                        <div>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">Manutenções Atrasadas</MudText>
-                            <MudText Typo="Typo.h5">@_statistics.OverdueMaintenances</MudText>
-                        </div>
-                        <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Size="Size.Large"/>
-                    </MudStack>
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-    </MudGrid>
-}
-
-<!-- Assets Table -->
-<MudPaper Elevation="2" Class="pa-4">
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
-        <MudText Typo="Typo.h6">Lista de Ativos</MudText>
-        <MudStack Row="true" Spacing="2">
-            <MudTextField T="string" 
-                          @bind-Value="_searchTerm"
-                          Placeholder="Buscar..." 
-                          Adornment="Adornment.Start" 
-                          AdornmentIcon="@Icons.Material.Filled.Search"
-                          Variant="Variant.Outlined"
-                          Margin="Margin.Dense"
-                          Immediate="true"
-                          DebounceInterval="300"
-                          OnDebounceIntervalElapsed="LoadAssets"/>
-            <MudSelect T="AssetStatus?" 
-                       @bind-Value="_statusFilter"
-                       Label="Status"
-                       Variant="Variant.Outlined"
-                       Margin="Margin.Dense"
-                       Clearable="true"
-                       OnClearButtonClick="async () => { _statusFilter = null; await LoadAssets(); }">
-                <MudSelectItem T="AssetStatus?" Value="@AssetStatus.Available">Disponível</MudSelectItem>
-                <MudSelectItem T="AssetStatus?" Value="@AssetStatus.InUse">Em Uso</MudSelectItem>
-                <MudSelectItem T="AssetStatus?" Value="@AssetStatus.Maintenance">Manutenção</MudSelectItem>
-                <MudSelectItem T="AssetStatus?" Value="@AssetStatus.Retired">Aposentado</MudSelectItem>
-                <MudSelectItem T="AssetStatus?" Value="@AssetStatus.Lost">Perdido</MudSelectItem>
-                <MudSelectItem T="AssetStatus?" Value="@AssetStatus.Sold">Vendido</MudSelectItem>
-            </MudSelect>
-        </MudStack>
+        <MudText Typo="Typo.h4">Gerenciar Ativos</MudText>
+            <MudButton Color="Color.Primary" 
+                    Variant="Variant.Filled" 
+                    StartIcon="@Icons.Material.Filled.Add"
+                    OnClick="OpenCreateDialog">
+                Adicionar Ativo
+            </MudButton>
     </MudStack>
 
-    @if (_loading)
+    @if (_loadError != null)
     {
-        <MudProgressLinear Indeterminate="true" Color="Color.Primary"/>
+        <MudAlert Severity="Severity.Error" Class="mb-4">@_loadError</MudAlert>
     }
 
-    <MudTable Items="@_assets" Hover="true" Striped="true" Dense="true">
-        <HeaderContent>
-            <MudTh>Código</MudTh>
-            <MudTh>Nome</MudTh>
-            <MudTh>Categoria</MudTh>
-            <MudTh>Status</MudTh>
-            <MudTh>Condição</MudTh>
-            <MudTh>Atribuído a</MudTh>
-            <MudTh>Localização</MudTh>
-            <MudTh Style="text-align: center">Ações</MudTh>
-        </HeaderContent>
-        <RowTemplate>
-            <MudTd DataLabel="Código">
-                <MudText Typo="Typo.body2" Style="font-family: monospace">@context.AssetCode</MudText>
-            </MudTd>
-            <MudTd DataLabel="Nome">
-                <MudText Typo="Typo.body2">@context.Name</MudText>
-                @if (!string.IsNullOrEmpty(context.SerialNumber))
-                {
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">SN: @context.SerialNumber</MudText>
-                }
-            </MudTd>
-            <MudTd DataLabel="Categoria">@context.CategoryName</MudTd>
-            <MudTd DataLabel="Status">
-                <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">
-                    @GetStatusText(context.Status)
-                </MudChip>
-            </MudTd>
-            <MudTd DataLabel="Condição">
-                <MudChip T="string" Size="Size.Small" Color="@GetConditionColor(context.Condition)">
-                    @GetConditionText(context.Condition)
-                </MudChip>
-            </MudTd>
-            <MudTd DataLabel="Atribuído a">
-                @if (!string.IsNullOrEmpty(context.CurrentAssignedToUserName))
-                {
-                    <MudText Typo="Typo.body2">@context.CurrentAssignedToUserName</MudText>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">
-                        Desde @context.CurrentAssignedDate?.ToString("dd/MM/yyyy")
-                    </MudText>
-                }
-                else
-                {
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">-</MudText>
-                }
-            </MudTd>
-            <MudTd DataLabel="Localização">
-                <MudText Typo="Typo.body2">@(context.Location ?? "-")</MudText>
-            </MudTd>
-            <MudTd DataLabel="Ações" Style="text-align: center">
-                <MudTooltip Text="Ver detalhes">
-                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
-                                   Size="Size.Small"
-                                   Href="@($"/assets/{context.Id}")"
-                                   aria-label="@($"Ver detalhes do ativo {context.Name}")" />
-                </MudTooltip>
-                <MudTooltip Text="Editar">
-                    <MudIconButton Icon="@Icons.Material.Filled.Edit" 
-                                   Size="Size.Small"
-                                   OnClick="@(() => OpenEditDialog(context.Id))"
-                                   aria-label="@($"Editar ativo {context.Name}")" />
-                </MudTooltip>
-                <MudTooltip Text="Excluir">
-                    <MudIconButton Icon="@Icons.Material.Filled.Delete" 
-                                   Size="Size.Small" 
-                                   Color="Color.Error"
-                                   OnClick="@(() => DeleteAsset(context.Id))"
-                                   aria-label="@($"Excluir ativo {context.Name}")" />
-                </MudTooltip>
-            </MudTd>
-        </RowTemplate>
-        <NoRecordsContent>
-            <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="pa-8">
-                <MudIcon Icon="@Icons.Material.Filled.Inventory2" Size="Size.Large" Color="Color.Default" Class="mb-2" />
-                <MudText Typo="Typo.h6" Color="Color.Default">Nenhum ativo encontrado</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary">Adicione um novo ativo clicando no botão acima</MudText>
+    <!-- Statistics Cards -->
+    @if (_statistics != null)
+    {
+        <MudGrid Class="mb-4">
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard>
+                    <MudCardContent>
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                            <div>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Total de Ativos</MudText>
+                                <MudText Typo="Typo.h5">@_statistics.TotalAssets</MudText>
+                            </div>
+                            <MudIcon Icon="@Icons.Material.Filled.Inventory" Color="Color.Primary" Size="Size.Large"/>
+                        </MudStack>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard>
+                    <MudCardContent>
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                            <div>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Disponíveis</MudText>
+                                <MudText Typo="Typo.h5">@_statistics.AvailableAssets</MudText>
+                            </div>
+                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large"/>
+                        </MudStack>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard>
+                    <MudCardContent>
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                            <div>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Em Uso</MudText>
+                                <MudText Typo="Typo.h5">@_statistics.AssignedAssets</MudText>
+                            </div>
+                            <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Color="Color.Info" Size="Size.Large"/>
+                        </MudStack>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard>
+                    <MudCardContent>
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                            <div>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Manutenções Atrasadas</MudText>
+                                <MudText Typo="Typo.h5">@_statistics.OverdueMaintenances</MudText>
+                            </div>
+                            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Size="Size.Large"/>
+                        </MudStack>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+    }
+
+    <!-- Assets Table -->
+    <MudPaper Elevation="2" Class="pa-4">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+            <MudText Typo="Typo.h6">Lista de Ativos</MudText>
+            <MudStack Row="true" Spacing="2">
+                <MudTextField T="string" 
+                            @bind-Value="_searchTerm"
+                            Placeholder="Buscar..." 
+                            Adornment="Adornment.Start" 
+                            AdornmentIcon="@Icons.Material.Filled.Search"
+                            Variant="Variant.Outlined"
+                            Margin="Margin.Dense"
+                            Immediate="true"
+                            DebounceInterval="300"
+                            OnDebounceIntervalElapsed="LoadAssets"/>
+                <MudSelect T="AssetStatus?" 
+                        @bind-Value="_statusFilter"
+                        Label="Status"
+                        Variant="Variant.Outlined"
+                        Margin="Margin.Dense"
+                        Clearable="true"
+                        OnClearButtonClick="async () => { _statusFilter = null; await LoadAssets(); }">
+                    <MudSelectItem T="AssetStatus?" Value="@AssetStatus.Available">Disponível</MudSelectItem>
+                    <MudSelectItem T="AssetStatus?" Value="@AssetStatus.InUse">Em Uso</MudSelectItem>
+                    <MudSelectItem T="AssetStatus?" Value="@AssetStatus.Maintenance">Manutenção</MudSelectItem>
+                    <MudSelectItem T="AssetStatus?" Value="@AssetStatus.Retired">Aposentado</MudSelectItem>
+                    <MudSelectItem T="AssetStatus?" Value="@AssetStatus.Lost">Perdido</MudSelectItem>
+                    <MudSelectItem T="AssetStatus?" Value="@AssetStatus.Sold">Vendido</MudSelectItem>
+                </MudSelect>
             </MudStack>
-        </NoRecordsContent>
-    </MudTable>
-</MudPaper>
+        </MudStack>
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary"/>
+        }
+
+        <MudTable Items="@_assets" Hover="true" Striped="true" Dense="true">
+            <HeaderContent>
+                <MudTh>Código</MudTh>
+                <MudTh>Nome</MudTh>
+                <MudTh>Categoria</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>Condição</MudTh>
+                <MudTh>Atribuído a</MudTh>
+                <MudTh>Localização</MudTh>
+                <MudTh Style="text-align: center">Ações</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Código">
+                    <MudText Typo="Typo.body2" Style="font-family: monospace">@context.AssetCode</MudText>
+                </MudTd>
+                <MudTd DataLabel="Nome">
+                    <MudText Typo="Typo.body2">@context.Name</MudText>
+                    @if (!string.IsNullOrEmpty(context.SerialNumber))
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">SN: @context.SerialNumber</MudText>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Categoria">@context.CategoryName</MudTd>
+                <MudTd DataLabel="Status">
+                    <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">
+                        @GetStatusText(context.Status)
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Condição">
+                    <MudChip T="string" Size="Size.Small" Color="@GetConditionColor(context.Condition)">
+                        @GetConditionText(context.Condition)
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Atribuído a">
+                    @if (!string.IsNullOrEmpty(context.CurrentAssignedToUserName))
+                    {
+                        <MudText Typo="Typo.body2">@context.CurrentAssignedToUserName</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            Desde @context.CurrentAssignedDate?.ToString("dd/MM/yyyy")
+                        </MudText>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">-</MudText>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Localização">
+                    <MudText Typo="Typo.body2">@(context.Location ?? "-")</MudText>
+                </MudTd>
+                <MudTd DataLabel="Ações" Style="text-align: center">
+                    <MudTooltip Text="Ver detalhes">
+                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
+                                    Size="Size.Small"
+                                    Href="@($"/assets/{context.Id}")"
+                                    aria-label="@($"Ver detalhes do ativo {context.Name}")" />
+                    </MudTooltip>
+                    <MudTooltip Text="Editar">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                                    Size="Size.Small"
+                                    OnClick="@(() => OpenEditDialog(context.Id))"
+                                    aria-label="@($"Editar ativo {context.Name}")" />
+                    </MudTooltip>
+                    <MudTooltip Text="Excluir">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                    Size="Size.Small" 
+                                    Color="Color.Error"
+                                    OnClick="@(() => DeleteAsset(context.Id))"
+                                    aria-label="@($"Excluir ativo {context.Name}")" />
+                    </MudTooltip>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="pa-8">
+                    <MudIcon Icon="@Icons.Material.Filled.Inventory2" Size="Size.Large" Color="Color.Default" Class="mb-2" />
+                    <MudText Typo="Typo.h6" Color="Color.Default">Nenhum ativo encontrado</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Adicione um novo ativo clicando no botão acima</MudText>
+                </MudStack>
+            </NoRecordsContent>
+        </MudTable>
+    </MudPaper>
+</MudContainer>
 
 @code {
     private List<AssetDto> _assets = new();

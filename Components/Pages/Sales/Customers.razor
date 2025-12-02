@@ -15,96 +15,98 @@
 
 <PageTitle>Clientes - Pillar ERP</PageTitle>
 
-<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
-    <MudText Typo="Typo.h4">Gerenciar Clientes</MudText>
-    <MudButton Color="Color.Primary" 
-               Variant="Variant.Filled" 
-               StartIcon="@Icons.Material.Filled.PersonAdd"
-               OnClick="ShowCreateDialog">
-        Adicionar Cliente
-    </MudButton>
-</MudStack>
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudText Typo="Typo.h4">Gerenciar Clientes</MudText>
+        <MudButton Color="Color.Primary" 
+                Variant="Variant.Filled" 
+                StartIcon="@Icons.Material.Filled.PersonAdd"
+                OnClick="ShowCreateDialog">
+            Adicionar Cliente
+        </MudButton>
+    </MudStack>
 
-@if (_loadError != null)
-{
-    <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
-}
+    @if (_loadError != null)
+    {
+        <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
+    }
 
-<MudTable T="CustomerDto" ServerData="ServerReload" 
-          Dense="false" Hover="true" Elevation="2" @ref="_table" Striped="true" Loading="@_loading">
-    <ToolBarContent>
-        <MudText Typo="Typo.h5">Clientes Cadastrados</MudText>
-        <MudSpacer/>
-        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
-            <MudTextField T="string" ValueChanged="OnSearch" Immediate="false" Placeholder="Procurar cliente" 
-                          Variant="Variant.Outlined" Margin="Margin.Dense"
-                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
-                          Clearable="true" Style="min-width: 250px;"/>
-            <MudSelect T="string" 
-                       Value="_statusFilter" 
-                       ValueChanged="OnStatusFilterChanged"
-                       Label="Status" 
-                       Variant="Variant.Outlined" 
-                       Margin="Margin.Dense"
-                       Clearable="true"
-                       Style="min-width: 120px;">
-                <MudSelectItem T="string" Value="@("true")">Ativo</MudSelectItem>
-                <MudSelectItem T="string" Value="@("false")">Inativo</MudSelectItem>
-            </MudSelect>
-        </MudStack>
-    </ToolBarContent>
-    <HeaderContent>
-        <MudTh>Documento</MudTh>
-        <MudTh>Nome</MudTh>
-        <MudTh>E-mail</MudTh>
-        <MudTh>Telefone</MudTh>
-        <MudTh>Cidade</MudTh>
-        <MudTh>Status</MudTh>
-        <MudTh Style="text-align: center">Ações</MudTh>
-    </HeaderContent>
-    <RowTemplate>
-        <MudTd DataLabel="Documento">
-            <MudText Typo="Typo.body2" Style="font-family: monospace">@FormatDocument(context.Document)</MudText>
-        </MudTd>
-        <MudTd DataLabel="Nome">@context.Name</MudTd>
-        <MudTd DataLabel="E-mail">@context.Email</MudTd>
-        <MudTd DataLabel="Telefone">@(context.Mobile ?? context.Phone)</MudTd>
-        <MudTd DataLabel="Cidade">@context.City, @context.State</MudTd>
-        <MudTd DataLabel="Status">
-            <MudChip T="string" Size="Size.Small" Color="@(context.IsActive ? MudBlazor.Color.Success : MudBlazor.Color.Default)">
-                @(context.IsActive ? "Ativo" : "Inativo")
-            </MudChip>
-        </MudTd>
-        <MudTd DataLabel="Ações" Style="text-align: center">
-            <MudTooltip Text="Editar cliente">
-                <MudIconButton Icon="@Icons.Material.Filled.Edit" 
-                               Size="Size.Small"
-                               OnClick="@(() => ShowEditDialog(context))"
-                               aria-label="@($"Editar cliente {context.Name}")" />
-            </MudTooltip>
-            <MudTooltip Text="Inativar cliente">
-                <MudIconButton Icon="@Icons.Material.Filled.Delete" 
-                               Size="Size.Small" 
-                               Color="Color.Error"
-                               OnClick="@(() => DeleteCustomer(context))"
-                               aria-label="@($"Inativar cliente {context.Name}")" />
-            </MudTooltip>
-        </MudTd>
-    </RowTemplate>
-    <NoRecordsContent>
-        <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="pa-8">
-            <MudIcon Icon="@Icons.Material.Filled.PersonOff" Size="Size.Large" Color="Color.Default" Class="mb-2" />
-            <MudText Typo="Typo.h6" Color="Color.Default">Nenhum cliente encontrado</MudText>
-            <MudText Typo="Typo.body2" Color="Color.Secondary">Adicione um novo cliente clicando no botão acima</MudText>
-        </MudStack>
-    </NoRecordsContent>
-    <LoadingContent>
-        <MudText>Carregando...</MudText>
-    </LoadingContent>
-    <PagerContent>
-        <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
-    </PagerContent>
-</MudTable>
+    <MudTable T="CustomerDto" ServerData="ServerReload" 
+            Dense="false" Hover="true" Elevation="2" @ref="_table" Striped="true" Loading="@_loading">
+        <ToolBarContent>
+            <MudText Typo="Typo.h5">Clientes Cadastrados</MudText>
+            <MudSpacer/>
+            <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                <MudTextField T="string" ValueChanged="OnSearch" Immediate="false" Placeholder="Procurar cliente" 
+                            Variant="Variant.Outlined" Margin="Margin.Dense"
+                            Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
+                            Clearable="true" Style="min-width: 250px;"/>
+                <MudSelect T="string" 
+                        Value="_statusFilter" 
+                        ValueChanged="OnStatusFilterChanged"
+                        Label="Status" 
+                        Variant="Variant.Outlined" 
+                        Margin="Margin.Dense"
+                        Clearable="true"
+                        Style="min-width: 120px;">
+                    <MudSelectItem T="string" Value="@("true")">Ativo</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("false")">Inativo</MudSelectItem>
+                </MudSelect>
+            </MudStack>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh>Documento</MudTh>
+            <MudTh>Nome</MudTh>
+            <MudTh>E-mail</MudTh>
+            <MudTh>Telefone</MudTh>
+            <MudTh>Cidade</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh Style="text-align: center">Ações</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Documento">
+                <MudText Typo="Typo.body2" Style="font-family: monospace">@FormatDocument(context.Document)</MudText>
+            </MudTd>
+            <MudTd DataLabel="Nome">@context.Name</MudTd>
+            <MudTd DataLabel="E-mail">@context.Email</MudTd>
+            <MudTd DataLabel="Telefone">@(context.Mobile ?? context.Phone)</MudTd>
+            <MudTd DataLabel="Cidade">@context.City, @context.State</MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip T="string" Size="Size.Small" Color="@(context.IsActive ? MudBlazor.Color.Success : MudBlazor.Color.Default)">
+                    @(context.IsActive ? "Ativo" : "Inativo")
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Ações" Style="text-align: center">
+                <MudTooltip Text="Editar cliente">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                                Size="Size.Small"
+                                OnClick="@(() => ShowEditDialog(context))"
+                                aria-label="@($"Editar cliente {context.Name}")" />
+                </MudTooltip>
+                <MudTooltip Text="Inativar cliente">
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                Size="Size.Small" 
+                                Color="Color.Error"
+                                OnClick="@(() => DeleteCustomer(context))"
+                                aria-label="@($"Inativar cliente {context.Name}")" />
+                </MudTooltip>
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="pa-8">
+                <MudIcon Icon="@Icons.Material.Filled.PersonOff" Size="Size.Large" Color="Color.Default" Class="mb-2" />
+                <MudText Typo="Typo.h6" Color="Color.Default">Nenhum cliente encontrado</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Adicione um novo cliente clicando no botão acima</MudText>
+            </MudStack>
+        </NoRecordsContent>
+        <LoadingContent>
+            <MudText>Carregando...</MudText>
+        </LoadingContent>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+        </PagerContent>
+    </MudTable>
+</MudContainer>
 
 @code {
     private MudTable<CustomerDto>? _table;
