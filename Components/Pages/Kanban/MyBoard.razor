@@ -61,7 +61,7 @@
                     <MudIcon Icon="@Icons.Material.Filled.ViewKanban" Size="MudBlazor.Size.Large" />
                 </div>
                 <div>
-                    <MudText Typo="Typo.h5" Class="kanban-main-title">Meu Kanban</MudText>
+                    <MudText Typo="Typo.h5" Class="kanban-main-title">@(_board?.Name ?? "Meu Kanban")</MudText>
                     <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">
                         @if (_stats != null)
                         {
@@ -93,6 +93,20 @@
                                       Title="Rolar para direita" />
                     </MudButtonGroup>
                 }
+                <MudTooltip Text="Gerenciar Etiquetas">
+                    <MudIconButton Icon="@Icons.Material.Filled.Label" 
+                                   Color="MudBlazor.Color.Default"
+                                   Variant="Variant.Outlined"
+                                   Size="MudBlazor.Size.Medium"
+                                   OnClick="OpenLabelsDialog" />
+                </MudTooltip>
+                <MudTooltip Text="Meus Quadros">
+                    <MudIconButton Icon="@Icons.Material.Filled.Dashboard" 
+                                   Color="MudBlazor.Color.Default"
+                                   Variant="Variant.Outlined"
+                                   Size="MudBlazor.Size.Medium"
+                                   OnClick="OpenBoardsDialog" />
+                </MudTooltip>
                 <MudButton Color="MudBlazor.Color.Primary" 
                            Variant="Variant.Filled" 
                            StartIcon="@Icons.Material.Filled.Add"
@@ -154,7 +168,10 @@
                                         </div>
                                         <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="MudBlazor.Size.Small" Dense="true" AnchorOrigin="Origin.BottomRight">
                                             <MudMenuItem Icon="@Icons.Material.Filled.Edit" OnClick="() => EditColumn(col)">Editar</MudMenuItem>
-                                            <MudMenuItem Icon="@Icons.Material.Filled.Delete" IconColor="MudBlazor.Color.Error">Excluir</MudMenuItem>
+                                            <MudMenuItem Icon="@Icons.Material.Filled.ArrowBack" OnClick="() => MoveColumnLeft(col)">Mover para Esquerda</MudMenuItem>
+                                            <MudMenuItem Icon="@Icons.Material.Filled.ArrowForward" OnClick="() => MoveColumnRight(col)">Mover para Direita</MudMenuItem>
+                                            <MudDivider />
+                                            <MudMenuItem Icon="@Icons.Material.Filled.Delete" IconColor="MudBlazor.Color.Error" OnClick="() => DeleteColumn(col)">Excluir</MudMenuItem>
                                         </MudMenu>
                                     </div>
                                 </div>
@@ -294,6 +311,7 @@
     private List<ColumnVm>? _columns;
     private bool _isLoading = false;
     private KanbanStatsDto? _stats;
+    private KanbanBoardDto? _board;
     private List<AssignableUserDto> _assignableUsers = new();
     private List<KanbanLabelDto> _boardLabels = new();
 
@@ -356,15 +374,11 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var ensureBoard = await Api.GetAsync("api/kanban/board");
-        if (!ensureBoard.IsSuccessStatusCode)
+        _board = await Api.GetAsync<KanbanBoardDto>("api/kanban/board");
+        if (_board is null)
         {
-            if ((int)ensureBoard.StatusCode == 401)
-            {
-                Nav.NavigateTo("/login", forceLoad: true);
-                return;
-            }
-            throw new HttpRequestException($"Falha ao carregar quadro: {(int)ensureBoard.StatusCode}");
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
         }
 
         await LoadDataAsync();
@@ -771,6 +785,134 @@
     [Inject] IJSRuntime JS { get; set; } = default!;
     private async Task<string?> PromptAsync(string message, string? defaultValue = null)
         => await JS.InvokeAsync<string?>("prompt", message, defaultValue);
+
+    private async Task OpenLabelsDialog()
+    {
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<KanbanLabelsDialog>("Gerenciar Etiquetas", options);
+        var result = await dialog.Result;
+        
+        // Reload labels after dialog closes
+        _boardLabels = await Api.GetAsync<List<KanbanLabelDto>>("api/kanban/labels") ?? new();
+        // Reload cards to update label associations
+        await LoadDataAsync();
+        StateHasChanged();
+    }
+
+    private async Task OpenBoardsDialog()
+    {
+        var parameters = new DialogParameters<KanbanBoardsDialog>
+        {
+            { x => x.CurrentBoardId, _board?.Id ?? 0 }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<KanbanBoardsDialog>("Meus Quadros", parameters, options);
+        var result = await dialog.Result;
+        
+        if (result is { Canceled: false } && result.Data is int selectedBoardId)
+        {
+            // If a different board was selected, reload the entire page
+            // For now, we only support one board view, but this enables future navigation
+            if (selectedBoardId != _board?.Id)
+            {
+                // Reload current board data (future: navigate to selected board)
+                _board = await Api.GetAsync<KanbanBoardDto>("api/kanban/board");
+                await LoadDataAsync();
+                StateHasChanged();
+            }
+        }
+        else
+        {
+            // Dialog was closed, refresh board in case name changed
+            _board = await Api.GetAsync<KanbanBoardDto>("api/kanban/board");
+            StateHasChanged();
+        }
+    }
+
+    private async Task DeleteColumn(ColumnVm col)
+    {
+        // Check if column has cards
+        var hasCards = _allCards.Any(c => c.ColumnId == col.Id);
+        if (hasCards)
+        {
+            Snackbar.Add("Não é possível excluir uma coluna com cards. Mova ou exclua os cards primeiro.", Severity.Warning);
+            return;
+        }
+
+        var parameters = new DialogParameters
+        {
+            { "ContentText", $"Tem certeza que deseja excluir a coluna \"{col.Title}\"?" },
+            { "ButtonText", "Excluir" },
+            { "Color", MudBlazor.Color.Error }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirmar Exclusão", parameters, options);
+        var result = await dialog.Result;
+        
+        if (result is { Canceled: false })
+        {
+            var res = await Api.DeleteAsync($"api/kanban/columns/{col.Id}");
+            if (res.IsSuccessStatusCode)
+            {
+                _columns?.Remove(col);
+                Snackbar.Add("Coluna excluída com sucesso!", Severity.Success);
+                StateHasChanged();
+            }
+            else
+            {
+                var error = await res.Content.ReadAsStringAsync();
+                Snackbar.Add($"Erro ao excluir coluna: {error}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task MoveColumnLeft(ColumnVm col)
+    {
+        if (col.Position <= 0 || _columns is null) return;
+        
+        var newPosition = col.Position - 1;
+        var res = await Api.PostAsJsonAsync("api/kanban/columns/reorder", new ReorderColumnRequest(col.Id, newPosition));
+        if (res.IsSuccessStatusCode)
+        {
+            // Update local positions
+            var otherCol = _columns.FirstOrDefault(c => c.Position == newPosition);
+            if (otherCol != null)
+            {
+                otherCol.Position = col.Position;
+            }
+            col.Position = newPosition;
+            StateHasChanged();
+        }
+        else
+        {
+            Snackbar.Add("Erro ao mover coluna.", Severity.Error);
+        }
+    }
+
+    private async Task MoveColumnRight(ColumnVm col)
+    {
+        if (_columns is null) return;
+        var maxPosition = _columns.Max(c => c.Position);
+        if (col.Position >= maxPosition) return;
+        
+        var newPosition = col.Position + 1;
+        var res = await Api.PostAsJsonAsync("api/kanban/columns/reorder", new ReorderColumnRequest(col.Id, newPosition));
+        if (res.IsSuccessStatusCode)
+        {
+            // Update local positions
+            var otherCol = _columns.FirstOrDefault(c => c.Position == newPosition);
+            if (otherCol != null)
+            {
+                otherCol.Position = col.Position;
+            }
+            col.Position = newPosition;
+            StateHasChanged();
+        }
+        else
+        {
+            Snackbar.Add("Erro ao mover coluna.", Severity.Error);
+        }
+    }
 
     private record ColumnsResponse(List<ColumnVm> Columns);
     private record ColumnVm

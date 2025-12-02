@@ -1,0 +1,275 @@
+@using erp.DTOs.Kanban
+@using erp.Services
+@using MudBlazor
+@using MudBlazor.Utilities
+@inject IApiService Api
+@inject ISnackbar Snackbar
+
+<MudDialog Style="min-width: 500px;">
+    <TitleContent>
+        <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Label" Color="MudBlazor.Color.Primary" />
+            <MudText Typo="Typo.h6">Gerenciar Etiquetas</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            @* Criar nova etiqueta *@
+            <MudPaper Elevation="0" Class="pa-3" Style="background: var(--mud-palette-background-grey); border-radius: 8px;">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Nova Etiqueta</MudText>
+                <MudStack Row Spacing="2" AlignItems="AlignItems.Center">
+                    <MudTextField @bind-Value="_newLabelName" 
+                                  Label="Nome" 
+                                  Variant="Variant.Outlined"
+                                  Dense="true"
+                                  Style="flex: 1;" />
+                    <MudColorPicker @bind-Value="_newLabelColor"
+                                    Label="Cor"
+                                    Variant="Variant.Outlined"
+                                    DisableAlpha="true"
+                                    DisableToolbar="false"
+                                    PickerVariant="PickerVariant.Inline"
+                                    Style="width: 100px;"
+                                    ColorPickerView="ColorPickerView.Palette"
+                                    Palette="@_colorPalette" />
+                    <MudButton Variant="Variant.Filled"
+                               Color="MudBlazor.Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Add"
+                               OnClick="CreateLabel"
+                               Disabled="@(string.IsNullOrWhiteSpace(_newLabelName) || _isCreating)">
+                        @if (_isCreating)
+                        {
+                            <MudProgressCircular Size="MudBlazor.Size.Small" Indeterminate="true" />
+                        }
+                        else
+                        {
+                            <span>Criar</span>
+                        }
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+
+            <MudDivider />
+
+            @* Lista de etiquetas *@
+            @if (_isLoading)
+            {
+                <MudProgressLinear Indeterminate="true" />
+            }
+            else if (_labels.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                    Nenhuma etiqueta criada ainda.
+                </MudAlert>
+            }
+            else
+            {
+                <MudStack Spacing="2" Style="max-height: 400px; overflow-y: auto;">
+                    @foreach (var label in _labels)
+                    {
+                        <MudPaper Elevation="0" Class="pa-3" Style="background: var(--mud-palette-surface); border-radius: 8px; border: 1px solid rgba(0,0,0,0.1);">
+                            @if (_editingLabelId == label.Id)
+                            {
+                                <MudStack Row Spacing="2" AlignItems="AlignItems.Center">
+                                    <MudTextField @bind-Value="_editLabelName"
+                                                  Variant="Variant.Outlined"
+                                                  Dense="true"
+                                                  Style="flex: 1;" />
+                                    <MudColorPicker @bind-Value="_editLabelColor"
+                                                    Variant="Variant.Outlined"
+                                                    DisableAlpha="true"
+                                                    Style="width: 80px;"
+                                                    ColorPickerView="ColorPickerView.Palette"
+                                                    Palette="@_colorPalette" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Check"
+                                                   Color="MudBlazor.Color.Success"
+                                                   Size="MudBlazor.Size.Small"
+                                                   OnClick="SaveEdit"
+                                                   Disabled="_isSaving" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                                   Color="MudBlazor.Color.Default"
+                                                   Size="MudBlazor.Size.Small"
+                                                   OnClick="CancelEdit" />
+                                </MudStack>
+                            }
+                            else
+                            {
+                                <MudStack Row Spacing="2" AlignItems="AlignItems.Center">
+                                    <MudChip T="string" 
+                                             Style="@($"background-color: {label.Color}; color: white;")"
+                                             Size="MudBlazor.Size.Medium">
+                                        @label.Name
+                                    </MudChip>
+                                    <MudSpacer />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                                   Size="MudBlazor.Size.Small"
+                                                   OnClick="@(() => StartEdit(label))"
+                                                   Title="Editar" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                   Size="MudBlazor.Size.Small"
+                                                   Color="MudBlazor.Color.Error"
+                                                   OnClick="@(() => DeleteLabel(label))"
+                                                   Title="Excluir" />
+                                </MudStack>
+                            }
+                        </MudPaper>
+                    }
+                </MudStack>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close" Variant="Variant.Filled" Color="MudBlazor.Color.Primary">
+            Fechar
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public int BoardId { get; set; }
+
+    private List<KanbanLabelDto> _labels = new();
+    private bool _isLoading = true;
+    private bool _isCreating;
+    private bool _isSaving;
+
+    // New label
+    private string _newLabelName = string.Empty;
+    private MudColor _newLabelColor = new("#3B82F6");
+
+    // Edit label
+    private int? _editingLabelId;
+    private string _editLabelName = string.Empty;
+    private MudColor _editLabelColor = new("#3B82F6");
+
+    private readonly MudColor[] _colorPalette = new[]
+    {
+        new MudColor("#EF4444"), // Red
+        new MudColor("#F59E0B"), // Amber
+        new MudColor("#22C55E"), // Green
+        new MudColor("#3B82F6"), // Blue
+        new MudColor("#8B5CF6"), // Violet
+        new MudColor("#EC4899"), // Pink
+        new MudColor("#06B6D4"), // Cyan
+        new MudColor("#84CC16"), // Lime
+        new MudColor("#F97316"), // Orange
+        new MudColor("#14B8A6"), // Teal
+        new MudColor("#6366F1"), // Indigo
+        new MudColor("#A855F7"), // Purple
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLabels();
+    }
+
+    private async Task LoadLabels()
+    {
+        _isLoading = true;
+        try
+        {
+            var labels = await Api.GetAsync<List<KanbanLabelDto>>("api/kanban/labels");
+            _labels = labels ?? new();
+        }
+        catch { }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task CreateLabel()
+    {
+        if (string.IsNullOrWhiteSpace(_newLabelName)) return;
+
+        _isCreating = true;
+        try
+        {
+            var result = await Api.PostAsJsonAsync<CreateLabelRequest, KanbanLabelDto>(
+                "api/kanban/labels",
+                new CreateLabelRequest(_newLabelName.Trim(), _newLabelColor.ToString(MudColorOutputFormats.Hex)));
+
+            if (result is not null)
+            {
+                _labels.Add(result);
+                _newLabelName = string.Empty;
+                _newLabelColor = new("#3B82F6");
+                Snackbar.Add("Etiqueta criada!", Severity.Success);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isCreating = false;
+        }
+    }
+
+    private void StartEdit(KanbanLabelDto label)
+    {
+        _editingLabelId = label.Id;
+        _editLabelName = label.Name;
+        _editLabelColor = new MudColor(label.Color);
+    }
+
+    private void CancelEdit()
+    {
+        _editingLabelId = null;
+    }
+
+    private async Task SaveEdit()
+    {
+        if (_editingLabelId is null || string.IsNullOrWhiteSpace(_editLabelName)) return;
+
+        _isSaving = true;
+        try
+        {
+            var result = await Api.PutAsJsonAsync(
+                $"api/kanban/labels/{_editingLabelId}",
+                new UpdateLabelRequest(_editLabelName.Trim(), _editLabelColor.ToString(MudColorOutputFormats.Hex)));
+
+            if (result.IsSuccessStatusCode)
+            {
+                var idx = _labels.FindIndex(l => l.Id == _editingLabelId);
+                if (idx >= 0)
+                {
+                    _labels[idx] = new KanbanLabelDto(_editingLabelId.Value, _editLabelName.Trim(), _editLabelColor.ToString(MudColorOutputFormats.Hex));
+                }
+                _editingLabelId = null;
+                Snackbar.Add("Etiqueta atualizada!", Severity.Success);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private async Task DeleteLabel(KanbanLabelDto label)
+    {
+        try
+        {
+            var result = await Api.DeleteAsync($"api/kanban/labels/{label.Id}");
+            if (result.IsSuccessStatusCode)
+            {
+                _labels.RemoveAll(l => l.Id == label.Id);
+                Snackbar.Add("Etiqueta excluída!", Severity.Success);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void Close() => MudDialog.Close(DialogResult.Ok(_labels));
+}

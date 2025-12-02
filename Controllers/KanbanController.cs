@@ -35,7 +35,115 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         return u;
     }
 
-    // ===== Board =====
+    // ===== Boards (Multiple) =====
+
+    [HttpGet("boards")]
+    public async Task<ActionResult<List<KanbanBoardDto>>> GetMyBoards()
+    {
+        var myId = await GetMyUserIdAsync();
+        var boards = await db.KanbanBoards
+            .Where(b => b.OwnerId == myId)
+            .OrderByDescending(b => b.CreatedAt)
+            .Select(b => new KanbanBoardDto(b.Id, b.Name, b.CreatedAt))
+            .ToListAsync();
+
+        return Ok(boards);
+    }
+
+    [HttpPost("boards")]
+    public async Task<ActionResult<KanbanBoardDto>> CreateBoard([FromBody] CreateBoardRequest req)
+    {
+        var myId = await GetMyUserIdAsync();
+        
+        var board = new KanbanBoard { OwnerId = myId, Name = req.Name };
+        db.KanbanBoards.Add(board);
+        await db.SaveChangesAsync();
+
+        // Default columns
+        db.KanbanColumns.AddRange(
+            new KanbanColumn { BoardId = board.Id, Title = "A Fazer", Position = 0 },
+            new KanbanColumn { BoardId = board.Id, Title = "Fazendo", Position = 1 },
+            new KanbanColumn { BoardId = board.Id, Title = "Feito", Position = 2 }
+        );
+
+        // Default labels
+        db.KanbanLabels.AddRange(
+            new KanbanLabel { BoardId = board.Id, Name = "Bug", Color = "#EF4444" },
+            new KanbanLabel { BoardId = board.Id, Name = "Feature", Color = "#22C55E" },
+            new KanbanLabel { BoardId = board.Id, Name = "Melhoria", Color = "#3B82F6" },
+            new KanbanLabel { BoardId = board.Id, Name = "Urgente", Color = "#F59E0B" }
+        );
+
+        await db.SaveChangesAsync();
+
+        return Created($"/api/kanban/boards/{board.Id}", new KanbanBoardDto(board.Id, board.Name, board.CreatedAt));
+    }
+
+    [HttpGet("boards/{id}")]
+    public async Task<ActionResult<KanbanBoardDto>> GetBoard(int id)
+    {
+        var myId = await GetMyUserIdAsync();
+        var board = await db.KanbanBoards.FirstOrDefaultAsync(b => b.Id == id && b.OwnerId == myId);
+        if (board is null) return NotFound();
+
+        return Ok(new KanbanBoardDto(board.Id, board.Name, board.CreatedAt));
+    }
+
+    [HttpPut("boards/{id}/name")]
+    public async Task<IActionResult> RenameBoard(int id, [FromBody] RenameBoardRequest req)
+    {
+        var myId = await GetMyUserIdAsync();
+        var board = await db.KanbanBoards.FirstOrDefaultAsync(b => b.Id == id && b.OwnerId == myId);
+        if (board is null) return NotFound();
+
+        board.Name = req.Name;
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    [HttpDelete("boards/{id}")]
+    public async Task<IActionResult> DeleteBoard(int id)
+    {
+        var myId = await GetMyUserIdAsync();
+        var board = await db.KanbanBoards.FirstOrDefaultAsync(b => b.Id == id && b.OwnerId == myId);
+        if (board is null) return NotFound();
+
+        // Check if this is the only board
+        var boardCount = await db.KanbanBoards.CountAsync(b => b.OwnerId == myId);
+        if (boardCount <= 1)
+        {
+            return BadRequest("Você precisa manter pelo menos um quadro.");
+        }
+
+        // Delete all related data
+        var columns = await db.KanbanColumns.Where(c => c.BoardId == id).ToListAsync();
+        var columnIds = columns.Select(c => c.Id).ToList();
+        
+        var cards = await db.KanbanCards.Where(c => columnIds.Contains(c.ColumnId)).ToListAsync();
+        var cardIds = cards.Select(c => c.Id).ToList();
+
+        // Delete card-related data
+        var cardLabels = await db.KanbanCardLabels.Where(cl => cardIds.Contains(cl.CardId)).ToListAsync();
+        var comments = await db.KanbanComments.Where(c => cardIds.Contains(c.CardId)).ToListAsync();
+        var history = await db.KanbanCardHistories.Where(h => cardIds.Contains(h.CardId)).ToListAsync();
+
+        db.KanbanCardLabels.RemoveRange(cardLabels);
+        db.KanbanComments.RemoveRange(comments);
+        db.KanbanCardHistories.RemoveRange(history);
+        db.KanbanCards.RemoveRange(cards);
+        
+        // Delete labels and columns
+        var labels = await db.KanbanLabels.Where(l => l.BoardId == id).ToListAsync();
+        db.KanbanLabels.RemoveRange(labels);
+        db.KanbanColumns.RemoveRange(columns);
+
+        db.KanbanBoards.Remove(board);
+        await db.SaveChangesAsync();
+
+        return NoContent();
+    }
+
+    // ===== Board (Legacy - get or create default) =====
 
     [HttpGet("board")]
     public async Task<ActionResult<KanbanBoardDto>> GetOrCreateMyBoard()
@@ -524,13 +632,21 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
             .Where(h => h.CardId == cardId)
             .OrderByDescending(h => h.CreatedAt)
             .Include(h => h.User)
-            .Select(h => new KanbanCardHistoryDto(
-                h.Id, h.CardId, h.UserId, h.User.FullName,
-                h.Action.ToString(), h.Description, h.OldValue, h.NewValue, h.CreatedAt
-            ))
             .ToListAsync();
 
-        return Ok(history);
+        var result = history.Select(h => new KanbanCardHistoryDto(
+            h.Id, 
+            h.CardId, 
+            h.UserId, 
+            h.User?.FullName ?? "Usuário",
+            h.Action.ToString(), 
+            h.Description ?? "", 
+            h.OldValue, 
+            h.NewValue, 
+            h.CreatedAt
+        )).ToList();
+
+        return Ok(result);
     }
 
     // ===== Labels =====

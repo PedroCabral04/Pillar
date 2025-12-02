@@ -142,17 +142,31 @@
                         <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary">Etiquetas</MudText>
                     </MudStack>
 
-                    <MudChipSet T="KanbanLabelDto" SelectionMode="SelectionMode.MultiSelection" @bind-SelectedValues="_selectedLabels" Style="flex-wrap: wrap;">
-                        @foreach (var label in _availableLabels)
-                        {
-                            <MudChip T="KanbanLabelDto" 
-                                     Value="@label"
-                                     Style="@($"background-color: {label.Color}; color: white;")"
-                                     Variant="Variant.Filled">
-                                @label.Name
-                            </MudChip>
-                        }
-                    </MudChipSet>
+                    @if (_availableLabels.Count == 0)
+                    {
+                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
+                            Nenhuma etiqueta disponível. Crie etiquetas nas configurações do quadro.
+                        </MudAlert>
+                    }
+                    else
+                    {
+                        <div class="d-flex flex-wrap gap-2">
+                            @foreach (var label in _availableLabels)
+                            {
+                                var isSelected = _selectedLabelIds.Contains(label.Id);
+                                <MudChip T="string"
+                                         Style="@(isSelected ? $"background-color: {label.Color}; color: white;" : $"border: 2px solid {label.Color}; color: {label.Color}; background: transparent;")"
+                                         Variant="@(isSelected ? Variant.Filled : Variant.Outlined)"
+                                         OnClick="@(() => ToggleLabel(label.Id))">
+                                    @if (isSelected)
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.Check" Size="MudBlazor.Size.Small" Class="mr-1"/>
+                                    }
+                                    @label.Name
+                                </MudChip>
+                            }
+                        </div>
+                    }
 
                     @if (IsEdit)
                     {
@@ -368,7 +382,7 @@
 
     // Labels
     private List<KanbanLabelDto> _availableLabels = new();
-    private IReadOnlyCollection<KanbanLabelDto> _selectedLabels = new List<KanbanLabelDto>();
+    private HashSet<int> _selectedLabelIds = new();
 
     // Comments
     private List<KanbanCommentDto> _comments = new();
@@ -416,11 +430,11 @@
         // Set selected labels from InitialLabelIds or InitialLabels
         if (InitialLabelIds?.Any() == true)
         {
-            _selectedLabels = _availableLabels.Where(l => InitialLabelIds.Contains(l.Id)).ToList();
+            _selectedLabelIds = new HashSet<int>(InitialLabelIds);
         }
         else if (InitialLabels?.Any() == true)
         {
-            _selectedLabels = _availableLabels.Where(l => InitialLabels.Any(il => il.Id == l.Id)).ToList();
+            _selectedLabelIds = new HashSet<int>(InitialLabels.Select(l => l.Id));
         }
 
         // Use provided users or load from API
@@ -494,10 +508,19 @@
 
     private async Task<IEnumerable<UserOption>> SearchUsers(string value, CancellationToken ct)
     {
+        await Task.CompletedTask; // Make it truly async
         if (string.IsNullOrWhiteSpace(value))
             return _users.Take(10);
 
         return _users.Where(u => u.FullName.Contains(value, StringComparison.OrdinalIgnoreCase)).Take(10);
+    }
+
+    private void ToggleLabel(int labelId)
+    {
+        if (_selectedLabelIds.Contains(labelId))
+            _selectedLabelIds.Remove(labelId);
+        else
+            _selectedLabelIds.Add(labelId);
     }
 
     private async Task AddComment()
@@ -555,7 +578,7 @@
             Priority: _priority,
             AssignedUserId: _selectedUser?.Id,
             Color: _cardColor,
-            LabelIds: _selectedLabels.Select(l => l.Id).ToList(),
+            LabelIds: _selectedLabelIds.ToList(),
             CompletedAt: _isCompleted ? DateTime.UtcNow : null,
             Delete: false,
             Archive: false
