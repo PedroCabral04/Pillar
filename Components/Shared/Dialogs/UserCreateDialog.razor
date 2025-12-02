@@ -242,17 +242,6 @@
     </DialogActions>
 </MudDialog>
 
-<style>
-    .user-dialog .mud-dialog-content {
-        overflow-y: auto;
-        max-height: 70vh;
-    }
-    
-    .user-dialog .mud-input-adornment {
-        color: var(--mud-palette-primary);
-    }
-</style>
-
 @implements IDisposable
 
 @code {
@@ -653,3 +642,14 @@
         _emailDebounceTimer?.Dispose();
     }
 }
+
+<style>
+.user-dialog ::deep .mud-dialog-content {
+    overflow-y: auto;
+    max-height: 70vh;
+}
+
+.user-dialog ::deep .mud-input-adornment {
+    color: var(--mud-palette-primary);
+}
+</style>

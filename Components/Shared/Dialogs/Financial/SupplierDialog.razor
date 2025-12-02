@@ -1,4 +1,5 @@
 @using erp.DTOs.Financial
+@using MudBlazor
 
 <MudDialog>
     <TitleContent>
@@ -35,6 +36,8 @@
                                           RequiredError="CNPJ/CPF é obrigatório" 
                                           Variant="Variant.Outlined"
                                           Placeholder="00.000.000/0000-00"
+                                          Mask="@_cnpjMask"
+                                          Validation="@(new Func<string, string>(ValidateTaxId))"
                                           Adornment="Adornment.Start"
                                           AdornmentIcon="@Icons.Material.Filled.Badge"/>
                         </MudItem>
@@ -54,6 +57,7 @@
                                           InputType="InputType.Email" 
                                           Variant="Variant.Outlined"
                                           Placeholder="contato@empresa.com.br"
+                                          Validation="@(new Func<string, string>(ValidateEmail))"
                                           Adornment="Adornment.Start"
                                           AdornmentIcon="@Icons.Material.Filled.Email"/>
                         </MudItem>
@@ -62,6 +66,7 @@
                                           Label="Telefone" 
                                           Variant="Variant.Outlined"
                                           Placeholder="(00) 0000-0000"
+                                          Mask="@_phoneMask"
                                           Adornment="Adornment.Start"
                                           AdornmentIcon="@Icons.Material.Filled.Phone"/>
                         </MudItem>
@@ -70,6 +75,7 @@
                                           Label="Celular" 
                                           Variant="Variant.Outlined"
                                           Placeholder="(00) 00000-0000"
+                                          Mask="@_mobileMask"
                                           Adornment="Adornment.Start"
                                           AdornmentIcon="@Icons.Material.Filled.PhoneAndroid"/>
                         </MudItem>
@@ -90,6 +96,7 @@
                                           Label="CEP" 
                                           Variant="Variant.Outlined"
                                           Placeholder="00000-000"
+                                          Mask="@_cepMask"
                                           Adornment="Adornment.Start"
                                           AdornmentIcon="@Icons.Material.Filled.LocationOn"/>
                         </MudItem>
@@ -198,10 +205,26 @@
         </MudForm>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="Cancel" Variant="Variant.Outlined">Cancelar</MudButton>
-        <MudButton Color="MudBlazor.Color.Primary" Variant="Variant.Filled" OnClick="Submit">
-            <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-1"/>
-            Salvar Fornecedor
+        <MudButton OnClick="Cancel" 
+                   Variant="Variant.Text"
+                   StartIcon="@Icons.Material.Filled.Close"
+                   Disabled="@_saving">
+            Cancelar
+        </MudButton>
+        <MudButton Color="MudBlazor.Color.Primary" 
+                   Variant="Variant.Filled" 
+                   OnClick="Submit"
+                   Disabled="@_saving"
+                   StartIcon="@(_saving ? null : Icons.Material.Filled.Save)">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="MudBlazor.Size.Small" Indeterminate="true" Class="mr-2"/>
+                <text>Salvando...</text>
+            }
+            else
+            {
+                <text>Salvar Fornecedor</text>
+            }
         </MudButton>
     </DialogActions>
 </MudDialog>
@@ -212,6 +235,97 @@
 
     private MudForm form;
     private bool success;
+    private bool _saving = false;
+    
+    // Máscaras de entrada
+    private PatternMask _cnpjMask = new PatternMask("00.000.000/0000-00");
+    private PatternMask _cpfMask = new PatternMask("000.000.000-00");
+    private PatternMask _phoneMask = new PatternMask("(00) 0000-0000");
+    private PatternMask _mobileMask = new PatternMask("(00) 00000-0000");
+    private PatternMask _cepMask = new PatternMask("00000-000");
+
+    private string ValidateTaxId(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null; // Required validation handled separately
+        
+        var digits = new string(value.Where(char.IsDigit).ToArray());
+        
+        if (digits.Length == 11)
+        {
+            // Validate CPF
+            if (!ValidateCpf(digits))
+                return "CPF inválido";
+        }
+        else if (digits.Length == 14)
+        {
+            // Validate CNPJ
+            if (!ValidateCnpj(digits))
+                return "CNPJ inválido";
+        }
+        else if (digits.Length > 0)
+        {
+            return "CNPJ deve ter 14 dígitos ou CPF deve ter 11 dígitos";
+        }
+        
+        return null;
+    }
+    
+    private bool ValidateCpf(string cpf)
+    {
+        if (cpf.Distinct().Count() == 1) return false;
+        
+        int[] mult1 = { 10, 9, 8, 7, 6, 5, 4, 3, 2 };
+        int[] mult2 = { 11, 10, 9, 8, 7, 6, 5, 4, 3, 2 };
+        
+        var tempCpf = cpf.Substring(0, 9);
+        var sum = tempCpf.Select((c, i) => (c - '0') * mult1[i]).Sum();
+        var rest = sum % 11;
+        var digit = rest < 2 ? 0 : 11 - rest;
+        
+        tempCpf += digit;
+        sum = tempCpf.Select((c, i) => (c - '0') * mult2[i]).Sum();
+        rest = sum % 11;
+        digit = rest < 2 ? 0 : 11 - rest;
+        
+        return cpf.EndsWith(tempCpf.Substring(9) + digit.ToString());
+    }
+    
+    private bool ValidateCnpj(string cnpj)
+    {
+        if (cnpj.Distinct().Count() == 1) return false;
+        
+        int[] mult1 = { 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2 };
+        int[] mult2 = { 6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2 };
+        
+        var tempCnpj = cnpj.Substring(0, 12);
+        var sum = tempCnpj.Select((c, i) => (c - '0') * mult1[i]).Sum();
+        var rest = sum % 11;
+        var digit = rest < 2 ? 0 : 11 - rest;
+        
+        tempCnpj += digit;
+        sum = tempCnpj.Select((c, i) => (c - '0') * mult2[i]).Sum();
+        rest = sum % 11;
+        digit = rest < 2 ? 0 : 11 - rest;
+        
+        return cnpj.EndsWith(tempCnpj.Substring(12) + digit.ToString());
+    }
+    
+    private string ValidateEmail(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null; // Email is optional
+        
+        try
+        {
+            var addr = new System.Net.Mail.MailAddress(value);
+            return addr.Address == value ? null : "Email inválido";
+        }
+        catch
+        {
+            return "Email inválido";
+        }
+    }
 
     private void Cancel() => MudDialog.Cancel();
 
@@ -220,6 +334,11 @@
         await form.Validate();
         if (success)
         {
+            _saving = true;
+            StateHasChanged();
+            
+            await Task.Delay(100);
+            
             MudDialog.Close(DialogResult.Ok(Model));
         }
     }

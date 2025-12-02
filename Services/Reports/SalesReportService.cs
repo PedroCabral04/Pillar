@@ -63,8 +63,9 @@ public class SalesReportService : ISalesReportService
             return new SalesReportResultDto
             {
                 Items = items,
-                Summary = summary,
-                Sales = sales
+                Summary = summary
+                // Note: Sales property is intentionally not populated to avoid circular reference issues
+                // during JSON serialization. Use Items instead which contains all necessary data.
             };
         }
         catch (Exception ex)

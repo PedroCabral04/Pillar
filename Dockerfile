@@ -20,7 +20,7 @@ WORKDIR /app
 ENV TZ=Etc/UTC \
     ASPNETCORE_URLS=http://+:8080 \
     ASPNETCORE_ENVIRONMENT=Production \
-    DB_BOOTSTRAP=false
+    DB_BOOTSTRAP=dropcreate
 
 EXPOSE 8080
 

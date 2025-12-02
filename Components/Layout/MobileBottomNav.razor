@@ -13,12 +13,12 @@
         <span class="bottom-nav-item__label">Vendas</span>
     </a>
     
-    <a href="/inventory" class="bottom-nav-item @GetActiveClass("/inventory")" @onclick="@(() => NavigateTo("/inventory"))" @onclick:preventDefault>
+    <a href="/inventory/products" class="bottom-nav-item @GetActiveClass("/inventory")" @onclick="@(() => NavigateTo("/inventory/products"))" @onclick:preventDefault>
         <MudIcon Icon="@Icons.Material.Filled.Inventory" Class="bottom-nav-item__icon"/>
         <span class="bottom-nav-item__label">Estoque</span>
     </a>
     
-    <a href="/financial" class="bottom-nav-item @GetActiveClass("/financial")" @onclick="@(() => NavigateTo("/financial"))" @onclick:preventDefault>
+    <a href="/financial/dashboard" class="bottom-nav-item @GetActiveClass("/financial")" @onclick="@(() => NavigateTo("/financial/dashboard"))" @onclick:preventDefault>
         <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Class="bottom-nav-item__icon"/>
         <span class="bottom-nav-item__label">Financeiro</span>
     </a>

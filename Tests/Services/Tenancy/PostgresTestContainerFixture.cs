@@ -1,5 +1,4 @@
-using DotNet.Testcontainers.Builders;
-using DotNet.Testcontainers.Containers;
+using Testcontainers.PostgreSql;
 using Npgsql;
 
 namespace erp.Tests.Services.Tenancy;

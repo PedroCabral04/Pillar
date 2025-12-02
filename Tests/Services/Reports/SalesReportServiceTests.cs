@@ -197,7 +197,7 @@ public class SalesReportServiceTests : IDisposable
         result.Should().NotBeNull();
         result.TotalSales.Should().Be(3);
         result.TotalAmount.Should().Be(600); // 200 + 150 + 250
-        result.Sales.Should().HaveCount(3);
+        result.Items.Should().HaveCount(3);
     }
 
     [Fact]
@@ -216,7 +216,7 @@ public class SalesReportServiceTests : IDisposable
         // Assert
         result.Should().NotBeNull();
         result.TotalSales.Should().Be(2); // Only sales from last 7 days
-        result.Sales.Should().HaveCount(2);
+        result.Items.Should().HaveCount(2);
     }
 
     [Fact]
@@ -234,7 +234,7 @@ public class SalesReportServiceTests : IDisposable
         // Assert
         result.Should().NotBeNull();
         result.TotalSales.Should().Be(2); // Customer 1 has 2 sales
-        result.Sales.Should().OnlyContain(s => s.CustomerId == 1);
+        result.Items.Should().OnlyContain(s => s.CustomerName == "Cliente Teste 1");
     }
 
     [Fact]
@@ -252,7 +252,7 @@ public class SalesReportServiceTests : IDisposable
         // Assert
         result.Should().NotBeNull();
         result.TotalSales.Should().Be(2); // 2 finalized sales
-        result.Sales.Should().OnlyContain(s => s.Status == "Finalizada");
+        result.Items.Should().OnlyContain(s => s.Status == "Finalizada");
     }
 
     [Fact]
@@ -270,7 +270,7 @@ public class SalesReportServiceTests : IDisposable
         // Assert
         result.Should().NotBeNull();
         result.TotalSales.Should().Be(1);
-        result.Sales.Should().OnlyContain(s => s.PaymentMethod == "Dinheiro");
+        result.Items.Should().OnlyContain(s => s.PaymentMethod == "Dinheiro");
     }
 
     [Fact]
@@ -288,7 +288,7 @@ public class SalesReportServiceTests : IDisposable
         // Assert
         result.Should().NotBeNull();
         result.TotalSales.Should().Be(3); // All sales by user 1
-        result.Sales.Should().OnlyContain(s => s.UserId == 1);
+        result.Items.Should().OnlyContain(s => s.SalespersonName == "Vendedor Teste");
     }
 
     [Fact]
@@ -354,8 +354,8 @@ public class SalesReportServiceTests : IDisposable
         // Assert
         result.Should().NotBeNull();
         result.TotalSales.Should().Be(1); // Only one sale matches all filters
-        result.Sales.Should().OnlyContain(s => 
-            s.CustomerId == 1 && 
+        result.Items.Should().OnlyContain(s => 
+            s.CustomerName == "Cliente Teste 1" && 
             s.Status == "Pendente" &&
             s.SaleDate >= filter.StartDate &&
             s.SaleDate <= filter.EndDate);
@@ -377,7 +377,7 @@ public class SalesReportServiceTests : IDisposable
         result.Should().NotBeNull();
         result.TotalSales.Should().Be(0);
         result.TotalAmount.Should().Be(0);
-        result.Sales.Should().BeEmpty();
+        result.Items.Should().BeEmpty();
     }
 
     [Fact]
@@ -391,9 +391,9 @@ public class SalesReportServiceTests : IDisposable
 
         // Assert
         result.Should().NotBeNull();
-        var saleWithMultipleItems = result.Sales.FirstOrDefault(s => s.Id == 3);
+        var saleWithMultipleItems = result.Items.FirstOrDefault(s => s.SaleId == 3);
         saleWithMultipleItems.Should().NotBeNull();
-        saleWithMultipleItems!.Items.Should().HaveCount(2);
+        saleWithMultipleItems!.ItemCount.Should().Be(2);
     }
 
     [Fact]
@@ -407,8 +407,8 @@ public class SalesReportServiceTests : IDisposable
 
         // Assert
         result.Should().NotBeNull();
-        result.Sales.Should().HaveCount(3);
-        var dates = result.Sales.Select(s => s.SaleDate).ToList();
+        result.Items.Should().HaveCount(3);
+        var dates = result.Items.Select(s => s.SaleDate).ToList();
         dates.Should().BeInDescendingOrder();
     }
 
@@ -538,7 +538,7 @@ public class SalesReportServiceTests : IDisposable
         // Assert
         result.Should().NotBeNull();
         result.TotalSales.Should().Be(4);
-        result.Sales.Should().Contain(s => s.CustomerId == null);
+        result.Items.Should().Contain(s => s.CustomerName == "Cliente não informado");
     }
 
     public void Dispose()
