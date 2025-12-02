@@ -2123,6 +2123,9 @@ namespace erp.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -2146,8 +2149,18 @@ namespace erp.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("AssignedUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Color")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)");
+
                     b.Property<int>("ColumnId")
                         .HasColumnType("integer");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -2159,8 +2172,16 @@ namespace erp.Migrations
                     b.Property<DateTime?>("DueDate")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("boolean");
+
                     b.Property<int>("Position")
                         .HasColumnType("integer");
+
+                    b.Property<int>("Priority")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -2169,9 +2190,74 @@ namespace erp.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AssignedUserId");
+
+                    b.HasIndex("DueDate");
+
+                    b.HasIndex("IsArchived");
+
+                    b.HasIndex("Priority");
+
                     b.HasIndex("ColumnId", "Position");
 
                     b.ToTable("KanbanCards", (string)null);
+                });
+
+            modelBuilder.Entity("erp.Models.Kanban.KanbanCardHistory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("Action")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("CardId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("NewValue")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("OldValue")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("CardId", "CreatedAt");
+
+                    b.ToTable("KanbanCardHistories", (string)null);
+                });
+
+            modelBuilder.Entity("erp.Models.Kanban.KanbanCardLabel", b =>
+                {
+                    b.Property<int>("CardId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("LabelId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("CardId", "LabelId");
+
+                    b.HasIndex("LabelId");
+
+                    b.ToTable("KanbanCardLabels", (string)null);
                 });
 
             modelBuilder.Entity("erp.Models.Kanban.KanbanColumn", b =>
@@ -2198,6 +2284,79 @@ namespace erp.Migrations
                     b.HasIndex("BoardId", "Position");
 
                     b.ToTable("KanbanColumns", (string)null);
+                });
+
+            modelBuilder.Entity("erp.Models.Kanban.KanbanComment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AuthorId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("CardId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsEdited")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AuthorId");
+
+                    b.HasIndex("CardId");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.ToTable("KanbanComments", (string)null);
+                });
+
+            modelBuilder.Entity("erp.Models.Kanban.KanbanLabel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BoardId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BoardId", "Name");
+
+                    b.ToTable("KanbanLabels", (string)null);
                 });
 
             modelBuilder.Entity("erp.Models.Onboarding.UserOnboardingProgress", b =>
@@ -3658,28 +3817,105 @@ namespace erp.Migrations
 
             modelBuilder.Entity("erp.Models.Kanban.KanbanBoard", b =>
                 {
-                    b.HasOne("erp.Models.Identity.ApplicationUser", null)
+                    b.HasOne("erp.Models.Identity.ApplicationUser", "Owner")
                         .WithMany()
                         .HasForeignKey("OwnerId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Owner");
                 });
 
             modelBuilder.Entity("erp.Models.Kanban.KanbanCard", b =>
                 {
+                    b.HasOne("erp.Models.Identity.ApplicationUser", "AssignedUser")
+                        .WithMany()
+                        .HasForeignKey("AssignedUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("erp.Models.Kanban.KanbanColumn", "Column")
                         .WithMany("Cards")
                         .HasForeignKey("ColumnId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.Navigation("AssignedUser");
+
                     b.Navigation("Column");
+                });
+
+            modelBuilder.Entity("erp.Models.Kanban.KanbanCardHistory", b =>
+                {
+                    b.HasOne("erp.Models.Kanban.KanbanCard", "Card")
+                        .WithMany("History")
+                        .HasForeignKey("CardId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("erp.Models.Identity.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Card");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("erp.Models.Kanban.KanbanCardLabel", b =>
+                {
+                    b.HasOne("erp.Models.Kanban.KanbanCard", "Card")
+                        .WithMany("CardLabels")
+                        .HasForeignKey("CardId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("erp.Models.Kanban.KanbanLabel", "Label")
+                        .WithMany()
+                        .HasForeignKey("LabelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Card");
+
+                    b.Navigation("Label");
                 });
 
             modelBuilder.Entity("erp.Models.Kanban.KanbanColumn", b =>
                 {
                     b.HasOne("erp.Models.Kanban.KanbanBoard", "Board")
                         .WithMany("Columns")
+                        .HasForeignKey("BoardId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Board");
+                });
+
+            modelBuilder.Entity("erp.Models.Kanban.KanbanComment", b =>
+                {
+                    b.HasOne("erp.Models.Identity.ApplicationUser", "Author")
+                        .WithMany()
+                        .HasForeignKey("AuthorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("erp.Models.Kanban.KanbanCard", "Card")
+                        .WithMany("Comments")
+                        .HasForeignKey("CardId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Author");
+
+                    b.Navigation("Card");
+                });
+
+            modelBuilder.Entity("erp.Models.Kanban.KanbanLabel", b =>
+                {
+                    b.HasOne("erp.Models.Kanban.KanbanBoard", "Board")
+                        .WithMany("Labels")
                         .HasForeignKey("BoardId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -4017,6 +4253,17 @@ namespace erp.Migrations
             modelBuilder.Entity("erp.Models.Kanban.KanbanBoard", b =>
                 {
                     b.Navigation("Columns");
+
+                    b.Navigation("Labels");
+                });
+
+            modelBuilder.Entity("erp.Models.Kanban.KanbanCard", b =>
+                {
+                    b.Navigation("CardLabels");
+
+                    b.Navigation("Comments");
+
+                    b.Navigation("History");
                 });
 
             modelBuilder.Entity("erp.Models.Kanban.KanbanColumn", b =>

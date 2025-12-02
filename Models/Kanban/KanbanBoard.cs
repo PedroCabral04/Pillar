@@ -1,6 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
+using erp.Models.Identity;
 
 namespace erp.Models.Kanban;
 
@@ -13,6 +14,10 @@ public class KanbanBoard
 
     // owner is an ApplicationUser.Id
     public int OwnerId { get; set; }
+    public ApplicationUser Owner { get; set; } = null!;
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public List<KanbanColumn> Columns { get; set; } = new();
+    public List<KanbanLabel> Labels { get; set; } = new();
 }

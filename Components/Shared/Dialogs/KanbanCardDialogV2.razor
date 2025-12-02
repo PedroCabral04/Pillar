@@ -1,0 +1,614 @@
+@using System.ComponentModel.DataAnnotations
+@using erp.DTOs.Kanban
+@using erp.Models.Kanban
+@using erp.Services
+@using MudBlazor
+@inject IApiService Api
+
+<MudDialog Style="min-width: 600px;">
+    <TitleContent>
+        <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@(IsEdit ? Icons.Material.Filled.Edit : Icons.Material.Filled.AddTask)" Color="MudBlazor.Color.Primary" />
+            <MudText Typo="Typo.h6">@(IsEdit ? "Editar Card" : "Novo Card")</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
+            <MudTabPanel Text="Detalhes" Icon="@Icons.Material.Filled.Info">
+                <MudStack Spacing="3">
+                    @* Seção: Informações Básicas *@
+                    <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
+                        <MudIcon Icon="@Icons.Material.Filled.Description" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Primary"/>
+                        <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary">Informações Básicas</MudText>
+                    </MudStack>
+                    
+                    <MudTextField @bind-Value="_title" 
+                                  Label="Título" 
+                                  Required="true"
+                                  Variant="Variant.Outlined"
+                                  Immediate="true"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Title" />
+                    
+                    <MudTextField @bind-Value="_description" 
+                                  Label="Descrição" 
+                                  Lines="4"
+                                  Variant="Variant.Outlined"
+                                  Immediate="true"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Notes" />
+
+                    <MudDivider Class="my-2"/>
+
+                    @* Seção: Prazo e Prioridade *@
+                    <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
+                        <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Primary"/>
+                        <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary">Prazo e Prioridade</MudText>
+                    </MudStack>
+
+                    <MudGrid>
+                        <MudItem xs="12" sm="6">
+                            <MudDatePicker @bind-Date="_dueDate"
+                                           Label="Data de Vencimento"
+                                           Variant="Variant.Outlined"
+                                           Clearable="true"
+                                           DateFormat="dd/MM/yyyy"
+                                           Placeholder="Selecione..."
+                                           Adornment="Adornment.Start"
+                                           AdornmentIcon="@Icons.Material.Filled.CalendarToday" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudSelect @bind-Value="_priority"
+                                       Label="Prioridade"
+                                       Variant="Variant.Outlined"
+                                       Adornment="Adornment.Start"
+                                       AdornmentIcon="@Icons.Material.Filled.Flag">
+                                <MudSelectItem Value="KanbanPriority.None">
+                                    <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Flag" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Default"/>
+                                        <span>Nenhuma</span>
+                                    </MudStack>
+                                </MudSelectItem>
+                                <MudSelectItem Value="KanbanPriority.Low">
+                                    <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                                        <MudIcon Icon="@Icons.Material.Filled.Flag" Size="MudBlazor.Size.Small" Style="color: #22C55E"/>
+                                        <span>Baixa</span>
+                                    </MudStack>
+                                </MudSelectItem>
+                                <MudSelectItem Value="KanbanPriority.Normal">
+                                    <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                                        <MudIcon Icon="@Icons.Material.Filled.Flag" Size="MudBlazor.Size.Small" Style="color: #3B82F6"/>
+                                        <span>Normal</span>
+                                    </MudStack>
+                                </MudSelectItem>
+                                <MudSelectItem Value="KanbanPriority.High">
+                                    <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                                        <MudIcon Icon="@Icons.Material.Filled.Flag" Size="MudBlazor.Size.Small" Style="color: #F59E0B"/>
+                                        <span>Alta</span>
+                                    </MudStack>
+                                </MudSelectItem>
+                                <MudSelectItem Value="KanbanPriority.Urgent">
+                                    <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                                        <MudIcon Icon="@Icons.Material.Filled.Flag" Size="MudBlazor.Size.Small" Style="color: #EF4444"/>
+                                        <span>Urgente</span>
+                                    </MudStack>
+                                </MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                    </MudGrid>
+
+                    <MudDivider Class="my-2"/>
+
+                    @* Seção: Responsável *@
+                    <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
+                        <MudIcon Icon="@Icons.Material.Filled.Person" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Primary"/>
+                        <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary">Responsável</MudText>
+                    </MudStack>
+
+                    <MudAutocomplete T="UserOption"
+                                     @bind-Value="_selectedUser"
+                                     Label="Atribuir a"
+                                     Variant="Variant.Outlined"
+                                     SearchFunc="SearchUsers"
+                                     ToStringFunc="@(u => u?.FullName ?? "")"
+                                     Clearable="true"
+                                     Adornment="Adornment.Start"
+                                     AdornmentIcon="@Icons.Material.Filled.PersonSearch"
+                                     ShowProgressIndicator="true">
+                        <ItemTemplate Context="user">
+                            <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                                @if (!string.IsNullOrEmpty(user.Photo))
+                                {
+                                    <MudAvatar Size="MudBlazor.Size.Small">
+                                        <MudImage Src="@user.Photo"/>
+                                    </MudAvatar>
+                                }
+                                else
+                                {
+                                    <MudAvatar Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Primary">
+                                        @GetInitials(user.FullName)
+                                    </MudAvatar>
+                                }
+                                <MudText>@user.FullName</MudText>
+                            </MudStack>
+                        </ItemTemplate>
+                    </MudAutocomplete>
+
+                    <MudDivider Class="my-2"/>
+
+                    @* Seção: Etiquetas *@
+                    <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
+                        <MudIcon Icon="@Icons.Material.Filled.Label" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Primary"/>
+                        <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary">Etiquetas</MudText>
+                    </MudStack>
+
+                    <MudChipSet T="KanbanLabelDto" SelectionMode="SelectionMode.MultiSelection" @bind-SelectedValues="_selectedLabels" Style="flex-wrap: wrap;">
+                        @foreach (var label in _availableLabels)
+                        {
+                            <MudChip T="KanbanLabelDto" 
+                                     Value="@label"
+                                     Style="@($"background-color: {label.Color}; color: white;")"
+                                     Variant="Variant.Filled">
+                                @label.Name
+                            </MudChip>
+                        }
+                    </MudChipSet>
+
+                    @if (IsEdit)
+                    {
+                        <MudDivider Class="my-2"/>
+
+                        @* Seção: Cor do Card *@
+                        <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
+                            <MudIcon Icon="@Icons.Material.Filled.Palette" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Primary"/>
+                            <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary">Cor do Card</MudText>
+                        </MudStack>
+
+                        <MudStack Row Spacing="1" Style="flex-wrap: wrap;">
+                            @foreach (var color in _colorOptions)
+                            {
+                                <MudIconButton Icon="@(_cardColor == color ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Circle)"
+                                               Size="MudBlazor.Size.Medium"
+                                               Style="@($"color: {color};")"
+                                               OnClick="@(() => _cardColor = color)"
+                                               Title="@color"/>
+                            }
+                            <MudIconButton Icon="@Icons.Material.Filled.Cancel"
+                                           Size="MudBlazor.Size.Medium"
+                                           Color="MudBlazor.Color.Default"
+                                           OnClick="@(() => _cardColor = null)"
+                                           Title="Sem cor"/>
+                        </MudStack>
+
+                        <MudDivider Class="my-2"/>
+
+                        @* Concluir Card *@
+                        <MudCheckBox @bind-Value="_isCompleted" Label="Marcar como concluído" Color="MudBlazor.Color.Success"/>
+                    }
+                </MudStack>
+            </MudTabPanel>
+
+            @if (IsEdit && CardId.HasValue)
+            {
+                <MudTabPanel Text="Comentários" Icon="@Icons.Material.Filled.Comment" BadgeData="@_comments.Count" BadgeColor="MudBlazor.Color.Primary">
+                    <MudStack Spacing="3">
+                        @* Novo comentário *@
+                        <MudStack Row Spacing="2">
+                            <MudTextField @bind-Value="_newComment"
+                                          Placeholder="Adicionar comentário..."
+                                          Variant="Variant.Outlined"
+                                          Lines="2"
+                                          Style="flex: 1;"/>
+                            <MudButton Variant="Variant.Filled"
+                                       Color="MudBlazor.Color.Primary"
+                                       OnClick="AddComment"
+                                       Disabled="@(string.IsNullOrWhiteSpace(_newComment) || _isSubmittingComment)">
+                                @if (_isSubmittingComment)
+                                {
+                                    <MudProgressCircular Size="MudBlazor.Size.Small" Indeterminate="true"/>
+                                }
+                                else
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.Send"/>
+                                }
+                            </MudButton>
+                        </MudStack>
+
+                        <MudDivider/>
+
+                        @if (_loadingComments)
+                        {
+                            <MudProgressLinear Indeterminate="true"/>
+                        }
+                        else if (_comments.Count == 0)
+                        {
+                            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                                Nenhum comentário ainda. Seja o primeiro a comentar!
+                            </MudAlert>
+                        }
+                        else
+                        {
+                            <MudStack Spacing="2" Style="max-height: 300px; overflow-y: auto;">
+                                @foreach (var comment in _comments)
+                                {
+                                    <MudPaper Elevation="0" Class="pa-3" Style="background: var(--mud-palette-background-grey); border-radius: 8px;">
+                                        <MudStack Row Spacing="2" AlignItems="AlignItems.Start">
+                                            <MudAvatar Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Primary">
+                                                @GetInitials(comment.AuthorName)
+                                            </MudAvatar>
+                                            <MudStack Spacing="0" Style="flex: 1;">
+                                                <MudStack Row Spacing="1" AlignItems="AlignItems.Center">
+                                                    <MudText Typo="Typo.body2"><strong>@comment.AuthorName</strong></MudText>
+                                                    <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">
+                                                        @comment.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                                                    </MudText>
+                                                    @if (comment.IsEdited)
+                                                    {
+                                                        <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">(editado)</MudText>
+                                                    }
+                                                </MudStack>
+                                                <MudText Typo="Typo.body2" Style="white-space: pre-wrap;">@comment.Content</MudText>
+                                            </MudStack>
+                                        </MudStack>
+                                    </MudPaper>
+                                }
+                            </MudStack>
+                        }
+                    </MudStack>
+                </MudTabPanel>
+
+                <MudTabPanel Text="Histórico" Icon="@Icons.Material.Filled.History">
+                    @if (_loadingHistory)
+                    {
+                        <MudProgressLinear Indeterminate="true"/>
+                    }
+                    else if (_history.Count == 0)
+                    {
+                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                            Nenhuma atividade registrada.
+                        </MudAlert>
+                    }
+                    else
+                    {
+                        <MudTimeline TimelinePosition="TimelinePosition.Start" Style="max-height: 400px; overflow-y: auto;">
+                            @foreach (var item in _history)
+                            {
+                                <MudTimelineItem Color="@GetHistoryColor(item.Action)" Size="MudBlazor.Size.Small">
+                                    <ItemContent>
+                                        <MudStack Spacing="0">
+                                            <MudText Typo="Typo.body2">
+                                                <strong>@item.UserName</strong> @item.Description
+                                            </MudText>
+                                            <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">
+                                                @item.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                                            </MudText>
+                                        </MudStack>
+                                    </ItemContent>
+                                </MudTimelineItem>
+                            }
+                        </MudTimeline>
+                    }
+                </MudTabPanel>
+            }
+        </MudTabs>
+
+        @if (IsEdit && CardId.HasValue)
+        {
+            <MudStack Row AlignItems="AlignItems.Center" Class="mt-3 pa-3" Style="background: var(--mud-palette-background-grey); border-radius: 8px;">
+                <MudIcon Icon="@Icons.Material.Filled.Info" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Secondary"/>
+                <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">
+                    Criado em @_createdAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                </MudText>
+            </MudStack>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Outlined">Cancelar</MudButton>
+        @if (IsEdit && CardId.HasValue)
+        {
+            <MudButton Color="MudBlazor.Color.Warning" 
+                       Variant="Variant.Text"
+                       StartIcon="@Icons.Material.Filled.Archive"
+                       OnClick="Archive">
+                Arquivar
+            </MudButton>
+            <MudButton Color="MudBlazor.Color.Error" 
+                       Variant="Variant.Text"
+                       StartIcon="@Icons.Material.Filled.Delete"
+                       OnClick="Delete">
+                Excluir
+            </MudButton>
+        }
+        <MudSpacer />
+        <MudButton Color="MudBlazor.Color.Primary" 
+                   Variant="Variant.Filled"
+                   OnClick="Submit"
+                   Disabled="@(string.IsNullOrWhiteSpace(_title) || _isProcessing)">
+            @if (_isProcessing)
+            {
+                <MudProgressCircular Size="MudBlazor.Size.Small" Indeterminate="true" Class="mr-2"/>
+            }
+            @(IsEdit ? "Salvar" : "Criar")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] 
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+    
+    // Parâmetros de entrada
+    [Parameter] public int? CardId { get; set; }
+    [Parameter] public int ColumnId { get; set; }
+    [Parameter] public bool IsEdit { get; set; } = false;
+    [Parameter] public string? InitialTitle { get; set; }
+    [Parameter] public string? InitialDescription { get; set; }
+    [Parameter] public DateTime? InitialDueDate { get; set; }
+    [Parameter] public KanbanPriority InitialPriority { get; set; } = KanbanPriority.None;
+    [Parameter] public int? InitialAssignedUserId { get; set; }
+    [Parameter] public string? InitialAssignedUserName { get; set; }
+    [Parameter] public string? InitialColor { get; set; }
+    [Parameter] public DateTime? InitialCompletedAt { get; set; }
+    [Parameter] public DateTime? InitialCreatedAt { get; set; }
+    [Parameter] public List<KanbanLabelDto>? InitialLabels { get; set; }
+    [Parameter] public List<int>? InitialLabelIds { get; set; }
+    [Parameter] public List<KanbanLabelDto>? BoardLabels { get; set; }
+    [Parameter] public List<UserOption>? AssignableUsers { get; set; }
+
+    // Estado do formulário
+    private string _title = string.Empty;
+    private string? _description;
+    private DateTime? _dueDate;
+    private KanbanPriority _priority = KanbanPriority.None;
+    private UserOption? _selectedUser;
+    private string? _cardColor;
+    private bool _isCompleted;
+    private bool _isProcessing;
+    private DateTime? _createdAt;
+
+    // Labels
+    private List<KanbanLabelDto> _availableLabels = new();
+    private IReadOnlyCollection<KanbanLabelDto> _selectedLabels = new List<KanbanLabelDto>();
+
+    // Comments
+    private List<KanbanCommentDto> _comments = new();
+    private string _newComment = string.Empty;
+    private bool _loadingComments;
+    private bool _isSubmittingComment;
+
+    // History
+    private List<KanbanCardHistoryDto> _history = new();
+    private bool _loadingHistory;
+
+    // Users for autocomplete
+    private List<UserOption> _users = new();
+
+    private readonly string[] _colorOptions = new[]
+    {
+        "#EF4444", "#F59E0B", "#22C55E", "#3B82F6", "#8B5CF6", "#EC4899", "#06B6D4", "#84CC16"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        _title = InitialTitle ?? string.Empty;
+        _description = InitialDescription;
+        _dueDate = InitialDueDate;
+        _priority = InitialPriority;
+        _cardColor = InitialColor;
+        _isCompleted = InitialCompletedAt.HasValue;
+        _createdAt = InitialCreatedAt;
+
+        if (InitialAssignedUserId.HasValue && !string.IsNullOrEmpty(InitialAssignedUserName))
+        {
+            _selectedUser = new UserOption(InitialAssignedUserId.Value, InitialAssignedUserName, null);
+        }
+
+        // Use provided labels or load from API
+        if (BoardLabels?.Any() == true)
+        {
+            _availableLabels = BoardLabels;
+        }
+        else
+        {
+            await LoadLabels();
+        }
+
+        // Set selected labels from InitialLabelIds or InitialLabels
+        if (InitialLabelIds?.Any() == true)
+        {
+            _selectedLabels = _availableLabels.Where(l => InitialLabelIds.Contains(l.Id)).ToList();
+        }
+        else if (InitialLabels?.Any() == true)
+        {
+            _selectedLabels = _availableLabels.Where(l => InitialLabels.Any(il => il.Id == l.Id)).ToList();
+        }
+
+        // Use provided users or load from API
+        if (AssignableUsers?.Any() == true)
+        {
+            _users = AssignableUsers;
+        }
+        else
+        {
+            await LoadUsers();
+        }
+
+        // Load comments and history if editing
+        if (IsEdit && CardId.HasValue)
+        {
+            await Task.WhenAll(LoadComments(), LoadHistory());
+        }
+    }
+
+    private async Task LoadLabels()
+    {
+        try
+        {
+            var labels = await Api.GetAsync<List<KanbanLabelDto>>("api/kanban/labels");
+            _availableLabels = labels ?? new();
+        }
+        catch { }
+    }
+
+    private async Task LoadUsers()
+    {
+        try
+        {
+            var users = await Api.GetAsync<List<UserOption>>("api/kanban/users");
+            _users = users ?? new();
+        }
+        catch { }
+    }
+
+    private async Task LoadComments()
+    {
+        if (!CardId.HasValue) return;
+        _loadingComments = true;
+        try
+        {
+            var comments = await Api.GetAsync<List<KanbanCommentDto>>($"api/kanban/cards/{CardId}/comments");
+            _comments = comments ?? new();
+        }
+        catch { }
+        finally
+        {
+            _loadingComments = false;
+        }
+    }
+
+    private async Task LoadHistory()
+    {
+        if (!CardId.HasValue) return;
+        _loadingHistory = true;
+        try
+        {
+            var history = await Api.GetAsync<List<KanbanCardHistoryDto>>($"api/kanban/cards/{CardId}/history");
+            _history = history ?? new();
+        }
+        catch { }
+        finally
+        {
+            _loadingHistory = false;
+        }
+    }
+
+    private async Task<IEnumerable<UserOption>> SearchUsers(string value, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return _users.Take(10);
+
+        return _users.Where(u => u.FullName.Contains(value, StringComparison.OrdinalIgnoreCase)).Take(10);
+    }
+
+    private async Task AddComment()
+    {
+        if (string.IsNullOrWhiteSpace(_newComment) || !CardId.HasValue) return;
+
+        _isSubmittingComment = true;
+        try
+        {
+            var result = await Api.PostAsJsonAsync<CreateCommentRequest, KanbanCommentDto>(
+                $"api/kanban/cards/{CardId}/comments", 
+                new CreateCommentRequest(_newComment));
+
+            if (result is not null)
+            {
+                _comments.Insert(0, result);
+                _newComment = string.Empty;
+            }
+        }
+        catch { }
+        finally
+        {
+            _isSubmittingComment = false;
+        }
+    }
+
+    private string GetInitials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "?";
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 1) return parts[0][..1].ToUpper();
+        return $"{parts[0][0]}{parts[^1][0]}".ToUpper();
+    }
+
+    private MudBlazor.Color GetHistoryColor(string action) => action switch
+    {
+        "Created" => MudBlazor.Color.Success,
+        "Updated" => MudBlazor.Color.Info,
+        "Moved" => MudBlazor.Color.Primary,
+        "CommentAdded" or "CommentEdited" or "CommentDeleted" => MudBlazor.Color.Secondary,
+        "Archived" or "Restored" => MudBlazor.Color.Warning,
+        _ => MudBlazor.Color.Default
+    };
+
+    private void Cancel() => MudDialog.Cancel();
+    
+    private void Submit()
+    {
+        if (string.IsNullOrWhiteSpace(_title)) return;
+
+        var result = new CardDialogResult(
+            Title: _title,
+            Description: _description,
+            DueDate: _dueDate,
+            Priority: _priority,
+            AssignedUserId: _selectedUser?.Id,
+            Color: _cardColor,
+            LabelIds: _selectedLabels.Select(l => l.Id).ToList(),
+            CompletedAt: _isCompleted ? DateTime.UtcNow : null,
+            Delete: false,
+            Archive: false
+        );
+        MudDialog.Close(DialogResult.Ok(result));
+    }
+
+    private void Delete()
+    {
+        var result = new CardDialogResult(
+            Title: _title,
+            Description: _description,
+            DueDate: null,
+            Priority: KanbanPriority.None,
+            AssignedUserId: null,
+            Color: null,
+            LabelIds: new(),
+            CompletedAt: null,
+            Delete: true,
+            Archive: false
+        );
+        MudDialog.Close(DialogResult.Ok(result));
+    }
+
+    private void Archive()
+    {
+        var result = new CardDialogResult(
+            Title: _title,
+            Description: _description,
+            DueDate: null,
+            Priority: KanbanPriority.None,
+            AssignedUserId: null,
+            Color: null,
+            LabelIds: new(),
+            CompletedAt: null,
+            Delete: false,
+            Archive: true
+        );
+        MudDialog.Close(DialogResult.Ok(result));
+    }
+
+    public record CardDialogResult(
+        string Title,
+        string? Description,
+        DateTime? DueDate,
+        KanbanPriority Priority,
+        int? AssignedUserId,
+        string? Color,
+        List<int> LabelIds,
+        DateTime? CompletedAt,
+        bool Delete,
+        bool Archive
+    );
+
+    public record UserOption(int Id, string FullName, string? Photo);
+}

@@ -24,6 +24,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<Models.Kanban.KanbanBoard> KanbanBoards { get; set; } = null!;
     public DbSet<Models.Kanban.KanbanColumn> KanbanColumns { get; set; } = null!;
     public DbSet<Models.Kanban.KanbanCard> KanbanCards { get; set; } = null!;
+    public DbSet<Models.Kanban.KanbanLabel> KanbanLabels { get; set; } = null!;
+    public DbSet<Models.Kanban.KanbanCardLabel> KanbanCardLabels { get; set; } = null!;
+    public DbSet<Models.Kanban.KanbanComment> KanbanComments { get; set; } = null!;
+    public DbSet<Models.Kanban.KanbanCardHistory> KanbanCardHistories { get; set; } = null!;
 
     // Inventory
     public DbSet<Models.Inventory.Product> Products { get; set; } = null!;
@@ -516,7 +520,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             b.ToTable("KanbanBoards");
             b.HasKey(x => x.Id);
             b.Property(x => x.Name).HasMaxLength(200).IsRequired();
-            b.HasOne<ApplicationUser>()
+            b.HasOne(x => x.Owner)
                 .WithMany()
                 .HasForeignKey(x => x.OwnerId)
                 .OnDelete(DeleteBehavior.Cascade);
@@ -543,11 +547,88 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             t.Property(x => x.Title).HasMaxLength(300).IsRequired();
             t.Property(x => x.Description).HasMaxLength(4000);
             t.Property(x => x.Position).IsRequired();
+            t.Property(x => x.Color).HasMaxLength(7);
+            t.Property(x => x.Priority).HasConversion<int>().HasDefaultValue(Models.Kanban.KanbanPriority.None);
             t.HasOne(x => x.Column)
                 .WithMany(x => x.Cards)
                 .HasForeignKey(x => x.ColumnId)
                 .OnDelete(DeleteBehavior.Cascade);
+            t.HasOne(x => x.AssignedUser)
+                .WithMany()
+                .HasForeignKey(x => x.AssignedUserId)
+                .OnDelete(DeleteBehavior.SetNull);
             t.HasIndex(x => new { x.ColumnId, x.Position });
+            t.HasIndex(x => x.AssignedUserId);
+            t.HasIndex(x => x.DueDate);
+            t.HasIndex(x => x.Priority);
+            t.HasIndex(x => x.IsArchived);
+        });
+
+        // KanbanLabel
+        modelBuilder.Entity<Models.Kanban.KanbanLabel>(l =>
+        {
+            l.ToTable("KanbanLabels");
+            l.HasKey(x => x.Id);
+            l.Property(x => x.Name).HasMaxLength(50).IsRequired();
+            l.Property(x => x.Color).HasMaxLength(7).IsRequired();
+            l.HasOne(x => x.Board)
+                .WithMany(x => x.Labels)
+                .HasForeignKey(x => x.BoardId)
+                .OnDelete(DeleteBehavior.Cascade);
+            l.HasIndex(x => new { x.BoardId, x.Name });
+        });
+
+        // KanbanCardLabel (many-to-many)
+        modelBuilder.Entity<Models.Kanban.KanbanCardLabel>(cl =>
+        {
+            cl.ToTable("KanbanCardLabels");
+            cl.HasKey(x => new { x.CardId, x.LabelId });
+            cl.HasOne(x => x.Card)
+                .WithMany(x => x.CardLabels)
+                .HasForeignKey(x => x.CardId)
+                .OnDelete(DeleteBehavior.Cascade);
+            cl.HasOne(x => x.Label)
+                .WithMany()
+                .HasForeignKey(x => x.LabelId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // KanbanComment
+        modelBuilder.Entity<Models.Kanban.KanbanComment>(c =>
+        {
+            c.ToTable("KanbanComments");
+            c.HasKey(x => x.Id);
+            c.Property(x => x.Content).HasMaxLength(4000).IsRequired();
+            c.HasOne(x => x.Card)
+                .WithMany(x => x.Comments)
+                .HasForeignKey(x => x.CardId)
+                .OnDelete(DeleteBehavior.Cascade);
+            c.HasOne(x => x.Author)
+                .WithMany()
+                .HasForeignKey(x => x.AuthorId)
+                .OnDelete(DeleteBehavior.Restrict);
+            c.HasIndex(x => x.CardId);
+            c.HasIndex(x => x.CreatedAt);
+        });
+
+        // KanbanCardHistory
+        modelBuilder.Entity<Models.Kanban.KanbanCardHistory>(h =>
+        {
+            h.ToTable("KanbanCardHistories");
+            h.HasKey(x => x.Id);
+            h.Property(x => x.Action).HasConversion<int>().IsRequired();
+            h.Property(x => x.Description).HasMaxLength(500).IsRequired();
+            h.Property(x => x.OldValue).HasMaxLength(1000);
+            h.Property(x => x.NewValue).HasMaxLength(1000);
+            h.HasOne(x => x.Card)
+                .WithMany(x => x.History)
+                .HasForeignKey(x => x.CardId)
+                .OnDelete(DeleteBehavior.Cascade);
+            h.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            h.HasIndex(x => new { x.CardId, x.CreatedAt });
         });
 
         ConfigureTenancyModels(modelBuilder);
