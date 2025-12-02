@@ -1,6 +1,7 @@
 @page "/sales/{Id:int}"
 @using erp.DTOs.Sales
 @using erp.Services
+@using erp.DTOs.Inventory
 @using erp.Components.Shared.Dialogs
 @using MudBlazor
 @using Size = MudBlazor.Size
@@ -34,6 +35,7 @@ else if (_error != null)
 else if (_sale != null)
 {
     <!-- Header with actions -->
+    <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
             <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Href="/sales" Title="Voltar"/>
@@ -217,6 +219,7 @@ else if (_sale != null)
             </MudCard>
         </MudItem>
     </MudGrid>
+    </MudContainer>
 }
 
 @code {
@@ -458,6 +461,13 @@ else if (_sale != null)
 
         if (result != null && !result.Canceled)
         {
+            var stockError = await CheckInventoryForSale(_sale);
+            if (!string.IsNullOrEmpty(stockError))
+            {
+                Snackbar.Add(stockError, Severity.Warning);
+                return;
+            }
+
             try
             {
                 await ApiService.PostAsync<object>($"/api/sales/{Id}/finalize", null);
@@ -467,7 +477,8 @@ else if (_sale != null)
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Erro ao finalizar venda {SaleId}", Id);
-                Snackbar.Add($"Erro ao finalizar venda: {ex.Message}", Severity.Error);
+                var friendly = ExtractServerErrorMessage(ex.Message);
+                Snackbar.Add($"Erro ao finalizar venda: {friendly}", Severity.Error);
             }
         }
     }
@@ -512,5 +523,62 @@ else if (_sale != null)
             "Cancelada" => MudBlazor.Color.Error,
             _ => MudBlazor.Color.Default
         };
+    }
+    
+    private async Task<string?> CheckInventoryForSale(SaleDto sale)
+    {
+        var insufficient = new List<string>();
+        foreach (var item in sale.Items)
+        {
+            try
+            {
+                var product = await ApiService.GetAsync<ProductDto>($"/api/products/{item.ProductId}");
+                if (product == null)
+                {
+                    insufficient.Add($"Produto {item.ProductName} (SKU: {item.ProductSku}) não encontrado");
+                    continue;
+                }
+
+                if (!product.AllowNegativeStock && product.CurrentStock < item.Quantity)
+                {
+                    insufficient.Add($"Estoque insuficiente para '{product.Name}' (SKU: {product.Sku}). Disponível: {product.CurrentStock}, Solicitado: {item.Quantity}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Não foi possível verificar estoque para o produto {ProductId}", item.ProductId);
+            }
+        }
+
+        if (insufficient.Any())
+        {
+            return string.Join("\n", insufficient);
+        }
+
+        return null;
+    }
+
+    private string ExtractServerErrorMessage(string errorMessage)
+    {
+        if (string.IsNullOrWhiteSpace(errorMessage)) return "Erro desconhecido";
+
+        var jsonStart = errorMessage.IndexOf('{');
+        if (jsonStart >= 0)
+        {
+            var json = errorMessage.Substring(jsonStart);
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("message", out var msgProp))
+                {
+                    return msgProp.GetString() ?? errorMessage;
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        return errorMessage;
     }
 }
