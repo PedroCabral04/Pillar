@@ -66,14 +66,6 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
             new KanbanColumn { BoardId = board.Id, Title = "Feito", Position = 2 }
         );
 
-        // Default labels
-        db.KanbanLabels.AddRange(
-            new KanbanLabel { BoardId = board.Id, Name = "Bug", Color = "#EF4444" },
-            new KanbanLabel { BoardId = board.Id, Name = "Feature", Color = "#22C55E" },
-            new KanbanLabel { BoardId = board.Id, Name = "Melhoria", Color = "#3B82F6" },
-            new KanbanLabel { BoardId = board.Id, Name = "Urgente", Color = "#F59E0B" }
-        );
-
         await db.SaveChangesAsync();
 
         return Created($"/api/kanban/boards/{board.Id}", new KanbanBoardDto(board.Id, board.Name, board.CreatedAt));
@@ -177,10 +169,20 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
     }
 
     [HttpGet("columns")]
-    public async Task<ActionResult<object>> GetColumns()
+    public async Task<ActionResult<object>> GetColumns([FromQuery] int? boardId = null)
     {
         var myId = await GetMyUserIdAsync();
-        var board = await db.KanbanBoards.FirstOrDefaultAsync(b => b.OwnerId == myId);
+        
+        KanbanBoard? board;
+        if (boardId.HasValue)
+        {
+            board = await db.KanbanBoards.FirstOrDefaultAsync(b => b.Id == boardId.Value && b.OwnerId == myId);
+        }
+        else
+        {
+            board = await db.KanbanBoards.FirstOrDefaultAsync(b => b.OwnerId == myId);
+        }
+        
         if (board is null) return Ok(new { columns = Array.Empty<object>() });
 
         // Load columns with all related data - use single filtered include then chain ThenIncludes
@@ -227,10 +229,20 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
     }
 
     [HttpGet("stats")]
-    public async Task<ActionResult<KanbanStatsDto>> GetStats()
+    public async Task<ActionResult<KanbanStatsDto>> GetStats([FromQuery] int? boardId = null)
     {
         var myId = await GetMyUserIdAsync();
-        var board = await db.KanbanBoards.FirstOrDefaultAsync(b => b.OwnerId == myId);
+        
+        KanbanBoard? board;
+        if (boardId.HasValue)
+        {
+            board = await db.KanbanBoards.FirstOrDefaultAsync(b => b.Id == boardId.Value && b.OwnerId == myId);
+        }
+        else
+        {
+            board = await db.KanbanBoards.FirstOrDefaultAsync(b => b.OwnerId == myId);
+        }
+        
         if (board is null) return Ok(new KanbanStatsDto(0, 0, 0, 0, 0));
 
         var cardIds = await db.KanbanColumns
@@ -652,10 +664,20 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
     // ===== Labels =====
 
     [HttpGet("labels")]
-    public async Task<ActionResult<List<KanbanLabelDto>>> GetLabels()
+    public async Task<ActionResult<List<KanbanLabelDto>>> GetLabels([FromQuery] int? boardId = null)
     {
         var myId = await GetMyUserIdAsync();
-        var board = await db.KanbanBoards.FirstOrDefaultAsync(b => b.OwnerId == myId);
+        
+        KanbanBoard? board;
+        if (boardId.HasValue)
+        {
+            board = await db.KanbanBoards.FirstOrDefaultAsync(b => b.Id == boardId.Value && b.OwnerId == myId);
+        }
+        else
+        {
+            board = await db.KanbanBoards.FirstOrDefaultAsync(b => b.OwnerId == myId);
+        }
+        
         if (board is null) return Ok(new List<KanbanLabelDto>());
 
         var labels = await db.KanbanLabels
@@ -671,7 +693,17 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
     public async Task<ActionResult<KanbanLabelDto>> CreateLabel([FromBody] CreateLabelRequest req)
     {
         var myId = await GetMyUserIdAsync();
-        var board = await db.KanbanBoards.FirstOrDefaultAsync(b => b.OwnerId == myId);
+        
+        KanbanBoard? board;
+        if (req.BoardId.HasValue)
+        {
+            board = await db.KanbanBoards.FirstOrDefaultAsync(b => b.Id == req.BoardId.Value && b.OwnerId == myId);
+        }
+        else
+        {
+            board = await db.KanbanBoards.FirstOrDefaultAsync(b => b.OwnerId == myId);
+        }
+        
         if (board is null) return NotFound("Crie o quadro primeiro");
 
         var label = new KanbanLabel

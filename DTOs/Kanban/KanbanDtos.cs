@@ -88,7 +88,7 @@ public record CreateBoardRequest(string Name);
 public record RenameBoardRequest(string Name);
 
 // Labels
-public record CreateLabelRequest(string Name, string Color);
+public record CreateLabelRequest(string Name, string Color, int? BoardId = null);
 
 public record UpdateLabelRequest(string Name, string Color);
 

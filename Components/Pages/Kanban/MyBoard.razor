@@ -391,10 +391,11 @@
 
         try
         {
-            var dataTask = Api.GetAsync<ColumnsResponse>("api/kanban/columns");
-            var statsTask = Api.GetAsync<KanbanStatsDto>("api/kanban/stats");
+            var boardIdParam = _board?.Id > 0 ? $"?boardId={_board.Id}" : "";
+            var dataTask = Api.GetAsync<ColumnsResponse>($"api/kanban/columns{boardIdParam}");
+            var statsTask = Api.GetAsync<KanbanStatsDto>($"api/kanban/stats{boardIdParam}");
             var usersTask = Api.GetAsync<List<AssignableUserDto>>("api/kanban/assignable-users");
-            var labelsTask = Api.GetAsync<List<KanbanLabelDto>>("api/kanban/labels");
+            var labelsTask = Api.GetAsync<List<KanbanLabelDto>>($"api/kanban/labels{boardIdParam}");
 
             await Task.WhenAll(dataTask, statsTask, usersTask, labelsTask);
 
@@ -788,12 +789,17 @@
 
     private async Task OpenLabelsDialog()
     {
+        var parameters = new DialogParameters<KanbanLabelsDialog>
+        {
+            { x => x.BoardId, _board?.Id ?? 0 }
+        };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
-        var dialog = await DialogService.ShowAsync<KanbanLabelsDialog>("Gerenciar Etiquetas", options);
+        var dialog = await DialogService.ShowAsync<KanbanLabelsDialog>("Gerenciar Etiquetas", parameters, options);
         var result = await dialog.Result;
         
         // Reload labels after dialog closes
-        _boardLabels = await Api.GetAsync<List<KanbanLabelDto>>("api/kanban/labels") ?? new();
+        var boardIdParam = _board?.Id > 0 ? $"?boardId={_board.Id}" : "";
+        _boardLabels = await Api.GetAsync<List<KanbanLabelDto>>($"api/kanban/labels{boardIdParam}") ?? new();
         // Reload cards to update label associations
         await LoadDataAsync();
         StateHasChanged();
@@ -811,12 +817,11 @@
         
         if (result is { Canceled: false } && result.Data is int selectedBoardId)
         {
-            // If a different board was selected, reload the entire page
-            // For now, we only support one board view, but this enables future navigation
+            // If a different board was selected, load that specific board
             if (selectedBoardId != _board?.Id)
             {
-                // Reload current board data (future: navigate to selected board)
-                _board = await Api.GetAsync<KanbanBoardDto>("api/kanban/board");
+                // Load the selected board specifically
+                _board = await Api.GetAsync<KanbanBoardDto>($"api/kanban/boards/{selectedBoardId}");
                 await LoadDataAsync();
                 StateHasChanged();
             }
@@ -824,7 +829,14 @@
         else
         {
             // Dialog was closed, refresh board in case name changed
-            _board = await Api.GetAsync<KanbanBoardDto>("api/kanban/board");
+            if (_board?.Id > 0)
+            {
+                _board = await Api.GetAsync<KanbanBoardDto>($"api/kanban/boards/{_board.Id}");
+            }
+            else
+            {
+                _board = await Api.GetAsync<KanbanBoardDto>("api/kanban/board");
+            }
             StateHasChanged();
         }
     }

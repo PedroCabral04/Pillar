@@ -168,7 +168,8 @@
         _isLoading = true;
         try
         {
-            var labels = await Api.GetAsync<List<KanbanLabelDto>>("api/kanban/labels");
+            var boardIdParam = BoardId > 0 ? $"?boardId={BoardId}" : "";
+            var labels = await Api.GetAsync<List<KanbanLabelDto>>($"api/kanban/labels{boardIdParam}");
             _labels = labels ?? new();
         }
         catch { }
@@ -187,7 +188,7 @@
         {
             var result = await Api.PostAsJsonAsync<CreateLabelRequest, KanbanLabelDto>(
                 "api/kanban/labels",
-                new CreateLabelRequest(_newLabelName.Trim(), _newLabelColor.ToString(MudColorOutputFormats.Hex)));
+                new CreateLabelRequest(_newLabelName.Trim(), _newLabelColor.ToString(MudColorOutputFormats.Hex), BoardId > 0 ? BoardId : null));
 
             if (result is not null)
             {
