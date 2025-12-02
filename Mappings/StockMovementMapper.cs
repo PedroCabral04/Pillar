@@ -10,6 +10,7 @@ namespace erp.Mappings;
 public partial class StockMovementMapper
 {
     // StockMovement -> StockMovementDto
+    [UserMapping(Default = true)]
     public partial StockMovementDto MovementToMovementDto(StockMovement movement);
     public partial IEnumerable<StockMovementDto> MovementsToMovementDtos(IEnumerable<StockMovement> movements);
     

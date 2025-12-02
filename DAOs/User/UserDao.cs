@@ -95,7 +95,7 @@ public class UserDao(ApplicationDbContext context) : IUserDao
         }
     }
 
-    public async Task<User> GetByEmailAsync(string email)
+    public async Task<User?> GetByEmailAsync(string email)
     {
         return await _context.Users
             .Include(u => u.UserRoles)

@@ -37,7 +37,7 @@
                                           Variant="Variant.Outlined"
                                           Placeholder="00.000.000/0000-00"
                                           Mask="@_cnpjMask"
-                                          Validation="@(new Func<string, string>(ValidateTaxId))"
+                                          Validation="@(new Func<string, string?>(ValidateTaxId))"
                                           Adornment="Adornment.Start"
                                           AdornmentIcon="@Icons.Material.Filled.Badge"/>
                         </MudItem>
@@ -57,7 +57,7 @@
                                           InputType="InputType.Email" 
                                           Variant="Variant.Outlined"
                                           Placeholder="contato@empresa.com.br"
-                                          Validation="@(new Func<string, string>(ValidateEmail))"
+                                          Validation="@(new Func<string, string?>(ValidateEmail))"
                                           Adornment="Adornment.Start"
                                           AdornmentIcon="@Icons.Material.Filled.Email"/>
                         </MudItem>
@@ -230,10 +230,10 @@
 </MudDialog>
 
 @code {
-    [CascadingParameter] IMudDialogInstance MudDialog { get; set; }
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
     [Parameter] public CreateSupplierDto Model { get; set; } = new() { Name = "", TaxId = "" };
 
-    private MudForm form;
+    private MudForm form = null!;
     private bool success;
     private bool _saving = false;
     
@@ -244,7 +244,7 @@
     private PatternMask _mobileMask = new PatternMask("(00) 00000-0000");
     private PatternMask _cepMask = new PatternMask("00000-000");
 
-    private string ValidateTaxId(string value)
+    private string? ValidateTaxId(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
             return null; // Required validation handled separately
@@ -311,7 +311,7 @@
         return cnpj.EndsWith(tempCnpj.Substring(12) + digit.ToString());
     }
     
-    private string ValidateEmail(string value)
+    private string? ValidateEmail(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
             return null; // Email is optional

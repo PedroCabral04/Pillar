@@ -504,7 +504,7 @@
 
         var dialog = await DialogService.ShowAsync<PayrollNotesDialog>("Aprovar folha", parameters, new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small });
         var result = await dialog.Result;
-        if (result.Canceled || result.Data is not PayrollNotesDialogResult payload)
+        if (result is null || result.Canceled || result.Data is not PayrollNotesDialogResult payload)
         {
             return;
         }
@@ -549,7 +549,7 @@
 
         var dialog = await DialogService.ShowAsync<PayrollNotesDialog>("Registrar pagamento", parameters, new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small });
         var result = await dialog.Result;
-        if (result.Canceled || result.Data is not PayrollNotesDialogResult payload || payload.PaymentDate is null)
+        if (result is null || result.Canceled || result.Data is not PayrollNotesDialogResult payload || payload.PaymentDate is null)
         {
             return;
         }

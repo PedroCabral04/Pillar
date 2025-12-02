@@ -104,11 +104,11 @@
 </MudDialog>
 
 @code {
-    [CascadingParameter] IMudDialogInstance MudDialog { get; set; }
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
     [Parameter] public CreateCostCenterDto Model { get; set; } = new() { Name = "", Code = "" };
     [Parameter] public List<UserDto> Users { get; set; } = new();
 
-    private MudForm form;
+    private MudForm form = null!;
     private bool success;
 
     private void Cancel() => MudDialog.Cancel();

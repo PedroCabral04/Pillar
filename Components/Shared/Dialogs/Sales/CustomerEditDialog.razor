@@ -218,7 +218,7 @@
         _processing = true;
         try
         {
-            var customer = await ApiService.PutAsync<CustomerDto>($"/api/sales/customers/{CustomerId}", _model);
+            var customer = await ApiService.PutAsync<CustomerDto>($"/api/sales/customers/{CustomerId}", _model ?? new());
             Snackbar.Add("Cliente atualizado com sucesso!", Severity.Success);
             MudDialog.Close(DialogResult.Ok(customer));
         }

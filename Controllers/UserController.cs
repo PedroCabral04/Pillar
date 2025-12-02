@@ -376,7 +376,7 @@ namespace erp.Controllers
         public async Task<IActionResult> UpdateUser(int id, [FromBody] UpdateUserDto updateUserDto)
         {
             var user = await _users.FindByIdAsync(id.ToString());
-            if (!UserVisible(user))
+            if (user == null || !UserVisible(user))
                 return NotFound($"Usuário com ID {id} não encontrado.");
 
             user.UserName = updateUserDto.Username ?? user.UserName;
@@ -482,7 +482,7 @@ namespace erp.Controllers
         public async Task<IActionResult> DeleteUser(int id)
         {
             var user = await _users.FindByIdAsync(id.ToString());
-            if (!UserVisible(user))
+            if (user == null || !UserVisible(user))
                 return NotFound($"Usuário com ID {id} não encontrado.");
 
             var res = await _users.DeleteAsync(user);

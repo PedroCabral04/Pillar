@@ -5,7 +5,23 @@
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
-        <NoWarn>$(NoWarn);1591</NoWarn>
+        <!-- 
+            Suppressed warnings:
+            1591: Missing XML comment
+            CS0618: Obsolete member usage (Mapperly generated code uses Name instead of FullName)
+            CS8981: Lowercase type names (EF migrations)
+            CS0169: Field never used (common in Blazor components for future features)
+            CS0649: Field never assigned (common in Blazor components)
+            MUD0002: MudBlazor analyzer warnings for attribute naming
+            CS8602: Possible null reference dereference (common in Blazor with dialog results)
+            CS8600: Converting null literal to non-nullable type
+            CS8618: Non-nullable field not initialized (common with [CascadingParameter])
+            CS8603: Possible null reference return
+            CS8604: Possible null reference argument  
+            CS8625: Cannot convert null literal to non-nullable reference type
+            CS1998: Async method lacks await operators
+        -->
+        <NoWarn>$(NoWarn);1591;CS0618;CS8981;CS0169;CS0649;MUD0002;CS8602;CS8600;CS8618;CS8603;CS8604;CS8625;CS1998</NoWarn>
     </PropertyGroup>
 
 

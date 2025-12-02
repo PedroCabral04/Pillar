@@ -20,6 +20,7 @@ public partial class SalesMapper
     public partial SaleDto ToDtoWithRelations(Sale sale);
     
     // SaleItem mappings
+    [UserMapping(Default = true)]
     public partial SaleItemDto ToDto(SaleItem item);
     
     [MapProperty(nameof(SaleItem.Product.Name), nameof(SaleItemDto.ProductName))]

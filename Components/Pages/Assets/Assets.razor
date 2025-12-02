@@ -230,7 +230,7 @@
         var dialog = await DialogService.ShowAsync<AssetForm>("Adicionar Ativo", options);
         var result = await dialog.Result;
 
-        if (!result.Canceled)
+        if (result is { Canceled: false })
         {
             await LoadStatistics();
             await LoadAssets();
@@ -252,9 +252,9 @@
         };
 
         var dialog = await DialogService.ShowAsync<AssetForm>("Editar Ativo", parameters, options);
-        var result = await dialog.Result;
+        var result2 = await dialog.Result;
 
-        if (!result.Canceled)
+        if (result2 is { Canceled: false })
         {
             await LoadStatistics();
             await LoadAssets();

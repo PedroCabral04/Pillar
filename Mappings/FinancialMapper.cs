@@ -50,6 +50,8 @@ public partial class FinancialMapper
     public partial AccountPayableSummaryDto ToSummaryDtoWithRelations(AccountPayable account);
     
     // Financial Category mappings
+    [MapperIgnoreSource(nameof(FinancialCategory.ParentCategory))]
+    [UserMapping(Default = true)]
     public partial FinancialCategoryDto ToDto(FinancialCategory category);
     public partial FinancialCategory ToEntity(CreateFinancialCategoryDto dto);
     public partial void UpdateEntity(UpdateFinancialCategoryDto dto, FinancialCategory entity);
