@@ -59,6 +59,15 @@ public sealed class DemoDataSeeder
         var tenant = await EnsureTenantAsync(cancellationToken);
         var demoUser = await EnsureDemoUserAsync(tenant, cancellationToken);
 
+        // Ensure admin user is also linked to this tenant
+        var adminUser = await _userManager.FindByEmailAsync("admin@erp.local");
+        if (adminUser != null && adminUser.TenantId != tenant.Id)
+        {
+            adminUser.TenantId = tenant.Id;
+            await _userManager.UpdateAsync(adminUser);
+            _logger.LogInformation("Updated admin@erp.local to belong to tenant {Tenant}", tenant.Slug);
+        }
+
         if (!_options.Force && await _db.Products.AnyAsync(p => p.TenantId == tenant.Id, cancellationToken))
         {
             _logger.LogInformation("Demo data already exists for tenant {Tenant}. Set DemoSeed:Force=true to regenerate.", tenant.Slug);
