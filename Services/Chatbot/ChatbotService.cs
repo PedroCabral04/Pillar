@@ -199,7 +199,15 @@ public class ChatbotService : IChatbotService
                 Seja prestativo, profissional e objetivo nas respostas.
                 Quando o usuário pedir para cadastrar algo ou realizar uma ação, use as funções disponíveis.
                 Sempre confirme o sucesso ou falha das operações realizadas.
-                Responda em português brasileiro de forma clara e amigável.");
+                Responda em português brasileiro de forma clara e amigável.
+
+                IMPORTANTE SOBRE FORMATAÇÃO:
+                - Use SEMPRE formatação Markdown para tornar as respostas legíveis.
+                - Ao listar itens (produtos, vendas, funcionários, etc.), use listas com marcadores (-) ou numéricas.
+                - Destaque informações importantes como nomes, valores e IDs usando negrito (**texto**).
+                - Pule linhas entre itens de uma lista para facilitar a leitura.
+                - Se houver muitos detalhes, considere usar tabelas Markdown ou agrupar as informações logicamente.
+                - NUNCA retorne blocos de texto contínuos sem quebras de linha para listas de dados.");
 
             // Adicionar histórico anterior se existir
             if (conversationHistory != null)
