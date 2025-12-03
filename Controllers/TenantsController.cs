@@ -13,10 +13,12 @@ namespace erp.Controllers;
 public class TenantsController : ControllerBase
 {
     private readonly ITenantService _tenantService;
+    private readonly ITenantBrandingService _brandingService;
 
-    public TenantsController(ITenantService tenantService)
+    public TenantsController(ITenantService tenantService, ITenantBrandingService brandingService)
     {
         _tenantService = tenantService;
+        _brandingService = brandingService;
     }
 
     [HttpGet]
@@ -120,6 +122,66 @@ public class TenantsController : ControllerBase
         {
             return NotFound();
         }
+    }
+
+    /// <summary>
+    /// Upload a branding image (logo or favicon) for a tenant.
+    /// Images exceeding maximum dimensions will be auto-resized.
+    /// </summary>
+    /// <param name="id">Tenant ID</param>
+    /// <param name="imageType">Type of image: "logo" or "favicon"</param>
+    /// <param name="file">The image file</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    [HttpPost("{id:int}/branding/{imageType}")]
+    [RequestSizeLimit(5 * 1024 * 1024)] // 5MB max request size
+    public async Task<ActionResult<BrandingUploadResult>> UploadBrandingImageAsync(
+        int id,
+        string imageType,
+        IFormFile file,
+        CancellationToken cancellationToken)
+    {
+        if (file is null || file.Length == 0)
+        {
+            return BadRequest(new BrandingUploadResult(false, null, "Nenhum arquivo enviado.", false, 0, 0));
+        }
+
+        await using var stream = file.OpenReadStream();
+        var result = await _brandingService.UploadImageAsync(id, imageType, file.FileName, stream, cancellationToken);
+
+        if (!result.Success)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Get dimension recommendations for a branding image type.
+    /// </summary>
+    /// <param name="imageType">Type of image: "logo" or "favicon"</param>
+    [HttpGet("branding/{imageType}/recommendations")]
+    public ActionResult<ImageDimensionRecommendation> GetImageRecommendations(string imageType)
+    {
+        try
+        {
+            var recommendation = _brandingService.GetDimensionRecommendation(imageType);
+            return Ok(recommendation);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Delete a branding image for a tenant.
+    /// </summary>
+    [HttpDelete("{id:int}/branding/{imageType}")]
+    public async Task<IActionResult> DeleteBrandingImageAsync(int id, string imageType, CancellationToken cancellationToken)
+    {
+        await _brandingService.DeleteImageAsync(id, imageType, cancellationToken);
+        return NoContent();
     }
 
     private int GetCurrentUserId()

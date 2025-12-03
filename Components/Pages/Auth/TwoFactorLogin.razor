@@ -32,16 +32,8 @@
         }
         
         <div class="d-flex flex-column align-center gap-4 pa-8 text-center" style="z-index: 2; max-width: 600px;">
-             @if (!string.IsNullOrEmpty(_branding.LogoUrl))
-             {
-                 <MudImage Src="@_branding.LogoUrl" Alt="@_branding.TenantName" Width="150" Class="mb-6" ObjectFit="ObjectFit.Contain" />
-             }
-             else
-             {
-                 <MudAvatar Size="Size.Large" Color="Color.Surface" Variant="Variant.Filled" Class="mb-6" Style="width: 80px; height: 80px;">
-                     <MudText Typo="Typo.h3" Color="Color.Primary" Style="font-weight: 700;">@_branding.Initials</MudText>
-                 </MudAvatar>
-             }
+             <!-- Use tenant logo when available, otherwise fall back to local /logo.png -->
+             <MudImage Src="@(_branding.LogoUrl ?? "/logo.png")" Alt="@_branding.TenantName" Width="150" Class="mb-6" ObjectFit="ObjectFit.Contain" />
              
              <MudText Typo="Typo.h2" Style="font-weight: 700; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">@_branding.TenantName</MudText>
              <MudText Typo="Typo.h5" Style="opacity: 0.9; font-weight: 300;">Segurança em primeiro lugar.</MudText>
@@ -52,11 +44,11 @@
     <MudItem xs="12" md="6" lg="5" Class="d-flex justify-center align-center pa-4" Style="background-color: var(--mud-palette-background);">
         <MudPaper Elevation="0" Class="pa-8 w-100" Style="max-width: 480px; background: transparent;">
             
-            <!-- Mobile Branding Header -->
-            <div class="d-md-none d-flex flex-column align-center mb-8">
-                 <MudAvatar Size="Size.Large" Color="Color.Primary" Class="mb-2">@_branding.Initials</MudAvatar>
-                 <MudText Typo="Typo.h5" Color="Color.Primary" Style="font-weight: 600;">@_branding.TenantName</MudText>
-            </div>
+              <!-- Mobile Branding Header -->
+              <div class="d-md-none d-flex flex-column align-center mb-8">
+                  <MudImage Src="@(_branding.LogoUrl ?? "/logo.png")" Alt="@_branding.TenantName" Width="80" Class="mb-2" ObjectFit="ObjectFit.Contain" />
+                  <MudText Typo="Typo.h5" Color="Color.Primary" Style="font-weight: 600;">@_branding.TenantName</MudText>
+              </div>
 
             <div class="mb-10">
                 <MudText Typo="Typo.h4" Style="font-weight: 700;" Class="mb-2">Verificação em Duas Etapas</MudText>

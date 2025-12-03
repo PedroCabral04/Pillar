@@ -1,21 +1,24 @@
 ﻿@using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
+@using erp.Components.Shared
 
-<Router AppAssembly="typeof(Program).Assembly">
-    <Found Context="routeData">
-        @if (routeData.PageType == typeof(erp.Components.Pages.Auth.Login) || 
-             routeData.PageType == typeof(erp.Components.Pages.Auth.TwoFactorLogin))
-        {
-            <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.AuthLayout)" />
-        }
-        else
-        {
-        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
-            <NotAuthorized>
-                <RedirectToLogin />
-            </NotAuthorized>
-        </AuthorizeRouteView>
-        }
-        <FocusOnNavigate RouteData="routeData" Selector="h1"/>
-    </Found>
-</Router>
+<TenantStateProvider>
+    <Router AppAssembly="typeof(Program).Assembly">
+        <Found Context="routeData">
+            @if (routeData.PageType == typeof(erp.Components.Pages.Auth.Login) || 
+                 routeData.PageType == typeof(erp.Components.Pages.Auth.TwoFactorLogin))
+            {
+                <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.AuthLayout)" />
+            }
+            else
+            {
+            <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+                <NotAuthorized>
+                    <RedirectToLogin />
+                </NotAuthorized>
+            </AuthorizeRouteView>
+            }
+            <FocusOnNavigate RouteData="routeData" Selector="h1"/>
+        </Found>
+    </Router>
+</TenantStateProvider>

@@ -9,12 +9,22 @@
 
 <MudAppBar Elevation="2" Dense="false" Class="px-3">
     <div class="d-flex align-center mr-6">
-        <MudAvatar Size="MudBlazor.Size.Medium"
-               Class="me-2"
-               Square="true"
-               Image="@_branding.LogoUrl"
-               Text="@_branding.Initials"
-               Style="@($"background-color:{_branding.PrimaryColor};color:white;")" />
+        @if (!string.IsNullOrEmpty(_branding.LogoUrl))
+        {
+            <MudImage Src="@_branding.LogoUrl" 
+                      Alt="@_branding.TenantName"
+                      Height="32"
+                      ObjectFit="ObjectFit.Contain"
+                      Class="me-2 rounded" />
+        }
+        else
+        {
+            <MudAvatar Size="MudBlazor.Size.Medium"
+                   Class="me-2"
+                   Square="true"
+                   Text="@_branding.Initials"
+                   Style="@($"background-color:{_branding.PrimaryColor};color:white;")" />
+        }
         <MudText Typo="Typo.h5" Style="font-weight: 600;">@_branding.TenantName</MudText>
     </div>
     

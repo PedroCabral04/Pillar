@@ -1,10 +1,15 @@
 @using System.ComponentModel.DataAnnotations
+@using System.Net.Http.Headers
 @using erp.DTOs.Tenancy
 @using erp.Models.Tenancy
 @using erp.Services
+@using erp.Services.Tenancy
 @using MudBlazor
+@using MudBlazor.Utilities
 @inject IApiService ApiService
 @inject ISnackbar Snackbar
+@inject ITenantBrandingProvider BrandingProvider
+@inject ITenantContextAccessor TenantContextAccessor
 
 <MudDialog Class="tenant-form-dialog">
     <TitleContent>
@@ -102,20 +107,119 @@
                 <MudExpansionPanels Elevation="0">
                     <MudExpansionPanel Text="Branding e identidade visual" Expanded="@(!IsEdit)">
                         <MudGrid GutterSize="GutterSize.Small">
+                            @* Logo Upload *@
                             <MudItem xs="12" md="6">
-                                <MudTextField @bind-Value="_model.Branding.LogoUrl" Label="Logo URL" Variant="Variant.Outlined" />
+                                <MudStack Spacing="2">
+                                    <MudText Typo="Typo.subtitle2">Logo</MudText>
+                                    <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">
+                                        Recomendado: 200×60px. Máximo: 512×512px, 2MB. Formatos: PNG, JPG, SVG, WebP
+                                    </MudText>
+                                    @if (!string.IsNullOrWhiteSpace(_model.Branding.LogoUrl))
+                                    {
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                            <MudImage Src="@_model.Branding.LogoUrl" Alt="Logo" Height="40" ObjectFit="ObjectFit.Contain" Class="rounded border" />
+                                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="MudBlazor.Color.Error" Size="MudBlazor.Size.Small" OnClick="() => _model.Branding.LogoUrl = null" Title="Remover logo" />
+                                        </MudStack>
+                                    }
+                                    <MudFileUpload T="IBrowserFile" Accept=".png,.jpg,.jpeg,.svg,.webp" OnFilesChanged="OnLogoFileSelected" MaximumFileCount="1">
+                                        <ActivatorContent>
+                                            <MudButton Variant="Variant.Outlined" Color="MudBlazor.Color.Primary" StartIcon="@Icons.Material.Filled.CloudUpload" Disabled="_uploadingLogo">
+                                                @if (_uploadingLogo)
+                                                {
+                                                    <MudProgressCircular Size="MudBlazor.Size.Small" Indeterminate="true" Class="mr-2" />
+                                                }
+                                                Enviar arquivo
+                                            </MudButton>
+                                        </ActivatorContent>
+                                    </MudFileUpload>
+                                    <MudTextField @bind-Value="_model.Branding.LogoUrl" Label="ou informe URL" Variant="Variant.Outlined" Placeholder="https://..." />
+                                </MudStack>
                             </MudItem>
+                            @* Favicon Upload *@
                             <MudItem xs="12" md="6">
-                                <MudTextField @bind-Value="_model.Branding.FaviconUrl" Label="Favicon URL" Variant="Variant.Outlined" />
+                                <MudStack Spacing="2">
+                                    <MudText Typo="Typo.subtitle2">Favicon</MudText>
+                                    <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">
+                                        Recomendado: 32×32px ou 64×64px. Máximo: 128×128px, 512KB. Formatos: PNG, ICO, SVG
+                                    </MudText>
+                                    @if (!string.IsNullOrWhiteSpace(_model.Branding.FaviconUrl))
+                                    {
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                            <MudImage Src="@_model.Branding.FaviconUrl" Alt="Favicon" Height="32" Width="32" ObjectFit="ObjectFit.Contain" Class="rounded border" />
+                                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="MudBlazor.Color.Error" Size="MudBlazor.Size.Small" OnClick="() => _model.Branding.FaviconUrl = null" Title="Remover favicon" />
+                                        </MudStack>
+                                    }
+                                    <MudFileUpload T="IBrowserFile" Accept=".png,.ico,.svg" OnFilesChanged="OnFaviconFileSelected" MaximumFileCount="1">
+                                        <ActivatorContent>
+                                            <MudButton Variant="Variant.Outlined" Color="MudBlazor.Color.Primary" StartIcon="@Icons.Material.Filled.CloudUpload" Disabled="_uploadingFavicon">
+                                                @if (_uploadingFavicon)
+                                                {
+                                                    <MudProgressCircular Size="MudBlazor.Size.Small" Indeterminate="true" Class="mr-2" />
+                                                }
+                                                Enviar arquivo
+                                            </MudButton>
+                                        </ActivatorContent>
+                                    </MudFileUpload>
+                                    <MudTextField @bind-Value="_model.Branding.FaviconUrl" Label="ou informe URL" Variant="Variant.Outlined" Placeholder="https://..." />
+                                </MudStack>
+                            </MudItem>
+                            @* Color Pickers *@
+                            <MudItem xs="12" md="4">
+                                <MudStack Spacing="1">
+                                    <MudText Typo="Typo.subtitle2">Cor primária</MudText>
+                                    <MudColorPicker Value="_primaryColor"
+                                                    Variant="Variant.Outlined"
+                                                    ShowAlpha="false"
+                                                    DisableToolbar="false"
+                                                    PickerVariant="PickerVariant.Inline"
+                                                    ColorPickerView="ColorPickerView.Spectrum"
+                                                    ValueChanged="OnPrimaryColorChanged" />
+                                    @if (_primaryColor is not null)
+                                    {
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                            <div style="width: 20px; height: 20px; border-radius: 4px; background-color: @_primaryColor.ToString(MudColorOutputFormats.Hex);"></div>
+                                            <MudText Typo="Typo.caption">@_primaryColor.ToString(MudColorOutputFormats.Hex)</MudText>
+                                        </MudStack>
+                                    }
+                                </MudStack>
                             </MudItem>
                             <MudItem xs="12" md="4">
-                                <MudTextField @bind-Value="_model.Branding.PrimaryColor" Label="Cor primária" Variant="Variant.Outlined" MaxLength="20" />
+                                <MudStack Spacing="1">
+                                    <MudText Typo="Typo.subtitle2">Cor secundária</MudText>
+                                    <MudColorPicker Value="_secondaryColor"
+                                                    Variant="Variant.Outlined"
+                                                    ShowAlpha="false"
+                                                    DisableToolbar="false"
+                                                    PickerVariant="PickerVariant.Inline"
+                                                    ColorPickerView="ColorPickerView.Spectrum"
+                                                    ValueChanged="OnSecondaryColorChanged" />
+                                    @if (_secondaryColor is not null)
+                                    {
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                            <div style="width: 20px; height: 20px; border-radius: 4px; background-color: @_secondaryColor.ToString(MudColorOutputFormats.Hex);"></div>
+                                            <MudText Typo="Typo.caption">@_secondaryColor.ToString(MudColorOutputFormats.Hex)</MudText>
+                                        </MudStack>
+                                    }
+                                </MudStack>
                             </MudItem>
                             <MudItem xs="12" md="4">
-                                <MudTextField @bind-Value="_model.Branding.SecondaryColor" Label="Cor secundária" Variant="Variant.Outlined" MaxLength="20" />
-                            </MudItem>
-                            <MudItem xs="12" md="4">
-                                <MudTextField @bind-Value="_model.Branding.AccentColor" Label="Cor destaque" Variant="Variant.Outlined" MaxLength="20" />
+                                <MudStack Spacing="1">
+                                    <MudText Typo="Typo.subtitle2">Cor destaque</MudText>
+                                    <MudColorPicker Value="_accentColor"
+                                                    Variant="Variant.Outlined"
+                                                    ShowAlpha="false"
+                                                    DisableToolbar="false"
+                                                    PickerVariant="PickerVariant.Inline"
+                                                    ColorPickerView="ColorPickerView.Spectrum"
+                                                    ValueChanged="OnAccentColorChanged" />
+                                    @if (_accentColor is not null)
+                                    {
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                            <div style="width: 20px; height: 20px; border-radius: 4px; background-color: @_accentColor.ToString(MudColorOutputFormats.Hex);"></div>
+                                            <MudText Typo="Typo.caption">@_accentColor.ToString(MudColorOutputFormats.Hex)</MudText>
+                                        </MudStack>
+                                    }
+                                </MudStack>
                             </MudItem>
                             <MudItem xs="12" md="6">
                                 <MudTextField @bind-Value="_model.Branding.LoginBackgroundUrl" Label="Fundo da tela de login" Variant="Variant.Outlined" />
@@ -172,6 +276,15 @@
     private bool _saving;
     private string? _errorMessage;
 
+    // File upload state
+    private bool _uploadingLogo;
+    private bool _uploadingFavicon;
+
+    // Color picker state
+    private MudColor? _primaryColor;
+    private MudColor? _secondaryColor;
+    private MudColor? _accentColor;
+
     protected override void OnInitialized()
     {
         if (Tenant is not null)
@@ -191,13 +304,122 @@
             if (Tenant.Branding is not null)
             {
                 _model.Branding = TenantBrandingModel.FromDto(Tenant.Branding);
+                // Initialize color pickers from existing values
+                _primaryColor = ParseColor(Tenant.Branding.PrimaryColor);
+                _secondaryColor = ParseColor(Tenant.Branding.SecondaryColor);
+                _accentColor = ParseColor(Tenant.Branding.AccentColor);
             }
         }
         else
         {
             _model.ProvisionDatabase = true;
+            // Default colors
+            _primaryColor = new MudColor("#2563EB");
+            _secondaryColor = new MudColor("#64748B");
+            _accentColor = new MudColor("#F59E0B");
         }
     }
+
+    private static MudColor? ParseColor(string? hexColor)
+    {
+        if (string.IsNullOrWhiteSpace(hexColor))
+            return null;
+        try
+        {
+            return new MudColor(hexColor);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private void OnPrimaryColorChanged(MudColor color)
+    {
+        _primaryColor = color;
+        _model.Branding.PrimaryColor = color?.ToString(MudColorOutputFormats.Hex);
+    }
+
+    private void OnSecondaryColorChanged(MudColor color)
+    {
+        _secondaryColor = color;
+        _model.Branding.SecondaryColor = color?.ToString(MudColorOutputFormats.Hex);
+    }
+
+    private void OnAccentColorChanged(MudColor color)
+    {
+        _accentColor = color;
+        _model.Branding.AccentColor = color?.ToString(MudColorOutputFormats.Hex);
+    }
+
+    private async Task OnLogoFileSelected(InputFileChangeEventArgs e)
+    {
+        if (e.FileCount == 0) return;
+        await UploadBrandingImage(e.File, "logo", url => _model.Branding.LogoUrl = url, v => _uploadingLogo = v);
+    }
+
+    private async Task OnFaviconFileSelected(InputFileChangeEventArgs e)
+    {
+        if (e.FileCount == 0) return;
+        await UploadBrandingImage(e.File, "favicon", url => _model.Branding.FaviconUrl = url, v => _uploadingFavicon = v);
+    }
+
+    private async Task UploadBrandingImage(IBrowserFile file, string imageType, Action<string?> setUrl, Action<bool> setUploading)
+    {
+        // For new tenants, we need to save first to get an ID
+        if (!IsEdit || Tenant is null)
+        {
+            Snackbar.Add("Salve o tenant primeiro para fazer upload de imagens.", Severity.Warning);
+            return;
+        }
+
+        setUploading(true);
+        StateHasChanged();
+
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            var fileContent = new StreamContent(file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024)); // 5MB
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
+            content.Add(fileContent, "file", file.Name);
+
+            var response = await ApiService.PostMultipartAsync($"api/tenants/{Tenant.Id}/branding/{imageType}", content);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<BrandingUploadResultDto>();
+                if (result?.Success == true)
+                {
+                    setUrl(result.Url);
+                    var message = result.WasResized 
+                        ? $"Imagem redimensionada para {result.FinalWidth}×{result.FinalHeight}px e salva!" 
+                        : "Imagem salva!";
+                    Snackbar.Add(message, Severity.Success);
+                }
+                else
+                {
+                    Snackbar.Add(result?.ErrorMessage ?? "Erro ao fazer upload", Severity.Error);
+                }
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Erro ao fazer upload: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao fazer upload: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            setUploading(false);
+            StateHasChanged();
+        }
+    }
+
+    // DTO for upload result
+    private record BrandingUploadResultDto(bool Success, string? Url, string? ErrorMessage, bool WasResized, int FinalWidth, int FinalHeight);
 
     private async Task HandleValidSubmit()
     {
@@ -226,6 +448,13 @@
 
                 var updated = await ApiService.PutAsync<TenantDto>($"api/tenants/{Tenant.Id}", updateDto);
                 Snackbar.Add($"Tenant '{updated?.Name ?? _model.Name}' atualizado com sucesso", Severity.Success);
+                
+                // Notify branding change if this is the current user's tenant
+                if (TenantContextAccessor.Current.TenantId == Tenant.Id)
+                {
+                    BrandingProvider.NotifyBrandingChanged();
+                }
+                
                 MudDialog.Close(DialogResult.Ok(updated));
             }
             else
@@ -262,7 +491,15 @@
         }
     }
 
-    private void SubmitForm() => _form?.Validate();
+    private async Task SubmitForm()
+    {
+        if (_form is null) return;
+        await _form.Validate();
+        if (_form.IsValid)
+        {
+            await HandleValidSubmit();
+        }
+    }
 
     private void Cancel() => MudDialog.Cancel();
 

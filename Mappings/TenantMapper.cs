@@ -14,8 +14,14 @@ public partial class TenantMapper
 
     public partial Tenant CreateTenantDtoToTenant(CreateTenantDto dto);
 
+    [MapperIgnoreTarget(nameof(Tenant.Branding))]
     public partial void UpdateTenantFromDto(UpdateTenantDto dto, Tenant tenant);
 
     public partial TenantBrandingDto? TenantBrandingToDto(TenantBranding? branding);
     public partial TenantBranding? TenantBrandingDtoToEntity(TenantBrandingDto? dto);
+
+    /// <summary>
+    /// Updates an existing TenantBranding entity from a DTO.
+    /// </summary>
+    public partial void UpdateBrandingFromDto(TenantBrandingDto dto, TenantBranding branding);
 }

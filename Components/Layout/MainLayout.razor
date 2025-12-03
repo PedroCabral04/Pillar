@@ -64,12 +64,11 @@
                                aria-label="@(_isSidebarLocked ? "Recolher menu lateral" : "Expandir menu lateral")" />
                 
                 <div class="d-flex align-center">
-                    <MudAvatar Size="MudBlazor.Size.Medium"
-                               Class="me-2"
-                               Square="true"
-                               Image="@_branding.LogoUrl"
-                               Text="@_branding.Initials"
-                               Style="@($"background-color:{_branding.PrimaryColor};color:white;")" />
+                    <MudImage Src='@(_branding.LogoUrl ?? "/logo.png")' 
+                              Alt="@_branding.TenantName"
+                              Height="32"
+                              ObjectFit="ObjectFit.Contain"
+                              Class="me-2" />
                     <MudText Typo="Typo.h6" Style="font-weight: 600;">@_branding.TenantName</MudText>
                 </div>
 
@@ -186,8 +185,16 @@
     protected override void OnInitialized()
     {
         ApplyTenantBranding();
+        // Subscribe to branding changes
+        BrandingProvider.BrandingChanged += OnBrandingChanged;
         // Subscribe to resume requests
         if (OnboardingResumeService != null) OnboardingResumeService.Changed += OnboardingResumeChanged;
+    }
+
+    private void OnBrandingChanged(object? sender, EventArgs e)
+    {
+        ApplyTenantBranding();
+        InvokeAsync(StateHasChanged);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -253,6 +260,7 @@
     public async ValueTask DisposeAsync()
     {
         PreferenceService.OnPreferenceChanged -= OnPreferenceChanged;
+        BrandingProvider.BrandingChanged -= OnBrandingChanged;
         _closeCts?.Cancel();
         _closeCts?.Dispose();
         _dotNetRef?.Dispose();

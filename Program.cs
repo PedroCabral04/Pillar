@@ -410,6 +410,7 @@ builder.Services.AddScoped<erp.Services.Browser.IBrowserService, erp.Services.Br
 
 // Tenancy services
 builder.Services.AddScoped<erp.Services.Tenancy.ITenantService, erp.Services.Tenancy.TenantService>();
+builder.Services.AddScoped<erp.Services.Tenancy.ITenantBrandingService, erp.Services.Tenancy.TenantBrandingService>();
 builder.Services.AddScoped<erp.Services.Tenancy.ITenantContextAccessor, erp.Services.Tenancy.TenantContextAccessor>();
 builder.Services.AddScoped<erp.Services.Tenancy.ITenantResolver, erp.Services.Tenancy.DefaultTenantResolver>();
 builder.Services.AddScoped<erp.Services.Tenancy.ITenantDbContextFactory, erp.Services.Tenancy.TenantDbContextFactory>();

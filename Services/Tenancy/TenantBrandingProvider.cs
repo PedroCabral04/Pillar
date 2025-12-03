@@ -11,6 +11,13 @@ public class TenantBrandingProvider : ITenantBrandingProvider
         _tenantContextAccessor = tenantContextAccessor;
     }
 
+    public event EventHandler? BrandingChanged;
+
+    public void NotifyBrandingChanged()
+    {
+        BrandingChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     public TenantBrandingTheme GetCurrentBranding()
     {
         var context = _tenantContextAccessor.Current;

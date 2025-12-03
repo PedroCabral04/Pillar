@@ -1,0 +1,95 @@
+@using erp.Services.Tenancy
+@using erp.Models.Tenancy
+@using erp.DTOs.Tenancy
+@implements IDisposable
+@inject PersistentComponentState ApplicationState
+@inject ITenantContextAccessor TenantContextAccessor
+@inject ITenantBrandingProvider BrandingProvider
+
+@ChildContent
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private PersistingComponentStateSubscription _subscription;
+
+    protected override void OnInitialized()
+    {
+        _subscription = ApplicationState.RegisterOnPersisting(PersistTenantState);
+
+        if (ApplicationState.TryTakeFromJson<TenantState>("TenantState", out var restoredState))
+        {
+            if (restoredState != null)
+            {
+                var tenant = new Tenant
+                {
+                    Id = restoredState.TenantId,
+                    Slug = restoredState.Slug,
+                    Name = restoredState.Name,
+                    IsDemo = restoredState.IsDemo,
+                    ConnectionString = restoredState.ConnectionString,
+                    DatabaseName = restoredState.DatabaseName,
+                    Branding = restoredState.Branding != null ? new TenantBranding
+                    {
+                        LogoUrl = restoredState.Branding.LogoUrl,
+                        FaviconUrl = restoredState.Branding.FaviconUrl,
+                        PrimaryColor = restoredState.Branding.PrimaryColor,
+                        SecondaryColor = restoredState.Branding.SecondaryColor,
+                        AccentColor = restoredState.Branding.AccentColor,
+                        LoginBackgroundUrl = restoredState.Branding.LoginBackgroundUrl,
+                        EmailFooterHtml = restoredState.Branding.EmailFooterHtml,
+                        CustomCss = restoredState.Branding.CustomCss
+                    } : null
+                };
+                
+                TenantContextAccessor.SetTenant(tenant);
+                BrandingProvider.NotifyBrandingChanged();
+            }
+        }
+    }
+
+    private Task PersistTenantState()
+    {
+        var current = TenantContextAccessor.Current;
+        if (current.IsResolved)
+        {
+            var state = new TenantState(
+                current.TenantId!.Value,
+                current.Slug!,
+                current.Name!,
+                current.Branding != null ? new TenantBrandingDto(
+                    current.Branding.LogoUrl,
+                    current.Branding.FaviconUrl,
+                    current.Branding.PrimaryColor,
+                    current.Branding.SecondaryColor,
+                    current.Branding.AccentColor,
+                    current.Branding.LoginBackgroundUrl,
+                    current.Branding.EmailFooterHtml,
+                    current.Branding.CustomCss
+                ) : null,
+                current.IsDemo,
+                current.ConnectionString,
+                current.DatabaseName
+            );
+
+            ApplicationState.PersistAsJson("TenantState", state);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        _subscription.Dispose();
+    }
+
+    private record TenantState(
+        int TenantId, 
+        string Slug, 
+        string Name, 
+        TenantBrandingDto? Branding,
+        bool IsDemo,
+        string? ConnectionString,
+        string? DatabaseName
+    );
+}

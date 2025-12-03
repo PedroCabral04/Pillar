@@ -20,6 +20,9 @@ public interface IApiService
     Task<HttpResponseMessage> PatchAsync(string endpoint, object? data, CancellationToken cancellationToken = default);
     Task<T?> PatchAsync<T>(string endpoint, object data, CancellationToken cancellationToken = default);
     
+    // File upload
+    Task<HttpResponseMessage> PostMultipartAsync(string endpoint, MultipartFormDataContent content, CancellationToken cancellationToken = default);
+    
     event EventHandler<bool>? LoadingStateChanged;
     event EventHandler<string>? ErrorOccurred;
     bool IsLoading { get; }
@@ -323,6 +326,28 @@ public class ApiService : IApiService
 
         var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
         throw new HttpRequestException($"Request failed with status {response.StatusCode}: {errorContent}");
+    }
+
+    public async Task<HttpResponseMessage> PostMultipartAsync(string endpoint, MultipartFormDataContent content, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            BeginLoading();
+
+            var request = CreateRequestWithCookies(HttpMethod.Post, endpoint);
+            request.Content = content;
+            
+            return await _httpClient.SendAsync(request, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            HandleError(ex, endpoint, "POST (multipart)");
+            throw;
+        }
+        finally
+        {
+            EndLoading();
+        }
     }
 
     /// <summary>

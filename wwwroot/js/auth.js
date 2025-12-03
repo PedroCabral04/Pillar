@@ -99,4 +99,34 @@ window.erpAuth = {
         }
     };
   }
+  ,
+  getSystemPrefersDark: function () {
+    try {
+      return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    } catch (e) {
+      return false;
+    }
+  },
+  registerThemeListener: function (dotNetHelper) {
+    try {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      const handler = (e) => {
+        // e.matches is true when dark mode is preferred
+        dotNetHelper.invokeMethodAsync('OnSystemThemeChanged', e.matches);
+      };
+      if (mq.addEventListener) mq.addEventListener('change', handler);
+      else mq.addListener(handler);
+
+      return {
+        dispose: () => {
+          try {
+            if (mq.removeEventListener) mq.removeEventListener('change', handler);
+            else mq.removeListener(handler);
+          } catch (e) { /* noop */ }
+        }
+      };
+    } catch (e) {
+      return { dispose: () => { } };
+    }
+  }
 };

@@ -47,6 +47,7 @@
         <PackageReference Include="QRCoder" Version="1.7.0" />
         <PackageReference Include="QuestPDF" Version="2024.10.3" />
         <PackageReference Include="Riok.Mapperly" Version="4.2.1" />
+        <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
         <PackageReference Include="Swashbuckle.AspNetCore.Swagger" Version="8.1.1" />
         <PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="8.1.1" />
         <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="8.1.1" />
