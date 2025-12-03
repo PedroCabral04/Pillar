@@ -39,7 +39,7 @@
     </style>
 }
 
-<MudLayout>
+<MudLayout Class="@GetLayoutClasses()">
     <!-- Desktop: Topbar Navigation (when explicitly selected in preferences) -->
     <MudHidden Breakpoint="Breakpoint.SmAndDown" Invert="false">
         @if (IsTopbarNavigation)
@@ -572,5 +572,22 @@
             style += "font-size: 1.1rem;";
         }
         return style;
+    }
+
+    private string GetLayoutClasses()
+    {
+        var classes = new List<string>();
+        
+        if (PreferenceService.CurrentPreferences?.Ui?.FontSize == "large")
+        {
+            classes.Add("font-size-large");
+        }
+        
+        if (PreferenceService.CurrentPreferences?.Ui?.HighContrast == true)
+        {
+            classes.Add("high-contrast");
+        }
+        
+        return string.Join(" ", classes);
     }
 }

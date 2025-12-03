@@ -672,6 +672,63 @@ input:focus-visible {
 }
 
 /* ==============================================
+   FONT SIZE PREFERENCES
+   ============================================== */
+
+/* Large font preference - affects tables and data displays */
+.font-size-large .mud-table {
+    font-size: 1.1rem;
+}
+
+.font-size-large .mud-table-cell {
+    font-size: 1.1rem;
+    padding: 12px 16px !important;
+}
+
+.font-size-large .mud-table-head .mud-table-cell {
+    font-size: 1.05rem;
+}
+
+.font-size-large .mud-table-pagination {
+    font-size: 1rem;
+}
+
+.font-size-large .mud-table-toolbar {
+    font-size: 1.1rem;
+}
+
+.font-size-large .mud-input,
+.font-size-large .mud-input-control,
+.font-size-large .mud-input-label {
+    font-size: 1.1rem;
+}
+
+.font-size-large .mud-select,
+.font-size-large .mud-select-input {
+    font-size: 1.1rem;
+}
+
+.font-size-large .mud-button-root {
+    font-size: 1rem;
+}
+
+.font-size-large .mud-chip {
+    font-size: 1rem;
+}
+
+.font-size-large .mud-data-grid-cell {
+    font-size: 1.1rem;
+}
+
+.font-size-large .mud-typography-body1 {
+    font-size: 1.1rem;
+}
+
+.font-size-large .mud-typography-body2 {
+    font-size: 1rem;
+}
+
+/* ==============================================
    REDUCED MOTION
    ============================================== */
 
