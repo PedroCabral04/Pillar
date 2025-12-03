@@ -10,7 +10,7 @@ using System.Security.Claims;
 namespace erp.Controllers;
 
 /// <summary>
-/// Controller for managing module permissions and role assignments
+/// Controller para gerenciamento de permissões de módulos e atribuições de função
 /// </summary>
 [ApiController]
 [Route("api/permissions")]
@@ -32,7 +32,7 @@ public class PermissionsController : ControllerBase
     }
     
     /// <summary>
-    /// Get all available modules in the system
+    /// Obtém todos os módulos disponíveis no sistema
     /// </summary>
     [HttpGet("modules")]
     public async Task<ActionResult<List<ModulePermissionDto>>> GetAllModules()
@@ -56,7 +56,7 @@ public class PermissionsController : ControllerBase
     }
     
     /// <summary>
-    /// Get all roles with their assigned modules
+    /// Obtém todas as funções com seus módulos atribuídos
     /// </summary>
     [HttpGet("roles")]
     public async Task<ActionResult<List<RolePermissionsDto>>> GetAllRolesWithPermissions()
@@ -93,7 +93,7 @@ public class PermissionsController : ControllerBase
     }
     
     /// <summary>
-    /// Get a specific role with its assigned modules
+    /// Obtém uma função específica com seus módulos atribuídos
     /// </summary>
     [HttpGet("roles/{roleId}")]
     public async Task<ActionResult<RolePermissionsDto>> GetRolePermissions(int roleId)
@@ -133,7 +133,7 @@ public class PermissionsController : ControllerBase
     }
     
     /// <summary>
-    /// Update modules assigned to a role
+    /// Atualiza os módulos atribuídos a uma função
     /// </summary>
     [HttpPut("roles/{roleId}/modules")]
     public async Task<IActionResult> UpdateRoleModules(int roleId, [FromBody] UpdateRoleModulesDto dto)
@@ -143,12 +143,12 @@ public class PermissionsController : ControllerBase
             
         var role = await _context.Set<ApplicationRole>().FindAsync(roleId);
         if (role == null)
-            return NotFound("Role not found");
+            return NotFound("Função não encontrada");
             
         // Prevent removing all modules from Administrador role
         if (role.Name == "Administrador" && dto.ModulePermissionIds.Count == 0)
         {
-            return BadRequest("Cannot remove all modules from Administrador role");
+            return BadRequest("Não é possível remover todos os módulos da função Administrador");
         }
         
         var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -166,13 +166,13 @@ public class PermissionsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating role modules for role {RoleId}", roleId);
-            return StatusCode(500, "Error updating role modules");
+            _logger.LogError(ex, "Erro ao atualizar módulos da função {RoleId}", roleId);
+            return StatusCode(500, "Erro ao atualizar módulos da função");
         }
     }
     
     /// <summary>
-    /// Get current user's accessible modules
+    /// Obtém os módulos acessíveis pelo usuário atual
     /// </summary>
     [HttpGet("my-modules")]
     [Authorize]
@@ -209,7 +209,7 @@ public class PermissionsController : ControllerBase
     }
     
     /// <summary>
-    /// Check if current user has access to a specific module
+    /// Verifica se o usuário atual tem acesso a um módulo específico
     /// </summary>
     [HttpGet("check/{moduleKey}")]
     [Authorize]

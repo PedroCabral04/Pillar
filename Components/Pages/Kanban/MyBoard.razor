@@ -80,7 +80,11 @@
         </div>
     </div>
 
-    <div class="kanban-scroll">
+    <MudSwipeArea @ref="@_swipeArea" 
+                  Class="kanban-scroll" 
+                  OnSwipeMove="HandleSwipeMove" 
+                  OnSwipeEnd="@OnSwipeEnd"
+                  PreventDefault="true">
         @if (_columns is null)
         {
             <div class="kanban-loading">
@@ -265,7 +269,7 @@
                 </ItemRenderer>
             </MudDropContainer>
         }
-    </div>
+    </MudSwipeArea>
 </div>
 
 @code {
@@ -275,6 +279,42 @@
     private KanbanBoardDto? _board;
     private List<AssignableUserDto> _assignableUsers = new();
     private List<KanbanLabelDto> _boardLabels = new();
+
+    // Swipe handling
+    private MudSwipeArea _swipeArea = null!;
+    private const double SwipeScrollMultiplier = 1.5; // Multiplier to make scrolling feel more responsive
+
+    private async Task HandleSwipeMove(MultiDimensionSwipeEventArgs e)
+    {
+        double deltaX = 0;
+        
+        for (int i = 0; i < e.SwipeDirections.Count; i++)
+        {
+            var delta = e.SwipeDeltas[i] ?? 0;
+            
+            if (e.SwipeDirections[i] == SwipeDirection.LeftToRight)
+            {
+                // Swiping right means scroll left (show previous columns)
+                deltaX -= Math.Abs(delta) * SwipeScrollMultiplier;
+            }
+            else if (e.SwipeDirections[i] == SwipeDirection.RightToLeft)
+            {
+                // Swiping left means scroll right (show next columns)
+                deltaX += Math.Abs(delta) * SwipeScrollMultiplier;
+            }
+        }
+        
+        if (Math.Abs(deltaX) > 0)
+        {
+            // Apply scroll directly
+            await JS.InvokeVoidAsync("scrollKanbanByDelta", deltaX);
+        }
+    }
+
+    private void OnSwipeEnd()
+    {
+        // Swipe ended - nothing to reset since we apply deltas directly
+    }
 
     // Filters
     private KanbanPriority? _filterPriority;
@@ -987,6 +1027,8 @@
     overflow-y: hidden;
     padding: 24px;
     scroll-behavior: smooth;
+    touch-action: pan-x; /* Optimize for horizontal touch scrolling */
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
 }
 
 .kanban-loading,
@@ -1293,6 +1335,14 @@
 </style>
 
 <script>
+// Kanban swipe scroll function
+window.scrollKanbanByDelta = function(delta) {
+    var container = document.querySelector('.kanban-scroll');
+    if (container) {
+        container.scrollLeft += delta;
+    }
+};
+
 (function(){
     if (window.__kanbanDragInit) return;
     window.__kanbanDragInit = true;
