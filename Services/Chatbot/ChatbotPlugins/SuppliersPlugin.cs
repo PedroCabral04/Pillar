@@ -77,22 +77,28 @@ public class SuppliersPlugin
         }
     }
 
-    [KernelFunction, Description("Lista todos os fornecedores cadastrados")]
+    [KernelFunction, Description("Lista todos os fornecedores cadastrados. Use página > 1 para ver mais.")]
     public async Task<string> ListSuppliers(
-        [Description("Número máximo de fornecedores a retornar")] int maxResults = 10,
+        [Description("Número máximo de fornecedores a retornar por página")] int maxResults = 10,
+        [Description("Número da página (1 = primeira, 2 = próxima, etc)")] int page = 1,
         [Description("Filtrar apenas fornecedores ativos?")] bool activeOnly = true)
     {
         try
         {
             var (suppliers, total) = await _supplierService.GetPagedAsync(
-                page: 1, 
+                page: page, 
                 pageSize: maxResults, 
                 search: null, 
                 activeOnly: activeOnly);
 
-            if (!suppliers.Any())
+            if (!suppliers.Any() && page == 1)
             {
                 return "🏢 Não há fornecedores cadastrados.";
+            }
+            
+            if (!suppliers.Any())
+            {
+                return $"🏢 Não há mais fornecedores. Total: {total} fornecedores.";
             }
 
             var list = suppliers.Select(s =>
@@ -100,11 +106,16 @@ public class SuppliersPlugin
             );
 
             var statusText = activeOnly ? " Ativos" : "";
-            var remaining = total - maxResults;
-            var moreText = remaining > 0 ? $"\n\n*...e mais {remaining} fornecedores.*" : "";
+            var shown = (page - 1) * maxResults + suppliers.Count();
+            var remaining = total - shown;
+            
+            var pageInfo = page > 1 ? $" (Página {page})" : "";
+            var moreText = remaining > 0 
+                ? $"\n\n*Exibindo {shown} de {total}. Peça \"listar fornecedores página {page + 1}\" para ver mais.*" 
+                : "";
             
             return $"""
-                🏢 **Fornecedores{statusText}** ({total} total)
+                🏢 **Fornecedores{statusText}**{pageInfo} ({total} total)
                 
                 | ID | Nome | CNPJ/CPF | Ativo |
                 |----|------|----------|-------|

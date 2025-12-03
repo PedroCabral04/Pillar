@@ -147,9 +147,10 @@ public class CustomersPlugin
         }
     }
 
-    [KernelFunction, Description("Lista os clientes mais recentes cadastrados no sistema")]
+    [KernelFunction, Description("Lista os clientes cadastrados no sistema. Use página > 1 para ver mais.")]
     public async Task<string> ListRecentCustomers(
-        [Description("Número máximo de clientes a retornar")] int maxResults = 10,
+        [Description("Número máximo de clientes a retornar por página")] int maxResults = 10,
+        [Description("Número da página (1 = primeira, 2 = próxima, etc)")] int page = 1,
         [Description("Filtrar apenas clientes ativos? (true/false/null para todos)")] bool? activeOnly = null)
     {
         try
@@ -157,12 +158,17 @@ public class CustomersPlugin
             var (customers, total) = await _customerService.SearchAsync(
                 search: null, 
                 isActive: activeOnly, 
-                page: 1, 
+                page: page, 
                 pageSize: maxResults);
 
-            if (!customers.Any())
+            if (!customers.Any() && page == 1)
             {
                 return "👥 Não há clientes cadastrados.";
+            }
+            
+            if (!customers.Any())
+            {
+                return $"👥 Não há mais clientes. Total: {total} clientes.";
             }
 
             var list = customers.Select(c =>
@@ -176,11 +182,16 @@ public class CustomersPlugin
                 _ => ""
             };
             
-            var remaining = total - maxResults;
-            var moreText = remaining > 0 ? $"\n\n*...e mais {remaining} clientes.*" : "";
+            var shown = (page - 1) * maxResults + customers.Count();
+            var remaining = total - shown;
+            
+            var pageInfo = page > 1 ? $" (Página {page})" : "";
+            var moreText = remaining > 0 
+                ? $"\n\n*Exibindo {shown} de {total}. Peça \"listar clientes página {page + 1}\" para ver mais.*" 
+                : "";
 
             return $"""
-                👥 **Clientes{statusFilter}** ({total} total)
+                👥 **Clientes{statusFilter}**{pageInfo} ({total} total)
                 
                 | ID | Nome | Documento | Ativo |
                 |----|------|-----------|-------|

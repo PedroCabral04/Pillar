@@ -17,15 +17,17 @@ public class ProductsPlugin
         _inventoryService = inventoryService;
     }
 
-    [KernelFunction, Description("Lista todos os produtos cadastrados no sistema")]
+    [KernelFunction, Description("Lista todos os produtos cadastrados no sistema. Use página > 1 para ver mais produtos.")]
     public async Task<string> ListProducts(
-        [Description("Número máximo de produtos a retornar")] int maxResults = 10)
+        [Description("Número máximo de produtos a retornar por página")] int maxResults = 10,
+        [Description("Número da página (1 = primeira página, 2 = próxima, etc)")] int page = 1)
     {
         try
         {
+            var skip = (page - 1) * maxResults;
             var result = await _inventoryService.SearchProductsAsync(new ProductSearchDto 
             { 
-                PageSize = maxResults 
+                PageSize = maxResults + skip // Busca até a página atual
             });
             
             if (!result.Products.Any())
@@ -33,15 +35,26 @@ public class ProductsPlugin
                 return "📦 Não há produtos cadastrados no momento.";
             }
 
-            var products = result.Products.Take(maxResults);
+            var products = result.Products.Skip(skip).Take(maxResults);
+            
+            if (!products.Any())
+            {
+                return $"📦 Não há mais produtos. Total: {result.TotalCount} produtos.";
+            }
+            
             var productList = products.Select(p => 
                 $"- **{p.Name}** (SKU: `{p.Sku}`) — R$ {p.SalePrice:N2} — Estoque: {p.CurrentStock} un."
             );
 
-            var remaining = result.TotalCount - maxResults;
-            var moreText = remaining > 0 ? $"\n\n*...e mais {remaining} produtos.*" : "";
+            var shown = skip + products.Count();
+            var remaining = result.TotalCount - shown;
+            
+            var pageInfo = page > 1 ? $" (Página {page})" : "";
+            var moreText = remaining > 0 
+                ? $"\n\n*Exibindo {shown} de {result.TotalCount}. Peça \"listar produtos página {page + 1}\" para ver mais.*" 
+                : "";
 
-            return $"📦 **Produtos Cadastrados** ({result.TotalCount} total)\n\n{string.Join("\n", productList)}{moreText}";
+            return $"📦 **Produtos Cadastrados**{pageInfo} ({result.TotalCount} total)\n\n{string.Join("\n", productList)}{moreText}";
         }
         catch (Exception ex)
         {

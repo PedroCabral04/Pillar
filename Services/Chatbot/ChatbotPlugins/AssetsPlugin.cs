@@ -17,9 +17,10 @@ public class AssetsPlugin
         _assetService = assetService;
     }
 
-    [KernelFunction, Description("Lista todos os ativos cadastrados no sistema")]
+    [KernelFunction, Description("Lista todos os ativos cadastrados no sistema. Use página > 1 para ver mais.")]
     public async Task<string> ListAssets(
-        [Description("Número máximo de ativos a retornar")] int maxResults = 10)
+        [Description("Número máximo de ativos a retornar por página")] int maxResults = 10,
+        [Description("Número da página (1 = primeira, 2 = próxima, etc)")] int page = 1)
     {
         try
         {
@@ -30,15 +31,28 @@ public class AssetsPlugin
                 return "📦 Não há ativos cadastrados no momento.";
             }
 
-            var assetList = assets.Take(maxResults).Select(a =>
+            var skip = (page - 1) * maxResults;
+            var paged = assets.Skip(skip).Take(maxResults);
+            
+            if (!paged.Any())
+            {
+                return $"📦 Não há mais ativos. Total: {assets.Count} ativos.";
+            }
+
+            var assetList = paged.Select(a =>
                 $"| `{a.AssetCode}` | {a.Name} | {GetStatusText(a.Status)} | {a.CurrentAssignedToUserName ?? "—"} |"
             );
             
-            var remaining = assets.Count - maxResults;
-            var moreText = remaining > 0 ? $"\n\n*...e mais {remaining} ativos.*" : "";
+            var shown = skip + paged.Count();
+            var remaining = assets.Count - shown;
+            
+            var pageInfo = page > 1 ? $" (Página {page})" : "";
+            var moreText = remaining > 0 
+                ? $"\n\n*Exibindo {shown} de {assets.Count}. Peça \"listar ativos página {page + 1}\" para ver mais.*" 
+                : "";
 
             return $"""
-                📦 **Ativos Cadastrados** ({assets.Count} total)
+                📦 **Ativos Cadastrados**{pageInfo} ({assets.Count} total)
                 
                 | Código | Nome | Status | Responsável |
                 |--------|------|--------|-------------|
