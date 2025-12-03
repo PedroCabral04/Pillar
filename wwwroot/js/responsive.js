@@ -252,6 +252,29 @@ window.erpResponsive = {
                 e.preventDefault();
             }
         }, { passive: false });
+    },
+    
+    // Set font size preference class on body
+    setFontSizeClass: function(fontSize) {
+        console.log('[ERP] Setting font size class:', fontSize);
+        
+        // Remove existing font size classes
+        document.body.classList.remove('font-size-base', 'font-size-large', 'font-size-small');
+        
+        // Add the appropriate class
+        if (fontSize === 'large') {
+            document.body.classList.add('font-size-large');
+            console.log('[ERP] Added font-size-large class to body');
+        } else if (fontSize === 'small') {
+            document.body.classList.add('font-size-small');
+        } else {
+            document.body.classList.add('font-size-base');
+        }
+        
+        // Force a reflow to ensure styles are applied
+        document.body.offsetHeight;
+        
+        console.log('[ERP] Body classes:', document.body.className);
     }
 };
 

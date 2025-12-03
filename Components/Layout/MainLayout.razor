@@ -39,7 +39,7 @@
     </style>
 }
 
-<MudLayout Class="@GetLayoutClasses()">
+<MudLayout>
     <!-- Desktop: Topbar Navigation (when explicitly selected in preferences) -->
     <MudHidden Breakpoint="Breakpoint.SmAndDown" Invert="false">
         @if (IsTopbarNavigation)
@@ -198,6 +198,7 @@
             ThemeService.InitializeTheme();
             ApplyCulture();
             ApplySidebarPreference();
+            await ApplyFontSizePreference();
             PreferenceService.OnPreferenceChanged += OnPreferenceChanged;
             
             // Detecta se é mobile
@@ -386,6 +387,7 @@
     {
         ApplyCulture();
         ApplySidebarPreference();
+        await ApplyFontSizePreference();
         await UpdateAutoLogout();
         await UpdateKeyboardShortcuts();
         await InvokeAsync(StateHasChanged);
@@ -398,6 +400,18 @@
         {
             _isSidebarLocked = PreferenceService.CurrentPreferences.Ui.SidebarPersistent;
         }
+    }
+
+    private async Task ApplyFontSizePreference()
+    {
+        try
+        {
+            var fontSize = PreferenceService.CurrentPreferences?.Ui?.FontSize ?? "base";
+            await JsRuntime.InvokeVoidAsync("erpResponsive.setFontSizeClass", fontSize);
+        }
+        catch (JSDisconnectedException) { }
+        catch (TaskCanceledException) { }
+        catch { }
     }
 
     private async Task UpdateKeyboardShortcuts()
@@ -572,22 +586,5 @@
             style += "font-size: 1.1rem;";
         }
         return style;
-    }
-
-    private string GetLayoutClasses()
-    {
-        var classes = new List<string>();
-        
-        if (PreferenceService.CurrentPreferences?.Ui?.FontSize == "large")
-        {
-            classes.Add("font-size-large");
-        }
-        
-        if (PreferenceService.CurrentPreferences?.Ui?.HighContrast == true)
-        {
-            classes.Add("high-contrast");
-        }
-        
-        return string.Join(" ", classes);
     }
 }

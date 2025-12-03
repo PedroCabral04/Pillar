@@ -561,6 +561,15 @@
     {
         await mutator();
         await PreferenceService.SaveAsync();
+        
+        // Apply font size class directly for immediate feedback
+        try
+        {
+            var fontSize = PreferenceService.CurrentPreferences?.Ui?.FontSize ?? "base";
+            await JsRuntime.InvokeVoidAsync("erpResponsive.setFontSizeClass", fontSize);
+        }
+        catch { }
+        
         Snackbar.Add("Preferências salvas", Severity.Success, cfg => { cfg.VisibleStateDuration = 1500; });
         StateHasChanged();
     }

@@ -6,6 +6,172 @@
     --tenant-primary-rgb: 89, 74, 226;
     --tenant-secondary-rgb: 0, 172, 193;
     --tenant-accent-rgb: 255, 193, 7;
+    
+    /* Font size preference - default values */
+    --erp-font-size-table: 0.875rem;
+    --erp-font-size-table-header: 0.875rem;
+    --erp-font-size-body: 0.875rem;
+    --erp-table-cell-padding: 6px 16px;
+}
+
+/* Large font mode CSS variable overrides */
+body.font-size-large {
+    --erp-font-size-table: 1rem;
+    --erp-font-size-table-header: 0.95rem;
+    --erp-font-size-body: 1rem;
+    --erp-table-cell-padding: 12px 20px;
+}
+
+/* ==============================================
+   FONT SIZE PREFERENCE STYLES
+   ============================================== */
+
+/* Large font mode - applied via class on body */
+html body.font-size-large,
+html body.font-size-large .mud-main-content {
+    font-size: 16px !important;
+}
+
+/* MudTable large font styles - using higher specificity and !important */
+/* Default MudTable uses .875rem (14px), we increase to 1rem (16px) for large mode */
+html body.font-size-large .mud-table {
+    font-size: 16px !important;
+}
+
+/* Table cells - target all variations with maximum specificity */
+html body.font-size-large .mud-table-cell,
+html body.font-size-large .mud-table td,
+html body.font-size-large .mud-table th,
+html body.font-size-large td.mud-table-cell,
+html body.font-size-large th.mud-table-cell,
+html body.font-size-large .mud-table-container td,
+html body.font-size-large .mud-table-container th,
+html body.font-size-large .mud-table-root td,
+html body.font-size-large .mud-table-root th,
+html body.font-size-large .mud-table-root .mud-table-body .mud-table-cell {
+    font-size: 16px !important;
+    padding: 14px 20px !important;
+}
+
+/* Table header cells */
+html body.font-size-large .mud-table-head th,
+html body.font-size-large .mud-table thead th,
+html body.font-size-large .mud-table-head .mud-table-cell,
+html body.font-size-large thead .mud-table-cell {
+    font-size: 15px !important;
+    font-weight: 600 !important;
+}
+
+/* Table body cells */
+html body.font-size-large .mud-table-body td,
+html body.font-size-large .mud-table tbody td,
+html body.font-size-large .mud-table-body .mud-table-cell,
+html body.font-size-large tbody .mud-table-cell,
+html body.font-size-large .mud-table-row td {
+    font-size: 16px !important;
+}
+
+/* Table sort labels */
+html body.font-size-large .mud-table-sort-label {
+    font-size: 15px !important;
+}
+
+/* Table pager */
+html body.font-size-large .mud-table-pager,
+html body.font-size-large .mud-table-pagination,
+html body.font-size-large .mud-table-pager .mud-select,
+html body.font-size-large .mud-table-pager .mud-input,
+html body.font-size-large .mud-table-pager span {
+    font-size: 15px !important;
+}
+
+/* Table toolbar */
+html body.font-size-large .mud-table-toolbar,
+html body.font-size-large .mud-table-toolbar .mud-typography {
+    font-size: 18px !important;
+}
+
+/* Typography inside tables */
+html body.font-size-large .mud-table .mud-typography-body1,
+html body.font-size-large .mud-table .mud-text-body1 {
+    font-size: 16px !important;
+}
+
+html body.font-size-large .mud-table .mud-typography-body2,
+html body.font-size-large .mud-table .mud-text-body2 {
+    font-size: 15px !important;
+}
+
+html body.font-size-large .mud-table .mud-typography-caption,
+html body.font-size-large .mud-table .mud-text-caption {
+    font-size: 14px !important;
+}
+
+/* MudChip inside tables */
+html body.font-size-large .mud-table .mud-chip,
+html body.font-size-large .mud-table .mud-chip-content {
+    font-size: 14px !important;
+}
+
+/* MudText typography adjustments for large font (global) */
+html body.font-size-large .mud-typography-body1,
+html body.font-size-large .mud-text-body1 {
+    font-size: 17px !important;
+}
+
+html body.font-size-large .mud-typography-body2,
+html body.font-size-large .mud-text-body2 {
+    font-size: 16px !important;
+}
+
+html body.font-size-large .mud-typography-caption,
+html body.font-size-large .mud-text-caption {
+    font-size: 14px !important;
+}
+
+html body.font-size-large .mud-typography-subtitle1 {
+    font-size: 18px !important;
+}
+
+html body.font-size-large .mud-typography-subtitle2 {
+    font-size: 17px !important;
+}
+
+/* Form inputs with large font */
+html body.font-size-large .mud-input,
+html body.font-size-large .mud-input-root,
+html body.font-size-large .mud-input-slot,
+html body.font-size-large .mud-input-text,
+html body.font-size-large .mud-select,
+html body.font-size-large .mud-select-input,
+html body.font-size-large .mud-autocomplete {
+    font-size: 16px !important;
+}
+
+html body.font-size-large .mud-input-label,
+html body.font-size-large .mud-input-label-text {
+    font-size: 15px !important;
+}
+
+/* Buttons with large font */
+html body.font-size-large .mud-button-root,
+html body.font-size-large .mud-button-label {
+    font-size: 15px !important;
+}
+
+/* Cards and papers */
+html body.font-size-large .mud-card-content {
+    font-size: 16px !important;
+}
+
+/* Navigation */
+html body.font-size-large .mud-nav-link {
+    font-size: 16px !important;
+}
+
+/* Alerts */
+html body.font-size-large .mud-alert-message {
+    font-size: 16px !important;
 }
 
 /* Breadcrumbs personalizados */
@@ -669,63 +835,6 @@ input:focus-visible {
         min-height: 44px;
         padding: 8px 16px;
     }
-}
-
-/* ==============================================
-   FONT SIZE PREFERENCES
-   ============================================== */
-
-/* Large font preference - affects tables and data displays */
-.font-size-large .mud-table {
-    font-size: 1.1rem;
-}
-
-.font-size-large .mud-table-cell {
-    font-size: 1.1rem;
-    padding: 12px 16px !important;
-}
-
-.font-size-large .mud-table-head .mud-table-cell {
-    font-size: 1.05rem;
-}
-
-.font-size-large .mud-table-pagination {
-    font-size: 1rem;
-}
-
-.font-size-large .mud-table-toolbar {
-    font-size: 1.1rem;
-}
-
-.font-size-large .mud-input,
-.font-size-large .mud-input-control,
-.font-size-large .mud-input-label {
-    font-size: 1.1rem;
-}
-
-.font-size-large .mud-select,
-.font-size-large .mud-select-input {
-    font-size: 1.1rem;
-}
-
-.font-size-large .mud-button-root {
-    font-size: 1rem;
-}
-
-.font-size-large .mud-chip {
-    font-size: 1rem;
-}
-
-.font-size-large .mud-data-grid-cell {
-    font-size: 1.1rem;
-}
-
-.font-size-large .mud-typography-body1 {
-    font-size: 1.1rem;
-}
-
-.font-size-large .mud-typography-body2 {
-    font-size: 1rem;
 }
 
 /* ==============================================
