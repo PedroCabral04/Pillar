@@ -255,7 +255,7 @@ public class ChatbotService : IChatbotService
                 _kernel);
 
             // Gerar sugestões de ações
-            var suggestions = GenerateSuggestions(message);
+            // var suggestions = GenerateSuggestions(message);
 
             return new ChatResponseDto
             {
@@ -360,6 +360,59 @@ No momento, posso apenas fornecer informações básicas.
 Digite 'ajuda' para ver o que posso fazer quando configurado corretamente.",
             Success = true,
             SuggestedActions = new List<string> { "Ajuda", "Sobre o sistema" }
+        };
+    }
+
+    private List<string> GenerateSuggestions(string message)
+    {
+        var lowerMessage = message.ToLower();
+
+        if (lowerMessage.Contains("produto") || lowerMessage.Contains("estoque"))
+        {
+            return new List<string>
+            {
+                "Listar todos os produtos",
+                "Verificar estoque",
+                "Cadastrar produto"
+            };
+        }
+
+        if (lowerMessage.Contains("venda") || lowerMessage.Contains("pedido"))
+        {
+            return new List<string>
+            {
+                "Ver vendas recentes",
+                "Criar nova venda",
+                "Calcular total de vendas"
+            };
+        }
+
+        if (lowerMessage.Contains("financeiro") || lowerMessage.Contains("conta") || lowerMessage.Contains("pagar") || lowerMessage.Contains("receber"))
+        {
+            return new List<string>
+            {
+                "Resumo financeiro",
+                "Contas a pagar vencidas",
+                "Contas a receber em atraso"
+            };
+        }
+
+        if (lowerMessage.Contains("funcionário") || lowerMessage.Contains("rh") || lowerMessage.Contains("departamento"))
+        {
+            return new List<string>
+            {
+                "Buscar funcionário",
+                "Listar departamento",
+                "Quem trabalha no TI?"
+            };
+        }
+
+        return new List<string>
+        {
+            "O que você pode fazer?",
+            "Mostrar produtos",
+            "Ver vendas recentes",
+            "Resumo financeiro"
         };
     }
 }
