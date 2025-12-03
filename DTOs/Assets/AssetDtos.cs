@@ -1,4 +1,5 @@
 using erp.Models;
+using Microsoft.AspNetCore.Http;
 
 namespace erp.DTOs.Assets;
 
@@ -256,6 +257,19 @@ public class CreateAssetDocumentDto
 
 public class UpdateAssetDocumentDto
 {
+    public AssetDocumentType Type { get; set; }
+    public string? Description { get; set; }
+    public string? DocumentNumber { get; set; }
+    public DateTime? DocumentDate { get; set; }
+    public DateTime? ExpiryDate { get; set; }
+}
+
+/// <summary>
+/// DTO para upload de documento via multipart/form-data
+/// </summary>
+public class UploadAssetDocumentFormDto
+{
+    public IFormFile File { get; set; } = null!;
     public AssetDocumentType Type { get; set; }
     public string? Description { get; set; }
     public string? DocumentNumber { get; set; }

@@ -746,27 +746,23 @@ public class AssetsController : ControllerBase
     /// Faz upload de um documento para um ativo
     /// </summary>
     [HttpPost("{id}/documents")]
+    [Consumes("multipart/form-data")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<AssetDocumentDto>> UploadDocument(
         int id,
-        [FromForm] IFormFile file,
-        [FromForm] AssetDocumentType type,
-        [FromForm] string? description = null,
-        [FromForm] string? documentNumber = null,
-        [FromForm] DateTime? documentDate = null,
-        [FromForm] DateTime? expiryDate = null)
+        [FromForm] UploadAssetDocumentFormDto formData)
     {
         try
         {
-            if (file == null || file.Length == 0)
+            if (formData.File == null || formData.File.Length == 0)
             {
                 return BadRequest(new { message = "Arquivo não fornecido ou vazio" });
             }
 
             // Validação de tamanho (50MB max)
-            if (file.Length > 50 * 1024 * 1024)
+            if (formData.File.Length > 50 * 1024 * 1024)
             {
                 return BadRequest(new { message = "Arquivo muito grande. Tamanho máximo: 50MB" });
             }
@@ -774,14 +770,14 @@ public class AssetsController : ControllerBase
             var dto = new CreateAssetDocumentDto
             {
                 AssetId = id,
-                Type = type,
-                Description = description,
-                DocumentNumber = documentNumber,
-                DocumentDate = documentDate,
-                ExpiryDate = expiryDate
+                Type = formData.Type,
+                Description = formData.Description,
+                DocumentNumber = formData.DocumentNumber,
+                DocumentDate = formData.DocumentDate,
+                ExpiryDate = formData.ExpiryDate
             };
 
-            using var stream = file.OpenReadStream();
+            using var stream = formData.File.OpenReadStream();
             var userId = GetCurrentUserId();
             var document = await _assetService.CreateDocumentAsync(dto, stream, userId);
             
