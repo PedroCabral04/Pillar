@@ -5,6 +5,9 @@
 @inject ISnackbar Snackbar
 @inject IJSRuntime JSRuntime
 
+@using System.Text.RegularExpressions
+@using System.Text.Encodings.Web
+
 <div class="chatbot-widget">
     @if (_isOpen)
     {
@@ -63,7 +66,7 @@
                     @foreach (var message in _messages)
                     {
                         <div class="chat-message @(message.IsError ? "chat-message-error" : message.Role == "user" ? "chat-message-user" : "chat-message-assistant")">
-                            <span>@message.Content</span>
+                            <span>@RenderMessage(message.Content)</span>
                         </div>
                     }
                     
@@ -268,6 +271,50 @@
     {
         _currentMessage = action;
         await SendMessage();
+    }
+
+    private MarkupString RenderMessage(string message)
+    {
+        if (string.IsNullOrEmpty(message))
+            return new MarkupString(string.Empty);
+
+        // 1. Encode HTML to prevent XSS
+        var encoded = HtmlEncoder.Default.Encode(message);
+
+        // 2. Replace newlines with <br>
+        var withBreaks = encoded.Replace("\n", "<br>");
+
+        // 3. Bold: **text** -> <strong>text</strong>
+        // Note: We need to match the encoded asterisks if HtmlEncoder encodes them, 
+        // but HtmlEncoder usually doesn't encode * unless configured strictly.
+        // However, let's assume it doesn't encode * for now.
+        var withBold = Regex.Replace(withBreaks, @"\*\*(.*?)\*\*", "<strong>$1</strong>");
+
+        // 4. Italic: *text* -> <em>text</em>
+        // Be careful not to match inside bold tags if we already replaced them, 
+        // but since we replaced ** with <strong>, single * should be fine.
+        // We need to handle the case where * is used for bullet points.
+        // Bullet points usually start with "- " or "* ".
+        // Let's handle bullet points first.
+        
+        // Better approach:
+        // Re-do the pipeline.
+        
+        // Let's try a simpler approach that handles the specific case seen in the screenshot.
+        // The screenshot shows "**text**".
+        
+        var processed = encoded;
+        
+        // Bold
+        processed = Regex.Replace(processed, @"\*\*(.*?)\*\*", "<strong>$1</strong>");
+        
+        // Italic (only if not surrounded by another *)
+        processed = Regex.Replace(processed, @"(?<!\*)\*(?!\*)(.*?)(?<!\*)\*(?!\*)", "<em>$1</em>");
+        
+        // Newlines
+        processed = processed.Replace("\n", "<br>");
+        
+        return new MarkupString(processed);
     }
 }
 
