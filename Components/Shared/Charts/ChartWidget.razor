@@ -282,32 +282,51 @@
     }
     
     /* Customização do ApexCharts */
-    .chart-widget :deep(.apexcharts-tooltip) {
+    .chart-widget .apexcharts-tooltip {
         background: var(--mud-palette-surface) !important;
         border: 1px solid rgba(var(--mud-palette-lines-default-rgb), 0.2) !important;
         border-radius: 8px !important;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+        color: var(--mud-palette-text-primary) !important;
     }
     
-    .chart-widget :deep(.apexcharts-tooltip-title) {
+    .chart-widget .apexcharts-tooltip-title {
         background: rgba(var(--mud-palette-primary-rgb), 0.08) !important;
         border-bottom: 1px solid rgba(var(--mud-palette-lines-default-rgb), 0.1) !important;
         font-weight: 600 !important;
+        color: var(--mud-palette-text-primary) !important;
     }
     
-    .chart-widget :deep(.apexcharts-xaxis-label),
-    .chart-widget :deep(.apexcharts-yaxis-label) {
+    .chart-widget .apexcharts-tooltip-text-y-value,
+    .chart-widget .apexcharts-tooltip-text-goals-value,
+    .chart-widget .apexcharts-tooltip-text-z-value {
+        color: var(--mud-palette-text-primary) !important;
+    }
+    
+    .chart-widget .apexcharts-xaxis-label,
+    .chart-widget .apexcharts-yaxis-label {
         fill: var(--mud-palette-text-secondary) !important;
         font-size: 11px !important;
     }
     
-    .chart-widget :deep(.apexcharts-legend-text) {
+    .chart-widget .apexcharts-legend-text {
         color: var(--mud-palette-text-primary) !important;
         font-size: 12px !important;
     }
     
-    .chart-widget :deep(.apexcharts-gridline) {
+    .chart-widget .apexcharts-gridline {
         stroke: rgba(var(--mud-palette-lines-default-rgb), 0.08) !important;
+    }
+
+    /* Labels internos do Donut/Pie */
+    .chart-widget .apexcharts-datalabel-label,
+    .chart-widget .apexcharts-datalabel-total-label {
+        fill: var(--mud-palette-text-secondary) !important;
+    }
+    
+    .chart-widget .apexcharts-datalabel-value,
+    .chart-widget .apexcharts-datalabel-total-value {
+        fill: var(--mud-palette-text-primary) !important;
     }
 </style>
 
@@ -354,7 +373,6 @@
         var baseTooltip = new Tooltip
         {
             Enabled = true,
-            Theme = Mode.Dark,
             Style = new TooltipStyle { FontSize = "12px" }
         };
         
