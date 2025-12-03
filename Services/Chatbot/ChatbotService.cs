@@ -205,9 +205,10 @@ public class ChatbotService : IChatbotService
                 - Use SEMPRE formatação Markdown para tornar as respostas legíveis.
                 - Ao listar itens (produtos, vendas, funcionários, etc.), use listas com marcadores (-) ou numéricas.
                 - Destaque informações importantes como nomes, valores e IDs usando negrito (**texto**).
-                - Pule linhas entre itens de uma lista para facilitar a leitura.
+                - Pule DUAS linhas entre itens de uma lista para garantir a separação visual.
                 - Se houver muitos detalhes, considere usar tabelas Markdown ou agrupar as informações logicamente.
-                - NUNCA retorne blocos de texto contínuos sem quebras de linha para listas de dados.");
+                - NUNCA retorne blocos de texto contínuos sem quebras de linha para listas de dados.
+                - Certifique-se de que cada item da lista comece em uma nova linha.");
 
             // Adicionar histórico anterior se existir
             if (conversationHistory != null)
@@ -359,59 +360,6 @@ No momento, posso apenas fornecer informações básicas.
 Digite 'ajuda' para ver o que posso fazer quando configurado corretamente.",
             Success = true,
             SuggestedActions = new List<string> { "Ajuda", "Sobre o sistema" }
-        };
-    }
-
-    private List<string> GenerateSuggestions(string message)
-    {
-        var lowerMessage = message.ToLower();
-
-        if (lowerMessage.Contains("produto") || lowerMessage.Contains("estoque"))
-        {
-            return new List<string>
-            {
-                "Listar todos os produtos",
-                "Verificar estoque",
-                "Cadastrar produto"
-            };
-        }
-
-        if (lowerMessage.Contains("venda") || lowerMessage.Contains("pedido"))
-        {
-            return new List<string>
-            {
-                "Ver vendas recentes",
-                "Criar nova venda",
-                "Calcular total de vendas"
-            };
-        }
-
-        if (lowerMessage.Contains("financeiro") || lowerMessage.Contains("conta") || lowerMessage.Contains("pagar") || lowerMessage.Contains("receber"))
-        {
-            return new List<string>
-            {
-                "Resumo financeiro",
-                "Contas a pagar vencidas",
-                "Contas a receber em atraso"
-            };
-        }
-
-        if (lowerMessage.Contains("funcionário") || lowerMessage.Contains("rh") || lowerMessage.Contains("departamento"))
-        {
-            return new List<string>
-            {
-                "Buscar funcionário",
-                "Listar departamento",
-                "Quem trabalha no TI?"
-            };
-        }
-
-        return new List<string>
-        {
-            "O que você pode fazer?",
-            "Mostrar produtos",
-            "Ver vendas recentes",
-            "Resumo financeiro"
         };
     }
 }

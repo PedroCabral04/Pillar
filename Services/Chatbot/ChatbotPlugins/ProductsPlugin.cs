@@ -33,10 +33,10 @@ public class ProductsPlugin
             }
 
             var productList = result.Products.Select(p => 
-                $"- {p.Name} (SKU: {p.Sku}) - R$ {p.SalePrice:F2} - Estoque: {p.CurrentStock} unidades"
+                $"- **{p.Name}** (SKU: {p.Sku})\n  R$ {p.SalePrice:F2} - Estoque: {p.CurrentStock} unidades"
             );
 
-            return $"Produtos cadastrados:\n{string.Join("\n", productList)}";
+            return $"Produtos cadastrados:\n\n{string.Join("\n\n", productList)}";
         }
         catch (Exception ex)
         {
