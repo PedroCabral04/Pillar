@@ -29,14 +29,19 @@ public class HRPlugin
             .FirstOrDefaultAsync();
 
         if (employee == null)
-            return $"Não encontrei nenhum funcionário com o nome '{name}'.";
+            return $"🔍 Não encontrei nenhum funcionário com o nome **'{name}'**.";
 
-        return $@"👤 **Ficha do Funcionário**
-**Nome:** {employee.FullName}
-**Email:** {employee.Email}
-**Telefone:** {employee.PhoneNumber ?? "N/A"}
-**Cargo:** {employee.Position?.Title ?? "N/A"}
-**Departamento:** {employee.Department?.Name ?? "N/A"}";
+        return $"""
+            👤 **Ficha do Funcionário**
+            
+            | Campo | Informação |
+            |-------|------------|
+            | **Nome** | {employee.FullName ?? "—"} |
+            | **Email** | {employee.Email ?? "—"} |
+            | **Telefone** | {employee.PhoneNumber ?? "—"} |
+            | **Cargo** | {employee.Position?.Title ?? "—"} |
+            | **Departamento** | {employee.Department?.Name ?? "—"} |
+            """;
     }
 
     [KernelFunction, Description("Lista os membros de um departamento")]
@@ -49,19 +54,24 @@ public class HRPlugin
             .FirstOrDefaultAsync(d => d.Name.Contains(departmentName));
 
         if (department == null)
-            return $"Não encontrei o departamento '{departmentName}'.";
+            return $"🔍 Não encontrei o departamento **'{departmentName}'**.";
 
         if (!department.Employees.Any())
-            return $"O departamento {department.Name} não possui funcionários alocados.";
+            return $"🏢 O departamento **{department.Name}** não possui funcionários alocados.";
 
-        var sb = new System.Text.StringBuilder();
-        sb.AppendLine($"🏢 **Equipe {department.Name}:**");
+        var employeeList = department.Employees.Take(15).Select(emp =>
+            $"| {emp.FullName ?? emp.UserName} | {emp.Email} |"
+        );
         
-        foreach (var emp in department.Employees)
-        {
-            sb.AppendLine($"- {emp.FullName ?? emp.UserName} ({emp.Email})");
-        }
+        var remaining = department.Employees.Count - 15;
+        var moreText = remaining > 0 ? $"\n\n*...e mais {remaining} funcionários.*" : "";
 
-        return sb.ToString();
+        return $"""
+            🏢 **Equipe {department.Name}** ({department.Employees.Count})
+            
+            | Nome | Email |
+            |------|-------|
+            {string.Join("\n", employeeList)}{moreText}
+            """;
     }
 }

@@ -25,31 +25,43 @@ public class FinancialPlugin
         var dueSoon = await _payableService.GetDueSoonAsync(7);
         
         if (!overdue.Any() && !dueSoon.Any())
-            return "Não há contas a pagar vencidas ou vencendo nos próximos 7 dias.";
+            return "✅ Não há contas a pagar vencidas ou vencendo nos próximos 7 dias.";
 
-        var sb = new System.Text.StringBuilder();
+        var result = "💳 **Contas a Pagar**\n\n";
         
         if (overdue.Any())
         {
-            sb.AppendLine($"🚨 **{overdue.Count} Contas Vencidas:**");
-            foreach (var item in overdue.Take(5))
-            {
-                sb.AppendLine($"- Nota {item.InvoiceNumber ?? "N/A"} ({item.SupplierName}): {item.OriginalAmount:C} (Venceu: {item.DueDate:dd/MM})");
-            }
-            if (overdue.Count > 5) sb.AppendLine($"+ {overdue.Count - 5} outras...");
-            sb.AppendLine();
+            var items = overdue.Take(5).Select(i => 
+                $"| {i.InvoiceNumber ?? "N/A"} | {i.SupplierName} | R$ {i.OriginalAmount:N2} | {i.DueDate:dd/MM} |"
+            );
+            var moreText = overdue.Count > 5 ? $"\n\n*...e mais {overdue.Count - 5} contas vencidas.*" : "";
+            
+            result += $"""
+                🚨 **Vencidas** ({overdue.Count})
+                
+                | Nota | Fornecedor | Valor | Venceu |
+                |------|------------|-------|--------|
+                {string.Join("\n", items)}{moreText}
+                
+                """;
         }
 
         if (dueSoon.Any())
         {
-            sb.AppendLine($"📅 **{dueSoon.Count} Contas Vencendo em Breve:**");
-            foreach (var item in dueSoon.Take(5))
-            {
-                sb.AppendLine($"- Nota {item.InvoiceNumber ?? "N/A"} ({item.SupplierName}): {item.OriginalAmount:C} (Vence: {item.DueDate:dd/MM})");
-            }
+            var items = dueSoon.Take(5).Select(i => 
+                $"| {i.InvoiceNumber ?? "N/A"} | {i.SupplierName} | R$ {i.OriginalAmount:N2} | {i.DueDate:dd/MM} |"
+            );
+            
+            result += $"""
+                📅 **Vencendo em Breve** ({dueSoon.Count})
+                
+                | Nota | Fornecedor | Valor | Vence |
+                |------|------------|-------|-------|
+                {string.Join("\n", items)}
+                """;
         }
 
-        return sb.ToString();
+        return result.TrimEnd();
     }
 
     [KernelFunction, Description("Verifica se existem contas a receber atrasadas")]
@@ -58,19 +70,20 @@ public class FinancialPlugin
         var overdue = await _receivableService.GetOverdueAsync();
         
         if (!overdue.Any())
-            return "Não há contas a receber em atraso.";
+            return "✅ Não há contas a receber em atraso.";
 
-        var sb = new System.Text.StringBuilder();
-        sb.AppendLine($"💰 **{overdue.Count} Recebimentos em Atraso:**");
-        
-        foreach (var item in overdue.Take(5))
-        {
-            sb.AppendLine($"- Nota {item.InvoiceNumber ?? "N/A"} ({item.CustomerName}): {item.OriginalAmount:C} (Venceu: {item.DueDate:dd/MM})");
-        }
-        
-        if (overdue.Count > 5) sb.AppendLine($"+ {overdue.Count - 5} outros...");
+        var items = overdue.Take(5).Select(i => 
+            $"| {i.InvoiceNumber ?? "N/A"} | {i.CustomerName} | R$ {i.OriginalAmount:N2} | {i.DueDate:dd/MM} |"
+        );
+        var moreText = overdue.Count > 5 ? $"\n\n*...e mais {overdue.Count - 5} contas.*" : "";
 
-        return sb.ToString();
+        return $"""
+            💰 **Recebíveis em Atraso** ({overdue.Count})
+            
+            | Nota | Cliente | Valor | Venceu |
+            |------|---------|-------|--------|
+            {string.Join("\n", items)}{moreText}
+            """;
     }
 
     [KernelFunction, Description("Obtém um resumo do fluxo de caixa atual (contas a pagar vs receber)")]
@@ -85,17 +98,18 @@ public class FinancialPlugin
         var totalPayables = payablesPending + payablesOverdue;
         var totalReceivables = receivablesPending + receivablesOverdue;
         var balance = totalReceivables - totalPayables;
+        var balanceIcon = balance >= 0 ? "🟢" : "🔴";
 
-        return $@"📊 **Resumo Financeiro**
-
-🔴 **A Pagar:** {totalPayables:C}
-   - Pendente: {payablesPending:C}
-   - Vencido: {payablesOverdue:C}
-
-🟢 **A Receber:** {totalReceivables:C}
-   - Pendente: {receivablesPending:C}
-   - Vencido: {receivablesOverdue:C}
-
-💵 **Saldo Previsto:** {balance:C}";
+        return $"""
+            📊 **Resumo Financeiro**
+            
+            | Categoria | Pendente | Vencido | Total |
+            |-----------|----------|---------|-------|
+            | 🔴 **A Pagar** | R$ {payablesPending:N2} | R$ {payablesOverdue:N2} | R$ {totalPayables:N2} |
+            | 🟢 **A Receber** | R$ {receivablesPending:N2} | R$ {receivablesOverdue:N2} | R$ {totalReceivables:N2} |
+            
+            ---
+            {balanceIcon} **Saldo Previsto:** R$ {balance:N2}
+            """;
     }
 }

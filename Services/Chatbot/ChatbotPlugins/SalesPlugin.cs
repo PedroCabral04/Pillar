@@ -38,20 +38,28 @@ public class SalesPlugin
 
             if (!result.items.Any())
             {
-                return "Não há vendas registradas no momento.";
+                return "📊 Não há vendas registradas no momento.";
             }
 
             var salesList = result.items.Select(s => 
-                $"- Venda #{s.Id} ({s.CreatedAt:dd/MM/yyyy}) - " +
-                $"Total: R$ {s.TotalAmount:F2} - " +
-                $"Status: {s.Status}"
+                $"| #{s.Id} | {s.CreatedAt:dd/MM/yyyy} | R$ {s.TotalAmount:N2} | {s.Status} |"
             );
 
-            return $"Vendas recentes:\n{string.Join("\n", salesList)}";
+            var remaining = result.total - limit;
+            var moreText = remaining > 0 ? $"\n\n*...e mais {remaining} vendas.*" : "";
+
+            return $"""
+                🛒 **Vendas Recentes** ({result.total} total)
+                
+                | Venda | Data | Total | Status |
+                |-------|------|-------|--------|
+                {string.Join("\n", salesList)}
+                {moreText}
+                """;
         }
         catch (Exception ex)
         {
-            return $"Erro ao listar vendas: {ex.Message}";
+            return $"❌ Erro ao listar vendas: {ex.Message}";
         }
     }
 
@@ -74,17 +82,19 @@ public class SalesPlugin
 
             if (product == null)
             {
-                return $"❌ Produto com SKU '{productSku}' não encontrado. " +
-                       $"Por favor, verifique o código do produto.";
+                return $"❌ Produto com SKU **'{productSku}'** não encontrado.";
             }
 
             // Verificar estoque
             if (product.CurrentStock < quantity)
             {
-                return $"❌ Estoque insuficiente!\n" +
-                       $"Produto: {product.Name}\n" +
-                       $"Solicitado: {quantity} unidades\n" +
-                       $"Disponível: {product.CurrentStock} unidades";
+                return $"""
+                    ❌ **Estoque Insuficiente!**
+                    
+                    - **Produto:** {product.Name}
+                    - **Solicitado:** {quantity} un.
+                    - **Disponível:** {product.CurrentStock} un.
+                    """;
             }
 
             var saleDto = new CreateSaleDto
@@ -104,15 +114,18 @@ public class SalesPlugin
                 Status = "Pendente"
             };
 
-            var createdSale = await _salesService.CreateAsync(saleDto, 1); // TODO: Obter userId do contexto
+            var createdSale = await _salesService.CreateAsync(saleDto, 1);
 
-            return $"✅ Venda registrada com sucesso!\n" +
-                   $"Venda: #{createdSale.Id}\n" +
-                   $"Produto: {product.Name}\n" +
-                   $"Quantidade: {quantity} unidades\n" +
-                   $"Valor unitário: R$ {product.SalePrice:F2}\n" +
-                   $"Total: R$ {createdSale.TotalAmount:F2}\n" +
-                   $"Status: {createdSale.Status}";
+            return $"""
+                ✅ **Venda Registrada!**
+                
+                - **Venda:** #{createdSale.Id}
+                - **Produto:** {product.Name}
+                - **Quantidade:** {quantity} un.
+                - **Unitário:** R$ {product.SalePrice:N2}
+                - **Total:** R$ {createdSale.TotalAmount:N2}
+                - **Status:** {createdSale.Status}
+                """;
         }
         catch (Exception ex)
         {
@@ -130,23 +143,34 @@ public class SalesPlugin
 
             if (sale == null)
             {
-                return $"Venda #{saleId} não encontrada.";
+                return $"🔍 Venda **#{saleId}** não encontrada.";
             }
 
-            var itemsList = sale.Items.Select(item =>
-                $"  - {item.Quantity}x {item.ProductName} @ R$ {item.UnitPrice:F2} = R$ {item.Total:F2}"
+            var itemsTable = sale.Items.Select(item =>
+                $"| {item.Quantity}x | {item.ProductName} | R$ {item.UnitPrice:N2} | R$ {item.Total:N2} |"
             );
 
-            return $"📋 Detalhes da Venda #{sale.Id}\n" +
-                   $"Data: {sale.CreatedAt:dd/MM/yyyy HH:mm}\n" +
-                   $"Status: {sale.Status}\n" +
-                   $"\nItens:\n{string.Join("\n", itemsList)}\n" +
-                   $"\n💰 Total: R$ {sale.TotalAmount:F2}" +
-                   (string.IsNullOrEmpty(sale.Notes) ? "" : $"\n\nObservações: {sale.Notes}");
+            var notesSection = string.IsNullOrEmpty(sale.Notes) ? "" : $"\n\n> **Obs:** {sale.Notes}";
+
+            return $"""
+                📋 **Venda #{sale.Id}**
+                
+                - **Data:** {sale.CreatedAt:dd/MM/yyyy HH:mm}
+                - **Status:** {sale.Status}
+                
+                **Itens:**
+                
+                | Qtd | Produto | Unit. | Subtotal |
+                |-----|---------|-------|----------|
+                {string.Join("\n", itemsTable)}
+                
+                ---
+                💰 **Total: R$ {sale.TotalAmount:N2}**{notesSection}
+                """;
         }
         catch (Exception ex)
         {
-            return $"Erro ao buscar venda: {ex.Message}";
+            return $"❌ Erro ao buscar venda: {ex.Message}";
         }
     }
 
@@ -159,12 +183,12 @@ public class SalesPlugin
         {
             if (!DateTime.TryParse(startDate, out var start))
             {
-                return "❌ Data inicial inválida. Use o formato: yyyy-MM-dd";
+                return "❌ Data inicial inválida. Use o formato: `yyyy-MM-dd`";
             }
 
             if (!DateTime.TryParse(endDate, out var end))
             {
-                return "❌ Data final inválida. Use o formato: yyyy-MM-dd";
+                return "❌ Data final inválida. Use o formato: `yyyy-MM-dd`";
             }
 
             var total = await _salesService.GetTotalSalesAsync(start, end);
@@ -182,20 +206,25 @@ public class SalesPlugin
 
             if (count == 0)
             {
-                return $"Nenhuma venda encontrada entre {start:dd/MM/yyyy} e {end:dd/MM/yyyy}.";
+                return $"📊 Nenhuma venda entre **{start:dd/MM/yyyy}** e **{end:dd/MM/yyyy}**.";
             }
 
             var average = total / count;
 
-            return $"📊 Resumo de Vendas\n" +
-                   $"Período: {start:dd/MM/yyyy} a {end:dd/MM/yyyy}\n" +
-                   $"Quantidade de vendas: {count}\n" +
-                   $"Valor total: R$ {total:F2}\n" +
-                   $"Ticket médio: R$ {average:F2}";
+            return $"""
+                📊 **Resumo de Vendas**
+                
+                | Métrica | Valor |
+                |---------|-------|
+                | **Período** | {start:dd/MM/yyyy} a {end:dd/MM/yyyy} |
+                | **Quantidade** | {count} vendas |
+                | **Total** | R$ {total:N2} |
+                | **Ticket médio** | R$ {average:N2} |
+                """;
         }
         catch (Exception ex)
         {
-            return $"Erro ao calcular total de vendas: {ex.Message}";
+            return $"❌ Erro ao calcular total: {ex.Message}";
         }
     }
 }

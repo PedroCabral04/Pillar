@@ -18,29 +18,34 @@ public class ProductsPlugin
     }
 
     [KernelFunction, Description("Lista todos os produtos cadastrados no sistema")]
-    public async Task<string> ListProducts()
+    public async Task<string> ListProducts(
+        [Description("Número máximo de produtos a retornar")] int maxResults = 10)
     {
         try
         {
             var result = await _inventoryService.SearchProductsAsync(new ProductSearchDto 
             { 
-                PageSize = 20 
+                PageSize = maxResults 
             });
             
             if (!result.Products.Any())
             {
-                return "Não há produtos cadastrados no momento.";
+                return "📦 Não há produtos cadastrados no momento.";
             }
 
-            var productList = result.Products.Select(p => 
-                $"- **{p.Name}** (SKU: {p.Sku})\n  R$ {p.SalePrice:F2} - Estoque: {p.CurrentStock} unidades"
+            var products = result.Products.Take(maxResults);
+            var productList = products.Select(p => 
+                $"- **{p.Name}** (SKU: `{p.Sku}`) — R$ {p.SalePrice:N2} — Estoque: {p.CurrentStock} un."
             );
 
-            return $"Produtos cadastrados:\n\n{string.Join("\n\n", productList)}";
+            var remaining = result.TotalCount - maxResults;
+            var moreText = remaining > 0 ? $"\n\n*...e mais {remaining} produtos.*" : "";
+
+            return $"📦 **Produtos Cadastrados** ({result.TotalCount} total)\n\n{string.Join("\n", productList)}{moreText}";
         }
         catch (Exception ex)
         {
-            return $"Erro ao listar produtos: {ex.Message}";
+            return $"❌ Erro ao listar produtos: {ex.Message}";
         }
     }
 
@@ -60,20 +65,25 @@ public class ProductsPlugin
 
             if (product == null)
             {
-                return $"Produto '{searchTerm}' não encontrado. Deseja cadastrá-lo?";
+                return $"🔍 Produto **'{searchTerm}'** não encontrado. Deseja cadastrá-lo?";
             }
 
-            return $"Produto encontrado:\n" +
-                   $"Nome: {product.Name}\n" +
-                   $"SKU: {product.Sku}\n" +
-                   $"Descrição: {product.Description}\n" +
-                   $"Preço: R$ {product.SalePrice:F2}\n" +
-                   $"Quantidade em estoque: {product.CurrentStock} unidades\n" +
-                   $"Categoria: {product.CategoryName}";
+            return $"""                
+                📦 **Produto Encontrado**
+                
+                | Campo | Valor |
+                |-------|-------|
+                | **Nome** | {product.Name} |
+                | **SKU** | `{product.Sku}` |
+                | **Descrição** | {product.Description ?? "—"} |
+                | **Preço** | R$ {product.SalePrice:N2} |
+                | **Estoque** | {product.CurrentStock} unidades |
+                | **Categoria** | {product.CategoryName ?? "—"} |
+                """;
         }
         catch (Exception ex)
         {
-            return $"Erro ao buscar produto: {ex.Message}";
+            return $"❌ Erro ao buscar produto: {ex.Message}";
         }
     }
 
@@ -99,11 +109,14 @@ public class ProductsPlugin
 
             var createdProduct = await _inventoryService.CreateProductAsync(productDto, 1); // TODO: Obter userId do contexto
 
-            return $"✅ Produto cadastrado com sucesso!\n" +
-                   $"Nome: {createdProduct.Name}\n" +
-                   $"SKU: {createdProduct.Sku}\n" +
-                   $"Preço: R$ {createdProduct.SalePrice:F2}\n" +
-                   $"Estoque inicial: {createdProduct.CurrentStock} unidades";
+            return $"""
+                ✅ **Produto Cadastrado com Sucesso!**
+                
+                - **Nome:** {createdProduct.Name}
+                - **SKU:** `{createdProduct.Sku}`
+                - **Preço:** R$ {createdProduct.SalePrice:N2}
+                - **Estoque:** {createdProduct.CurrentStock} unidades
+                """;
         }
         catch (Exception ex)
         {
@@ -127,23 +140,26 @@ public class ProductsPlugin
 
             if (product == null)
             {
-                return $"Produto '{productIdentifier}' não encontrado.";
+                return $"🔍 Produto **'{productIdentifier}'** não encontrado.";
             }
 
-            var status = product.CurrentStock switch
+            var (icon, status) = product.CurrentStock switch
             {
-                0 => "⚠️ SEM ESTOQUE",
-                < 10 => "⚠️ ESTOQUE BAIXO",
-                _ => "✅ ESTOQUE OK"
+                0 => ("🔴", "SEM ESTOQUE"),
+                < 10 => ("🟡", "ESTOQUE BAIXO"),
+                _ => ("🟢", "ESTOQUE OK")
             };
 
-            return $"{status}\n" +
-                   $"Produto: {product.Name}\n" +
-                   $"Quantidade disponível: {product.CurrentStock} unidades";
+            return $"""
+                {icon} **{status}**
+                
+                - **Produto:** {product.Name}
+                - **Disponível:** {product.CurrentStock} unidades
+                """;
         }
         catch (Exception ex)
         {
-            return $"Erro ao verificar estoque: {ex.Message}";
+            return $"❌ Erro ao verificar estoque: {ex.Message}";
         }
     }
 }

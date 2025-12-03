@@ -28,14 +28,23 @@ public class CustomersPlugin
 
             if (!customers.Any())
             {
-                return $"🔍 Nenhum cliente encontrado com o termo '{searchTerm}'.";
+                return $"🔍 Nenhum cliente encontrado com **'{searchTerm}'**.";
             }
 
-            var customerList = customers.Select(c =>
-                $"- **{c.Name}** (Doc: {FormatDocument(c.Document)}) - {(c.IsActive ? "✅ Ativo" : "❌ Inativo")} - Email: {c.Email ?? "Não informado"}"
+            var list = customers.Select(c =>
+                $"| {c.Name} | {FormatDocument(c.Document)} | {(c.IsActive ? "✅" : "❌")} | {c.Email ?? "—"} |"
             );
+            
+            var remaining = total - maxResults;
+            var moreText = remaining > 0 ? $"\n\n*...e mais {remaining} clientes.*" : "";
 
-            return $"👥 **Clientes encontrados ({total} total):**\n{string.Join("\n", customerList)}";
+            return $"""
+                👥 **Clientes Encontrados** ({total} total)
+                
+                | Nome | Documento | Ativo | Email |
+                |------|-----------|-------|-------|
+                {string.Join("\n", list)}{moreText}
+                """;
         }
         catch (Exception ex)
         {
@@ -118,12 +127,15 @@ public class CustomersPlugin
 
             var customer = await _customerService.CreateAsync(createDto);
 
-            return $"✅ **Cliente cadastrado com sucesso!**\n\n" +
-                   $"**ID:** {customer.Id}\n" +
-                   $"**Nome:** {customer.Name}\n" +
-                   $"**Documento:** {FormatDocument(customer.Document)}\n" +
-                   $"**Email:** {customer.Email ?? "Não informado"}\n" +
-                   $"**Telefone:** {customer.Phone ?? "Não informado"}";
+            return $"""
+                ✅ **Cliente Cadastrado!**
+                
+                - **ID:** {customer.Id}
+                - **Nome:** {customer.Name}
+                - **Documento:** {FormatDocument(customer.Document)}
+                - **Email:** {customer.Email ?? "—"}
+                - **Telefone:** {customer.Phone ?? "—"}
+                """;
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("já existe"))
         {
@@ -137,7 +149,7 @@ public class CustomersPlugin
 
     [KernelFunction, Description("Lista os clientes mais recentes cadastrados no sistema")]
     public async Task<string> ListRecentCustomers(
-        [Description("Número máximo de clientes a retornar")] int maxResults = 15,
+        [Description("Número máximo de clientes a retornar")] int maxResults = 10,
         [Description("Filtrar apenas clientes ativos? (true/false/null para todos)")] bool? activeOnly = null)
     {
         try
@@ -150,21 +162,30 @@ public class CustomersPlugin
 
             if (!customers.Any())
             {
-                return "👥 Não há clientes cadastrados no momento.";
+                return "👥 Não há clientes cadastrados.";
             }
 
-            var customerList = customers.Select(c =>
-                $"- **{c.Name}** (ID: {c.Id}) - Doc: {FormatDocument(c.Document)} - {(c.IsActive ? "✅ Ativo" : "❌ Inativo")}"
+            var list = customers.Select(c =>
+                $"| {c.Id} | {c.Name} | {FormatDocument(c.Document)} | {(c.IsActive ? "✅" : "❌")} |"
             );
 
             var statusFilter = activeOnly switch
             {
-                true => " ativos",
-                false => " inativos",
+                true => " Ativos",
+                false => " Inativos",
                 _ => ""
             };
+            
+            var remaining = total - maxResults;
+            var moreText = remaining > 0 ? $"\n\n*...e mais {remaining} clientes.*" : "";
 
-            return $"👥 **Clientes{statusFilter} ({total} total):**\n{string.Join("\n", customerList)}";
+            return $"""
+                👥 **Clientes{statusFilter}** ({total} total)
+                
+                | ID | Nome | Documento | Ativo |
+                |----|------|-----------|-------|
+                {string.Join("\n", list)}{moreText}
+                """;
         }
         catch (Exception ex)
         {
@@ -180,17 +201,21 @@ public class CustomersPlugin
         if (!string.IsNullOrEmpty(customer.State)) addressParts.Add(customer.State);
         if (!string.IsNullOrEmpty(customer.ZipCode)) addressParts.Add($"CEP: {FormatCep(customer.ZipCode)}");
 
-        var fullAddress = addressParts.Any() ? string.Join(", ", addressParts) : "Não informado";
+        var fullAddress = addressParts.Any() ? string.Join(", ", addressParts) : "—";
 
-        return $"👤 **Detalhes do Cliente:**\n\n" +
-               $"**ID:** {customer.Id}\n" +
-               $"**Nome:** {customer.Name}\n" +
-               $"**Documento:** {FormatDocument(customer.Document)}\n" +
-               $"**Email:** {customer.Email ?? "Não informado"}\n" +
-               $"**Telefone:** {customer.Phone ?? "Não informado"}\n" +
-               $"**Endereço:** {fullAddress}\n" +
-               $"**Status:** {(customer.IsActive ? "✅ Ativo" : "❌ Inativo")}\n" +
-               $"**Cadastrado em:** {customer.CreatedAt:dd/MM/yyyy HH:mm}";
+        return $"""
+            👤 **Cliente #{customer.Id}**
+            
+            | Campo | Valor |
+            |-------|-------|
+            | **Nome** | {customer.Name} |
+            | **Documento** | {FormatDocument(customer.Document)} |
+            | **Email** | {customer.Email ?? "—"} |
+            | **Telefone** | {customer.Phone ?? "—"} |
+            | **Endereço** | {fullAddress} |
+            | **Status** | {(customer.IsActive ? "✅ Ativo" : "❌ Inativo")} |
+            | **Cadastro** | {customer.CreatedAt:dd/MM/yyyy HH:mm} |
+            """;
     }
 
     private static string FormatDocument(string document)
