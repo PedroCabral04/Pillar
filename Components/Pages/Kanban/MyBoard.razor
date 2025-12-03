@@ -3,8 +3,10 @@
 @using erp.DTOs.Kanban
 @using erp.Models.Kanban
 @using erp.Services
+@using erp.Services.Authorization
 @using MudBlazor
 @using erp.Components.Shared.Dialogs
+@attribute [Authorize(Policy = ModulePolicies.Kanban)]
 @inject IApiService Api
 @inject NavigationManager Nav
 @inject IDialogService DialogService

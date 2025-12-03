@@ -1,5 +1,6 @@
 @page "/reports/hr"
-@attribute [Authorize]
+@using erp.Services.Authorization
+@attribute [Authorize(Policy = ModulePolicies.Reports)]
 @using erp.DTOs.Reports
 @using erp.Services
 @using Microsoft.AspNetCore.Authorization

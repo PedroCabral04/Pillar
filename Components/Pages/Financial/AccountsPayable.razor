@@ -1,8 +1,9 @@
 @page "/financial/payables"
 @using erp.DTOs.Financial
 @using erp.Models.Financial
+@using erp.Services.Authorization
 @using erp.Components.Shared.Dialogs.Financial
-@attribute [Authorize]
+@attribute [Authorize(Policy = ModulePolicies.Financial)]
 
 <PageTitle>Contas a Pagar - Pillar ERP</PageTitle>
 

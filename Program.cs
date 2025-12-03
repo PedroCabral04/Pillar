@@ -24,6 +24,8 @@ using erp.Services.Dashboard.Providers.Finance;
 using erp.Services.Dashboard.Providers.Inventory;
 using erp.Services.Sales;
 using erp.Services.Seeding;
+using erp.Services.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using System.Reflection;
 using Microsoft.Extensions.Options;
 using ApexCharts;
@@ -52,7 +54,34 @@ builder.AddServiceDefaults();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddCascadingAuthenticationState();
-builder.Services.AddAuthorization();
+
+// Configure Authorization with module-based policies
+builder.Services.AddAuthorization(options =>
+{
+    // Module-based authorization policies
+    options.AddPolicy(ModulePolicies.Dashboard, policy => 
+        policy.Requirements.Add(new ModuleAccessRequirement(ModuleKeys.Dashboard)));
+    options.AddPolicy(ModulePolicies.Sales, policy => 
+        policy.Requirements.Add(new ModuleAccessRequirement(ModuleKeys.Sales)));
+    options.AddPolicy(ModulePolicies.Inventory, policy => 
+        policy.Requirements.Add(new ModuleAccessRequirement(ModuleKeys.Inventory)));
+    options.AddPolicy(ModulePolicies.Financial, policy => 
+        policy.Requirements.Add(new ModuleAccessRequirement(ModuleKeys.Financial)));
+    options.AddPolicy(ModulePolicies.HR, policy => 
+        policy.Requirements.Add(new ModuleAccessRequirement(ModuleKeys.HR)));
+    options.AddPolicy(ModulePolicies.Assets, policy => 
+        policy.Requirements.Add(new ModuleAccessRequirement(ModuleKeys.Assets)));
+    options.AddPolicy(ModulePolicies.Kanban, policy => 
+        policy.Requirements.Add(new ModuleAccessRequirement(ModuleKeys.Kanban)));
+    options.AddPolicy(ModulePolicies.Reports, policy => 
+        policy.Requirements.Add(new ModuleAccessRequirement(ModuleKeys.Reports)));
+    options.AddPolicy(ModulePolicies.Admin, policy => 
+        policy.Requirements.Add(new ModuleAccessRequirement(ModuleKeys.Admin)));
+});
+
+// Register authorization handler
+builder.Services.AddScoped<IAuthorizationHandler, ModuleAccessHandler>();
+builder.Services.AddMemoryCache();
 
 // Data Protection keys persistence (optional, via env DATAPROTECTION__KEYS_DIRECTORY)
 var dataProtectionKeysDir = Environment.GetEnvironmentVariable("DATAPROTECTION__KEYS_DIRECTORY");
@@ -368,6 +397,9 @@ builder.Services.AddScoped<erp.Services.Payroll.IPayrollService, erp.Services.Pa
 
 // Audit services
 builder.Services.AddScoped<erp.Services.Audit.IAuditService, erp.Services.Audit.AuditService>();
+
+// Authorization / Permission services
+builder.Services.AddScoped<IPermissionService, PermissionService>();
 
 // Chatbot services
 builder.Services.AddScoped<erp.Services.Chatbot.IChatbotService, erp.Services.Chatbot.ChatbotService>();
@@ -723,17 +755,29 @@ using (var scope = app.Services.CreateScope())
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
 
-        async Task EnsureRole(string name)
+        async Task EnsureRole(string name, string? description = null, string? icon = null)
         {
             if (!await roleManager.RoleExistsAsync(name))
             {
-                await roleManager.CreateAsync(new ApplicationRole { Name = name, NormalizedName = name.ToUpperInvariant() });
+                await roleManager.CreateAsync(new ApplicationRole 
+                { 
+                    Name = name, 
+                    NormalizedName = name.ToUpperInvariant(),
+                    Description = description,
+                    Icon = icon
+                });
             }
         }
 
-        await EnsureRole("Administrador");
-        await EnsureRole("Gerente");
-        await EnsureRole("Vendedor");
+        await EnsureRole("Administrador", "Acesso total ao sistema", "AdminPanelSettings");
+        await EnsureRole("Gerente", "Gerenciar equipes e relatórios", "SupervisorAccount");
+        await EnsureRole("Vendedor", "Registro de vendas e atendimento", "PointOfSale");
+        await EnsureRole("Estoque", "Usuário comum de estoque", "Inventory");
+        await EnsureRole("RH", "Recursos Humanos", "Badge");
+        await EnsureRole("Financeiro", "Departamento Financeiro", "AccountBalance");
+
+        // Seed Module Permissions
+        await SeedModulePermissionsAsync(db, roleManager);
 
         var adminEmail = "admin@erp.local";
         var admin = await userManager.FindByEmailAsync(adminEmail);
@@ -769,6 +813,97 @@ using (var scope = app.Services.CreateScope())
     catch (Exception ex)
     {
         Console.WriteLine($"Identity seed error: {ex.Message}");
+    }
+}
+
+/// <summary>
+/// Seeds module permissions and assigns them to roles
+/// </summary>
+static async Task SeedModulePermissionsAsync(ApplicationDbContext db, RoleManager<ApplicationRole> roleManager)
+{
+    try
+    {
+        // Define all modules
+        var modules = new[]
+        {
+            new ModulePermission { ModuleKey = ModuleKeys.Dashboard, DisplayName = "Dashboard", Description = "Painel principal com visão geral", Icon = "Dashboard", DisplayOrder = 1 },
+            new ModulePermission { ModuleKey = ModuleKeys.Sales, DisplayName = "Vendas", Description = "Gestão de vendas e clientes", Icon = "ShoppingCart", DisplayOrder = 2 },
+            new ModulePermission { ModuleKey = ModuleKeys.Inventory, DisplayName = "Estoque", Description = "Controle de produtos e movimentações", Icon = "Inventory", DisplayOrder = 3 },
+            new ModulePermission { ModuleKey = ModuleKeys.Financial, DisplayName = "Financeiro", Description = "Contas a pagar/receber, fornecedores", Icon = "AccountBalance", DisplayOrder = 4 },
+            new ModulePermission { ModuleKey = ModuleKeys.HR, DisplayName = "RH", Description = "Recursos Humanos e folha de pagamento", Icon = "Groups", DisplayOrder = 5 },
+            new ModulePermission { ModuleKey = ModuleKeys.Assets, DisplayName = "Ativos", Description = "Gestão de patrimônio", Icon = "Devices", DisplayOrder = 6 },
+            new ModulePermission { ModuleKey = ModuleKeys.Kanban, DisplayName = "Kanban", Description = "Quadros de tarefas", Icon = "ViewKanban", DisplayOrder = 7 },
+            new ModulePermission { ModuleKey = ModuleKeys.Reports, DisplayName = "Relatórios", Description = "Relatórios gerenciais", Icon = "Assessment", DisplayOrder = 8 },
+            new ModulePermission { ModuleKey = ModuleKeys.Admin, DisplayName = "Administração", Description = "Configurações do sistema", Icon = "AdminPanelSettings", DisplayOrder = 9 }
+        };
+
+        // Add modules if they don't exist
+        foreach (var module in modules)
+        {
+            var existing = await db.ModulePermissions.FirstOrDefaultAsync(m => m.ModuleKey == module.ModuleKey);
+            if (existing == null)
+            {
+                db.ModulePermissions.Add(module);
+            }
+        }
+        await db.SaveChangesAsync();
+
+        // Reload modules from DB to get IDs
+        var dbModules = await db.ModulePermissions.ToDictionaryAsync(m => m.ModuleKey, m => m.Id);
+
+        // Define role-module mappings
+        var roleModules = new Dictionary<string, string[]>
+        {
+            // Administrador gets all modules (handled in code, but seed anyway for completeness)
+            ["Administrador"] = new[] { ModuleKeys.Dashboard, ModuleKeys.Sales, ModuleKeys.Inventory, ModuleKeys.Financial, ModuleKeys.HR, ModuleKeys.Assets, ModuleKeys.Kanban, ModuleKeys.Reports, ModuleKeys.Admin },
+            
+            // Gerente gets most modules except Admin
+            ["Gerente"] = new[] { ModuleKeys.Dashboard, ModuleKeys.Sales, ModuleKeys.Inventory, ModuleKeys.Financial, ModuleKeys.HR, ModuleKeys.Assets, ModuleKeys.Kanban, ModuleKeys.Reports },
+            
+            // Vendedor gets Sales, Dashboard, Kanban
+            ["Vendedor"] = new[] { ModuleKeys.Dashboard, ModuleKeys.Sales, ModuleKeys.Kanban },
+            
+            // Estoque gets Inventory, Dashboard, Reports
+            ["Estoque"] = new[] { ModuleKeys.Dashboard, ModuleKeys.Inventory, ModuleKeys.Reports },
+            
+            // RH gets HR, Dashboard, Reports
+            ["RH"] = new[] { ModuleKeys.Dashboard, ModuleKeys.HR, ModuleKeys.Reports },
+            
+            // Financeiro gets Financial, Dashboard, Reports
+            ["Financeiro"] = new[] { ModuleKeys.Dashboard, ModuleKeys.Financial, ModuleKeys.Reports }
+        };
+
+        // Assign modules to roles
+        foreach (var (roleName, moduleKeys) in roleModules)
+        {
+            var role = await db.Set<ApplicationRole>().FirstOrDefaultAsync(r => r.Name == roleName);
+            if (role == null) continue;
+
+            foreach (var moduleKey in moduleKeys)
+            {
+                if (!dbModules.TryGetValue(moduleKey, out var moduleId)) continue;
+
+                var exists = await db.RoleModulePermissions
+                    .AnyAsync(rmp => rmp.RoleId == role.Id && rmp.ModulePermissionId == moduleId);
+
+                if (!exists)
+                {
+                    db.RoleModulePermissions.Add(new RoleModulePermission
+                    {
+                        RoleId = role.Id,
+                        ModulePermissionId = moduleId,
+                        GrantedAt = DateTime.UtcNow
+                    });
+                }
+            }
+        }
+
+        await db.SaveChangesAsync();
+        Console.WriteLine("[Seed] Module permissions seeded successfully.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[Seed] Module permissions seed error: {ex.Message}");
     }
 }
 

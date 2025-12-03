@@ -1,11 +1,12 @@
 @page "/inventory/categories"
 @using erp.DTOs.Inventory
 @using erp.Services
+@using erp.Services.Authorization
 @using erp.Components.Shared.Dialogs.Inventory
 @using MudBlazor
 @using Size = MudBlazor.Size
 @using Color = MudBlazor.Color
-@attribute [Authorize]
+@attribute [Authorize(Policy = ModulePolicies.Inventory)]
 
 @inject IApiService ApiService
 @inject ILogger<ProductCategories> Logger

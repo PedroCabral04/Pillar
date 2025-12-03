@@ -1,0 +1,290 @@
+@page "/admin/role-permissions"
+@using erp.DTOs.Permissions
+@using erp.Services
+@using MudBlazor
+@attribute [Authorize(Roles = "Administrador")]
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+@inject ILogger<RolePermissionsPage> Logger
+
+<PageTitle>Permissões de Módulos - Pillar ERP</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <div>
+        <MudText Typo="Typo.h4">Permissões de Módulos</MudText>
+        <MudText Typo="Typo.body2" Color="MudBlazor.Color.Secondary">
+            Defina quais módulos cada função pode acessar
+        </MudText>
+    </div>
+</MudStack>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="MudBlazor.Color.Primary" />
+}
+else if (_error != null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@_error</MudAlert>
+}
+else
+{
+    <MudGrid Spacing="3">
+        @foreach (var role in _roles)
+        {
+            <MudItem xs="12" md="6" lg="4">
+                <MudCard Elevation="2" Class="role-permission-card">
+                    <MudCardHeader>
+                        <CardHeaderAvatar>
+                            <MudAvatar Color="@GetRoleColor(role.RoleName)" Size="MudBlazor.Size.Medium">
+                                <MudIcon Icon="@GetRoleIcon(role.RoleName)" />
+                            </MudAvatar>
+                        </CardHeaderAvatar>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">@role.RoleName</MudText>
+                            <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">
+                                @(role.Description ?? GetDefaultDescription(role.RoleName))
+                            </MudText>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            @if (_savingRole == role.RoleId)
+                            {
+                                <MudProgressCircular Size="MudBlazor.Size.Small" Indeterminate="true" />
+                            }
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudDivider />
+                    <MudCardContent Class="pa-4">
+                        <MudStack Spacing="2">
+                            @foreach (var module in _allModules)
+                            {
+                                var isChecked = _roleModules.TryGetValue(role.RoleId, out var modules) && 
+                                               modules.Contains(module.Id);
+                                var isAdmin = role.RoleName == "Administrador";
+                                
+                                <MudCheckBox T="bool" 
+                                             Value="@isChecked"
+                                             ValueChanged="@(v => OnModuleToggled(role.RoleId, module.Id, v))"
+                                             Dense="true"
+                                             Disabled="@isAdmin"
+                                             Color="MudBlazor.Color.Primary">
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                        <MudIcon Icon="@GetModuleIcon(module.Icon)" Size="MudBlazor.Size.Small" 
+                                                 Color="@(isChecked ? MudBlazor.Color.Primary : MudBlazor.Color.Default)" />
+                                        <MudText Typo="Typo.body2">@module.DisplayName</MudText>
+                                    </MudStack>
+                                </MudCheckBox>
+                            }
+                        </MudStack>
+                        
+                        @if (role.RoleName == "Administrador")
+                        {
+                            <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3" Icon="@Icons.Material.Filled.Info">
+                                Administradores têm acesso a todos os módulos
+                            </MudAlert>
+                        }
+                    </MudCardContent>
+                    <MudDivider />
+                    <MudCardActions Class="pa-3">
+                        <MudChip T="string" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Primary" Variant="Variant.Outlined">
+                            @GetSelectedModulesCount(role.RoleId) módulo(s)
+                        </MudChip>
+                        <MudSpacer />
+                        <MudButton Variant="Variant.Filled" 
+                                   Color="MudBlazor.Color.Primary" 
+                                   Size="MudBlazor.Size.Small"
+                                   Disabled="@(role.RoleName == "Administrador" || _savingRole == role.RoleId)"
+                                   OnClick="@(() => SaveRolePermissions(role.RoleId))">
+                            Salvar
+                        </MudButton>
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+    
+    <MudPaper Class="mt-6 pa-4" Elevation="0" Style="background: var(--mud-palette-background-gray);">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Info" Color="MudBlazor.Color.Info" />
+            <MudText Typo="Typo.body2">
+                <strong>Dica:</strong> As alterações de permissão entram em vigor imediatamente. 
+                Usuários com a função alterada terão o menu atualizado no próximo acesso.
+            </MudText>
+        </MudStack>
+    </MudPaper>
+}
+
+@code {
+    private List<RolePermissionsDto> _roles = new();
+    private List<ModulePermissionDto> _allModules = new();
+    private Dictionary<int, HashSet<int>> _roleModules = new();
+    private bool _loading = true;
+    private string? _error;
+    private int? _savingRole;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        _error = null;
+        
+        try
+        {
+            // Load all modules
+            var modulesResponse = await ApiService.GetAsync("api/permissions/modules");
+            if (modulesResponse.IsSuccessStatusCode)
+            {
+                _allModules = await modulesResponse.Content.ReadFromJsonAsync<List<ModulePermissionDto>>() ?? new();
+            }
+            
+            // Load all roles with their permissions
+            var rolesResponse = await ApiService.GetAsync("api/permissions/roles");
+            if (rolesResponse.IsSuccessStatusCode)
+            {
+                _roles = await rolesResponse.Content.ReadFromJsonAsync<List<RolePermissionsDto>>() ?? new();
+                
+                // Build role modules dictionary
+                _roleModules = _roles.ToDictionary(
+                    r => r.RoleId,
+                    r => r.Modules.Select(m => m.Id).ToHashSet()
+                );
+            }
+            else
+            {
+                _error = "Erro ao carregar permissões. Verifique sua conexão.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading role permissions");
+            _error = "Erro ao carregar permissões. Tente novamente.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OnModuleToggled(int roleId, int moduleId, bool isChecked)
+    {
+        if (!_roleModules.ContainsKey(roleId))
+        {
+            _roleModules[roleId] = new HashSet<int>();
+        }
+        
+        if (isChecked)
+        {
+            _roleModules[roleId].Add(moduleId);
+        }
+        else
+        {
+            _roleModules[roleId].Remove(moduleId);
+        }
+    }
+
+    private async Task SaveRolePermissions(int roleId)
+    {
+        _savingRole = roleId;
+        StateHasChanged();
+        
+        try
+        {
+            var dto = new UpdateRoleModulesDto
+            {
+                RoleId = roleId,
+                ModulePermissionIds = _roleModules.TryGetValue(roleId, out var modules) 
+                    ? modules.ToList() 
+                    : new List<int>()
+            };
+            
+            var response = await ApiService.PutAsJsonAsync($"api/permissions/roles/{roleId}/modules", dto);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var role = _roles.FirstOrDefault(r => r.RoleId == roleId);
+                Snackbar.Add($"Permissões de '{role?.RoleName}' atualizadas!", Severity.Success);
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Erro ao salvar: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error saving role permissions for role {RoleId}", roleId);
+            Snackbar.Add("Erro ao salvar permissões. Tente novamente.", Severity.Error);
+        }
+        finally
+        {
+            _savingRole = null;
+        }
+    }
+
+    private int GetSelectedModulesCount(int roleId)
+    {
+        return _roleModules.TryGetValue(roleId, out var modules) ? modules.Count : 0;
+    }
+
+    private MudBlazor.Color GetRoleColor(string roleName) => roleName switch
+    {
+        "Administrador" => MudBlazor.Color.Primary,
+        "Gerente" => MudBlazor.Color.Secondary,
+        "Vendedor" => MudBlazor.Color.Success,
+        "Estoque" => MudBlazor.Color.Info,
+        "RH" => MudBlazor.Color.Warning,
+        "Financeiro" => MudBlazor.Color.Tertiary,
+        _ => MudBlazor.Color.Default
+    };
+
+    private string GetRoleIcon(string roleName) => roleName switch
+    {
+        "Administrador" => Icons.Material.Filled.AdminPanelSettings,
+        "Gerente" => Icons.Material.Filled.SupervisorAccount,
+        "Vendedor" => Icons.Material.Filled.PointOfSale,
+        "Estoque" => Icons.Material.Filled.Inventory,
+        "RH" => Icons.Material.Filled.Badge,
+        "Financeiro" => Icons.Material.Filled.AccountBalance,
+        _ => Icons.Material.Filled.Person
+    };
+
+    private string GetDefaultDescription(string roleName) => roleName switch
+    {
+        "Administrador" => "Acesso total ao sistema",
+        "Gerente" => "Gerenciar equipes e relatórios",
+        "Vendedor" => "Registro de vendas e atendimento",
+        "Estoque" => "Controle de estoque e produtos",
+        "RH" => "Recursos Humanos e folha",
+        "Financeiro" => "Gestão financeira",
+        _ => "Usuário do sistema"
+    };
+
+    private string GetModuleIcon(string? iconName) => iconName switch
+    {
+        "Dashboard" => Icons.Material.Filled.Dashboard,
+        "ShoppingCart" => Icons.Material.Filled.ShoppingCart,
+        "Inventory" => Icons.Material.Filled.Inventory,
+        "AccountBalance" => Icons.Material.Filled.AccountBalance,
+        "Groups" => Icons.Material.Filled.Groups,
+        "Devices" => Icons.Material.Filled.Devices,
+        "ViewKanban" => Icons.Material.Filled.ViewKanban,
+        "Assessment" => Icons.Material.Filled.Assessment,
+        "AdminPanelSettings" => Icons.Material.Filled.AdminPanelSettings,
+        _ => Icons.Material.Filled.Extension
+    };
+}
+
+<style>
+    .role-permission-card {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .role-permission-card .mud-card-content {
+        flex: 1;
+    }
+</style>

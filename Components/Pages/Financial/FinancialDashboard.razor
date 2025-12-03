@@ -1,7 +1,8 @@
 @page "/financial/dashboard"
 @using erp.DTOs.Financial
 @using erp.Services
-@attribute [Authorize]
+@using erp.Services.Authorization
+@attribute [Authorize(Policy = ModulePolicies.Financial)]
 
 <PageTitle>Dashboard Financeiro - Pillar ERP</PageTitle>
 

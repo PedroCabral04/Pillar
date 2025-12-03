@@ -1,12 +1,13 @@
 @page "/sales/customers"
 @using erp.DTOs.Sales
 @using erp.Services
+@using erp.Services.Authorization
 @using erp.Components.Shared.Dialogs
 @using erp.Components.Shared.Dialogs.Sales
 @using MudBlazor
 @using Size = MudBlazor.Size
 @using Color = MudBlazor.Color
-@attribute [Authorize]
+@attribute [Authorize(Policy = ModulePolicies.Sales)]
 
 @inject IApiService ApiService
 @inject ILogger<Customers> Logger

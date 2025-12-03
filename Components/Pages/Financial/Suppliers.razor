@@ -1,7 +1,8 @@
 @page "/financial/suppliers"
 @using erp.DTOs.Financial
+@using erp.Services.Authorization
 @using erp.Components.Shared.Dialogs.Financial
-@attribute [Authorize]
+@attribute [Authorize(Policy = ModulePolicies.Financial)]
 
 <PageTitle>Fornecedores - Pillar ERP</PageTitle>
 

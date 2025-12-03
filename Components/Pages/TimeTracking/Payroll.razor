@@ -4,10 +4,11 @@
 @using erp.Models.Payroll
 @using erp.Models.TimeTracking
 @using erp.Services
+@using erp.Services.Authorization
 @using erp.Components.Shared.Dialogs
 @using Color = MudBlazor.Color
 @using Size = MudBlazor.Size
-@attribute [Authorize(Roles = "Administrador,Gerente,RH")]
+@attribute [Authorize(Policy = ModulePolicies.HR)]
 
 @inject IApiService ApiService
 @inject ILogger<Payroll> Logger

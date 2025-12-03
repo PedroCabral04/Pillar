@@ -1,12 +1,13 @@
 @page "/assets"
 @using erp.DTOs.Assets
 @using erp.Services
+@using erp.Services.Authorization
 @using erp.Components.Pages.Assets
 @using erp.Models
 @using MudBlazor
 @using Size = MudBlazor.Size
 @using Color = MudBlazor.Color
-@attribute [Authorize]
+@attribute [Authorize(Policy = ModulePolicies.Assets)]
 
 @inject IApiService ApiService
 @inject ILogger<Assets> Logger

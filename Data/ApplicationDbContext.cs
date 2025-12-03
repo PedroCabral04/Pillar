@@ -84,6 +84,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<UserDashboardLayout> UserDashboardLayouts { get; set; } = null!;
     public DbSet<WidgetRoleConfiguration> WidgetRoleConfigurations { get; set; } = null!;
     
+    // Module Permissions
+    public DbSet<ModulePermission> ModulePermissions { get; set; } = null!;
+    public DbSet<RoleModulePermission> RoleModulePermissions { get; set; } = null!;
+    
     // Serviços injetados para auditoria
     private readonly IHttpContextAccessor? _httpContextAccessor;
     private readonly erp.Services.Tenancy.ITenantContextAccessor? _tenantContextAccessor;
@@ -875,6 +879,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         
         // Dashboard model configuration
         ConfigureDashboardModels(modelBuilder);
+        
+        // Module permissions configuration
+        ConfigureModulePermissionModels(modelBuilder);
 
         // Apply Global Query Filters for Multi-Tenancy
         // This ensures that queries only return data for the current tenant
@@ -1995,6 +2002,57 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .WithMany()
                 .HasForeignKey(x => x.ModifiedByUserId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+    }
+    
+    private void ConfigureModulePermissionModels(ModelBuilder modelBuilder)
+    {
+        // ModulePermission
+        modelBuilder.Entity<ModulePermission>(mp =>
+        {
+            mp.ToTable("ModulePermissions");
+            mp.HasKey(x => x.Id);
+            
+            mp.Property(x => x.ModuleKey).HasMaxLength(50).IsRequired();
+            mp.Property(x => x.DisplayName).HasMaxLength(100).IsRequired();
+            mp.Property(x => x.Description).HasMaxLength(500);
+            mp.Property(x => x.Icon).HasMaxLength(100);
+            mp.Property(x => x.DisplayOrder).HasDefaultValue(0);
+            mp.Property(x => x.IsActive).HasDefaultValue(true);
+            
+            mp.HasIndex(x => x.ModuleKey).IsUnique();
+            mp.HasIndex(x => x.DisplayOrder);
+        });
+        
+        // RoleModulePermission (junction table)
+        modelBuilder.Entity<RoleModulePermission>(rmp =>
+        {
+            rmp.ToTable("RoleModulePermissions");
+            rmp.HasKey(x => x.Id);
+            
+            rmp.HasIndex(x => new { x.RoleId, x.ModulePermissionId }).IsUnique();
+            
+            rmp.HasOne(x => x.Role)
+                .WithMany(r => r.ModulePermissions)
+                .HasForeignKey(x => x.RoleId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            rmp.HasOne(x => x.ModulePermission)
+                .WithMany(mp => mp.RolePermissions)
+                .HasForeignKey(x => x.ModulePermissionId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            rmp.HasOne(x => x.GrantedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.GrantedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+        
+        // ApplicationRole additional configuration
+        modelBuilder.Entity<ApplicationRole>(role =>
+        {
+            role.Property(x => x.Description).HasMaxLength(500);
+            role.Property(x => x.Icon).HasMaxLength(100);
         });
     }
 }
