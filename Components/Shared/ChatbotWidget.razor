@@ -66,7 +66,7 @@
                 {
                     @foreach (var message in _messages)
                     {
-                        var messageId = _messages.IndexOf(message);
+                        var messageId = message.Id;
                         var isLongMessage = message.Role == "assistant" && !message.IsError && message.Content.Length > MaxCollapsedLength;
                         var isExpanded = _expandedMessages.Contains(messageId);
                         
@@ -174,15 +174,15 @@
     private List<ChatMessageDto> _messages = new();
     private List<string> _suggestedActions = new();
     private ElementReference _messagesContainer;
-    private HashSet<int> _expandedMessages = new();
+    private HashSet<string> _expandedMessages = new();
 
-    private void ExpandMessage(int messageId)
+    private void ExpandMessage(string messageId)
     {
         _expandedMessages.Add(messageId);
         StateHasChanged();
     }
 
-    private void CollapseMessage(int messageId)
+    private void CollapseMessage(string messageId)
     {
         _expandedMessages.Remove(messageId);
         StateHasChanged();
@@ -572,9 +572,11 @@
 .message-collapse-button {
     display: flex;
     justify-content: center;
-    margin-top: 8px;
+    margin-top: 12px;
     padding-top: 8px;
     border-top: 1px solid var(--mud-palette-lines-default);
+    width: 100%;
+    box-sizing: border-box;
 }
 
 /* Estilos para elementos Markdown dentro das mensagens */

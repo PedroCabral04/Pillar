@@ -2,6 +2,7 @@ namespace erp.DTOs.Chatbot;
 
 public class ChatMessageDto
 {
+    public string Id { get; set; } = Guid.NewGuid().ToString();
     public string Role { get; set; } = string.Empty; // "user" ou "assistant"
     public string Content { get; set; } = string.Empty;
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
