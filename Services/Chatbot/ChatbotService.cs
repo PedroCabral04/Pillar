@@ -261,7 +261,7 @@ public class ChatbotService : IChatbotService
             {
                 Response = result.Content ?? "Desculpe, não consegui processar sua mensagem.",
                 Success = true,
-                SuggestedActions = suggestions
+                // SuggestedActions = suggestions
             };
         }
         catch (Exception ex)
