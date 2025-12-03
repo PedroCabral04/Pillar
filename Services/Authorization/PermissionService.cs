@@ -8,11 +8,12 @@ using Microsoft.Extensions.Caching.Memory;
 namespace erp.Services.Authorization;
 
 /// <summary>
-/// Service for checking module-level permissions with caching
+/// Service for checking module-level permissions with caching.
+/// Uses IDbContextFactory to avoid concurrency issues in Blazor Server.
 /// </summary>
 public class PermissionService : IPermissionService
 {
-    private readonly ApplicationDbContext _context;
+    private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IMemoryCache _cache;
     private readonly ILogger<PermissionService> _logger;
@@ -23,12 +24,12 @@ public class PermissionService : IPermissionService
     private const string AllModulesCacheKey = "all_modules";
     
     public PermissionService(
-        ApplicationDbContext context,
+        IDbContextFactory<ApplicationDbContext> contextFactory,
         UserManager<ApplicationUser> userManager,
         IMemoryCache cache,
         ILogger<PermissionService> logger)
     {
-        _context = context;
+        _contextFactory = contextFactory;
         _userManager = userManager;
         _cache = cache;
         _logger = logger;
@@ -69,27 +70,31 @@ public class PermissionService : IPermissionService
             
         var roleNames = await _userManager.GetRolesAsync(user);
         
-        // Admins get all modules
+        // Admins get all modules - return hardcoded list to avoid DB dependency
         if (roleNames.Contains("Administrador"))
         {
-            var allModules = await GetAllModulesAsync();
-            var allModuleKeys = allModules.Select(m => m.ModuleKey).ToList();
-            _cache.Set(cacheKey, (IReadOnlyList<string>)allModuleKeys, CacheDuration);
-            return allModuleKeys;
+            _cache.Set(cacheKey, AllModuleKeys, CacheDuration);
+            return AllModuleKeys;
         }
         
-        // Get role IDs
-        var roleIds = await _context.Roles
+        // Use factory to create a new DbContext instance
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        
+        // Get role IDs - use Set<ApplicationRole>() to avoid the overridden Roles DbSet
+        var roleIds = await context.Set<ApplicationRole>()
             .Where(r => roleNames.Contains(r.Name!))
             .Select(r => r.Id)
             .ToListAsync();
             
         // Get modules for all user's roles
-        var moduleKeys = await _context.RoleModulePermissions
+        var moduleKeys = await context.RoleModulePermissions
             .Where(rmp => roleIds.Contains(rmp.RoleId))
             .Select(rmp => rmp.ModulePermission.ModuleKey)
             .Distinct()
             .ToListAsync();
+        
+        _logger.LogInformation("[PermissionService] User {UserId} roles: [{Roles}], modules: [{Modules}]", 
+            userId, string.Join(", ", roleNames), string.Join(", ", moduleKeys));
             
         _cache.Set(cacheKey, (IReadOnlyList<string>)moduleKeys, CacheDuration);
         return moduleKeys;
@@ -97,11 +102,10 @@ public class PermissionService : IPermissionService
     
     public async Task<IReadOnlyList<string>> GetUserModulesAsync(ClaimsPrincipal user)
     {
-        // Admins get all modules
+        // Admins get all modules - return hardcoded list to avoid DB dependency
         if (user.IsInRole("Administrador"))
         {
-            var allModules = await GetAllModulesAsync();
-            return allModules.Select(m => m.ModuleKey).ToList();
+            return AllModuleKeys;
         }
         
         var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -111,6 +115,22 @@ public class PermissionService : IPermissionService
         return await GetUserModulesAsync(userId);
     }
     
+    /// <summary>
+    /// All available module keys (for admins and fallback scenarios)
+    /// </summary>
+    private static readonly IReadOnlyList<string> AllModuleKeys = new[]
+    {
+        ModuleKeys.Dashboard,
+        ModuleKeys.Sales,
+        ModuleKeys.Inventory,
+        ModuleKeys.Financial,
+        ModuleKeys.HR,
+        ModuleKeys.Assets,
+        ModuleKeys.Kanban,
+        ModuleKeys.Reports,
+        ModuleKeys.Admin
+    };
+    
     public async Task<IReadOnlyList<ModulePermission>> GetAllModulesAsync()
     {
         if (_cache.TryGetValue(AllModulesCacheKey, out IReadOnlyList<ModulePermission>? cached) && cached != null)
@@ -118,7 +138,8 @@ public class PermissionService : IPermissionService
             return cached;
         }
         
-        var modules = await _context.ModulePermissions
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var modules = await context.ModulePermissions
             .Where(m => m.IsActive)
             .OrderBy(m => m.DisplayOrder)
             .ToListAsync();
@@ -136,7 +157,8 @@ public class PermissionService : IPermissionService
             return cached;
         }
         
-        var modules = await _context.RoleModulePermissions
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var modules = await context.RoleModulePermissions
             .Where(rmp => rmp.RoleId == roleId)
             .Include(rmp => rmp.ModulePermission)
             .Select(rmp => rmp.ModulePermission)
@@ -149,7 +171,9 @@ public class PermissionService : IPermissionService
     
     public async Task AssignModulesToRoleAsync(int roleId, IEnumerable<int> modulePermissionIds, int? grantedByUserId = null)
     {
-        var existingAssignments = await _context.RoleModulePermissions
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        
+        var existingAssignments = await context.RoleModulePermissions
             .Where(rmp => rmp.RoleId == roleId)
             .Select(rmp => rmp.ModulePermissionId)
             .ToListAsync();
@@ -164,20 +188,22 @@ public class PermissionService : IPermissionService
                 GrantedByUserId = grantedByUserId
             });
             
-        await _context.RoleModulePermissions.AddRangeAsync(newAssignments);
-        await _context.SaveChangesAsync();
+        await context.RoleModulePermissions.AddRangeAsync(newAssignments);
+        await context.SaveChangesAsync();
         
         InvalidateRoleCache(roleId);
     }
     
     public async Task UpdateRoleModulesAsync(int roleId, IEnumerable<int> modulePermissionIds, int? grantedByUserId = null)
     {
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        
         // Remove existing assignments
-        var existingAssignments = await _context.RoleModulePermissions
+        var existingAssignments = await context.RoleModulePermissions
             .Where(rmp => rmp.RoleId == roleId)
             .ToListAsync();
             
-        _context.RoleModulePermissions.RemoveRange(existingAssignments);
+        context.RoleModulePermissions.RemoveRange(existingAssignments);
         
         // Add new assignments
         var newAssignments = modulePermissionIds.Select(mpId => new RoleModulePermission
@@ -188,8 +214,8 @@ public class PermissionService : IPermissionService
             GrantedByUserId = grantedByUserId
         });
         
-        await _context.RoleModulePermissions.AddRangeAsync(newAssignments);
-        await _context.SaveChangesAsync();
+        await context.RoleModulePermissions.AddRangeAsync(newAssignments);
+        await context.SaveChangesAsync();
         
         InvalidateRoleCache(roleId);
         InvalidateAllUserCaches();

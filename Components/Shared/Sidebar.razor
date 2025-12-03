@@ -376,22 +376,23 @@
             {
                 _userModules = await PermissionService.GetUserModulesAsync(authState.User);
                 _permissionsLoaded = true;
+                await InvokeAsync(StateHasChanged);
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // If permissions fail to load, allow all modules (fail open for UI)
-            _userModules = new[] { ModuleKeys.Dashboard, ModuleKeys.Sales, ModuleKeys.Inventory, 
-                                   ModuleKeys.Financial, ModuleKeys.HR, ModuleKeys.Assets, 
-                                   ModuleKeys.Kanban, ModuleKeys.Reports };
+            // If permissions fail to load, only allow Dashboard (fail safe for UI)
+            Console.WriteLine($"[Sidebar] Failed to load permissions: {ex.Message}");
+            _userModules = new[] { ModuleKeys.Dashboard };
             _permissionsLoaded = true;
+            await InvokeAsync(StateHasChanged);
         }
     }
 
     private bool HasModuleAccess(string moduleKey)
     {
-        // If permissions haven't loaded yet, show modules (optimistic UI)
-        if (!_permissionsLoaded) return true;
+        // If permissions haven't loaded yet, hide modules until loaded
+        if (!_permissionsLoaded) return false;
         
         return _userModules.Contains(moduleKey, StringComparer.OrdinalIgnoreCase);
     }

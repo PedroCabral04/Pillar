@@ -334,7 +334,7 @@
     private async Task ShowUserUpdateDialog(int userId)
     {
         var options = new DialogOptions { CloseOnEscapeKey = true, CloseButton = true, MaxWidth = MaxWidth.Medium };
-        var parameters = new DialogParameters<UserUpdateDialog> { { x => x.UserId, userId } };
+        var parameters = new DialogParameters { { "UserId", userId } };
 
         var userName = _users?.FirstOrDefault(u => u.Id == userId)?.Username ?? "usuário";
         var dialog = await DialogService.ShowAsync<UserUpdateDialog>($"Alterar {userName}", parameters, options);
