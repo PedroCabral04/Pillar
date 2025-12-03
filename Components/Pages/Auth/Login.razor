@@ -9,6 +9,7 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject IJSRuntime JS
 @inject ITenantBrandingProvider BrandingProvider
+@inject PreferenceService PreferenceService
 @code {
     [Parameter] [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
 }
@@ -186,7 +187,21 @@
                 }
                 
                 Console.WriteLine("Login sem 2FA - redirecionando para home");
-                var target = string.IsNullOrWhiteSpace(ReturnUrl) ? "/" : ReturnUrl;
+                // Get the preferred start page from user preferences
+                await PreferenceService.InitializeAsync();
+                var defaultPage = PreferenceService.CurrentPreferences.Dashboard.DefaultStartPage;
+                var targetPage = defaultPage switch
+                {
+                    "Home" => "/",
+                    "Dashboard" => "/dashboard",
+                    "Kanban" => "/kanban",
+                    "Vendas" => "/sales",
+                    "Clientes" => "/customers",
+                    "Produtos" => "/inventory/products",
+                    "Financeiro" => "/financial/dashboard",
+                    _ => "/"
+                };
+                var target = string.IsNullOrWhiteSpace(ReturnUrl) ? targetPage : ReturnUrl;
                 Nav.NavigateTo(target!, forceLoad: true);
             }
             else

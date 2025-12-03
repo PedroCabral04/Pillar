@@ -336,6 +336,7 @@ builder.Services.AddHttpClient<IApiService, ApiService>((serviceProvider, client
 
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<erp.Services.Notifications.IAdvancedNotificationService, erp.Services.Notifications.AdvancedNotificationService>();
+builder.Services.AddScoped<ITablePreferenceService, TablePreferenceService>();
 // Dashboard services
 builder.Services.AddScoped<IDashboardRegistry, DashboardRegistry>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();

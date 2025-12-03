@@ -164,6 +164,7 @@
     private bool _isMouseOver = false;
     private System.Threading.CancellationTokenSource? _closeCts;
     private IJSObjectReference? _activityMonitor;
+    private IJSObjectReference? _shortcutsModule;
     private DotNetObjectReference<MainLayout>? _dotNetRef;
 
     private bool _mobileDrawerOpen;
@@ -196,6 +197,7 @@
             await PreferenceService.InitializeAsync();
             ThemeService.InitializeTheme();
             ApplyCulture();
+            ApplySidebarPreference();
             PreferenceService.OnPreferenceChanged += OnPreferenceChanged;
             
             // Detecta se é mobile
@@ -214,6 +216,12 @@
                 _dotNetRef = DotNetObjectReference.Create(this);
                 var timeout = PreferenceService.CurrentPreferences.Security.AutoLogoutMinutes;
                 _activityMonitor = await JsRuntime.InvokeAsync<IJSObjectReference>("erpAuth.monitorActivity", _dotNetRef, timeout);
+
+                // Setup Keyboard Shortcuts
+                if (PreferenceService.CurrentPreferences.Ui.KeyboardShortcutsEnabled)
+                {
+                    _shortcutsModule = await JsRuntime.InvokeAsync<IJSObjectReference>("erpShortcuts.initialize", _dotNetRef);
+                }
             }
             catch (JSDisconnectedException)
             {
@@ -252,6 +260,11 @@
         if (_activityMonitor != null)
         {
             try { await _activityMonitor.InvokeVoidAsync("dispose"); await _activityMonitor.DisposeAsync(); } catch {}
+        }
+        
+        if (_shortcutsModule != null)
+        {
+            try { await _shortcutsModule.InvokeVoidAsync("dispose"); await _shortcutsModule.DisposeAsync(); } catch {}
         }
     }
 
@@ -372,8 +385,39 @@
     private async void OnPreferenceChanged()
     {
         ApplyCulture();
+        ApplySidebarPreference();
         await UpdateAutoLogout();
+        await UpdateKeyboardShortcuts();
         await InvokeAsync(StateHasChanged);
+    }
+
+    private void ApplySidebarPreference()
+    {
+        // Apply sidebar persistent preference (only for desktop)
+        if (!_isMobileView)
+        {
+            _isSidebarLocked = PreferenceService.CurrentPreferences.Ui.SidebarPersistent;
+        }
+    }
+
+    private async Task UpdateKeyboardShortcuts()
+    {
+        try
+        {
+            if (PreferenceService.CurrentPreferences.Ui.KeyboardShortcutsEnabled && _shortcutsModule == null)
+            {
+                // Enable shortcuts
+                _shortcutsModule = await JsRuntime.InvokeAsync<IJSObjectReference>("erpShortcuts.initialize", _dotNetRef);
+            }
+            else if (!PreferenceService.CurrentPreferences.Ui.KeyboardShortcutsEnabled && _shortcutsModule != null)
+            {
+                // Disable shortcuts
+                await _shortcutsModule.InvokeVoidAsync("dispose");
+                await _shortcutsModule.DisposeAsync();
+                _shortcutsModule = null;
+            }
+        }
+        catch { }
     }
 
     [JSInvokable]
@@ -388,6 +432,19 @@
         {
             NavigationManager.NavigateTo("/login", forceLoad: true);
         }
+    }
+
+    [JSInvokable]
+    public void NavigateFromShortcut(string route)
+    {
+        NavigationManager.NavigateTo(route);
+    }
+
+    [JSInvokable]
+    public void ToggleSidebarFromShortcut()
+    {
+        ToggleDrawer();
+        InvokeAsync(StateHasChanged);
     }
     
     private async Task UpdateAutoLogout()

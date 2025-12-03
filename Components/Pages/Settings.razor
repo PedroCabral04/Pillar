@@ -13,6 +13,7 @@
 @inject ISnackbar Snackbar
 @inject IDashboardService DashboardService
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IJSRuntime JsRuntime
 
 <PageTitle>Configurações - Pillar ERP</PageTitle>
 
@@ -98,12 +99,12 @@
                        Color="MudBlazor.Color.Primary"
                        Label="Preferência de autenticação de dois fatores" />
 
-            <MudNumericField T="int"
+            @* <MudNumericField T="int"
                              Label="Tempo para sair automaticamente (minutos)"
                              Min="1" Max="480" Step="5"
                              Value="@PreferenceService.CurrentPreferences.Security.AutoLogoutMinutes"
                              ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Security.AutoLogoutMinutes = v))"
-                             Variant="Variant.Outlined" />
+                             Variant="Variant.Outlined" /> *@
         </MudStack>
     </MudTabPanel>
 
@@ -117,13 +118,17 @@
                        Label="@ThemeLabel"
                        ThumbIconChecked="@Icons.Material.Filled.DarkMode"
                        ThumbIconUnchecked="@Icons.Material.Filled.LightMode" />
-
+            <MudDivider Class="my-2" />
             <MudSelect T="string" Label="Tipo de navegação" Variant="Variant.Outlined"
                        Value="@PreferenceService.CurrentPreferences.Ui.NavigationType"
                        ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Ui.NavigationType = v))">
                 <MudSelectItem T="string" Value="@("sidebar")">Barra lateral (Sidebar)</MudSelectItem>
                 <MudSelectItem T="string" Value="@("topbar")">Barra superior (Topbar)</MudSelectItem>
             </MudSelect>
+
+            <MudSwitch T="bool" Color="MudBlazor.Color.Primary" Label="Sidebar fixa (não recolhe automaticamente)"
+                       Value="@PreferenceService.CurrentPreferences.Ui.SidebarPersistent"
+                       ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Ui.SidebarPersistent = v))" />
 
             <MudSelect T="string" Label="Densidade" Variant="Variant.Outlined"
                        Value="@PreferenceService.CurrentPreferences.Ui.Density"
@@ -146,6 +151,26 @@
             <MudSwitch T="bool" Color="MudBlazor.Color.Primary" Label="Reduzir animações"
                        Value="@PreferenceService.CurrentPreferences.Ui.ReduceMotion"
                        ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Ui.ReduceMotion = v))" />
+
+            @* <MudSwitch T="bool" Color="MudBlazor.Color.Primary" Label="Atalhos de teclado habilitados"
+                       Value="@PreferenceService.CurrentPreferences.Ui.KeyboardShortcutsEnabled"
+                       ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Ui.KeyboardShortcutsEnabled = v))" /> *@
+            
+            @if (PreferenceService.CurrentPreferences.Ui.KeyboardShortcutsEnabled)
+            {
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mt-2">
+                    <MudText Typo="Typo.body2"><strong>Atalhos disponíveis:</strong></MudText>
+                    <MudText Typo="Typo.body2">• <kbd>g</kbd> + <kbd>d</kbd> → Dashboard</MudText>
+                    <MudText Typo="Typo.body2">• <kbd>g</kbd> + <kbd>h</kbd> → Início</MudText>
+                    <MudText Typo="Typo.body2">• <kbd>g</kbd> + <kbd>s</kbd> → Vendas</MudText>
+                    <MudText Typo="Typo.body2">• <kbd>g</kbd> + <kbd>c</kbd> → Clientes</MudText>
+                    <MudText Typo="Typo.body2">• <kbd>g</kbd> + <kbd>p</kbd> → Produtos</MudText>
+                    <MudText Typo="Typo.body2">• <kbd>g</kbd> + <kbd>k</kbd> → Kanban</MudText>
+                    <MudText Typo="Typo.body2">• <kbd>g</kbd> + <kbd>a</kbd> → Configurações</MudText>
+                    <MudText Typo="Typo.body2">• <kbd>Ctrl</kbd> + <kbd>b</kbd> → Alternar Sidebar</MudText>
+                    <MudText Typo="Typo.body2">• <kbd>Ctrl</kbd> + <kbd>k</kbd> ou <kbd>/</kbd> → Buscar</MudText>
+                </MudAlert>
+            }
         </MudStack>
     </MudTabPanel>
 
@@ -236,12 +261,16 @@
 
     <MudTabPanel Text="Dashboard" Icon="@Icons.Material.Filled.Dashboard">
         <MudStack Row="false" Spacing="2">
-            <MudSelect T="string" Label="Página inicial" Variant="Variant.Outlined"
+            <MudSelect T="string" Label="Página inicial após login" Variant="Variant.Outlined"
                        Value="@PreferenceService.CurrentPreferences.Dashboard.DefaultStartPage"
                        ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Dashboard.DefaultStartPage = v))">
+                <MudSelectItem T="string" Value="@("Home")">Início</MudSelectItem>
                 <MudSelectItem T="string" Value="@("Dashboard")">Dashboard</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Kanban")">Kanban</MudSelectItem>
                 <MudSelectItem T="string" Value="@("Vendas")">Vendas</MudSelectItem>
                 <MudSelectItem T="string" Value="@("Clientes")">Clientes</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Produtos")">Produtos</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Financeiro")">Dashboard Financeiro</MudSelectItem>
             </MudSelect>
 
     <MudSelect T="string" Label="Widgets" Variant="Variant.Outlined" MultiSelection="true"
@@ -260,7 +289,7 @@
         </MudStack>
     </MudTabPanel>
 
-    <MudTabPanel Text="Notificações" Icon="@Icons.Material.Filled.Notifications">
+    @* <MudTabPanel Text="Notificações" Icon="@Icons.Material.Filled.Notifications">
         <MudStack Row="false" Spacing="2">
             <MudSwitch T="bool" Color="MudBlazor.Color.Primary" Label="Notificações no app"
                        Value="@PreferenceService.CurrentPreferences.Notifications.InApp"
@@ -282,14 +311,33 @@
 
     <MudTabPanel Text="Áudio" Icon="@Icons.Material.Filled.VolumeUp">
         <MudStack Row="false" Spacing="2">
-            <MudSwitch T="bool" Color="MudBlazor.Color.Primary" Label="Sons"
+            <MudSwitch T="bool" Color="MudBlazor.Color.Primary" Label="Sons de notificação"
                        Value="@PreferenceService.CurrentPreferences.Notifications.Sounds"
                        ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Notifications.Sounds = v))" />
 
-            <MudSlider T="int" Min="0" Max="100" Step="1"
-                       Value="@PreferenceService.CurrentPreferences.Notifications.Volume"
-                       ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Notifications.Volume = v))"
-                       Color="MudBlazor.Color.Primary" Label="true" />
+            @if (PreferenceService.CurrentPreferences.Notifications.Sounds)
+            {
+                <MudText Typo="Typo.subtitle2" Class="mt-2">Volume: @PreferenceService.CurrentPreferences.Notifications.Volume%</MudText>
+                <MudSlider T="int" Min="0" Max="100" Step="5"
+                           Value="@PreferenceService.CurrentPreferences.Notifications.Volume"
+                           ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Notifications.Volume = v))"
+                           Color="MudBlazor.Color.Primary" />
+
+                <MudSelect T="string" Label="Som de notificação" Variant="Variant.Outlined"
+                           Value="@PreferenceService.CurrentPreferences.Notifications.SoundFile"
+                           ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Notifications.SoundFile = v))">
+                    <MudSelectItem T="string" Value="@("notification.mp3")">Padrão</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("chime.mp3")">Chime</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("ding.mp3")">Ding</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("pop.mp3")">Pop</MudSelectItem>
+                </MudSelect>
+
+                <MudButton Variant="Variant.Outlined" Color="MudBlazor.Color.Primary" 
+                           StartIcon="@Icons.Material.Filled.PlayArrow"
+                           OnClick="TestNotificationSound">
+                    Testar Som
+                </MudButton>
+            }
         </MudStack>
     </MudTabPanel>
 
@@ -307,7 +355,7 @@
                        Value="@PreferenceService.CurrentPreferences.Export.PrintHeader"
                        ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Export.PrintHeader = v))" />
         </MudStack>
-    </MudTabPanel>
+    </MudTabPanel> *@
 
         </MudTabs>
     </MudItem>
@@ -327,6 +375,11 @@
                     <MudText Typo="Typo.body2" Color="Color.Secondary">
                         Este é um exemplo de como o texto aparece no tema atual.
                     </MudText>
+                    <div class="mt-2">
+                        <MudChip T="string" Size="Size.Small" Style="@($"background-color: {PreferenceService.CurrentPreferences.Ui.PrimaryColor}; color: white;")">
+                            Cor Primária
+                        </MudChip>
+                    </div>
                 </MudPaper>
 
                 <!-- Density Preview -->
@@ -366,9 +419,26 @@
                                 Reduzir Animações
                             </MudChip>
                         }
-                        @if (!PreferenceService.CurrentPreferences.Ui.HighContrast && !PreferenceService.CurrentPreferences.Ui.ReduceMotion)
+                        @if (PreferenceService.CurrentPreferences.Ui.KeyboardShortcutsEnabled)
                         {
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">Nenhuma opção de acessibilidade ativa</MudText>
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small">
+                                <MudIcon Icon="@Icons.Material.Filled.Keyboard" Size="Size.Small" Class="mr-1" />
+                                Atalhos Habilitados
+                            </MudChip>
+                        }
+                        @if (!PreferenceService.CurrentPreferences.Ui.SidebarPersistent)
+                        {
+                            <MudChip T="string" Color="Color.Warning" Size="Size.Small">
+                                <MudIcon Icon="@Icons.Material.Filled.ViewSidebar" Size="Size.Small" Class="mr-1" />
+                                Sidebar Auto-Recolher
+                            </MudChip>
+                        }
+                        @if (!PreferenceService.CurrentPreferences.Ui.HighContrast && 
+                             !PreferenceService.CurrentPreferences.Ui.ReduceMotion &&
+                             !PreferenceService.CurrentPreferences.Ui.KeyboardShortcutsEnabled &&
+                             PreferenceService.CurrentPreferences.Ui.SidebarPersistent)
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Configurações padrão</MudText>
                         }
                     </MudStack>
                 </MudPaper>
@@ -388,6 +458,22 @@
                         </MudText>
                     </MudStack>
                 </MudPaper>
+
+                <!-- Navigation Preview -->
+                <MudPaper Elevation="1" Class="pa-3">
+                    <MudText Typo="Typo.subtitle2" GutterBottom="true">Navegação</MudText>
+                    <MudStack Spacing="1">
+                        <MudText Typo="Typo.body2">
+                            <strong>Página inicial:</strong> @(PreferenceService.CurrentPreferences.Dashboard.DefaultStartPage ?? "Início")
+                        </MudText>
+                        <MudText Typo="Typo.body2">
+                            <strong>Tipo de menu:</strong> @(PreferenceService.CurrentPreferences.Ui.NavigationType == "topbar" ? "Barra Superior" : "Barra Lateral")
+                        </MudText>
+                        <MudText Typo="Typo.body2">
+                            <strong>Itens/página:</strong> @PreferenceService.CurrentPreferences.Tables.PageSize
+                        </MudText>
+                    </MudStack>
+                </MudPaper>
             </MudStack>
         </MudPaper>
     </MudItem>
@@ -400,6 +486,20 @@
     private string ThemeIcon => ThemeService.IsDarkMode ? Icons.Material.Filled.DarkMode : Icons.Material.Filled.LightMode;
     private List<string> AvailableWidgets { get; set; } = new();
     private string NewWidgetName { get; set; } = string.Empty;
+
+    // Color picker
+    private string _customColorHex = "#2563EB";
+    private readonly List<string> AvailableColors = new()
+    {
+        "#2563EB", // Blue (default)
+        "#DC2626", // Red
+        "#16A34A", // Green
+        "#9333EA", // Purple
+        "#EA580C", // Orange
+        "#0891B2", // Cyan
+        "#DB2777", // Pink
+        "#4F46E5", // Indigo
+    };
 
     // User profile info
     private string _userName = "Usuário";
@@ -476,6 +576,42 @@
             NewWidgetName = string.Empty;
             await PreferenceService.SaveAsync();
             Snackbar.Add("Widget adicionado", Severity.Info, c => c.VisibleStateDuration = 1200);
+        }
+    }
+
+    // Color picker helper
+    private async Task OnPrimaryColorChange(string color)
+    {
+        if (string.IsNullOrWhiteSpace(color)) return;
+        _customColorHex = color;
+        PreferenceService.CurrentPreferences.Ui.PrimaryColor = color;
+        ThemeService.UpdatePrimaryColor(color);
+        await PreferenceService.SaveAsync();
+        Snackbar.Add("Cor primária atualizada", Severity.Success, c => c.VisibleStateDuration = 1200);
+        StateHasChanged();
+    }
+
+    // Sound test helper
+    private async Task TestNotificationSound()
+    {
+        try
+        {
+            var volume = PreferenceService.CurrentPreferences.Notifications.Volume / 100.0;
+            var soundFile = PreferenceService.CurrentPreferences.Notifications.SoundFile ?? "notification.mp3";
+            await JsRuntime.InvokeVoidAsync("erpNotifications.playSound", $"/sounds/{soundFile}", volume);
+        }
+        catch
+        {
+            // If sound file doesn't exist, play test beep
+            try
+            {
+                var volume = PreferenceService.CurrentPreferences.Notifications.Volume / 100.0;
+                await JsRuntime.InvokeVoidAsync("erpNotifications.testSound", volume);
+            }
+            catch
+            {
+                Snackbar.Add("Não foi possível reproduzir o som de teste", Severity.Warning);
+            }
         }
     }
 

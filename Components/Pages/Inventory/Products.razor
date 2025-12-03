@@ -14,6 +14,7 @@
 @inject IDialogService DialogService
 @inject IJSRuntime JS
 @inject CurrencyFormatService Currency
+@inject ITablePreferenceService TablePreferences
 
 <PageTitle>Produtos - Pillar ERP</PageTitle>
 
@@ -312,7 +313,7 @@
                 </MudStack>
             </LoadingContent>
             <PagerContent>
-                <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" 
+                <MudTablePager PageSizeOptions="@_pageSizeOptions" 
                                InfoFormat="Mostrando {first_item} a {last_item} de {all_items} produtos"
                                RowsPerPageString="Itens por página:"/>
             </PagerContent>
@@ -334,9 +335,28 @@
     private List<ProductCategoryDto> _categories = new();
     private string? _currentSortLabel;
     private bool _sortDescending;
+    
+    // Table preferences
+    private int[] _pageSizeOptions = new[] { 10, 25, 50, 100 };
+    private int _defaultPageSize = 25;
 
     protected override async Task OnInitializedAsync()
     {
+        // Apply table preferences
+        _defaultPageSize = TablePreferences.GetPageSize();
+        var defaultSort = TablePreferences.GetDefaultSort("Produtos");
+        if (defaultSort.HasValue)
+        {
+            _currentSortLabel = defaultSort.Value.field;
+            _sortDescending = defaultSort.Value.descending;
+        }
+        
+        // Ensure user's preferred page size is in the options
+        if (!_pageSizeOptions.Contains(_defaultPageSize))
+        {
+            _pageSizeOptions = _pageSizeOptions.Append(_defaultPageSize).OrderBy(x => x).ToArray();
+        }
+
         await LoadStatistics();
         await LoadCategories();
     }
