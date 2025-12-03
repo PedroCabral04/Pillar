@@ -71,9 +71,18 @@
                         var isExpanded = _expandedMessages.Contains(messageId);
                         
                         <div class="chat-message @(message.IsError ? "chat-message-error" : message.Role == "user" ? "chat-message-user" : "chat-message-assistant") @(isLongMessage && !isExpanded ? "collapsed" : "")">
+                            <div class="message-content">
+                                @if (isLongMessage && !isExpanded)
+                                {
+                                    @RenderMessage(TruncateMessage(message.Content))
+                                }
+                                else
+                                {
+                                    @RenderMessage(message.Content)
+                                }
+                            </div>
                             @if (isLongMessage && !isExpanded)
                             {
-                                @RenderMessage(TruncateMessage(message.Content))
                                 <div class="message-expand-overlay">
                                     <MudButton Size="MudBlazor.Size.Small" 
                                                Variant="Variant.Text" 
@@ -84,21 +93,17 @@
                                     </MudButton>
                                 </div>
                             }
-                            else
+                            @if (isLongMessage && isExpanded)
                             {
-                                @RenderMessage(message.Content)
-                                @if (isLongMessage && isExpanded)
-                                {
-                                    <div class="message-collapse-button">
-                                        <MudButton Size="MudBlazor.Size.Small" 
-                                                   Variant="Variant.Text" 
-                                                   Color="MudBlazor.Color.Primary"
-                                                   StartIcon="@Icons.Material.Filled.ExpandLess"
-                                                   OnClick="@(() => CollapseMessage(messageId))">
-                                            Ver menos
-                                        </MudButton>
-                                    </div>
-                                }
+                                <div class="message-collapse-button">
+                                    <MudButton Size="MudBlazor.Size.Small" 
+                                               Variant="Variant.Text" 
+                                               Color="MudBlazor.Color.Primary"
+                                               StartIcon="@Icons.Material.Filled.ExpandLess"
+                                               OnClick="@(() => CollapseMessage(messageId))">
+                                        Ver menos
+                                    </MudButton>
+                                </div>
                             }
                         </div>
                     }
@@ -554,19 +559,30 @@
 /* Estilos para mensagens colapsadas */
 .chat-message.collapsed {
     position: relative;
-    max-height: 200px;
-    overflow: hidden;
 }
 
-.message-expand-overlay {
+.chat-message.collapsed .message-content {
+    max-height: 180px;
+    overflow: hidden;
+    position: relative;
+}
+
+.chat-message.collapsed .message-content::after {
+    content: '';
     position: absolute;
     bottom: 0;
     left: 0;
     right: 0;
-    padding: 24px 8px 8px 8px;
-    background: linear-gradient(transparent, var(--mud-palette-surface) 60%);
+    height: 40px;
+    background: linear-gradient(transparent, var(--mud-palette-surface));
+    pointer-events: none;
+}
+
+.message-expand-overlay {
     display: flex;
     justify-content: center;
+    padding-top: 4px;
+    margin-top: 4px;
 }
 
 .message-collapse-button {
