@@ -10,6 +10,7 @@ namespace erp.Services
     {
         private readonly IApiService _apiService;
         private readonly ILocalStorageService _localStorage;
+        private bool _isInitialized = false;
         public UserPreferences CurrentPreferences { get; private set; } = new();
         public event Action? OnPreferenceChanged;
 
@@ -21,17 +22,25 @@ namespace erp.Services
 
         public async Task InitializeAsync()
         {
-            Console.WriteLine("[PreferenceService] InitializeAsync started");
+            await InitializeAsync(forceServerLoad: false);
+        }
+
+        public async Task InitializeAsync(bool forceServerLoad)
+        {
+            Console.WriteLine($"[PreferenceService] InitializeAsync started (forceServerLoad: {forceServerLoad})");
             
-            var localPreferences = await _localStorage.GetItemAsync<UserPreferences>("userPreferences");
-            if (localPreferences is not null)
+            if (!forceServerLoad)
             {
-                CurrentPreferences = localPreferences;
-                Console.WriteLine($"[PreferenceService] Loaded from localStorage - DefaultStartPage: '{localPreferences.Dashboard.DefaultStartPage}'");
-            }
-            else
-            {
-                Console.WriteLine("[PreferenceService] No preferences in localStorage");
+                var localPreferences = await _localStorage.GetItemAsync<UserPreferences>("userPreferences");
+                if (localPreferences is not null)
+                {
+                    CurrentPreferences = localPreferences;
+                    Console.WriteLine($"[PreferenceService] Loaded from localStorage - DefaultStartPage: '{localPreferences.Dashboard.DefaultStartPage}'");
+                }
+                else
+                {
+                    Console.WriteLine("[PreferenceService] No preferences in localStorage");
+                }
             }
 
             try
@@ -54,14 +63,49 @@ namespace erp.Services
                 // API might be unavailable or user not logged in, proceed with local preferences
             }
             
+            _isInitialized = true;
             Console.WriteLine($"[PreferenceService] Final DefaultStartPage: '{CurrentPreferences.Dashboard.DefaultStartPage}'");
             OnPreferenceChanged?.Invoke();
         }
 
         public async Task SaveAsync()
         {
-            Console.WriteLine($"[PreferenceService] SaveAsync called - DefaultStartPage: '{CurrentPreferences.Dashboard.DefaultStartPage}'");
-            await _localStorage.SetItemAsync("userPreferences", CurrentPreferences);
+            Console.WriteLine($"[PreferenceService] SaveAsync called - DefaultStartPage: '{CurrentPreferences.Dashboard.DefaultStartPage}', IsInitialized: {_isInitialized}");
+            
+            // If not initialized, load preferences first to avoid overwriting with defaults
+            if (!_isInitialized)
+            {
+                Console.WriteLine("[PreferenceService] Not initialized, loading preferences first...");
+                try
+                {
+                    var localPrefs = await _localStorage.GetItemAsync<UserPreferences>("userPreferences");
+                    if (localPrefs != null)
+                    {
+                        // Merge: keep current UI changes but restore other values from storage
+                        var currentGroupExpanded = CurrentPreferences.Ui.GroupExpanded;
+                        var currentPinnedRoutes = CurrentPreferences.Ui.PinnedRoutes;
+                        
+                        CurrentPreferences = localPrefs;
+                        
+                        // Restore the UI state changes that triggered this save
+                        foreach (var kvp in currentGroupExpanded)
+                        {
+                            CurrentPreferences.Ui.GroupExpanded[kvp.Key] = kvp.Value;
+                        }
+                        foreach (var route in currentPinnedRoutes.Where(r => !CurrentPreferences.Ui.PinnedRoutes.Contains(r)))
+                        {
+                            CurrentPreferences.Ui.PinnedRoutes.Add(route);
+                        }
+                        
+                        Console.WriteLine($"[PreferenceService] Merged with localStorage - DefaultStartPage: '{CurrentPreferences.Dashboard.DefaultStartPage}'");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[PreferenceService] Error loading from localStorage: {ex.Message}");
+                }
+                _isInitialized = true;
+            }
             
             const int maxRetries = 3;
             Exception? lastException = null;
@@ -75,7 +119,9 @@ namespace erp.Services
                     Console.WriteLine($"[PreferenceService] Server response: {response.StatusCode}");
                     if (response.IsSuccessStatusCode)
                     {
-                        Console.WriteLine("[PreferenceService] Preferences saved successfully!");
+                        // Only save to localStorage AFTER server confirms success
+                        await _localStorage.SetItemAsync("userPreferences", CurrentPreferences);
+                        Console.WriteLine("[PreferenceService] Preferences saved successfully to server and localStorage!");
                         OnPreferenceChanged?.Invoke();
                         return;
                     }

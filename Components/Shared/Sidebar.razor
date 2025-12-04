@@ -115,7 +115,7 @@
                 @* Vendas *@
                 @if (HasModuleAccess(ModuleKeys.Sales))
                 {
-                    <MudNavGroup Title="Vendas" Icon="@Icons.Material.Filled.ShoppingCart" Expanded="@(IsGroupExpanded("sales"))" ExpandedChanged="@(v => OnGroupExpandedChanged("sales", v))" Class="nav-group" AriaLabel="Seção Vendas">
+                    <MudNavGroup Title="Vendas" Icon="@Icons.Material.Filled.ShoppingCart" Class="nav-group" AriaLabel="Seção Vendas">
                         <MudNavLink Href="/sales" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Receipt" Class="nav-subitem">Vendas</MudNavLink>
                         <MudNavLink Href="/sales/customers" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.People" Class="nav-subitem">Clientes</MudNavLink>
                     </MudNavGroup>
@@ -124,7 +124,7 @@
                 @* Estoque *@
                 @if (HasModuleAccess(ModuleKeys.Inventory))
                 {
-                    <MudNavGroup Title="Estoque" Icon="@Icons.Material.Filled.Inventory" Expanded="@(IsGroupExpanded("inventory"))" ExpandedChanged="@(v => OnGroupExpandedChanged("inventory", v))" Class="nav-group" AriaLabel="Seção Estoque">
+                    <MudNavGroup Title="Estoque" Icon="@Icons.Material.Filled.Inventory" Class="nav-group" AriaLabel="Seção Estoque">
                         <MudNavLink Href="/inventory/products" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Category" Class="nav-subitem">Produtos</MudNavLink>
                         <MudNavLink Href="/inventory/categories" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FolderOpen" Class="nav-subitem">Categorias</MudNavLink>
                         <MudNavLink Href="/inventory/movements" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.SwapHoriz" Class="nav-subitem">Movimentações</MudNavLink>
@@ -135,7 +135,7 @@
                 @* Financeiro *@
                 @if (HasModuleAccess(ModuleKeys.Financial))
                 {
-                    <MudNavGroup Title="Financeiro" Icon="@Icons.Material.Filled.AccountBalance" Expanded="@(IsGroupExpanded("financial"))" ExpandedChanged="@(v => OnGroupExpandedChanged("financial", v))" Class="nav-group" AriaLabel="Seção Financeiro">
+                    <MudNavGroup Title="Financeiro" Icon="@Icons.Material.Filled.AccountBalance" Class="nav-group" AriaLabel="Seção Financeiro">
                         <MudNavLink Href="/financial/dashboard" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Dashboard" Class="nav-subitem">Dashboard</MudNavLink>
                         <MudNavLink Href="/financial/receivables" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CallReceived" Class="nav-subitem">Contas a Receber</MudNavLink>
                         <MudNavLink Href="/financial/payables" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CallMade" Class="nav-subitem">Contas a Pagar</MudNavLink>
@@ -148,7 +148,7 @@
                 @* RH - Recursos Humanos *@
                 @if (HasModuleAccess(ModuleKeys.HR))
                 {
-                    <MudNavGroup Title="RH" Icon="@Icons.Material.Filled.Groups" Expanded="@(IsGroupExpanded("hr"))" ExpandedChanged="@(v => OnGroupExpandedChanged("hr", v))" Class="nav-group" AriaLabel="Seção Recursos Humanos">
+                    <MudNavGroup Title="RH" Icon="@Icons.Material.Filled.Groups" Class="nav-group" AriaLabel="Seção Recursos Humanos">
                         <MudNavLink Href="/admin/users" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.People" Class="nav-subitem">Colaboradores</MudNavLink>
                         <MudNavLink Href="/admin/departments" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.BusinessCenter" Class="nav-subitem">Departamentos</MudNavLink>
                         <MudNavLink Href="/admin/positions" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.WorkOutline" Class="nav-subitem">Cargos</MudNavLink>
@@ -180,7 +180,7 @@
             <AuthorizeView Roles="Administrador">
                 <Authorized>
                     <div class="sidebar-section admin-section">
-                        <MudNavGroup Title="Administração" Icon="@Icons.Material.Filled.AdminPanelSettings" Expanded="@(IsGroupExpanded("admin"))" ExpandedChanged="@(v => OnGroupExpandedChanged("admin", v))" Class="nav-group admin-group" AriaLabel="Seção Administração">
+                        <MudNavGroup Title="Administração" Icon="@Icons.Material.Filled.AdminPanelSettings" Class="nav-group admin-group" AriaLabel="Seção Administração">
                             <MudNavLink Href="/admin/tenants" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Domain" Class="nav-subitem">Tenants</MudNavLink>
                             <MudNavLink Href="/admin/role-permissions" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Security" Class="nav-subitem">Permissões</MudNavLink>
                             <MudNavLink Href="/admin/widget-roles" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Widgets" Class="nav-subitem">Widgets / Papéis</MudNavLink>
@@ -357,7 +357,6 @@
     protected override void OnInitialized()
     {
         _branding = BrandingProvider.GetCurrentBranding();
-        InitializeGroupExpansion();
     }
 
     protected override async Task OnInitializedAsync()
@@ -397,29 +396,7 @@
         return _userModules.Contains(moduleKey, StringComparer.OrdinalIgnoreCase);
     }
 
-    private void InitializeGroupExpansion()
-    {
-        var g = PreferenceService.CurrentPreferences.Ui.GroupExpanded;
-        EnsureGroupKey(g, "sales", false);
-        EnsureGroupKey(g, "inventory", false);
-        EnsureGroupKey(g, "financial", false);
-        EnsureGroupKey(g, "hr", false);
-        EnsureGroupKey(g, "admin", false);
-    }
 
-    private static void EnsureGroupKey(Dictionary<string, bool> dict, string key, bool defaultValue)
-    {
-        dict.TryAdd(key, defaultValue);
-    }
-
-    private bool IsGroupExpanded(string key) => 
-        PreferenceService.CurrentPreferences.Ui.GroupExpanded.TryGetValue(key, out var v) && v;
-
-    private async Task OnGroupExpandedChanged(string key, bool expanded)
-    {
-        PreferenceService.CurrentPreferences.Ui.GroupExpanded[key] = expanded;
-        await PreferenceService.SaveAsync();
-    }
 
     private bool IsPinned(string href) => 
         PreferenceService.CurrentPreferences.Ui.PinnedRoutes.Contains(href);

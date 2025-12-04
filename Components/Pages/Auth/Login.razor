@@ -240,7 +240,8 @@
                 
                 Console.WriteLine("Login sem 2FA - redirecionando para home");
                 // Get the preferred start page from user preferences
-                await PreferenceService.InitializeAsync();
+                // Force loading from server to get the latest preferences after login
+                await PreferenceService.InitializeAsync(forceServerLoad: true);
                 var defaultPage = PreferenceService.CurrentPreferences.Dashboard.DefaultStartPage;
                 Console.WriteLine($"[LOGIN] DefaultStartPage from preferences: '{defaultPage}'");
                 var targetPage = defaultPage switch
