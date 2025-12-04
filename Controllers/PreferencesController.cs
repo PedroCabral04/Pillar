@@ -48,14 +48,32 @@ namespace erp.Controllers
         [HttpPut("me")]
         public async Task<IActionResult> UpdateMy([FromBody] UserPreferences prefs)
         {
-            var user = await _users.GetUserAsync(User);
-            if (user is null) return Unauthorized();
+            const int maxRetries = 3;
+            for (int attempt = 0; attempt < maxRetries; attempt++)
+            {
+                // Always fetch fresh user to get latest ConcurrencyStamp
+                var user = await _users.GetUserAsync(User);
+                if (user is null) return Unauthorized();
 
-            user.PreferencesJson = JsonSerializer.Serialize(prefs);
-            var res = await _users.UpdateAsync(user);
-            if (!res.Succeeded) return BadRequest(string.Join("; ", res.Errors.Select(e => e.Description)));
+                user.PreferencesJson = JsonSerializer.Serialize(prefs);
+                var res = await _users.UpdateAsync(user);
+                
+                if (res.Succeeded)
+                    return NoContent();
 
-            return NoContent();
+                // Check if this is a concurrency error - if so, retry
+                var isConcurrencyError = res.Errors.Any(e => 
+                    e.Code == "ConcurrencyFailure" || 
+                    e.Description.Contains("concurrency", StringComparison.OrdinalIgnoreCase));
+                
+                if (!isConcurrencyError || attempt == maxRetries - 1)
+                    return BadRequest(string.Join("; ", res.Errors.Select(e => e.Description)));
+                
+                // Small delay before retry to reduce collision likelihood
+                await Task.Delay(50 * (attempt + 1));
+            }
+
+            return BadRequest("Failed to save preferences after multiple attempts");
         }
     }
 }

@@ -138,9 +138,9 @@ public class ThemeService
 
     public async Task SetDarkModeAsync(bool value)
     {
-        if (IsDarkMode != value)
+        if (_isDarkMode != value)
         {
-            IsDarkMode = value;
+            _isDarkMode = value;
             _preferenceService.CurrentPreferences.Ui.DarkMode = value;
             await _preferenceService.SaveAsync();
             UpdateTheme();

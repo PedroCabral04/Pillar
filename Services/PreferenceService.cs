@@ -8,14 +8,14 @@ namespace erp.Services
 {
     public class PreferenceService
     {
-        private readonly HttpClient _httpClient;
+        private readonly IApiService _apiService;
         private readonly ILocalStorageService _localStorage;
         public UserPreferences CurrentPreferences { get; private set; } = new();
         public event Action? OnPreferenceChanged;
 
-        public PreferenceService(HttpClient httpClient, ILocalStorageService localStorage)
+        public PreferenceService(IApiService apiService, ILocalStorageService localStorage)
         {
-            _httpClient = httpClient;
+            _apiService = apiService;
             _localStorage = localStorage;
         }
 
@@ -29,7 +29,7 @@ namespace erp.Services
 
             try
             {
-                var serverPreferences = await _httpClient.GetFromJsonAsync<UserPreferences>("api/preferences/me");
+                var serverPreferences = await _apiService.GetAsync<UserPreferences>("api/preferences/me");
                 if (serverPreferences != null)
                 {
                     CurrentPreferences = serverPreferences;
@@ -46,14 +46,57 @@ namespace erp.Services
         public async Task SaveAsync()
         {
             await _localStorage.SetItemAsync("userPreferences", CurrentPreferences);
-            try
+            
+            const int maxRetries = 3;
+            Exception? lastException = null;
+            
+            for (int attempt = 0; attempt < maxRetries; attempt++)
             {
-                await _httpClient.PutAsJsonAsync("api/preferences/me", CurrentPreferences);
+                try
+                {
+                    var response = await _apiService.PutAsync("api/preferences/me", CurrentPreferences);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        OnPreferenceChanged?.Invoke();
+                        return;
+                    }
+                    
+                    var error = await response.Content.ReadAsStringAsync();
+                    
+                    // If it's a concurrency error, retry
+                    if (response.StatusCode == System.Net.HttpStatusCode.BadRequest && 
+                        error.Contains("concurrency", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (attempt < maxRetries - 1)
+                        {
+                            await Task.Delay(50 * (attempt + 1));
+                            continue;
+                        }
+                    }
+                    
+                    throw new HttpRequestException($"Server returned {response.StatusCode}: {error}");
+                }
+                catch (HttpRequestException ex)
+                {
+                    lastException = ex;
+                    // Only retry on concurrency-related errors
+                    if (ex.Message.Contains("concurrency", StringComparison.OrdinalIgnoreCase) && attempt < maxRetries - 1)
+                    {
+                        await Task.Delay(50 * (attempt + 1));
+                        continue;
+                    }
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error saving preferences: {ex.Message}");
+                    throw;
+                }
             }
-            catch
-            {
-                // Handle case where user is offline
-            }
+            
+            if (lastException != null)
+                throw lastException;
+                
             OnPreferenceChanged?.Invoke();
         }
     }

@@ -841,15 +841,10 @@ input:focus-visible {
 
 /* ==============================================
    REDUCED MOTION
+   Note: System preference is NOT automatically applied.
+   The app uses its own preference setting in MainLayout.razor
+   which injects a <style> block when ReduceMotion is enabled.
    ============================================== */
-
-@media (prefers-reduced-motion: reduce) {
-    * {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-    }
-}
 
 /* ==============================================
    PRINT STYLES

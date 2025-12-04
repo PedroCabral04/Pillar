@@ -93,12 +93,6 @@
 
             <MudDivider />
 
-            <MudSwitch T="bool"
-                       Value="@PreferenceService.CurrentPreferences.Security.TwoFactor"
-                       ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Security.TwoFactor = v))"
-                       Color="MudBlazor.Color.Primary"
-                       Label="Preferência de autenticação de dois fatores" />
-
             @* <MudNumericField T="int"
                              Label="Tempo para sair automaticamente (minutos)"
                              Min="1" Max="480" Step="5"
@@ -156,7 +150,7 @@
                        Value="@PreferenceService.CurrentPreferences.Ui.KeyboardShortcutsEnabled"
                        ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Ui.KeyboardShortcutsEnabled = v))" /> *@
             
-            @if (PreferenceService.CurrentPreferences.Ui.KeyboardShortcutsEnabled)
+            <!-- @if (PreferenceService.CurrentPreferences.Ui.KeyboardShortcutsEnabled)
             {
                 <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mt-2">
                     <MudText Typo="Typo.body2"><strong>Atalhos disponíveis:</strong></MudText>
@@ -170,7 +164,7 @@
                     <MudText Typo="Typo.body2">• <kbd>Ctrl</kbd> + <kbd>b</kbd> → Alternar Sidebar</MudText>
                     <MudText Typo="Typo.body2">• <kbd>Ctrl</kbd> + <kbd>k</kbd> ou <kbd>/</kbd> → Buscar</MudText>
                 </MudAlert>
-            }
+            } -->
         </MudStack>
     </MudTabPanel>
 
@@ -242,20 +236,6 @@
             <MudButton Variant="Variant.Outlined" Color="MudBlazor.Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AddDefaultSortRow">Adicionar</MudButton>
 
             <MudDivider Class="my-4" />
-            <MudText Typo="Typo.subtitle2">Colunas visíveis por módulo</MudText>
-            @foreach (var row in VisibleColumnsRows)
-            {
-                <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
-                    <MudTextField T="string" Label="Módulo" Variant="Variant.Outlined" Class="w-30"
-                                  Value="@row.Module"
-                                  ValueChanged="@(v => { row.Module = v; SyncVisibleColumnsDict(); })" />
-                    <MudTextField T="string" Label="Colunas (separadas por vírgula)" Variant="Variant.Outlined" Class="w-50"
-                                  Value="@row.ColumnsCsv"
-                                  ValueChanged="@(v => { row.ColumnsCsv = v; SyncVisibleColumnsDict(); })" />
-                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="MudBlazor.Color.Error" OnClick="() => RemoveVisibleColumnsRow(row)" aria-label="Remover colunas" />
-                </MudStack>
-            }
-            <MudButton Variant="Variant.Outlined" Color="MudBlazor.Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AddVisibleColumnsRow">Adicionar</MudButton>
         </MudStack>
     </MudTabPanel>
 
@@ -559,18 +539,25 @@
 
     private async Task OnChange(Func<Task> mutator)
     {
-        await mutator();
-        await PreferenceService.SaveAsync();
-        
-        // Apply font size class directly for immediate feedback
         try
         {
-            var fontSize = PreferenceService.CurrentPreferences?.Ui?.FontSize ?? "base";
-            await JsRuntime.InvokeVoidAsync("erpResponsive.setFontSizeClass", fontSize);
+            await mutator();
+            await PreferenceService.SaveAsync();
+            
+            // Apply font size class directly for immediate feedback
+            try
+            {
+                var fontSize = PreferenceService.CurrentPreferences?.Ui?.FontSize ?? "base";
+                await JsRuntime.InvokeVoidAsync("erpResponsive.setFontSizeClass", fontSize);
+            }
+            catch { }
+            
+            Snackbar.Add("Preferências salvas", Severity.Success, cfg => { cfg.VisibleStateDuration = 1500; });
         }
-        catch { }
-        
-        Snackbar.Add("Preferências salvas", Severity.Success, cfg => { cfg.VisibleStateDuration = 1500; });
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao salvar preferências: {ex.Message}", Severity.Error);
+        }
         StateHasChanged();
     }
 

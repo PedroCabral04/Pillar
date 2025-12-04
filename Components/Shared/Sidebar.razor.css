@@ -295,15 +295,6 @@
 
 /* ========================================
    Reduced Motion
+   Note: System preference is NOT automatically applied.
+   The app controls this via MainLayout.razor preference.
    ======================================== */
-
-@media (prefers-reduced-motion: reduce) {
-    .pillar-sidebar *,
-    .nav-item,
-    .nav-subitem,
-    .mini-nav-item,
-    .full-wrapper {
-        transition: none !important;
-        transform: none !important;
-    }
-}
