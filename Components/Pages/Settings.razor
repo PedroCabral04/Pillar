@@ -220,20 +220,37 @@
 
             <MudDivider Class="my-2" />
             <MudText Typo="Typo.subtitle2">Ordenação padrão por módulo</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">
+                Configure a ordenação inicial das tabelas em cada módulo do sistema.
+            </MudText>
 
             @foreach (var row in DefaultSortRows)
             {
                 <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
-                    <MudTextField T="string" Label="Módulo" Variant="Variant.Outlined" Class="w-30"
-                                  Value="@row.Module"
-                                  ValueChanged="@(v => { row.Module = v; SyncDefaultSortDict(); })" />
-                    <MudTextField T="string" Label="Campo:direção (ex.: Nome:asc)" Variant="Variant.Outlined" Class="w-50"
-                                  Value="@row.Sort"
-                                  ValueChanged="@(v => { row.Sort = v; SyncDefaultSortDict(); })" />
+                    <MudSelect T="string" Label="Módulo" Variant="Variant.Outlined" Style="min-width: 180px;"
+                               Value="@row.Module"
+                               ValueChanged="@(v => { row.Module = v; StateHasChanged(); SyncDefaultSortDict(); })">
+                        @foreach (var module in AvailableModules)
+                        {
+                            <MudSelectItem T="string" Value="@module.Key">@module.Key</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudSelect T="string" Label="Ordenar por" Variant="Variant.Outlined" Style="min-width: 220px;"
+                               Value="@row.Sort"
+                               ValueChanged="@(v => { row.Sort = v; SyncDefaultSortDict(); })"
+                               Disabled="@(string.IsNullOrEmpty(row.Module))">
+                        @if (!string.IsNullOrEmpty(row.Module) && AvailableModules.TryGetValue(row.Module, out var sortOptions))
+                        {
+                            @foreach (var option in sortOptions)
+                            {
+                                <MudSelectItem T="string" Value="@option.Value">@option.Label</MudSelectItem>
+                            }
+                        }
+                    </MudSelect>
                     <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="MudBlazor.Color.Error" OnClick="() => RemoveDefaultSortRow(row)" aria-label="Remover ordenação" />
                 </MudStack>
             }
-            <MudButton Variant="Variant.Outlined" Color="MudBlazor.Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AddDefaultSortRow">Adicionar</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="MudBlazor.Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AddDefaultSortRow">Adicionar Regra</MudButton>
 
             <MudDivider Class="my-4" />
         </MudStack>
@@ -481,6 +498,89 @@
         "#4F46E5", // Indigo
     };
 
+    // Available modules and their sort options for table preferences
+    private record SortOption(string Label, string Value);
+    private readonly Dictionary<string, List<SortOption>> AvailableModules = new()
+    {
+        ["Produtos"] = new()
+        {
+            new("SKU (A-Z)", "sku:asc"),
+            new("SKU (Z-A)", "sku:desc"),
+            new("Nome (A-Z)", "name:asc"),
+            new("Nome (Z-A)", "name:desc"),
+            new("Estoque (Menor)", "stock:asc"),
+            new("Estoque (Maior)", "stock:desc"),
+            new("Preço (Menor)", "price:asc"),
+            new("Preço (Maior)", "price:desc")
+        },
+        ["Vendas"] = new()
+        {
+            new("Data (Mais Recente)", "date:desc"),
+            new("Data (Mais Antiga)", "date:asc"),
+            new("Cliente (A-Z)", "customer:asc"),
+            new("Cliente (Z-A)", "customer:desc"),
+            new("Valor (Maior)", "total:desc"),
+            new("Valor (Menor)", "total:asc")
+        },
+        ["Clientes"] = new()
+        {
+            new("Nome (A-Z)", "name:asc"),
+            new("Nome (Z-A)", "name:desc"),
+            new("E-mail (A-Z)", "email:asc"),
+            new("E-mail (Z-A)", "email:desc"),
+            new("Criado (Mais Recente)", "createdAt:desc"),
+            new("Criado (Mais Antigo)", "createdAt:asc")
+        },
+        ["Movimentações"] = new()
+        {
+            new("Data (Mais Recente)", "date:desc"),
+            new("Data (Mais Antiga)", "date:asc"),
+            new("Produto (A-Z)", "product:asc"),
+            new("Produto (Z-A)", "product:desc"),
+            new("Quantidade (Maior)", "quantity:desc"),
+            new("Quantidade (Menor)", "quantity:asc")
+        },
+        ["Contagens"] = new()
+        {
+            new("Data (Mais Recente)", "date:desc"),
+            new("Data (Mais Antiga)", "date:asc"),
+            new("Status (A-Z)", "status:asc"),
+            new("Status (Z-A)", "status:desc")
+        },
+        ["Categorias"] = new()
+        {
+            new("Nome (A-Z)", "name:asc"),
+            new("Nome (Z-A)", "name:desc"),
+            new("Código (A-Z)", "code:asc"),
+            new("Código (Z-A)", "code:desc")
+        },
+        ["ContasPagar"] = new()
+        {
+            new("Vencimento (Próximo)", "dueDate:asc"),
+            new("Vencimento (Distante)", "dueDate:desc"),
+            new("Fornecedor (A-Z)", "supplierName:asc"),
+            new("Fornecedor (Z-A)", "supplierName:desc"),
+            new("Valor (Maior)", "amount:desc"),
+            new("Valor (Menor)", "amount:asc")
+        },
+        ["ContasReceber"] = new()
+        {
+            new("Vencimento (Próximo)", "dueDate:asc"),
+            new("Vencimento (Distante)", "dueDate:desc"),
+            new("Cliente (A-Z)", "customerName:asc"),
+            new("Cliente (Z-A)", "customerName:desc"),
+            new("Valor (Maior)", "amount:desc"),
+            new("Valor (Menor)", "amount:asc")
+        },
+        ["Usuários"] = new()
+        {
+            new("Nome (A-Z)", "userName:asc"),
+            new("Nome (Z-A)", "userName:desc"),
+            new("E-mail (A-Z)", "email:asc"),
+            new("E-mail (Z-A)", "email:desc")
+        }
+    };
+
     // User profile info
     private string _userName = "Usuário";
     private string _userEmail = "";
@@ -541,8 +641,11 @@
     {
         try
         {
+            Console.WriteLine("[Settings.OnChange] Starting mutation...");
             await mutator();
+            Console.WriteLine($"[Settings.OnChange] After mutation - DefaultStartPage: '{PreferenceService.CurrentPreferences.Dashboard.DefaultStartPage}'");
             await PreferenceService.SaveAsync();
+            Console.WriteLine("[Settings.OnChange] SaveAsync completed");
             
             // Apply font size class directly for immediate feedback
             try
@@ -556,6 +659,7 @@
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[Settings.OnChange] Error: {ex.Message}");
             Snackbar.Add($"Erro ao salvar preferências: {ex.Message}", Severity.Error);
         }
         StateHasChanged();

@@ -50,7 +50,8 @@
               @ref="table"
                   Dense="true"
                   Hover="true"
-                  Striped="true">
+                  Striped="true"
+                  RowsPerPage="@_defaultPageSize">
             <HeaderContent>
                 <MudTh><MudTableSortLabel SortLabel="SupplierName" T="AccountPayableDto">Fornecedor</MudTableSortLabel></MudTh>
                 <MudTh>Nota Fiscal</MudTh>
@@ -113,6 +114,7 @@
     [Inject] private ISnackbar Snackbar { get; set; } = null!;
     [Inject] private IDialogService DialogService { get; set; } = null!;
     [Inject] private CurrencyFormatService Currency { get; set; } = null!;
+    [Inject] private ITablePreferenceService TablePreferences { get; set; } = null!;
 
     private MudTable<AccountPayableDto> table;
     private string searchTerm = "";
@@ -122,9 +124,22 @@
     private List<SupplierDto> suppliers = new();
     private List<FinancialCategoryDto> categories = new();
     private List<CostCenterDto> costCenters = new();
+    
+    // Table preferences
+    private string? _currentSortLabel;
+    private bool _sortDescending;
+    private int _defaultPageSize = 25;
 
     protected override async Task OnInitializedAsync()
     {
+        _defaultPageSize = TablePreferences.GetPageSize();
+        var defaultSort = TablePreferences.GetDefaultSort("ContasPagar");
+        if (defaultSort.HasValue)
+        {
+            _currentSortLabel = defaultSort.Value.field;
+            _sortDescending = defaultSort.Value.descending;
+        }
+        
         await LoadAuxiliaryData();
     }
 
@@ -146,16 +161,34 @@
     {
         try
         {
+            // Handle sorting - use preference as fallback when no sort is selected
+            string? sortBy = null;
+            bool sortDescending = false;
+            
+            if (string.IsNullOrEmpty(state.SortLabel))
+            {
+                if (!string.IsNullOrEmpty(_currentSortLabel))
+                {
+                    sortBy = _currentSortLabel;
+                    sortDescending = _sortDescending;
+                }
+            }
+            else
+            {
+                sortBy = state.SortLabel;
+                sortDescending = state.SortDirection == SortDirection.Descending;
+            }
+            
             var query = new List<string>
             {
                 $"page={state.Page + 1}",
                 $"pageSize={state.PageSize}",
-                $"sortDescending={state.SortDirection == SortDirection.Descending}"
+                $"sortDescending={sortDescending}"
             };
 
-            if (!string.IsNullOrEmpty(state.SortLabel))
+            if (!string.IsNullOrEmpty(sortBy))
             {
-                query.Add($"sortBy={state.SortLabel}");
+                query.Add($"sortBy={sortBy}");
             }
 
             if (statusFilter.HasValue)

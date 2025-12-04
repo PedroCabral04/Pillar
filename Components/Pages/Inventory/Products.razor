@@ -213,7 +213,7 @@
                   Striped="true" 
                   Loading="@_loading"
                   LoadingProgressColor="Color.Primary"
-                  RowsPerPage="25">
+                  RowsPerPage="@_defaultPageSize">
             <ToolBarContent>
                 <MudText Typo="Typo.h6">
                     <MudIcon Icon="@Icons.Material.Filled.ViewList" Class="mr-2"/>
@@ -394,9 +394,21 @@
             var page = state.Page + 1;
             var pageSize = state.PageSize;
 
-            // Handle sorting
-            var sortBy = state.SortLabel ?? "name";
-            var sortDescending = state.SortDirection == SortDirection.Descending;
+            // Handle sorting - use preference as fallback when no sort is selected
+            string sortBy;
+            bool sortDescending;
+            
+            if (string.IsNullOrEmpty(state.SortLabel))
+            {
+                // Apply default sort from preferences
+                sortBy = _currentSortLabel ?? "name";
+                sortDescending = _sortDescending;
+            }
+            else
+            {
+                sortBy = state.SortLabel;
+                sortDescending = state.SortDirection == SortDirection.Descending;
+            }
 
             var queryParams = new List<string>
             {

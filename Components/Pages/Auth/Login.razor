@@ -242,18 +242,22 @@
                 // Get the preferred start page from user preferences
                 await PreferenceService.InitializeAsync();
                 var defaultPage = PreferenceService.CurrentPreferences.Dashboard.DefaultStartPage;
+                Console.WriteLine($"[LOGIN] DefaultStartPage from preferences: '{defaultPage}'");
                 var targetPage = defaultPage switch
                 {
                     "Home" => "/",
                     "Dashboard" => "/dashboard",
                     "Kanban" => "/kanban",
                     "Vendas" => "/sales",
-                    "Clientes" => "/customers",
+                    "Clientes" => "/sales/customers",
                     "Produtos" => "/inventory/products",
                     "Financeiro" => "/financial/dashboard",
                     _ => "/"
                 };
+                Console.WriteLine($"[LOGIN] Target page resolved to: '{targetPage}'");
+                Console.WriteLine($"[LOGIN] ReturnUrl is: '{ReturnUrl}'");
                 var target = string.IsNullOrWhiteSpace(ReturnUrl) ? targetPage : ReturnUrl;
+                Console.WriteLine($"[LOGIN] Final navigation target: '{target}'");
                 Nav.NavigateTo(target!, forceLoad: true);
             }
             else

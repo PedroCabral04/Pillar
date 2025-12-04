@@ -16,6 +16,7 @@
 @inject IDialogService DialogService
 @inject NavigationManager Navigation
 @inject CurrencyFormatService Currency
+@inject ITablePreferenceService TablePreferences
 
 <PageTitle>Vendas - Pillar ERP</PageTitle>
 
@@ -36,7 +37,7 @@
     }
 
     <MudTable T="SaleDto" ServerData="ServerReload" 
-            Dense="false" Hover="true" Elevation="2" @ref="_table" Striped="true" Loading="@_loading">
+            Dense="false" Hover="true" Elevation="2" @ref="_table" Striped="true" Loading="@_loading" RowsPerPage="@_defaultPageSize">
         <ToolBarContent>
             <MudText Typo="Typo.h5">Vendas Registradas</MudText>
             <MudSpacer/>
@@ -146,6 +147,22 @@
     private DateTime? _startDate;
     private DateTime? _endDate;
     private bool _loading = false;
+    
+    // Table preferences
+    private string? _currentSortLabel;
+    private bool _sortDescending;
+    private int _defaultPageSize = 25;
+
+    protected override void OnInitialized()
+    {
+        _defaultPageSize = TablePreferences.GetPageSize();
+        var defaultSort = TablePreferences.GetDefaultSort("Vendas");
+        if (defaultSort.HasValue)
+        {
+            _currentSortLabel = defaultSort.Value.field;
+            _sortDescending = defaultSort.Value.descending;
+        }
+    }
 
     private async Task<TableData<SaleDto>> ServerReload(TableState state, CancellationToken ct)
     {
@@ -155,11 +172,35 @@
             var page = state.Page + 1;
             var pageSize = state.PageSize;
 
+            // Handle sorting - use preference as fallback when no sort is selected
+            string? sortBy = null;
+            bool sortDescending = false;
+            
+            if (string.IsNullOrEmpty(state.SortLabel))
+            {
+                if (!string.IsNullOrEmpty(_currentSortLabel))
+                {
+                    sortBy = _currentSortLabel;
+                    sortDescending = _sortDescending;
+                }
+            }
+            else
+            {
+                sortBy = state.SortLabel;
+                sortDescending = state.SortDirection == SortDirection.Descending;
+            }
+
             var queryParams = new List<string>
             {
                 $"page={page}",
                 $"pageSize={pageSize}"
             };
+
+            if (!string.IsNullOrEmpty(sortBy))
+            {
+                queryParams.Add($"sortBy={sortBy}");
+                queryParams.Add($"sortDescending={sortDescending}");
+            }
 
             if (!string.IsNullOrWhiteSpace(_searchString))
             {
