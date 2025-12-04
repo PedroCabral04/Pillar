@@ -1,6 +1,7 @@
 using erp.Models;
 using erp.Models.Identity;
 using erp.Models.Audit;
+using erp.Models.Chatbot;
 using erp.Models.TimeTracking;
 using erp.Models.Financial;
 using erp.Models.Payroll;
@@ -83,6 +84,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     // Dashboard
     public DbSet<UserDashboardLayout> UserDashboardLayouts { get; set; } = null!;
     public DbSet<WidgetRoleConfiguration> WidgetRoleConfigurations { get; set; } = null!;
+    
+    // Chatbot Conversations
+    public DbSet<ChatConversation> ChatConversations { get; set; } = null!;
+    public DbSet<ChatMessage> ChatMessages { get; set; } = null!;
     
     // Module Permissions
     public DbSet<ModulePermission> ModulePermissions { get; set; } = null!;
@@ -879,6 +884,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         
         // Dashboard model configuration
         ConfigureDashboardModels(modelBuilder);
+        
+        // Chatbot model configuration
+        ConfigureChatbotModels(modelBuilder);
         
         // Module permissions configuration
         ConfigureModulePermissionModels(modelBuilder);
@@ -2053,6 +2061,56 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         {
             role.Property(x => x.Description).HasMaxLength(500);
             role.Property(x => x.Icon).HasMaxLength(100);
+        });
+    }
+    
+    private void ConfigureChatbotModels(ModelBuilder modelBuilder)
+    {
+        // ChatConversation
+        modelBuilder.Entity<ChatConversation>(c =>
+        {
+            c.ToTable("ChatConversations");
+            c.HasKey(x => x.Id);
+            
+            c.Property(x => x.Title).HasMaxLength(200).IsRequired();
+            c.Property(x => x.CreatedAt).IsRequired();
+            
+            c.HasIndex(x => x.UserId);
+            c.HasIndex(x => x.TenantId);
+            c.HasIndex(x => new { x.UserId, x.CreatedAt });
+            c.HasIndex(x => new { x.UserId, x.IsArchived });
+            
+            c.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            // Query filter for multi-tenancy
+            c.HasQueryFilter(conv => 
+                _tenantContextAccessor == null || 
+                _tenantContextAccessor.Current == null || 
+                !_tenantContextAccessor.Current.TenantId.HasValue || 
+                conv.TenantId == _tenantContextAccessor.Current.TenantId.GetValueOrDefault());
+        });
+        
+        // ChatMessage
+        modelBuilder.Entity<ChatMessage>(m =>
+        {
+            m.ToTable("ChatMessages");
+            m.HasKey(x => x.Id);
+            
+            m.Property(x => x.Role).HasMaxLength(20).IsRequired();
+            m.Property(x => x.Content).IsRequired();
+            m.Property(x => x.Timestamp).IsRequired();
+            m.Property(x => x.Order).IsRequired();
+            
+            m.HasIndex(x => x.ConversationId);
+            m.HasIndex(x => new { x.ConversationId, x.Order });
+            
+            m.HasOne(x => x.Conversation)
+                .WithMany(x => x.Messages)
+                .HasForeignKey(x => x.ConversationId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

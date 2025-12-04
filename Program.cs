@@ -404,6 +404,8 @@ builder.Services.AddScoped<IPermissionService, PermissionService>();
 
 // Chatbot services
 builder.Services.AddScoped<erp.Services.Chatbot.IChatbotService, erp.Services.Chatbot.ChatbotService>();
+builder.Services.AddScoped<erp.Services.Chatbot.IChatConversationService, erp.Services.Chatbot.ChatConversationService>();
+builder.Services.AddScoped<erp.DAOs.Chatbot.IChatConversationDao, erp.DAOs.Chatbot.ChatConversationDao>();
 
 // Browser Service (Mobile/Responsive)
 builder.Services.AddScoped<erp.Services.Browser.IBrowserService, erp.Services.Browser.BrowserService>();
