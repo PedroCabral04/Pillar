@@ -37,6 +37,10 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
 
     // ===== Boards (Multiple) =====
 
+    /// <summary>
+    /// Obtém a lista de quadros (boards) pertencentes ao usuário autenticado.
+    /// </summary>
+    /// <returns>Uma lista de `KanbanBoardDto` contendo os quadros do usuário.</returns>
     [HttpGet("boards")]
     public async Task<ActionResult<List<KanbanBoardDto>>> GetMyBoards()
     {
@@ -50,6 +54,11 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         return Ok(boards);
     }
 
+    /// <summary>
+    /// Cria um novo quadro para o usuário autenticado e adiciona colunas padrão.
+    /// </summary>
+    /// <param name="req">Dados necessários para criar o quadro (`CreateBoardRequest`).</param>
+    /// <returns>O `KanbanBoardDto` criado com código HTTP 201.</returns>
     [HttpPost("boards")]
     public async Task<ActionResult<KanbanBoardDto>> CreateBoard([FromBody] CreateBoardRequest req)
     {
@@ -71,6 +80,11 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         return Created($"/api/kanban/boards/{board.Id}", new KanbanBoardDto(board.Id, board.Name, board.CreatedAt));
     }
 
+    /// <summary>
+    /// Retorna um quadro específico do usuário autenticado.
+    /// </summary>
+    /// <param name="id">ID do quadro a ser recuperado.</param>
+    /// <returns>O `KanbanBoardDto` correspondente ou 404 se não encontrado.</returns>
     [HttpGet("boards/{id}")]
     public async Task<ActionResult<KanbanBoardDto>> GetBoard(int id)
     {
@@ -81,6 +95,12 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         return Ok(new KanbanBoardDto(board.Id, board.Name, board.CreatedAt));
     }
 
+    /// <summary>
+    /// Renomeia um quadro do usuário autenticado.
+    /// </summary>
+    /// <param name="id">ID do quadro a ser renomeado.</param>
+    /// <param name="req">Objeto `RenameBoardRequest` contendo o novo nome.</param>
+    /// <returns>204 No Content em sucesso, 404 se o quadro não existir.</returns>
     [HttpPut("boards/{id}/name")]
     public async Task<IActionResult> RenameBoard(int id, [FromBody] RenameBoardRequest req)
     {
@@ -93,6 +113,11 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         return NoContent();
     }
 
+    /// <summary>
+    /// Exclui um quadro do usuário autenticado (remove também colunas, cards e dados relacionados).
+    /// </summary>
+    /// <param name="id">ID do quadro a ser excluído.</param>
+    /// <returns>204 No Content em sucesso, 400 se for o último quadro, 404 se não encontrado.</returns>
     [HttpDelete("boards/{id}")]
     public async Task<IActionResult> DeleteBoard(int id)
     {
@@ -137,6 +162,10 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
 
     // ===== Board (Legacy - get or create default) =====
 
+    /// <summary>
+    /// Retorna o quadro do usuário ou cria um quadro padrão caso não exista.
+    /// </summary>
+    /// <returns>O `KanbanBoardDto` do quadro existente ou recém-criado.</returns>
     [HttpGet("board")]
     public async Task<ActionResult<KanbanBoardDto>> GetOrCreateMyBoard()
     {
@@ -168,6 +197,11 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         return Ok(new KanbanBoardDto(board.Id, board.Name, board.CreatedAt));
     }
 
+    /// <summary>
+    /// Obtém as colunas (e seus cards) de um quadro. Se `boardId` não for fornecido, usa o quadro padrão do usuário.
+    /// </summary>
+    /// <param name="boardId">ID opcional do quadro para filtrar as colunas.</param>
+    /// <returns>Objeto contendo a lista de colunas e cards formatados para a UI.</returns>
     [HttpGet("columns")]
     public async Task<ActionResult<object>> GetColumns([FromQuery] int? boardId = null)
     {
@@ -228,6 +262,11 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         return Ok(new { columns = result });
     }
 
+    /// <summary>
+    /// Calcula e retorna estatísticas do quadro (total de cards, concluídos, atrasados, prioridades, não atribuídos).
+    /// </summary>
+    /// <param name="boardId">ID opcional do quadro para calcular as estatísticas.</param>
+    /// <returns>Um `KanbanStatsDto` com os valores agregados do quadro.</returns>
     [HttpGet("stats")]
     public async Task<ActionResult<KanbanStatsDto>> GetStats([FromQuery] int? boardId = null)
     {
@@ -264,6 +303,11 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
 
     // ===== Cards =====
 
+    /// <summary>
+    /// Recupera um card pelo seu ID, incluindo labels e contagem de comentários.
+    /// </summary>
+    /// <param name="id">ID do card a ser recuperado.</param>
+    /// <returns>O `KanbanCardDto` com os detalhes do card ou 404/403 conforme aplicável.</returns>
     [HttpGet("cards/{id}")]
     public async Task<ActionResult<KanbanCardDto>> GetCard(int id)
     {
@@ -298,6 +342,11 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         ));
     }
 
+    /// <summary>
+    /// Cria um novo card em uma coluna específica e aplica labels e histórico inicial.
+    /// </summary>
+    /// <param name="req">`CreateCardRequest` com dados do card (coluna, título, descrição, labels, etc.).</param>
+    /// <returns>O `KanbanCardDto` criado com código HTTP 201.</returns>
     [HttpPost("cards")]
     public async Task<ActionResult<KanbanCardDto>> CreateCard([FromBody] CreateCardRequest req)
     {
@@ -367,6 +416,12 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         ));
     }
 
+    /// <summary>
+    /// Atualiza os dados de um card (título, descrição, prazo, prioridade, responsável, etiquetas, conclusão).
+    /// </summary>
+    /// <param name="id">ID do card a ser atualizado.</param>
+    /// <param name="req">`UpdateCardRequest` com os campos a serem atualizados.</param>
+    /// <returns>204 No Content em sucesso, 404/403 conforme aplicável.</returns>
     [HttpPut("cards/{id}")]
     public async Task<IActionResult> UpdateCard(int id, [FromBody] UpdateCardRequest req)
     {
@@ -443,6 +498,11 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         return NoContent();
     }
 
+    /// <summary>
+    /// Exclui um card e reajusta posições dos demais cards na coluna.
+    /// </summary>
+    /// <param name="id">ID do card a ser excluído.</param>
+    /// <returns>204 No Content em sucesso, 404/403 conforme aplicável.</returns>
     [HttpDelete("cards/{id}")]
     public async Task<IActionResult> DeleteCard(int id)
     {
@@ -461,6 +521,12 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         return NoContent();
     }
 
+    /// <summary>
+    /// Arquiva ou restaura um card (marca `IsArchived`).
+    /// </summary>
+    /// <param name="id">ID do card a ser arquivado/restaurado.</param>
+    /// <param name="req">`ArchiveCardRequest` contendo `IsArchived`.</param>
+    /// <returns>204 No Content em sucesso, 404/403 conforme aplicável.</returns>
     [HttpPost("cards/{id}/archive")]
     public async Task<IActionResult> ArchiveCard(int id, [FromBody] ArchiveCardRequest req)
     {
@@ -483,6 +549,11 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         return NoContent();
     }
 
+    /// <summary>
+    /// Move um card entre colunas e/ou atualiza sua posição dentro da coluna.
+    /// </summary>
+    /// <param name="req">`MoveCardRequest` com `CardId`, `ToColumnId` e `ToPosition`.</param>
+    /// <returns>204 No Content em sucesso, 404/403 conforme aplicável.</returns>
     [HttpPost("cards/move")]
     public async Task<IActionResult> MoveCard([FromBody] MoveCardRequest req)
     {
@@ -525,6 +596,11 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
 
     // ===== Comments =====
 
+    /// <summary>
+    /// Obtém os comentários de um card, ordenados por data decrescente.
+    /// </summary>
+    /// <param name="cardId">ID do card cujo comentários serão retornados.</param>
+    /// <returns>Lista de `KanbanCommentDto` do card.</returns>
     [HttpGet("cards/{cardId}/comments")]
     public async Task<ActionResult<List<KanbanCommentDto>>> GetComments(int cardId)
     {
@@ -546,6 +622,12 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         return Ok(comments);
     }
 
+    /// <summary>
+    /// Cria um comentário em um card e registra o evento no histórico.
+    /// </summary>
+    /// <param name="cardId">ID do card onde o comentário será criado.</param>
+    /// <param name="req">`CreateCommentRequest` com o conteúdo do comentário.</param>
+    /// <returns>O `KanbanCommentDto` criado com código HTTP 201.</returns>
     [HttpPost("cards/{cardId}/comments")]
     public async Task<ActionResult<KanbanCommentDto>> CreateComment(int cardId, [FromBody] CreateCommentRequest req)
     {
@@ -578,6 +660,13 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         ));
     }
 
+    /// <summary>
+    /// Atualiza um comentário criado pelo próprio usuário.
+    /// </summary>
+    /// <param name="cardId">ID do card do comentário.</param>
+    /// <param name="commentId">ID do comentário a ser atualizado.</param>
+    /// <param name="req">`UpdateCommentRequest` com o novo conteúdo.</param>
+    /// <returns>204 No Content em sucesso, 404/403 conforme aplicável.</returns>
     [HttpPut("cards/{cardId}/comments/{commentId}")]
     public async Task<IActionResult> UpdateComment(int cardId, int commentId, [FromBody] UpdateCommentRequest req)
     {
@@ -605,6 +694,12 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         return NoContent();
     }
 
+    /// <summary>
+    /// Remove um comentário (autor ou dono do quadro pode excluir).
+    /// </summary>
+    /// <param name="cardId">ID do card do comentário.</param>
+    /// <param name="commentId">ID do comentário a ser removido.</param>
+    /// <returns>204 No Content em sucesso, 404/403 conforme aplicável.</returns>
     [HttpDelete("cards/{cardId}/comments/{commentId}")]
     public async Task<IActionResult> DeleteComment(int cardId, int commentId)
     {
@@ -632,6 +727,11 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
 
     // ===== History =====
 
+    /// <summary>
+    /// Retorna o histórico de ações de um card (movimentações, edições, comentários, etc.).
+    /// </summary>
+    /// <param name="cardId">ID do card cujo histórico será retornado.</param>
+    /// <returns>Lista de `KanbanCardHistoryDto` ordenada por data decrescente.</returns>
     [HttpGet("cards/{cardId}/history")]
     public async Task<ActionResult<List<KanbanCardHistoryDto>>> GetHistory(int cardId)
     {
@@ -663,6 +763,11 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
 
     // ===== Labels =====
 
+    /// <summary>
+    /// Obtém as labels (etiquetas) ativas de um quadro. Se `boardId` não for informado, usa o quadro padrão do usuário.
+    /// </summary>
+    /// <param name="boardId">ID opcional do quadro para filtrar as labels.</param>
+    /// <returns>Lista de `KanbanLabelDto` ativas.</returns>
     [HttpGet("labels")]
     public async Task<ActionResult<List<KanbanLabelDto>>> GetLabels([FromQuery] int? boardId = null)
     {
@@ -689,6 +794,11 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         return Ok(labels);
     }
 
+    /// <summary>
+    /// Cria uma nova label (etiqueta) em um quadro.
+    /// </summary>
+    /// <param name="req">`CreateLabelRequest` com `BoardId` opcional, `Name` e `Color`.</param>
+    /// <returns>O `KanbanLabelDto` criado com código HTTP 201.</returns>
     [HttpPost("labels")]
     public async Task<ActionResult<KanbanLabelDto>> CreateLabel([FromBody] CreateLabelRequest req)
     {
@@ -718,6 +828,12 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         return Created($"/api/kanban/labels/{label.Id}", new KanbanLabelDto(label.Id, label.Name, label.Color));
     }
 
+    /// <summary>
+    /// Atualiza uma label existente (nome e cor).
+    /// </summary>
+    /// <param name="id">ID da label a ser atualizada.</param>
+    /// <param name="req">`UpdateLabelRequest` com `Name` e `Color`.</param>
+    /// <returns>204 No Content em sucesso, 404/403 conforme aplicável.</returns>
     [HttpPut("labels/{id}")]
     public async Task<IActionResult> UpdateLabel(int id, [FromBody] UpdateLabelRequest req)
     {
@@ -732,6 +848,11 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         return NoContent();
     }
 
+    /// <summary>
+    /// Marca uma label como inativa (soft-delete) para o quadro.
+    /// </summary>
+    /// <param name="id">ID da label a ser desativada.</param>
+    /// <returns>204 No Content em sucesso, 404/403 conforme aplicável.</returns>
     [HttpDelete("labels/{id}")]
     public async Task<IActionResult> DeleteLabel(int id)
     {
@@ -747,6 +868,10 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
 
     // ===== Users for assignment =====
 
+    /// <summary>
+    /// Lista usuários que podem ser atribuídos a cards (usuários ativos, limitados a 100 resultados).
+    /// </summary>
+    /// <returns>Lista de objetos com `Id`, `FullName` e `Photo`.</returns>
     [HttpGet("users")]
     [HttpGet("assignable-users")]
     public async Task<ActionResult<List<object>>> GetAssignableUsers()
@@ -763,6 +888,11 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
 
     // ===== Columns =====
 
+    /// <summary>
+    /// Cria uma nova coluna no quadro do usuário e retorna a coluna criada.
+    /// </summary>
+    /// <param name="req">`CreateColumnRequest` com o título da coluna.</param>
+    /// <returns>O `KanbanColumnDto` criado com código HTTP 201.</returns>
     [HttpPost("columns")]
     public async Task<ActionResult<KanbanColumnDto>> CreateColumn([FromBody] CreateColumnRequest req)
     {
@@ -776,6 +906,12 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         return Created($"/api/kanban/columns/{col.Id}", new KanbanColumnDto(col.Id, col.Title, col.Position));
     }
 
+    /// <summary>
+    /// Renomeia uma coluna do quadro do usuário.
+    /// </summary>
+    /// <param name="id">ID da coluna a ser renomeada.</param>
+    /// <param name="req">`RenameColumnRequest` com o novo título.</param>
+    /// <returns>204 No Content em sucesso, 404/403 conforme aplicável.</returns>
     [HttpPut("columns/{id}/title")]
     public async Task<IActionResult> RenameColumn(int id, [FromBody] RenameColumnRequest req)
     {
@@ -788,6 +924,11 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         return NoContent();
     }
 
+    /// <summary>
+    /// Exclui uma coluna (apenas se não houver cards na coluna) e ajusta posições.
+    /// </summary>
+    /// <param name="id">ID da coluna a ser excluída.</param>
+    /// <returns>204 No Content em sucesso, 400 se a coluna tiver cards, 404/403 conforme aplicável.</returns>
     [HttpDelete("columns/{id}")]
     public async Task<IActionResult> DeleteColumn(int id)
     {
@@ -814,6 +955,11 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         return NoContent();
     }
 
+    /// <summary>
+    /// Reordena as colunas no quadro (ajusta posições entre colunas existentes).
+    /// </summary>
+    /// <param name="req">`ReorderColumnRequest` com `ColumnId` e `NewPosition`.</param>
+    /// <returns>204 No Content em sucesso, 404/403 conforme aplicável.</returns>
     [HttpPost("columns/reorder")]
     public async Task<IActionResult> ReorderColumn([FromBody] ReorderColumnRequest req)
     {

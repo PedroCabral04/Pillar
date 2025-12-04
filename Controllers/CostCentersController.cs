@@ -21,7 +21,7 @@ public class CostCentersController : ControllerBase
     }
 
     /// <summary>
-    /// Get all cost centers
+    /// Obter todos os centros de custo
     /// </summary>
     [HttpGet]
     public async Task<ActionResult<List<CostCenterDto>>> GetAll()
@@ -39,7 +39,7 @@ public class CostCentersController : ControllerBase
     }
 
     /// <summary>
-    /// Get cost center by ID
+    /// Obter centro de custo por ID
     /// </summary>
     [HttpGet("{id}")]
     public async Task<ActionResult<CostCenterDto>> GetById(int id)
@@ -61,7 +61,7 @@ public class CostCentersController : ControllerBase
     }
 
     /// <summary>
-    /// Create new cost center
+    /// Criar novo centro de custo
     /// </summary>
     [HttpPost]
     public async Task<ActionResult<CostCenterDto>> Create([FromBody] CreateCostCenterDto dto)
@@ -89,7 +89,7 @@ public class CostCentersController : ControllerBase
     }
 
     /// <summary>
-    /// Update existing cost center
+    /// Atualizar centro de custo existente
     /// </summary>
     [HttpPut("{id}")]
     public async Task<ActionResult<CostCenterDto>> Update(int id, [FromBody] UpdateCostCenterDto dto)
@@ -121,7 +121,7 @@ public class CostCentersController : ControllerBase
     }
 
     /// <summary>
-    /// Delete cost center
+    /// Excluir centro de custo
     /// </summary>
     [HttpDelete("{id}")]
     public async Task<ActionResult> Delete(int id)
@@ -139,7 +139,7 @@ public class CostCentersController : ControllerBase
     }
 
     /// <summary>
-    /// Toggle cost center active status
+    /// Alternar status ativo do centro de custo
     /// </summary>
     [HttpPatch("{id}/toggle-active")]
     public async Task<ActionResult<CostCenterDto>> ToggleActive(int id)

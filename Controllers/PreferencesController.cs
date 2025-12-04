@@ -12,6 +12,10 @@ namespace erp.Controllers
     [ApiController]
     [Route("api/preferences")]
     [Authorize]
+    /// <summary>
+    /// Controller responsável por recuperar e atualizar preferências do usuário atual.
+    /// Fornece endpoints para obter as preferências do usuário autenticado e atualizá-las.
+    /// </summary>
     public class PreferencesController : ControllerBase
     {
         private readonly UserManager<ApplicationUser> _users;
@@ -19,6 +23,10 @@ namespace erp.Controllers
         public PreferencesController(UserManager<ApplicationUser> users)
             => _users = users;
 
+        /// <summary>
+        /// Recupera as preferências do usuário autenticado.
+        /// </summary>
+        /// <returns>Objeto <see cref="UserPreferences"/> representando as preferências do usuário.</returns>
         [HttpGet("me")]
         public async Task<ActionResult<UserPreferences>> GetMy()
         {
@@ -32,6 +40,11 @@ namespace erp.Controllers
             return Ok(prefs);
         }
 
+        /// <summary>
+        /// Atualiza as preferências do usuário autenticado.
+        /// </summary>
+        /// <param name="prefs">Objeto <see cref="UserPreferences"/> com as preferências a serem salvas.</param>
+        /// <returns>Resposta HTTP 204 quando bem-sucedido, ou erro apropriado.</returns>
         [HttpPut("me")]
         public async Task<IActionResult> UpdateMy([FromBody] UserPreferences prefs)
         {

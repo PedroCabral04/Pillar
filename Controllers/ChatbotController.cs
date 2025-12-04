@@ -39,7 +39,7 @@ public class ChatbotController : ControllerBase
     }
 
     /// <summary>
-    /// Send a message without persisting (widget quick mode).
+    /// Enviar uma mensagem sem persistir (modo rápido do widget).
     /// </summary>
     [HttpPost("message")]
     public async Task<ActionResult<ChatResponseDto>> SendMessage([FromBody] ChatRequestDto request)
@@ -73,7 +73,7 @@ public class ChatbotController : ControllerBase
     }
 
     /// <summary>
-    /// Get all conversations for the current user.
+    /// Obter todas as conversas do usuário atual.
     /// </summary>
     [HttpGet("conversations")]
     public async Task<ActionResult<List<ChatConversationListDto>>> GetConversations([FromQuery] bool includeArchived = false)
@@ -89,7 +89,7 @@ public class ChatbotController : ControllerBase
     }
     
     /// <summary>
-    /// Get a specific conversation with all messages.
+    /// Obter uma conversa específica com todas as mensagens.
     /// </summary>
     [HttpGet("conversations/{id}")]
     public async Task<ActionResult<ChatConversationDto>> GetConversation(int id)
@@ -110,7 +110,7 @@ public class ChatbotController : ControllerBase
     }
     
     /// <summary>
-    /// Create a new conversation.
+    /// Criar uma nova conversa.
     /// </summary>
     [HttpPost("conversations")]
     public async Task<ActionResult<ChatConversationDto>> CreateConversation([FromBody] CreateConversationDto request)
@@ -126,7 +126,7 @@ public class ChatbotController : ControllerBase
     }
     
     /// <summary>
-    /// Send a message in a conversation.
+    /// Enviar uma mensagem em uma conversa.
     /// </summary>
     [HttpPost("conversations/{id}/messages")]
     public async Task<ActionResult<ConversationMessageResponseDto>> SendMessageToConversation(int id, [FromBody] SendMessageToConversationDto request)
@@ -157,7 +157,7 @@ public class ChatbotController : ControllerBase
     }
     
     /// <summary>
-    /// Update conversation (title, archive status).
+    /// Atualizar conversa (título, estado de arquivamento).
     /// </summary>
     [HttpPut("conversations/{id}")]
     public async Task<ActionResult> UpdateConversation(int id, [FromBody] UpdateConversationDto request)
@@ -178,7 +178,7 @@ public class ChatbotController : ControllerBase
     }
     
     /// <summary>
-    /// Delete a conversation.
+    /// Excluir uma conversa.
     /// </summary>
     [HttpDelete("conversations/{id}")]
     public async Task<ActionResult> DeleteConversation(int id)
@@ -205,7 +205,7 @@ public class ChatbotController : ControllerBase
     }
 
     /// <summary>
-    /// Get cache statistics for monitoring and cost analysis.
+    /// Obter estatísticas de cache para monitoramento e análise de custos.
     /// </summary>
     [HttpGet("cache/stats")]
     public ActionResult<ChatCacheStatistics> GetCacheStats()
@@ -225,7 +225,7 @@ public class ChatbotController : ControllerBase
     }
 
     /// <summary>
-    /// Invalidate all plugin caches (useful after bulk data changes).
+    /// Invalidar caches de plugins (útil após alterações em massa nos dados).
     /// </summary>
     [HttpPost("cache/invalidate")]
     public IActionResult InvalidateCache([FromQuery] string? pluginName = null)

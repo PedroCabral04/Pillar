@@ -10,6 +10,12 @@ namespace erp.Controllers;
 [Route("api/[controller]")]
 [Authorize(Roles = "Administrador")]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+/// <summary>
+/// Controller responsável por gerenciar tenants (locatários) do sistema.
+/// Exponha endpoints de listagem, consulta por id/slug, criação, atualização,
+/// exclusão, provisionamento da base e operações de branding (logo/favicon).
+/// Requer autorização com a role "Administrador".
+/// </summary>
 public class TenantsController : ControllerBase
 {
     private readonly ITenantService _tenantService;
@@ -21,6 +27,11 @@ public class TenantsController : ControllerBase
         _brandingService = brandingService;
     }
 
+    /// <summary>
+    /// Recupera todos os tenants registrados no sistema.
+    /// </summary>
+    /// <param name="cancellationToken">Token para cancelamento da operação.</param>
+    /// <returns>Lista de <see cref="TenantDto"/> contendo os tenants.</returns>
     [HttpGet]
     public async Task<ActionResult<IEnumerable<TenantDto>>> GetAsync(CancellationToken cancellationToken)
     {
@@ -28,6 +39,12 @@ public class TenantsController : ControllerBase
         return Ok(tenants);
     }
 
+    /// <summary>
+    /// Recupera um tenant pelo seu identificador numérico.
+    /// </summary>
+    /// <param name="id">Identificador do tenant.</param>
+    /// <param name="cancellationToken">Token para cancelamento da operação.</param>
+    /// <returns>O <see cref="TenantDto"/> correspondente ou 404 se não encontrado.</returns>
     [HttpGet("{id:int}")]
     public async Task<ActionResult<TenantDto>> GetByIdAsync(int id, CancellationToken cancellationToken)
     {
@@ -40,6 +57,12 @@ public class TenantsController : ControllerBase
         return Ok(tenant);
     }
 
+    /// <summary>
+    /// Recupera um tenant pelo seu slug (identificador legível na URL).
+    /// </summary>
+    /// <param name="slug">Slug do tenant.</param>
+    /// <param name="cancellationToken">Token para cancelamento da operação.</param>
+    /// <returns>O <see cref="TenantDto"/> correspondente ou 404 se não encontrado.</returns>
     [HttpGet("slug/{slug}")]
     public async Task<ActionResult<TenantDto>> GetBySlugAsync(string slug, CancellationToken cancellationToken)
     {
@@ -52,6 +75,12 @@ public class TenantsController : ControllerBase
         return Ok(tenant);
     }
 
+    /// <summary>
+    /// Recupera informações de conexão (ex.: connection string) do tenant.
+    /// </summary>
+    /// <param name="id">Identificador do tenant.</param>
+    /// <param name="cancellationToken">Token para cancelamento da operação.</param>
+    /// <returns>Objeto <see cref="TenantConnectionInfoDto"/> ou 404 se não encontrado.</returns>
     [HttpGet("{id:int}/connection-info")]
     public async Task<ActionResult<TenantConnectionInfoDto>> GetConnectionInfoAsync(int id, CancellationToken cancellationToken)
     {
@@ -64,6 +93,12 @@ public class TenantsController : ControllerBase
         return Ok(info);
     }
 
+    /// <summary>
+    /// Verifica se um slug já existe para outro tenant.
+    /// </summary>
+    /// <param name="slug">Slug a ser verificado.</param>
+    /// <param name="cancellationToken">Token para cancelamento da operação.</param>
+    /// <returns>Objeto indicando o slug normalizado e se existe.</returns>
     [HttpGet("slug/{slug}/exists")]
     public async Task<ActionResult> CheckSlugAsync(string slug, CancellationToken cancellationToken)
     {
@@ -71,6 +106,12 @@ public class TenantsController : ControllerBase
         return Ok(new { slug = slug.ToLowerInvariant(), exists });
     }
 
+    /// <summary>
+    /// Cria um novo tenant.
+    /// </summary>
+    /// <param name="dto">Dados necessários para criação do tenant.</param>
+    /// <param name="cancellationToken">Token para cancelamento da operação.</param>
+    /// <returns>O <see cref="TenantDto"/> criado (HTTP 201) ou erro de validação.</returns>
     [HttpPost]
     public async Task<ActionResult<TenantDto>> CreateAsync([FromBody] CreateTenantDto dto, CancellationToken cancellationToken)
     {
@@ -84,6 +125,13 @@ public class TenantsController : ControllerBase
         return CreatedAtAction(nameof(GetByIdAsync), new { id = created.Id }, created);
     }
 
+    /// <summary>
+    /// Atualiza os dados de um tenant existente.
+    /// </summary>
+    /// <param name="id">Identificador do tenant a ser atualizado.</param>
+    /// <param name="dto">Dados atualizados do tenant.</param>
+    /// <param name="cancellationToken">Token para cancelamento da operação.</param>
+    /// <returns>O <see cref="TenantDto"/> atualizado ou 404 se não encontrado.</returns>
     [HttpPut("{id:int}")]
     public async Task<ActionResult<TenantDto>> UpdateAsync(int id, [FromBody] UpdateTenantDto dto, CancellationToken cancellationToken)
     {
@@ -103,6 +151,12 @@ public class TenantsController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Remove um tenant do sistema.
+    /// </summary>
+    /// <param name="id">Identificador do tenant a ser removido.</param>
+    /// <param name="cancellationToken">Token para cancelamento da operação.</param>
+    /// <returns>HTTP 204 quando removido com sucesso.</returns>
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> DeleteAsync(int id, CancellationToken cancellationToken)
     {
@@ -110,6 +164,12 @@ public class TenantsController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    /// Executa o provisionamento da base de dados para o tenant (criação/migração de schema).
+    /// </summary>
+    /// <param name="id">Identificador do tenant a ser provisionado.</param>
+    /// <param name="cancellationToken">Token para cancelamento da operação.</param>
+    /// <returns>HTTP 204 se bem-sucedido ou 404 se o tenant não existir.</returns>
     [HttpPost("{id:int}/provision")]
     public async Task<IActionResult> ProvisionAsync(int id, CancellationToken cancellationToken)
     {
