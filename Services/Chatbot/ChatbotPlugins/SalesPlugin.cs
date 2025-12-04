@@ -79,14 +79,29 @@ public class SalesPlugin
         }
     }
 
-    [KernelFunction, Description("Cria uma nova venda/pedido no sistema")]
+    [KernelFunction, Description("Cria uma nova venda/pedido no sistema. Campos obrigatórios: SKU do produto e quantidade. Campos opcionais: ID do cliente, método de pagamento, desconto, observações.")]
     public async Task<string> CreateSale(
-        [Description("SKU do produto")] string productSku,
-        [Description("Quantidade do produto")] int quantity,
+        [Description("SKU do produto (obrigatório)")] string productSku,
+        [Description("Quantidade do produto (obrigatório)")] int quantity,
+        [Description("ID do cliente (opcional, deixe vazio para venda sem cliente)")] int? customerId = null,
+        [Description("Método de pagamento (opcional). Exemplos: Dinheiro, Cartão de Crédito, Cartão de Débito, PIX, Boleto")] string? paymentMethod = null,
+        [Description("Desconto em reais a aplicar no total (opcional, padrão: 0)")] decimal discountAmount = 0,
         [Description("Observações adicionais (opcional)")] string? notes = null)
     {
         try
         {
+            // Validar quantidade
+            if (quantity <= 0)
+            {
+                return "❌ A quantidade deve ser maior que zero.";
+            }
+
+            // Validar desconto
+            if (discountAmount < 0)
+            {
+                return "❌ O desconto não pode ser negativo.";
+            }
+
             // Buscar produto
             var result = await _inventoryService.SearchProductsAsync(new ProductSearchDto
             {
@@ -113,6 +128,13 @@ public class SalesPlugin
                     """;
             }
 
+            // Calcular subtotal e verificar desconto
+            var subtotal = product.SalePrice * quantity;
+            if (discountAmount > subtotal)
+            {
+                return $"❌ O desconto (R$ {discountAmount:N2}) não pode ser maior que o subtotal (R$ {subtotal:N2}).";
+            }
+
             var saleDto = new CreateSaleDto
             {
                 Items = new List<CreateSaleItemDto>
@@ -125,6 +147,9 @@ public class SalesPlugin
                         Discount = 0
                     }
                 },
+                CustomerId = customerId,
+                PaymentMethod = paymentMethod,
+                DiscountAmount = discountAmount,
                 Notes = notes,
                 SaleDate = DateTime.Now,
                 Status = "Pendente"
@@ -136,15 +161,25 @@ public class SalesPlugin
             _cacheService.InvalidatePluginCache(PluginName);
             _cacheService.InvalidatePluginCache("ProductsPlugin"); // Estoque mudou
 
+            var customerInfo = customerId.HasValue ? $"Cliente #{customerId}" : "Venda sem cliente";
+            var paymentInfo = !string.IsNullOrEmpty(paymentMethod) ? paymentMethod : "Não informado";
+            var discountInfo = discountAmount > 0 ? $"R$ {discountAmount:N2}" : "—";
+
             return $"""
                 ✅ **Venda Registrada!**
                 
-                - **Venda:** #{createdSale.Id}
-                - **Produto:** {product.Name}
-                - **Quantidade:** {quantity} un.
-                - **Unitário:** R$ {product.SalePrice:N2}
-                - **Total:** R$ {createdSale.TotalAmount:N2}
-                - **Status:** {createdSale.Status}
+                | Campo | Valor |
+                |-------|-------|
+                | **Venda** | #{createdSale.Id} |
+                | **Cliente** | {customerInfo} |
+                | **Produto** | {product.Name} |
+                | **Quantidade** | {quantity} un. |
+                | **Preço Unitário** | R$ {product.SalePrice:N2} |
+                | **Subtotal** | R$ {subtotal:N2} |
+                | **Desconto** | {discountInfo} |
+                | **Total** | R$ {createdSale.TotalAmount:N2} |
+                | **Pagamento** | {paymentInfo} |
+                | **Status** | {createdSale.Status} |
                 """;
         }
         catch (Exception ex)

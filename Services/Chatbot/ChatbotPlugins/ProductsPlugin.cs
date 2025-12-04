@@ -116,24 +116,73 @@ public class ProductsPlugin
         }
     }
 
-    [KernelFunction, Description("Cadastra um novo produto no sistema")]
+    [KernelFunction, Description("Cadastra um novo produto no sistema. Campos obrigatórios: nome, SKU, preço de custo e preço de venda. Campos opcionais: descrição, categoria (nome da categoria), unidade, quantidade inicial em estoque.")]
     public async Task<string> CreateProduct(
-        [Description("Nome do produto")] string name,
-        [Description("SKU/Código do produto")] string sku,
-        [Description("Preço do produto")] decimal price,
-        [Description("Descrição do produto")] string description = "",
-        [Description("Categoria do produto")] string category = "Geral",
-        [Description("Quantidade inicial em estoque")] int initialQuantity = 0)
+        [Description("Nome do produto (obrigatório)")] string name,
+        [Description("SKU/Código do produto (obrigatório)")] string sku,
+        [Description("Preço de custo do produto (obrigatório)")] decimal costPrice,
+        [Description("Preço de venda do produto (obrigatório)")] decimal salePrice,
+        [Description("Descrição do produto (opcional)")] string? description = null,
+        [Description("Nome da categoria do produto (opcional, padrão: primeira categoria encontrada)")] string? category = null,
+        [Description("Unidade de medida (opcional, padrão: UN). Exemplos: UN, KG, M, L, CX")] string unit = "UN",
+        [Description("Quantidade inicial em estoque (opcional, padrão: 0)")] decimal initialQuantity = 0)
     {
         try
         {
+            // Validar preços
+            if (costPrice < 0)
+                return "❌ O preço de custo deve ser maior ou igual a zero.";
+            if (salePrice <= 0)
+                return "❌ O preço de venda deve ser maior que zero.";
+
+            // Buscar categoria por nome
+            int categoryId = 1;
+            string categoryName = "Padrão";
+            
+            if (!string.IsNullOrWhiteSpace(category))
+            {
+                var (categories, _) = await _inventoryService.GetCategoriesAsync(search: category, page: 1, pageSize: 10);
+                var foundCategory = categories.FirstOrDefault(c => 
+                    c.Name.Equals(category, StringComparison.OrdinalIgnoreCase) ||
+                    c.Name.Contains(category, StringComparison.OrdinalIgnoreCase));
+                
+                if (foundCategory != null)
+                {
+                    categoryId = foundCategory.Id;
+                    categoryName = foundCategory.Name;
+                }
+                else
+                {
+                    // Listar categorias disponíveis
+                    var (allCategories, _) = await _inventoryService.GetCategoriesAsync(page: 1, pageSize: 20);
+                    if (allCategories.Any())
+                    {
+                        var categoryList = string.Join(", ", allCategories.Select(c => $"`{c.Name}`"));
+                        return $"❌ Categoria **'{category}'** não encontrada.\n\n📂 Categorias disponíveis: {categoryList}";
+                    }
+                }
+            }
+            else
+            {
+                // Usar primeira categoria disponível
+                var (categories, _) = await _inventoryService.GetCategoriesAsync(page: 1, pageSize: 1);
+                if (categories.Any())
+                {
+                    categoryId = categories.First().Id;
+                    categoryName = categories.First().Name;
+                }
+            }
+
             var productDto = new CreateProductDto
             {
                 Name = name,
                 Sku = sku,
                 Description = description,
-                SalePrice = price,
-                CategoryId = 1 // Default category - TODO: Allow specifying category
+                CostPrice = costPrice,
+                SalePrice = salePrice,
+                CategoryId = categoryId,
+                Unit = unit,
+                CurrentStock = initialQuantity
             };
 
             var createdProduct = await _inventoryService.CreateProductAsync(productDto, 1); // TODO: Obter userId do contexto
@@ -141,13 +190,21 @@ public class ProductsPlugin
             // Invalidar cache de listagem de produtos após criar novo
             _cacheService.InvalidatePluginCache(PluginName);
 
+            var marginPercent = costPrice > 0 ? ((salePrice - costPrice) / costPrice * 100) : 0;
+
             return $"""
                 ✅ **Produto Cadastrado com Sucesso!**
                 
-                - **Nome:** {createdProduct.Name}
-                - **SKU:** `{createdProduct.Sku}`
-                - **Preço:** R$ {createdProduct.SalePrice:N2}
-                - **Estoque:** {createdProduct.CurrentStock} unidades
+                | Campo | Valor |
+                |-------|-------|
+                | **Nome** | {createdProduct.Name} |
+                | **SKU** | `{createdProduct.Sku}` |
+                | **Categoria** | {categoryName} |
+                | **Unidade** | {unit} |
+                | **Preço de Custo** | R$ {costPrice:N2} |
+                | **Preço de Venda** | R$ {createdProduct.SalePrice:N2} |
+                | **Margem** | {marginPercent:N1}% |
+                | **Estoque Inicial** | {createdProduct.CurrentStock} {unit} |
                 """;
         }
         catch (Exception ex)

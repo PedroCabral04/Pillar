@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using Microsoft.SemanticKernel;
 using erp.Services.Financial;
+using erp.Services.Financial.Validation;
 using erp.DTOs.Financial;
 
 namespace erp.Services.Chatbot.ChatbotPlugins;
@@ -229,43 +230,79 @@ public class SuppliersPlugin
         }
     }
 
-    [KernelFunction, Description("Cadastra um novo fornecedor no sistema")]
+    [KernelFunction, Description("Cadastra um novo fornecedor no sistema. Campos obrigatórios: razão social e CNPJ/CPF. Campos opcionais: nome fantasia, email, telefone, celular, website, logradouro, número, bairro, cidade, estado, CEP.")]
     public async Task<string> CreateSupplier(
-        [Description("Razão social do fornecedor")] string name,
-        [Description("CNPJ ou CPF do fornecedor")] string taxId,
+        [Description("Razão social do fornecedor (obrigatório)")] string name,
+        [Description("CNPJ (14 dígitos) ou CPF (11 dígitos) do fornecedor (obrigatório)")] string taxId,
         [Description("Nome fantasia (opcional)")] string? tradeName = null,
         [Description("Email do fornecedor (opcional)")] string? email = null,
-        [Description("Telefone do fornecedor (opcional)")] string? phone = null,
-        [Description("Endereço do fornecedor (opcional)")] string? address = null,
+        [Description("Telefone fixo do fornecedor (opcional)")] string? phone = null,
+        [Description("Celular do fornecedor (opcional)")] string? mobilePhone = null,
+        [Description("Website do fornecedor (opcional)")] string? website = null,
+        [Description("Logradouro/Rua (opcional)")] string? street = null,
+        [Description("Número do endereço (opcional)")] string? number = null,
+        [Description("Bairro (opcional)")] string? district = null,
         [Description("Cidade (opcional)")] string? city = null,
-        [Description("Estado/UF (opcional)")] string? state = null,
+        [Description("Estado/UF (opcional, ex: SP, RJ, MG)")] string? state = null,
         [Description("CEP (opcional)")] string? zipCode = null)
     {
         try
         {
+            // Limpar e validar documento
+            var cleanTaxId = BrazilianDocumentValidator.RemoveFormatting(taxId);
+
+            // Validar documento
+            if (!BrazilianDocumentValidator.IsValidDocument(cleanTaxId))
+            {
+                var docType = cleanTaxId.Length <= 11 ? "CPF" : "CNPJ";
+                return $"❌ **{docType} inválido!**\n\nO documento informado não passou na validação. Verifique se os dígitos estão corretos.";
+            }
+
+            var docTypeLabel = cleanTaxId.Length == 11 ? "CPF" : "CNPJ";
+
             var createDto = new CreateSupplierDto
             {
                 Name = name,
                 TradeName = tradeName,
-                TaxId = taxId,
+                TaxId = cleanTaxId,
                 Email = email,
                 Phone = phone,
-                Street = address,
+                MobilePhone = mobilePhone,
+                Website = website,
+                Street = street,
+                Number = number,
+                District = district,
                 City = city,
-                State = state,
+                State = state?.ToUpperInvariant(),
                 ZipCode = zipCode?.Replace("-", ""),
                 IsActive = true
             };
 
             var supplier = await _supplierService.CreateAsync(createDto, currentUserId: 1); // TODO: obter userId do contexto
 
-            return $"✅ **Fornecedor cadastrado com sucesso!**\n\n" +
-                   $"**ID:** {supplier.Id}\n" +
-                   $"**Razão Social:** {supplier.Name}\n" +
-                   $"**Nome Fantasia:** {supplier.TradeName ?? "Não informado"}\n" +
-                   $"**CNPJ/CPF:** {FormatDocument(supplier.TaxId)}\n" +
-                   $"**Email:** {supplier.Email ?? "Não informado"}\n" +
-                   $"**Telefone:** {supplier.Phone ?? "Não informado"}";
+            var addressParts = new List<string>();
+            if (!string.IsNullOrEmpty(street)) addressParts.Add(street);
+            if (!string.IsNullOrEmpty(number)) addressParts.Add($"nº {number}");
+            if (!string.IsNullOrEmpty(district)) addressParts.Add(district);
+            if (!string.IsNullOrEmpty(city)) addressParts.Add(city);
+            if (!string.IsNullOrEmpty(state)) addressParts.Add(state.ToUpperInvariant());
+            var addressDisplay = addressParts.Any() ? string.Join(", ", addressParts) : "—";
+
+            return $"""
+                ✅ **Fornecedor Cadastrado!**
+                
+                | Campo | Valor |
+                |-------|-------|
+                | **ID** | {supplier.Id} |
+                | **Razão Social** | {supplier.Name} |
+                | **Nome Fantasia** | {supplier.TradeName ?? "—"} |
+                | **{docTypeLabel}** | {FormatDocument(supplier.TaxId)} |
+                | **Email** | {supplier.Email ?? "—"} |
+                | **Telefone** | {supplier.Phone ?? "—"} |
+                | **Celular** | {supplier.MobilePhone ?? "—"} |
+                | **Website** | {supplier.Website ?? "—"} |
+                | **Endereço** | {addressDisplay} |
+                """;
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("Já existe"))
         {

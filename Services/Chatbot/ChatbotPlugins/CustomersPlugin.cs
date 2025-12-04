@@ -1,7 +1,9 @@
 using System.ComponentModel;
 using Microsoft.SemanticKernel;
 using erp.Services.Sales;
+using erp.Services.Financial.Validation;
 using erp.DTOs.Sales;
+using erp.Models.Sales;
 
 namespace erp.Services.Chatbot.ChatbotPlugins;
 
@@ -97,44 +99,79 @@ public class CustomersPlugin
         }
     }
 
-    [KernelFunction, Description("Cadastra um novo cliente no sistema")]
+    [KernelFunction, Description("Cadastra um novo cliente no sistema. Campos obrigatórios: nome e documento (CPF ou CNPJ). Campos opcionais: nome fantasia, email, telefone, celular, endereço, número, bairro, cidade, estado, CEP, tipo (PF ou PJ).")]
     public async Task<string> CreateCustomer(
-        [Description("Nome completo ou razão social do cliente")] string name,
-        [Description("Documento do cliente (CPF ou CNPJ)")] string document,
+        [Description("Nome completo (pessoa física) ou razão social (pessoa jurídica) - obrigatório")] string name,
+        [Description("Documento do cliente: CPF (11 dígitos) ou CNPJ (14 dígitos) - obrigatório")] string document,
+        [Description("Nome fantasia (opcional, mais usado para PJ)")] string? tradeName = null,
         [Description("Email do cliente (opcional)")] string? email = null,
-        [Description("Telefone do cliente (opcional)")] string? phone = null,
-        [Description("Endereço do cliente (opcional)")] string? address = null,
+        [Description("Telefone fixo do cliente (opcional)")] string? phone = null,
+        [Description("Celular do cliente (opcional)")] string? mobile = null,
+        [Description("Logradouro/Rua (opcional)")] string? street = null,
+        [Description("Número do endereço (opcional)")] string? number = null,
+        [Description("Bairro (opcional)")] string? neighborhood = null,
         [Description("Cidade do cliente (opcional)")] string? city = null,
-        [Description("Estado/UF do cliente (opcional)")] string? state = null,
+        [Description("Estado/UF do cliente (opcional, ex: SP, RJ, MG)")] string? state = null,
         [Description("CEP do cliente (opcional)")] string? zipCode = null)
     {
         try
         {
             // Remove formatação do documento
-            var cleanDocument = document.Replace(".", "").Replace("-", "").Replace("/", "").Trim();
+            var cleanDocument = BrazilianDocumentValidator.RemoveFormatting(document);
+
+            // Validar documento
+            if (!BrazilianDocumentValidator.IsValidDocument(cleanDocument))
+            {
+                var docType = cleanDocument.Length <= 11 ? "CPF" : "CNPJ";
+                return $"❌ **{docType} inválido!**\n\nO documento informado não passou na validação. Verifique se os dígitos estão corretos.";
+            }
+
+            // Determinar tipo de cliente baseado no documento
+            var customerType = cleanDocument.Length == 11 ? CustomerType.Individual : CustomerType.Business;
+            var docTypeLabel = cleanDocument.Length == 11 ? "CPF" : "CNPJ";
+
+            // Montar endereço completo se houver logradouro
+            string? fullAddress = null;
+            if (!string.IsNullOrWhiteSpace(street))
+            {
+                var addressParts = new List<string> { street };
+                if (!string.IsNullOrWhiteSpace(number)) addressParts.Add($"nº {number}");
+                fullAddress = string.Join(", ", addressParts);
+            }
 
             var createDto = new CreateCustomerDto
             {
                 Name = name,
+                TradeName = tradeName,
                 Document = cleanDocument,
                 Email = email,
                 Phone = phone,
-                Address = address,
+                Mobile = mobile,
+                Address = fullAddress,
+                Neighborhood = neighborhood,
                 City = city,
-                State = state,
-                ZipCode = zipCode?.Replace("-", "")
+                State = state?.ToUpperInvariant(),
+                ZipCode = zipCode?.Replace("-", ""),
+                Type = customerType
             };
 
             var customer = await _customerService.CreateAsync(createDto);
 
+            var addressDisplay = string.Join(", ", new[] { fullAddress, neighborhood, city, state }.Where(s => !string.IsNullOrEmpty(s)));
+
             return $"""
                 ✅ **Cliente Cadastrado!**
                 
-                - **ID:** {customer.Id}
-                - **Nome:** {customer.Name}
-                - **Documento:** {FormatDocument(customer.Document)}
-                - **Email:** {customer.Email ?? "—"}
-                - **Telefone:** {customer.Phone ?? "—"}
+                | Campo | Valor |
+                |-------|-------|
+                | **ID** | {customer.Id} |
+                | **Tipo** | {(customerType == CustomerType.Individual ? "👤 Pessoa Física" : "🏢 Pessoa Jurídica")} |
+                | **Nome** | {customer.Name} |
+                | **{docTypeLabel}** | {FormatDocument(customer.Document)} |
+                | **Email** | {customer.Email ?? "—"} |
+                | **Telefone** | {customer.Phone ?? "—"} |
+                | **Celular** | {customer.Mobile ?? "—"} |
+                | **Endereço** | {(string.IsNullOrEmpty(addressDisplay) ? "—" : addressDisplay)} |
                 """;
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("já existe"))
