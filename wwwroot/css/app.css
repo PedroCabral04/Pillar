@@ -344,6 +344,8 @@ input:focus-visible {
 #nav-drawer.mud-drawer--closed {
     width: 56px !important;
     min-width: 56px !important;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE 10+ */
 }
 
 /* Ensure icon-only mode centers nicely and the label hides cleanly */
