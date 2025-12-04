@@ -13,15 +13,18 @@ public class ChatbotController : ControllerBase
 {
     private readonly IChatbotService _chatbotService;
     private readonly IChatConversationService _conversationService;
+    private readonly IChatbotCacheService _cacheService;
     private readonly ILogger<ChatbotController> _logger;
 
     public ChatbotController(
         IChatbotService chatbotService,
         IChatConversationService conversationService,
+        IChatbotCacheService cacheService,
         ILogger<ChatbotController> logger)
     {
         _chatbotService = chatbotService;
         _conversationService = conversationService;
+        _cacheService = cacheService;
         _logger = logger;
     }
     
@@ -199,5 +202,52 @@ public class ChatbotController : ControllerBase
     public IActionResult Health()
     {
         return Ok(new { status = "healthy", service = "chatbot" });
+    }
+
+    /// <summary>
+    /// Get cache statistics for monitoring and cost analysis.
+    /// </summary>
+    [HttpGet("cache/stats")]
+    public ActionResult<ChatCacheStatistics> GetCacheStats()
+    {
+        var stats = _cacheService.GetStatistics();
+        return Ok(new
+        {
+            enabled = _cacheService.IsEnabled,
+            statistics = stats,
+            summary = new
+            {
+                responseCacheHitRate = $"{stats.ResponseHitRate:F1}%",
+                pluginCacheHitRate = $"{stats.PluginHitRate:F1}%",
+                estimatedApiCallsSaved = stats.EstimatedApiCallsSaved
+            }
+        });
+    }
+
+    /// <summary>
+    /// Invalidate all plugin caches (useful after bulk data changes).
+    /// </summary>
+    [HttpPost("cache/invalidate")]
+    public IActionResult InvalidateCache([FromQuery] string? pluginName = null)
+    {
+        if (string.IsNullOrEmpty(pluginName))
+        {
+            // Invalidar todos os plugins conhecidos
+            _cacheService.InvalidatePluginCache("ProductsPlugin");
+            _cacheService.InvalidatePluginCache("SalesPlugin");
+            _cacheService.InvalidatePluginCache("FinancialPlugin");
+            _cacheService.InvalidatePluginCache("HRPlugin");
+            _cacheService.InvalidatePluginCache("AssetsPlugin");
+            _cacheService.InvalidatePluginCache("CustomersPlugin");
+            _cacheService.InvalidatePluginCache("SuppliersPlugin");
+            _cacheService.InvalidatePluginCache("PayrollPlugin");
+            
+            _logger.LogInformation("Cache de todos os plugins invalidado por requisição");
+            return Ok(new { message = "Cache de todos os plugins invalidado" });
+        }
+        
+        _cacheService.InvalidatePluginCache(pluginName);
+        _logger.LogInformation("Cache do plugin {PluginName} invalidado por requisição", pluginName);
+        return Ok(new { message = $"Cache do plugin {pluginName} invalidado" });
     }
 }

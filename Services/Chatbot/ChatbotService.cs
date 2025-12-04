@@ -12,16 +12,19 @@ public class ChatbotService : IChatbotService
     private readonly Kernel _kernel;
     private readonly ILogger<ChatbotService> _logger;
     private readonly IConfiguration _configuration;
+    private readonly IChatbotCacheService _cacheService;
     private readonly string _aiProvider;
     private readonly bool _aiConfigured;
 
     public ChatbotService(
         ILogger<ChatbotService> logger,
         IConfiguration configuration,
-        IServiceProvider serviceProvider)
+        IServiceProvider serviceProvider,
+        IChatbotCacheService cacheService)
     {
         _logger = logger;
         _configuration = configuration;
+        _cacheService = cacheService;
 
         // Criar o Kernel do Semantic Kernel
         var builder = Kernel.CreateBuilder();
@@ -184,6 +187,20 @@ public class ChatbotService : IChatbotService
     {
         try
         {
+            // Verificar cache primeiro
+            if (_cacheService.IsEnabled)
+            {
+                var contextHash = _cacheService.GenerateContextHash(conversationHistory);
+                var cachedResponse = _cacheService.GetCachedResponse(message, contextHash);
+                
+                if (cachedResponse != null)
+                {
+                    _logger.LogDebug("Resposta obtida do cache para: {MessagePreview}...", 
+                        message.Length > 30 ? message[..30] : message);
+                    return cachedResponse;
+                }
+            }
+
             // Se não tem IA configurada, usar modo fallback
             if (!_aiConfigured)
             {
@@ -266,12 +283,21 @@ public class ChatbotService : IChatbotService
             // Gerar sugestões de ações
             // var suggestions = GenerateSuggestions(message);
 
-            return new ChatResponseDto
+            var response = new ChatResponseDto
             {
                 Response = result.Content ?? "Desculpe, não consegui processar sua mensagem.",
                 Success = true,
                 // SuggestedActions = suggestions
             };
+
+            // Armazenar no cache para futuras requisições
+            if (_cacheService.IsEnabled)
+            {
+                var contextHash = _cacheService.GenerateContextHash(conversationHistory);
+                _cacheService.SetCachedResponse(message, response, contextHash);
+            }
+
+            return response;
         }
         catch (Exception ex)
         {

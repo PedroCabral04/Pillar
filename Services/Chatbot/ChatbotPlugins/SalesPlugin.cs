@@ -14,11 +14,14 @@ public class SalesPlugin
 {
     private readonly ISalesService _salesService;
     private readonly IInventoryService _inventoryService;
+    private readonly IChatbotCacheService _cacheService;
+    private const string PluginName = "SalesPlugin";
 
-    public SalesPlugin(ISalesService salesService, IInventoryService inventoryService)
+    public SalesPlugin(ISalesService salesService, IInventoryService inventoryService, IChatbotCacheService cacheService)
     {
         _salesService = salesService;
         _inventoryService = inventoryService;
+        _cacheService = cacheService;
     }
 
     [KernelFunction, Description("Lista as vendas recentes")]
@@ -27,6 +30,14 @@ public class SalesPlugin
     {
         try
         {
+            // Tentar obter do cache
+            var cacheKey = $"limit:{limit}";
+            var cachedResult = _cacheService.GetPluginData<string>(PluginName, nameof(ListRecentSales), cacheKey);
+            if (cachedResult != null)
+            {
+                return cachedResult;
+            }
+
             var result = await _salesService.SearchAsync(
                 search: null,
                 status: null,
@@ -48,7 +59,7 @@ public class SalesPlugin
             var remaining = result.total - limit;
             var moreText = remaining > 0 ? $"\n\n*...e mais {remaining} vendas.*" : "";
 
-            return $"""
+            var response = $"""
                 🛒 **Vendas Recentes** ({result.total} total)
                 
                 | Venda | Data | Total | Status |
@@ -56,6 +67,11 @@ public class SalesPlugin
                 {string.Join("\n", salesList)}
                 {moreText}
                 """;
+            
+            // Armazenar no cache
+            _cacheService.SetPluginData(PluginName, nameof(ListRecentSales), response, cacheKey);
+            
+            return response;
         }
         catch (Exception ex)
         {
@@ -115,6 +131,10 @@ public class SalesPlugin
             };
 
             var createdSale = await _salesService.CreateAsync(saleDto, 1);
+
+            // Invalidar cache após criar venda
+            _cacheService.InvalidatePluginCache(PluginName);
+            _cacheService.InvalidatePluginCache("ProductsPlugin"); // Estoque mudou
 
             return $"""
                 ✅ **Venda Registrada!**

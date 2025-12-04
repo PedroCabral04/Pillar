@@ -11,10 +11,13 @@ namespace erp.Services.Chatbot.ChatbotPlugins;
 public class ProductsPlugin
 {
     private readonly IInventoryService _inventoryService;
+    private readonly IChatbotCacheService _cacheService;
+    private const string PluginName = "ProductsPlugin";
 
-    public ProductsPlugin(IInventoryService inventoryService)
+    public ProductsPlugin(IInventoryService inventoryService, IChatbotCacheService cacheService)
     {
         _inventoryService = inventoryService;
+        _cacheService = cacheService;
     }
 
     [KernelFunction, Description("Lista todos os produtos cadastrados no sistema. Use página > 1 para ver mais produtos.")]
@@ -24,6 +27,14 @@ public class ProductsPlugin
     {
         try
         {
+            // Tentar obter do cache
+            var cacheKey = $"{maxResults}:{page}";
+            var cachedResult = _cacheService.GetPluginData<string>(PluginName, nameof(ListProducts), cacheKey);
+            if (cachedResult != null)
+            {
+                return cachedResult;
+            }
+
             var skip = (page - 1) * maxResults;
             var result = await _inventoryService.SearchProductsAsync(new ProductSearchDto 
             { 
@@ -54,7 +65,12 @@ public class ProductsPlugin
                 ? $"\n\n*Exibindo {shown} de {result.TotalCount}. Peça \"listar produtos página {page + 1}\" para ver mais.*" 
                 : "";
 
-            return $"📦 **Produtos Cadastrados**{pageInfo} ({result.TotalCount} total)\n\n{string.Join("\n", productList)}{moreText}";
+            var response = $"📦 **Produtos Cadastrados**{pageInfo} ({result.TotalCount} total)\n\n{string.Join("\n", productList)}{moreText}";
+            
+            // Armazenar no cache
+            _cacheService.SetPluginData(PluginName, nameof(ListProducts), response, cacheKey);
+            
+            return response;
         }
         catch (Exception ex)
         {
@@ -121,6 +137,9 @@ public class ProductsPlugin
             };
 
             var createdProduct = await _inventoryService.CreateProductAsync(productDto, 1); // TODO: Obter userId do contexto
+
+            // Invalidar cache de listagem de produtos após criar novo
+            _cacheService.InvalidatePluginCache(PluginName);
 
             return $"""
                 ✅ **Produto Cadastrado com Sucesso!**
