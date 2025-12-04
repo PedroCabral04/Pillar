@@ -232,12 +232,11 @@ public class ChatbotController : ControllerBase
     {
         if (string.IsNullOrEmpty(pluginName))
         {
-            // Invalidar todos os plugins conhecidos
             _cacheService.InvalidatePluginCache("ProductsPlugin");
             _cacheService.InvalidatePluginCache("SalesPlugin");
             _cacheService.InvalidatePluginCache("FinancialPlugin");
             _cacheService.InvalidatePluginCache("HRPlugin");
-            _cacheService.InvalidatePluginCache("AssetsPlugin");
+            //_cacheService.InvalidatePluginCache("AssetsPlugin");
             _cacheService.InvalidatePluginCache("CustomersPlugin");
             _cacheService.InvalidatePluginCache("SuppliersPlugin");
             _cacheService.InvalidatePluginCache("PayrollPlugin");

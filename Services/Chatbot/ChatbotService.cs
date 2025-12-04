@@ -161,10 +161,9 @@ public class ChatbotService : IChatbotService
             new SystemPlugin(), 
             "SystemPlugin");
         
-        // Novos plugins
-        builder.Plugins.AddFromObject(
-            ActivatorUtilities.CreateInstance<AssetsPlugin>(serviceProvider), 
-            "AssetsPlugin");
+        // builder.Plugins.AddFromObject(
+        //     ActivatorUtilities.CreateInstance<AssetsPlugin>(serviceProvider), 
+        //     "AssetsPlugin");
         
         builder.Plugins.AddFromObject(
             ActivatorUtilities.CreateInstance<CustomersPlugin>(serviceProvider), 

@@ -120,10 +120,6 @@
                 <MudSelectItem T="string" Value="@("topbar")">Barra superior (Topbar)</MudSelectItem>
             </MudSelect>
 
-            <MudSwitch T="bool" Color="MudBlazor.Color.Primary" Label="Sidebar fixa (não recolhe automaticamente)"
-                       Value="@PreferenceService.CurrentPreferences.Ui.SidebarPersistent"
-                       ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Ui.SidebarPersistent = v))" />
-
             <MudSelect T="string" Label="Densidade" Variant="Variant.Outlined"
                        Value="@PreferenceService.CurrentPreferences.Ui.Density"
                        ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Ui.Density = v))">
