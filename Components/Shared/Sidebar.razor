@@ -166,7 +166,8 @@
                 }
                 @if (HasModuleAccess(ModuleKeys.Assets))
                 {
-                    <MudNavLink Href="/assets" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Devices" Class="nav-item">Ativos</MudNavLink>
+                    @* Link para o módulo 'Ativos' comentado por solicitação *@
+                    @* <MudNavLink Href="/assets" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Devices" Class="nav-item">Ativos</MudNavLink> *@
                 }
                 @if (HasModuleAccess(ModuleKeys.Reports))
                 {
@@ -255,9 +256,12 @@
                 }
                 @if (HasModuleAccess(ModuleKeys.Assets))
                 {
+                    @* Link compacto para 'Ativos' comentado por solicitação *@
+                    @*
                     <MudTooltip Text="Ativos" Placement="Placement.Right" Arrow="true" Duration="200">
                         <MudNavLink Href="/assets" Icon="@Icons.Material.Filled.Devices" Class="mini-nav-item" AriaLabel="Ativos"/>
                     </MudTooltip>
+                    *@
                 }
                 @if (HasModuleAccess(ModuleKeys.Reports))
                 {
@@ -335,7 +339,8 @@
         new("Apontamento", "/time-tracking/payroll", Icons.Material.Filled.AccessTime, "RH"),
         // Ferramentas
         new("Kanban", "/kanban", Icons.Material.Filled.ViewKanban, "Ferramentas"),
-        new("Ativos", "/assets", Icons.Material.Filled.Devices, "Ferramentas"),
+        // Link para 'Ativos' comentado por solicitação
+        // new("Ativos", "/assets", Icons.Material.Filled.Devices, "Ferramentas"),
         new("Relatórios", "/reports", Icons.Material.Filled.Assessment, "Ferramentas"),
         // Administração
         new("Tenants", "/admin/tenants", Icons.Material.Filled.Domain, "Administração"),
