@@ -42,6 +42,19 @@
                             Variant="Variant.Outlined" Margin="Margin.Dense"
                             Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
                             Clearable="true" Style="min-width: 250px;"/>
+                <MudSelect T="int?" 
+                        Value="_parentCategoryFilter" 
+                        ValueChanged="OnParentCategoryFilterChanged"
+                        Label="Categoria Pai" 
+                        Variant="Variant.Outlined" 
+                        Margin="Margin.Dense"
+                        Clearable="true"
+                        Style="min-width: 200px;">
+                    @foreach (var category in _parentCategories)
+                    {
+                        <MudSelectItem T="int?" Value="@category.Id">@category.Name</MudSelectItem>
+                    }
+                </MudSelect>
                 <MudSelect T="string" 
                         Value="_statusFilter" 
                         ValueChanged="OnStatusFilterChanged"
@@ -132,6 +145,8 @@
     private string? _loadError;
     private string? _searchString;
     private string? _statusFilter;
+    private int? _parentCategoryFilter;
+    private List<ProductCategoryDto> _parentCategories = new();
     private bool _loading = false;
     
     // Table preferences
@@ -139,7 +154,7 @@
     private bool _sortDescending;
     private int _defaultPageSize = 25;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         _defaultPageSize = TablePreferences.GetPageSize();
         var defaultSort = TablePreferences.GetDefaultSort("Categorias");
@@ -147,6 +162,25 @@
         {
             _currentSortLabel = defaultSort.Value.field;
             _sortDescending = defaultSort.Value.descending;
+        }
+        
+        await LoadParentCategories();
+    }
+
+    private async Task LoadParentCategories()
+    {
+        try
+        {
+            // Carrega todas as categorias para o filtro (usando um tamanho de página grande)
+            var response = await ApiService.GetAsync<PaginatedCategoriesResponse>("/api/products/categories?pageSize=1000");
+            if (response != null)
+            {
+                _parentCategories = response.Items.OrderBy(c => c.Name).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar categorias para filtro");
         }
     }
 
@@ -198,6 +232,11 @@
                 queryParams.Add($"status={Uri.EscapeDataString(_statusFilter)}");
             }
 
+            if (_parentCategoryFilter.HasValue)
+            {
+                queryParams.Add($"parentCategoryId={_parentCategoryFilter}");
+            }
+
             var query = string.Join("&", queryParams);
             var response = await ApiService.GetAsync<PaginatedCategoriesResponse>($"/api/products/categories?{query}");
 
@@ -234,6 +273,12 @@
     private void OnStatusFilterChanged(string? value)
     {
         _statusFilter = value;
+        _table?.ReloadServerData();
+    }
+
+    private void OnParentCategoryFilterChanged(int? value)
+    {
+        _parentCategoryFilter = value;
         _table?.ReloadServerData();
     }
 

@@ -1,6 +1,7 @@
 @using erp.DTOs.User
 @using erp.Services
 @using MudBlazor
+@using erp.DTOs.Financial
 @inject IApiService ApiService
 @inject ISnackbar Snackbar
 
@@ -55,10 +56,25 @@
                     }
                 </MudSelect>
 
-                <MudTextField @bind-Value="_model.CostCenter"
-                              Label="Centro de Custo"
-                              Variant="Variant.Outlined"
-                              For="@(() => _model.CostCenter)"/>
+                <MudAutocomplete T="string"
+                                 @bind-Value="_model.CostCenter"
+                                 Label="Centro de Custo"
+                                 Variant="Variant.Outlined"
+                                 For="@(() => _model.CostCenter)"
+                                 Clearable="true"
+                                 Dense="true"
+                                 SearchFunc="@(async (string value, CancellationToken ct) =>
+                                 {
+                                     IEnumerable<string> results;
+                                     if (string.IsNullOrWhiteSpace(value))
+                                        results = _costCenterOptions;
+                                     else
+                                        results = _costCenterOptions.Where(c => c.Contains(value, StringComparison.OrdinalIgnoreCase));
+
+                                     return await Task.FromResult(results);
+                                 })"
+                                 CoerceText="true"
+                                 ToStringFunc="@(c => c ?? string.Empty)" />
 
                 @if (IsEdit)
                 {
@@ -103,6 +119,8 @@
     private bool _processing = false;
     private List<DepartmentDto>? _departments;
     private List<UserDto>? _users;
+    private List<CostCenterDto>? _costCenters;
+    private List<string> _costCenterOptions = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -120,6 +138,23 @@
         {
             _departments = await ApiService.GetAsync<List<DepartmentDto>>("api/departments");
             _users = await ApiService.GetAsync<List<UserDto>>("api/users");
+            // load cost centers (non-fatal)
+            try
+            {
+                _costCenters = await ApiService.GetAsync<List<CostCenterDto>>("api/costcenters");
+                if (_costCenters != null)
+                {
+                    _costCenterOptions = _costCenters
+                        .Select(c => string.IsNullOrWhiteSpace(c.Code) ? (c.Description ?? c.Name ?? string.Empty) : c.Code)
+                        .Where(s => !string.IsNullOrWhiteSpace(s))
+                        .Distinct()
+                        .ToList();
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Aviso: não foi possível carregar centros de custo: {ex.Message}", Severity.Warning);
+            }
         }
         catch (Exception ex)
         {

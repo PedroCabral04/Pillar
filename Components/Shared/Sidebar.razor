@@ -128,7 +128,7 @@
                         <MudNavLink Href="/inventory/products" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Category" Class="nav-subitem">Produtos</MudNavLink>
                         <MudNavLink Href="/inventory/categories" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FolderOpen" Class="nav-subitem">Categorias</MudNavLink>
                         <MudNavLink Href="/inventory/movements" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.SwapHoriz" Class="nav-subitem">Movimentações</MudNavLink>
-                        <MudNavLink Href="/inventory/counts" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Checklist" Class="nav-subitem">Contagens</MudNavLink>
+                        @*<MudNavLink Href="/inventory/counts" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Checklist" Class="nav-subitem">Contagens</MudNavLink>*@
                     </MudNavGroup>
                 }
 
@@ -170,7 +170,7 @@
                 }
                 @if (HasModuleAccess(ModuleKeys.Reports))
                 {
-                    <MudNavLink Href="/reports" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Assessment" Class="nav-item">Relatórios</MudNavLink>
+                    @*<MudNavLink Href="/reports" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Assessment" Class="nav-item">Relatórios</MudNavLink>*@
                 }
             </div>
 
@@ -264,9 +264,9 @@
                 }
                 @if (HasModuleAccess(ModuleKeys.Reports))
                 {
-                    <MudTooltip Text="Relatórios" Placement="Placement.Right" Arrow="true" Duration="200">
+                    @* <MudTooltip Text="Relatórios" Placement="Placement.Right" Arrow="true" Duration="200">
                         <MudNavLink Href="/reports" Icon="@Icons.Material.Filled.Assessment" Class="mini-nav-item" AriaLabel="Relatórios"/>
-                    </MudTooltip>
+                    </MudTooltip> *@
                 }
                 
                 <AuthorizeView Roles="Administrador">

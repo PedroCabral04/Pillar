@@ -90,6 +90,7 @@ public sealed class DemoDataSeeder
         
         // Seed asset categories
         await SeedAssetCategoriesAsync(cancellationToken);
+        await SeedAssetsAsync(cancellationToken);
 
         var customers = await SeedCustomersAsync(tenant.Id, demoUser.Id, cancellationToken);
         var suppliers = await SeedSuppliersAsync(tenant.Id, demoUser.Id, cancellationToken);
@@ -579,6 +580,54 @@ public sealed class DemoDataSeeder
         await _db.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Seeded {Count} asset categories.", categories.Count);
+    }
+
+    private async Task SeedAssetsAsync(CancellationToken cancellationToken)
+    {
+        if (await _db.Assets.AnyAsync(cancellationToken))
+        {
+            return;
+        }
+
+        var categories = await _db.AssetCategories.ToListAsync(cancellationToken);
+        if (categories.Count == 0) return;
+
+        var faker = new Faker("pt_BR");
+        var assets = new List<Asset>();
+
+        for (int i = 0; i < 5; i++)
+        {
+            var category = categories[faker.Random.Int(0, categories.Count - 1)];
+            var purchaseDate = DateTime.UtcNow.AddMonths(-faker.Random.Int(1, 36));
+
+            var asset = new Asset
+            {
+                AssetCode = $"ATV-{faker.Random.AlphaNumeric(6).ToUpper()}",
+                Name = faker.Commerce.ProductName(),
+                Description = faker.Commerce.ProductDescription(),
+                CategoryId = category.Id,
+                SerialNumber = faker.Random.AlphaNumeric(10).ToUpper(),
+                Manufacturer = faker.Company.CompanyName(),
+                Model = faker.Commerce.ProductAdjective() + " " + faker.Random.Number(100, 900),
+                PurchaseDate = purchaseDate,
+                PurchaseValue = Math.Round(faker.Random.Decimal(500, 15000), 2),
+                Status = faker.PickRandom<AssetStatus>(),
+                Condition = faker.PickRandom<AssetCondition>(),
+                Location = faker.PickRandom(new[] { "Escritório Central", "Filial SP", "Almoxarifado", "Sala de Reunião" }),
+                WarrantyExpiryDate = purchaseDate.AddYears(faker.Random.Int(1, 3)),
+                ExpectedLifespanMonths = faker.Random.Int(24, 60),
+                Notes = faker.Lorem.Sentence(),
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            };
+            
+            assets.Add(asset);
+        }
+
+        await _db.Assets.AddRangeAsync(assets, cancellationToken);
+        await _db.SaveChangesAsync(cancellationToken);
+        
+        _logger.LogInformation("Seeded {Count} assets.", assets.Count);
     }
 
     private async Task SeedAccountsPayableAsync(

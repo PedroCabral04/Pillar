@@ -396,7 +396,11 @@ public class InventoryService : IInventoryService
                 IsActive = c.IsActive,
                 CreatedAt = c.CreatedAt,
                 UpdatedAt = c.UpdatedAt,
-                SubCategories = new List<ProductCategoryDto>()
+                SubCategories = c.SubCategories.Select(sc => new ProductCategoryDto 
+                { 
+                    Id = sc.Id, 
+                    Name = sc.Name 
+                }).ToList()
             })
             .ToListAsync();
 

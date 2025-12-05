@@ -32,9 +32,37 @@ public partial class StockMovementMapper
         dto.ProductName = movement.Product?.Name ?? "";
         dto.ProductSku = movement.Product?.Sku ?? "";
         dto.WarehouseName = movement.Warehouse?.Name;
-        dto.TypeName = movement.Type.ToString();
-        dto.ReasonName = movement.Reason.ToString();
+        dto.TypeName = TranslateMovementType(movement.Type);
+        dto.ReasonName = TranslateMovementReason(movement.Reason);
         dto.CreatedByUserName = movement.CreatedByUser?.UserName ?? "";
         return dto;
+    }
+
+    private string TranslateMovementType(MovementType type)
+    {
+        return type switch
+        {
+            MovementType.In => "Entrada",
+            MovementType.Out => "Saída",
+            MovementType.Transfer => "Transferência",
+            _ => type.ToString()
+        };
+    }
+
+    private string TranslateMovementReason(MovementReason reason)
+    {
+        return reason switch
+        {
+            MovementReason.Purchase => "Compra",
+            MovementReason.Sale => "Venda",
+            MovementReason.Return => "Devolução",
+            MovementReason.Adjustment => "Ajuste",
+            MovementReason.Production => "Produção",
+            MovementReason.Loss => "Perda",
+            MovementReason.Donation => "Doação",
+            MovementReason.Transfer => "Transferência",
+            MovementReason.InitialBalance => "Saldo Inicial",
+            _ => reason.ToString()
+        };
     }
 }
