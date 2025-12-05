@@ -86,7 +86,7 @@
                         <MudButton OnClick="NextStep" Variant="Variant.Filled" Color="MudBlazor.Color.Primary" Disabled="@_isProcessing">
                             @if (_isProcessing)
                             {
-                                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true"/>
+                                <MudProgressCircular Class="ms-n1" Size="MudBlazor.Size.Small" Indeterminate="true"/>
                                 <MudText Class="ms-2">Processando</MudText>
                             }
                             else
@@ -100,7 +100,7 @@
                         <MudButton OnClick="CompleteTour" Variant="Variant.Filled" Color="MudBlazor.Color.Success" Disabled="@_isProcessing">
                             @if (_isProcessing)
                             {
-                                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true"/>
+                                <MudProgressCircular Class="ms-n1" Size="MudBlazor.Size.Small" Indeterminate="true"/>
                                 <MudText Class="ms-2">Processando</MudText>
                             }
                             else

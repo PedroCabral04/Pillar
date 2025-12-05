@@ -32,7 +32,7 @@ public sealed class DemoSeedOptions
 public sealed class DemoDataSeeder
 {
     private static readonly string[] PaymentMethods = ["Pix", "Boleto", "Cartão de Crédito", "Cartão de Débito"];
-    private static readonly string[] SaleStatuses = ["Confirmada", "Pendente", "Enviada", "Finalizada"];
+    private static readonly string[] SaleStatuses = ["Pendente", "Finalizada"];
 
     private readonly ApplicationDbContext _db;
     private readonly UserManager<ApplicationUser> _userManager;
@@ -887,6 +887,7 @@ public sealed class DemoDataSeeder
             .RuleFor(p => p.Length, f => Math.Round(f.Random.Decimal(5m, 120m), 2))
             .RuleFor(p => p.Width, f => Math.Round(f.Random.Decimal(5m, 80m), 2))
             .RuleFor(p => p.Height, f => Math.Round(f.Random.Decimal(2m, 60m), 2))
+            .RuleFor(p => p.CurrentStock, f => f.Random.Int(1, 10))
             .RuleFor(p => p.MinimumStock, f => Math.Round(f.Random.Decimal(5, 50), 2))
             .RuleFor(p => p.MaximumStock, (f, p) => p.MinimumStock + Math.Round(f.Random.Decimal(20, 200), 2))
             .RuleFor(p => p.ReorderPoint, (f, p) => Math.Round(p.MinimumStock * 0.7m, 2))

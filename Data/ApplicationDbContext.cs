@@ -10,6 +10,7 @@ using erp.Models.Dashboard;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using System.Reflection;
 using System.Text.Json;
 
@@ -106,6 +107,15 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     {
         _httpContextAccessor = httpContextAccessor;
         _tenantContextAccessor = tenantContextAccessor;
+    }
+
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        configurationBuilder.Properties<DateTime>()
+            .HaveConversion<DateTimeToUtcConverter>();
+
+        configurationBuilder.Properties<DateTime?>()
+            .HaveConversion<NullableDateTimeToUtcConverter>();
     }
 
     protected override void OnConfiguring(DbContextOptionsBuilder options)
@@ -2185,5 +2195,21 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }
+}
+
+public class DateTimeToUtcConverter : ValueConverter<DateTime, DateTime>
+{
+    public DateTimeToUtcConverter() : base(
+        v => v.ToUniversalTime(),
+        v => DateTime.SpecifyKind(v, DateTimeKind.Utc))
+    { }
+}
+
+public class NullableDateTimeToUtcConverter : ValueConverter<DateTime?, DateTime?>
+{
+    public NullableDateTimeToUtcConverter() : base(
+        v => v.HasValue ? v.Value.ToUniversalTime() : v,
+        v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v)
+    { }
 }
 

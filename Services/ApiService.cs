@@ -255,7 +255,8 @@ public class ApiService : IApiService
         
         // If not successful, throw exception with error details
         var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-        throw new HttpRequestException($"Request failed with status {response.StatusCode}: {errorContent}");
+        var errorMessage = ExtractErrorMessage(errorContent);
+        throw new HttpRequestException(errorMessage ?? $"Request failed with status {response.StatusCode}: {errorContent}");
     }
 
     public async Task<T?> PutAsync<T>(string endpoint, object data, CancellationToken cancellationToken = default)
@@ -273,7 +274,8 @@ public class ApiService : IApiService
         
         // If not successful, throw exception with error details
         var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-        throw new HttpRequestException($"Request failed with status {response.StatusCode}: {errorContent}");
+        var errorMessage = ExtractErrorMessage(errorContent);
+        throw new HttpRequestException(errorMessage ?? $"Request failed with status {response.StatusCode}: {errorContent}");
     }
 
     public async Task<HttpResponseMessage> PostAsync(string endpoint, object? data, CancellationToken cancellationToken = default)
@@ -325,7 +327,8 @@ public class ApiService : IApiService
         }
 
         var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-        throw new HttpRequestException($"Request failed with status {response.StatusCode}: {errorContent}");
+        var errorMessage = ExtractErrorMessage(errorContent);
+        throw new HttpRequestException(errorMessage ?? $"Request failed with status {response.StatusCode}: {errorContent}");
     }
 
     public async Task<HttpResponseMessage> PostMultipartAsync(string endpoint, MultipartFormDataContent content, CancellationToken cancellationToken = default)
@@ -416,6 +419,23 @@ public class ApiService : IApiService
         }
 
         throw lastException ?? new Exception($"Falha ao executar requisição para {endpoint} após {maxRetries} tentativas");
+    }
+
+    private string? ExtractErrorMessage(string content)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(content);
+            if (doc.RootElement.TryGetProperty("message", out var msg))
+            {
+                return msg.GetString();
+            }
+        }
+        catch
+        {
+            // Ignore parsing errors
+        }
+        return null;
     }
 
     /// <summary>
