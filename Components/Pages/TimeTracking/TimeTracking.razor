@@ -23,14 +23,13 @@
         <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
             <MudText Typo="Typo.h5">Apontamento</MudText>
             <MudSpacer />
-            <MudSelect T="int" Label="Mês" @bind-Value="_selectedMonth" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 150px">
+            <MudSelect T="int" Label="Mês" Value="@_selectedMonth" ValueChanged="@(async (int v) => await OnMonthChanged(v))" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 150px">
                 @foreach (var month in _months)
                 {
                     <MudSelectItem Value="@month.Value">@month.Label</MudSelectItem>
                 }
             </MudSelect>
-            <MudNumericField T="int" Label="Ano" @bind-Value="_selectedYear" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 100px" Min="2000" Max="2100" />
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadPeriodAsync" StartIcon="@Icons.Material.Filled.Search">Buscar</MudButton>
+            <MudNumericField T="int" Label="Ano" Value="@_selectedYear" ValueChanged="@(async (int v) => await OnYearChanged(v))" Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 100px" Min="2000" Max="2100" />
             <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="CreatePeriodAsync" StartIcon="@Icons.Material.Filled.Add">Novo Período</MudButton>
         </MudStack>
     </MudPaper>
@@ -164,6 +163,20 @@
             Logger.LogError(ex, "Erro ao criar período");
             Snackbar.Add($"Erro ao criar período: {ex.Message}", Severity.Error);
         }
+    }
+
+    private async Task OnMonthChanged(int month)
+    {
+        if (_selectedMonth != month)
+            _selectedMonth = month;
+        await LoadPeriodAsync();
+    }
+
+    private async Task OnYearChanged(int year)
+    {
+        if (_selectedYear != year)
+            _selectedYear = year;
+        await LoadPeriodAsync();
     }
 
     private async Task SaveChanges()

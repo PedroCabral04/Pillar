@@ -29,17 +29,6 @@
                 Filtros
             </MudText>
             <MudSpacer />
-            <MudChipSet T="string" SelectionMode="SelectionMode.MultiSelection" @bind-SelectedValues="_selectedQuickFilters">
-                <MudChip Text="overdue" Value="@("overdue")" Color="MudBlazor.Color.Error" Variant="Variant.Outlined">
-                    Vencidas
-                </MudChip>
-                <MudChip Text="due7" Value="@("due7")" Color="MudBlazor.Color.Warning" Variant="Variant.Outlined">
-                    Vencendo em 7 dias
-                </MudChip>
-                <MudChip Text="pending" Value="@("pending")" Color="MudBlazor.Color.Info" Variant="Variant.Outlined">
-                    Pendentes
-                </MudChip>
-            </MudChipSet>
         </MudStack>
 
         <MudGrid Spacing="2">
@@ -343,6 +332,12 @@
     private void OnFilterChanged()
     {
         _table?.ReloadServerData();
+    }
+
+    private void OnQuickFiltersChanged(IReadOnlyCollection<string> values)
+    {
+        _selectedQuickFilters = values ?? new List<string>();
+        OnFilterChanged();
     }
 
     private async Task RefreshTable()

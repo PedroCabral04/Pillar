@@ -2027,10 +2027,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         {
             e.ToTable("PayrollEntries");
             e.HasKey(x => x.Id);
-            e.Property(x => x.Faltas).HasColumnType("decimal(5,2)");
-            e.Property(x => x.Abonos).HasColumnType("decimal(5,2)");
-            e.Property(x => x.HorasExtras).HasColumnType("decimal(5,2)");
-            e.Property(x => x.Atrasos).HasColumnType("decimal(5,2)");
+            e.Property(x => x.Faltas).HasColumnType("decimal(18,2)");
+            e.Property(x => x.Abonos).HasColumnType("decimal(18,2)");
+            e.Property(x => x.HorasExtras).HasColumnType("decimal(18,2)");
+            e.Property(x => x.Atrasos).HasColumnType("decimal(18,2)");
             e.Property(x => x.Observacoes).HasMaxLength(1000);
             e.Property(x => x.CreatedAt).IsRequired();
 

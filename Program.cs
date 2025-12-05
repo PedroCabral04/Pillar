@@ -549,6 +549,22 @@ using (var scope = app.Services.CreateScope())
 
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         
+        // --- HOTFIX: Increase PayrollEntry precision ---
+        try
+        {
+            await db.Database.ExecuteSqlRawAsync(@"
+                ALTER TABLE ""PayrollEntries"" ALTER COLUMN ""HorasExtras"" TYPE numeric(18,2);
+                ALTER TABLE ""PayrollEntries"" ALTER COLUMN ""Faltas"" TYPE numeric(18,2);
+                ALTER TABLE ""PayrollEntries"" ALTER COLUMN ""Atrasos"" TYPE numeric(18,2);
+                ALTER TABLE ""PayrollEntries"" ALTER COLUMN ""Abonos"" TYPE numeric(18,2);
+            ");
+            Console.WriteLine("[Hotfix] PayrollEntry precision increased.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Hotfix] Error increasing precision (might be already applied): {ex.Message}");
+        }
+        
         // --- AUTO-FIX: Baseline migrations if missing (Self-Healing for Coolify) ---
         try 
         {
