@@ -22,7 +22,7 @@ public class SystemPlugin
             | 🛒 **Vendas** | Listar recentes, criar vendas, consultar totais |
             | 👥 **Clientes** | Buscar, cadastrar, consultar histórico |
             | 🏢 **Fornecedores** | Buscar, cadastrar, consultar CNPJ/CEP |
-            | 💳 **Financeiro** | Contas a pagar/receber, fluxo de caixa |
+            | 💳 **Financeiro** | Contas a pagar/receber, fluxo de caixa, categorias |
             | 🖥️ **Ativos** | Listar, buscar, manutenções, estatísticas |
             | 💼 **Folha** | Períodos, resumos mensais/anuais |
             | 👔 **RH** | Buscar funcionários, listar departamentos |

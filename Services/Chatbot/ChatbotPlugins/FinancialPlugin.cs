@@ -2,6 +2,7 @@ using System.ComponentModel;
 using Microsoft.SemanticKernel;
 using erp.Services.Financial;
 using erp.Models.Financial;
+using erp.DTOs.Financial;
 
 namespace erp.Services.Chatbot.ChatbotPlugins;
 
@@ -9,16 +10,19 @@ public class FinancialPlugin
 {
     private readonly IAccountPayableService _payableService;
     private readonly IAccountReceivableService _receivableService;
+    private readonly IFinancialCategoryService _categoryService;
     private readonly IChatbotCacheService _cacheService;
     private const string PluginName = "FinancialPlugin";
 
     public FinancialPlugin(
         IAccountPayableService payableService,
         IAccountReceivableService receivableService,
+        IFinancialCategoryService categoryService,
         IChatbotCacheService cacheService)
     {
         _payableService = payableService;
         _receivableService = receivableService;
+        _categoryService = categoryService;
         _cacheService = cacheService;
     }
 
@@ -152,5 +156,73 @@ public class FinancialPlugin
         
         _cacheService.SetPluginData(PluginName, nameof(GetCashFlowSummary), response);
         return response;
+    }
+
+    [KernelFunction, Description("Lista as categorias financeiras (receitas ou despesas)")]
+    public async Task<string> GetFinancialCategories(
+        [Description("O tipo de categoria para filtrar: 'receita', 'despesa' ou vazio para todas")] string? type = null)
+    {
+        var cacheKey = $"{nameof(GetFinancialCategories)}_{type ?? "all"}";
+        var cachedResult = _cacheService.GetPluginData<string>(PluginName, cacheKey);
+        if (cachedResult != null)
+        {
+            return cachedResult;
+        }
+
+        List<FinancialCategoryDto> categories;
+
+        if (!string.IsNullOrWhiteSpace(type))
+        {
+            var normalizedType = type.ToLower().Trim();
+            if (normalizedType.Contains("receita") || normalizedType.Contains("entrada"))
+            {
+                categories = await _categoryService.GetByTypeAsync(CategoryType.Revenue);
+            }
+            else if (normalizedType.Contains("despesa") || normalizedType.Contains("saida") || normalizedType.Contains("saída"))
+            {
+                categories = await _categoryService.GetByTypeAsync(CategoryType.Expense);
+            }
+            else
+            {
+                categories = await _categoryService.GetAllAsync();
+            }
+        }
+        else
+        {
+            categories = await _categoryService.GetAllAsync();
+        }
+
+        if (!categories.Any())
+        {
+            return "Não encontrei nenhuma categoria financeira cadastrada.";
+        }
+
+        var result = "📂 **Categorias Financeiras**\n\n";
+        
+        // Group by type if showing all
+        var revenues = categories.Where(c => c.Type == CategoryType.Revenue).ToList();
+        var expenses = categories.Where(c => c.Type == CategoryType.Expense).ToList();
+
+        if (revenues.Any())
+        {
+            result += "**Receitas:**\n";
+            foreach (var cat in revenues)
+            {
+                result += $"- {cat.Name}\n";
+            }
+            result += "\n";
+        }
+
+        if (expenses.Any())
+        {
+            result += "**Despesas:**\n";
+            foreach (var cat in expenses)
+            {
+                result += $"- {cat.Name}\n";
+            }
+        }
+
+        _cacheService.SetPluginData(PluginName, cacheKey, result);
+        return result;
     }
 }
