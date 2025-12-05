@@ -1,0 +1,196 @@
+@using erp.DTOs.Assets
+@using erp.Services
+@using MudBlazor
+@using Size = MudBlazor.Size
+@using Color = MudBlazor.Color
+
+@inject IApiService ApiService
+@inject ILogger<AssetCategoryDialog> Logger
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Category" Color="Color.Primary" Size="Size.Large" />
+            <MudText Typo="Typo.h6">@(IsEditMode ? "Editar Categoria" : "Nova Categoria")</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" Model="_model" Class="pa-2">
+            <MudStack Spacing="3">
+                <MudTextField @bind-Value="_model.Name"
+                              Label="Nome da Categoria"
+                              Required="true"
+                              RequiredError="Nome é obrigatório"
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Label"
+                              HelperText="Ex: Computadores, Móveis, Veículos" />
+
+                <MudTextField @bind-Value="_model.Description"
+                              Label="Descrição"
+                              Variant="Variant.Outlined"
+                              Lines="2"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Description"
+                              HelperText="Descrição opcional da categoria" />
+
+                <MudSelect T="string" @bind-Value="_model.Icon"
+                           Label="Ícone"
+                           Variant="Variant.Outlined"
+                           Adornment="Adornment.Start"
+                           AdornmentIcon="@(_model.Icon ?? Icons.Material.Filled.Category)"
+                           HelperText="Selecione um ícone representativo">
+                    @foreach (var iconOption in _iconOptions)
+                    {
+                        <MudSelectItem T="string" Value="@iconOption.Value">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                <MudIcon Icon="@iconOption.Value" Size="Size.Small" />
+                                <MudText>@iconOption.Label</MudText>
+                            </MudStack>
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+
+                @if (IsEditMode)
+                {
+                    <MudSwitch @bind-Value="_isActive"
+                               Label="Categoria Ativa"
+                               Color="Color.Success" />
+                }
+
+                <MudAlert Severity="Severity.Info" Variant="Variant.Text" Dense="true">
+                    <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Class="mr-1" />
+                    Categorias ajudam a organizar e filtrar seus ativos.
+                </MudAlert>
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Close">
+            Cancelar
+        </MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save" 
+                   Disabled="_saving" StartIcon="@(_saving ? null : Icons.Material.Filled.Save)">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <text>Salvando...</text>
+            }
+            else
+            {
+                <text>Salvar</text>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public AssetCategoryDto? Category { get; set; }
+
+    private bool IsEditMode => Category != null;
+    private MudForm? _form;
+    private CreateAssetCategoryDto _model = new();
+    private bool _isActive = true;
+    private bool _saving = false;
+
+    // Preset MudBlazor icons for asset categories
+    private readonly List<(string Value, string Label)> _iconOptions = new()
+    {
+        (Icons.Material.Filled.Computer, "Computadores"),
+        (Icons.Material.Filled.Laptop, "Notebooks"),
+        (Icons.Material.Filled.PhoneAndroid, "Celulares"),
+        (Icons.Material.Filled.Tablet, "Tablets"),
+        (Icons.Material.Filled.Monitor, "Monitores"),
+        (Icons.Material.Filled.Print, "Impressoras"),
+        (Icons.Material.Filled.Keyboard, "Periféricos"),
+        (Icons.Material.Filled.Router, "Rede/Infraestrutura"),
+        (Icons.Material.Filled.Storage, "Servidores/Storage"),
+        (Icons.Material.Filled.Chair, "Mobiliário"),
+        (Icons.Material.Filled.Desk, "Mesas"),
+        (Icons.Material.Filled.Weekend, "Sofás/Poltronas"),
+        (Icons.Material.Filled.DirectionsCar, "Veículos"),
+        (Icons.Material.Filled.LocalShipping, "Caminhões"),
+        (Icons.Material.Filled.TwoWheeler, "Motos"),
+        (Icons.Material.Filled.Construction, "Ferramentas"),
+        (Icons.Material.Filled.Handyman, "Equipamentos Manuais"),
+        (Icons.Material.Filled.ElectricalServices, "Equipamentos Elétricos"),
+        (Icons.Material.Filled.AcUnit, "Ar Condicionado"),
+        (Icons.Material.Filled.Kitchen, "Eletrodomésticos"),
+        (Icons.Material.Filled.CoffeeMaker, "Copa/Cozinha"),
+        (Icons.Material.Filled.CleaningServices, "Limpeza"),
+        (Icons.Material.Filled.MedicalServices, "Equipamentos Médicos"),
+        (Icons.Material.Filled.Science, "Laboratório"),
+        (Icons.Material.Filled.Videocam, "Audiovisual"),
+        (Icons.Material.Filled.CameraAlt, "Câmeras"),
+        (Icons.Material.Filled.Headphones, "Áudio"),
+        (Icons.Material.Filled.Security, "Segurança"),
+        (Icons.Material.Filled.Category, "Outros"),
+    };
+
+    protected override void OnInitialized()
+    {
+        if (Category != null)
+        {
+            _model = new CreateAssetCategoryDto
+            {
+                Name = Category.Name,
+                Description = Category.Description,
+                Icon = Category.Icon
+            };
+            _isActive = Category.IsActive;
+        }
+        else
+        {
+            // Default icon for new categories
+            _model.Icon = Icons.Material.Filled.Category;
+        }
+    }
+
+    private async Task Save()
+    {
+        await _form!.Validate();
+        if (!_form.IsValid)
+        {
+            return;
+        }
+
+        _saving = true;
+
+        try
+        {
+            if (IsEditMode)
+            {
+                var updateDto = new UpdateAssetCategoryDto
+                {
+                    Name = _model.Name,
+                    Description = _model.Description,
+                    Icon = _model.Icon,
+                    IsActive = _isActive
+                };
+
+                await ApiService.PutAsync<AssetCategoryDto>($"/api/assets/categories/{Category!.Id}", updateDto);
+                Snackbar.Add("Categoria atualizada com sucesso!", Severity.Success);
+            }
+            else
+            {
+                await ApiService.PostAsync<AssetCategoryDto>("/api/assets/categories", _model);
+                Snackbar.Add("Categoria criada com sucesso!", Severity.Success);
+            }
+
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao salvar categoria");
+            Snackbar.Add($"Erro ao salvar categoria: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

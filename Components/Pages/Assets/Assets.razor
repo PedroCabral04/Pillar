@@ -3,6 +3,7 @@
 @using erp.Services
 @using erp.Services.Authorization
 @using erp.Components.Pages.Assets
+@using erp.Components.Shared.Dialogs.Assets
 @using erp.Models
 @using MudBlazor
 @using Size = MudBlazor.Size
@@ -179,6 +180,26 @@
                     <MudText Typo="Typo.body2">@(context.Location ?? "-")</MudText>
                 </MudTd>
                 <MudTd DataLabel="Ações" Style="text-align: center">
+                    @if (context.Status == AssetStatus.Available && context.CurrentAssignmentId == null)
+                    {
+                        <MudTooltip Text="Atribuir a usuário">
+                            <MudIconButton Icon="@Icons.Material.Filled.PersonAdd" 
+                                        Size="Size.Small"
+                                        Color="Color.Success"
+                                        OnClick="@(() => OpenAssignDialog(context))"
+                                        aria-label="@($"Atribuir ativo {context.Name} a um usuário")" />
+                        </MudTooltip>
+                    }
+                    else if (context.CurrentAssignmentId != null)
+                    {
+                        <MudTooltip Text="Registrar devolução">
+                            <MudIconButton Icon="@Icons.Material.Filled.AssignmentReturn" 
+                                        Size="Size.Small"
+                                        Color="Color.Warning"
+                                        OnClick="@(() => OpenReturnDialog(context))"
+                                        aria-label="@($"Registrar devolução do ativo {context.Name}")" />
+                        </MudTooltip>
+                    }
                     <MudTooltip Text="Ver detalhes">
                         <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
                                     Size="Size.Small"
@@ -402,4 +423,59 @@
         AssetCondition.Damaged => "Danificado",
         _ => condition.ToString()
     };
+
+    private async Task OpenAssignDialog(AssetDto asset)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Asset", asset }
+        };
+
+        var options = new DialogOptions 
+        { 
+            CloseButton = true, 
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true 
+        };
+
+        var dialog = await DialogService.ShowAsync<AssetAssignmentDialog>("Atribuir Ativo", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await LoadStatistics();
+            await LoadAssets();
+        }
+    }
+
+    private async Task OpenReturnDialog(AssetDto asset)
+    {
+        if (!asset.CurrentAssignmentId.HasValue)
+        {
+            Snackbar.Add("Este ativo não está atribuído a nenhum usuário", Severity.Warning);
+            return;
+        }
+
+        var parameters = new DialogParameters
+        {
+            { "Asset", asset },
+            { "AssignmentId", asset.CurrentAssignmentId.Value }
+        };
+
+        var options = new DialogOptions 
+        { 
+            CloseButton = true, 
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true 
+        };
+
+        var dialog = await DialogService.ShowAsync<AssetReturnDialog>("Devolver Ativo", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await LoadStatistics();
+            await LoadAssets();
+        }
+    }
 }

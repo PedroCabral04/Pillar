@@ -1544,7 +1544,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             c.HasKey(x => x.Id);
             c.Property(x => x.Name).HasMaxLength(100).IsRequired();
             c.Property(x => x.Description).HasMaxLength(500);
-            c.Property(x => x.Icon).HasMaxLength(50);
+            c.Property(x => x.Icon).HasMaxLength(500); // MudBlazor icons are SVG paths, need more space
+            c.Property(x => x.CreatedAt).HasConversion(
+                v => v.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : v.ToUniversalTime(),
+                v => v);
             
             c.HasIndex(x => x.Name);
             c.HasIndex(x => x.IsActive);
@@ -1566,6 +1569,18 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             a.Property(x => x.Notes).HasMaxLength(2000);
             a.Property(x => x.ImageUrl).HasMaxLength(500);
             a.Property(x => x.PurchaseValue).HasPrecision(18, 2);
+            a.Property(x => x.PurchaseDate).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
+            a.Property(x => x.WarrantyExpiryDate).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
+            a.Property(x => x.CreatedAt).HasConversion(
+                v => v.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : v.ToUniversalTime(),
+                v => v);
+            a.Property(x => x.UpdatedAt).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
             
             a.HasIndex(x => x.AssetCode).IsUnique();
             a.HasIndex(x => x.SerialNumber);
@@ -1587,6 +1602,18 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             aa.HasKey(x => x.Id);
             aa.Property(x => x.AssignmentNotes).HasMaxLength(1000);
             aa.Property(x => x.ReturnNotes).HasMaxLength(1000);
+            aa.Property(x => x.AssignedDate).HasConversion(
+                v => v.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : v.ToUniversalTime(),
+                v => v);
+            aa.Property(x => x.ReturnedDate).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
+            aa.Property(x => x.CreatedAt).HasConversion(
+                v => v.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : v.ToUniversalTime(),
+                v => v);
+            aa.Property(x => x.UpdatedAt).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
             
             aa.HasIndex(x => x.AssetId);
             aa.HasIndex(x => x.AssignedToUserId);
@@ -1626,6 +1653,24 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             am.Property(x => x.InvoiceNumber).HasMaxLength(50);
             am.Property(x => x.Notes).HasMaxLength(2000);
             am.Property(x => x.Cost).HasPrecision(18, 2);
+            am.Property(x => x.ScheduledDate).HasConversion(
+                v => v.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : v.ToUniversalTime(),
+                v => v);
+            am.Property(x => x.StartedDate).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
+            am.Property(x => x.CompletedDate).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
+            am.Property(x => x.NextMaintenanceDate).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
+            am.Property(x => x.CreatedAt).HasConversion(
+                v => v.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : v.ToUniversalTime(),
+                v => v);
+            am.Property(x => x.UpdatedAt).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
             
             am.HasIndex(x => x.AssetId);
             am.HasIndex(x => x.Type);
@@ -1661,6 +1706,18 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             ad.Property(x => x.ContentType).HasMaxLength(200).IsRequired();
             ad.Property(x => x.Description).HasMaxLength(1000);
             ad.Property(x => x.DocumentNumber).HasMaxLength(100);
+            ad.Property(x => x.DocumentDate).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
+            ad.Property(x => x.ExpiryDate).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
+            ad.Property(x => x.CreatedAt).HasConversion(
+                v => v.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : v.ToUniversalTime(),
+                v => v);
+            ad.Property(x => x.UpdatedAt).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
             
             ad.HasIndex(x => x.AssetId);
             ad.HasIndex(x => x.Type);
@@ -1688,6 +1745,21 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             at.Property(x => x.ToLocation).HasMaxLength(200).IsRequired();
             at.Property(x => x.Reason).HasMaxLength(1000);
             at.Property(x => x.Notes).HasMaxLength(2000);
+            at.Property(x => x.TransferDate).HasConversion(
+                v => v.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : v.ToUniversalTime(),
+                v => v);
+            at.Property(x => x.ApprovedDate).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
+            at.Property(x => x.CompletedDate).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
+            at.Property(x => x.CreatedAt).HasConversion(
+                v => v.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : v.ToUniversalTime(),
+                v => v);
+            at.Property(x => x.UpdatedAt).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
             
             at.HasIndex(x => x.AssetId);
             at.HasIndex(x => x.FromDepartmentId);
@@ -2114,3 +2186,4 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         });
     }
 }
+

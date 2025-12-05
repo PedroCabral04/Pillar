@@ -42,6 +42,7 @@ public class AccountReceivableDao : IAccountReceivableDao
     public async Task<AccountReceivable?> GetByIdAsync(int id)
     {
         return await _context.AccountsReceivable
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .FirstOrDefaultAsync(a => a.Id == id);
     }
@@ -49,6 +50,7 @@ public class AccountReceivableDao : IAccountReceivableDao
     public async Task<AccountReceivable?> GetByIdWithRelationsAsync(int id)
     {
         return await _context.AccountsReceivable
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Include(a => a.Customer)
             .Include(a => a.Category)
@@ -62,6 +64,7 @@ public class AccountReceivableDao : IAccountReceivableDao
     public async Task<List<AccountReceivable>> GetAllAsync()
     {
         return await _context.AccountsReceivable
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Include(a => a.Customer)
             .OrderByDescending(a => a.CreatedAt)
@@ -81,6 +84,7 @@ public class AccountReceivableDao : IAccountReceivableDao
         bool sortDescending = false)
     {
         var query = _context.AccountsReceivable
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Include(a => a.Customer)
             .Include(a => a.Category)
@@ -129,6 +133,7 @@ public class AccountReceivableDao : IAccountReceivableDao
     public async Task<List<AccountReceivable>> GetOverdueAsync()
     {
         return await _context.AccountsReceivable
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Include(a => a.Customer)
             .Where(a => a.DueDate < DateTime.UtcNow && a.Status == AccountStatus.Pending)
@@ -140,6 +145,7 @@ public class AccountReceivableDao : IAccountReceivableDao
     {
         var targetDate = DateTime.UtcNow.AddDays(days);
         return await _context.AccountsReceivable
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Include(a => a.Customer)
             .Where(a => a.DueDate >= DateTime.UtcNow && a.DueDate <= targetDate && a.Status == AccountStatus.Pending)
@@ -150,6 +156,7 @@ public class AccountReceivableDao : IAccountReceivableDao
     public async Task<decimal> GetTotalByStatusAsync(AccountStatus status)
     {
         return await _context.AccountsReceivable
+            .IgnoreQueryFilters()
             .Where(a => a.Status == status)
             .SumAsync(a => a.OriginalAmount - a.DiscountAmount + a.InterestAmount + a.FineAmount);
     }
@@ -157,6 +164,7 @@ public class AccountReceivableDao : IAccountReceivableDao
     public async Task<decimal> GetTotalByCustomerAsync(int customerId)
     {
         return await _context.AccountsReceivable
+            .IgnoreQueryFilters()
             .Where(a => a.CustomerId == customerId && a.Status != AccountStatus.Paid)
             .SumAsync(a => a.OriginalAmount - a.DiscountAmount + a.InterestAmount + a.FineAmount - a.PaidAmount);
     }
@@ -164,6 +172,7 @@ public class AccountReceivableDao : IAccountReceivableDao
     public async Task<List<AccountReceivable>> GetInstallmentsAsync(int parentAccountId)
     {
         return await _context.AccountsReceivable
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(a => a.ParentAccountId == parentAccountId)
             .OrderBy(a => a.InstallmentNumber)

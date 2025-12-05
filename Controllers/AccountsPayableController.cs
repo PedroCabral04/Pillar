@@ -72,10 +72,10 @@ public class AccountsPayableController : ControllerBase
     {
         try
         {
-            var result = await _accountPayableService.GetPagedAsync(
+            var (items, totalCount) = await _accountPayableService.GetPagedAsync(
                 page, pageSize, supplierId, status, dueDateFrom, dueDateTo,
                 categoryId, costCenterId, pendingApproval, sortBy, sortDescending);
-            return Ok(result);
+            return Ok(new { Items = items, TotalCount = totalCount });
         }
         catch (Exception ex)
         {

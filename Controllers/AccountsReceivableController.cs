@@ -41,10 +41,10 @@ public class AccountsReceivableController : ControllerBase
     {
         try
         {
-            var result = await _accountReceivableService.GetPagedAsync(
+            var (items, totalCount) = await _accountReceivableService.GetPagedAsync(
                 page, pageSize, customerId, status, dueDateFrom, dueDateTo,
                 categoryId, costCenterId, sortBy, sortDescending);
-            return Ok(result);
+            return Ok(new { Items = items, TotalCount = totalCount });
         }
         catch (Exception ex)
         {
