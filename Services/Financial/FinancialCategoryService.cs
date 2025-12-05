@@ -32,7 +32,7 @@ public class FinancialCategoryService : IFinancialCategoryService
     public async Task<List<FinancialCategoryDto>> GetAllAsync(bool activeOnly = true)
     {
         var entities = await _dao.GetAllAsync(activeOnly);
-        return entities.Select(x => _mapper.ToDto(x)).ToList();
+        return entities.Select(x => _mapper.ToDtoWithRelations(x)).ToList();
     }
 
     public async Task<FinancialCategoryDto?> GetByIdAsync(int id)
@@ -44,7 +44,7 @@ public class FinancialCategoryService : IFinancialCategoryService
     public async Task<List<FinancialCategoryDto>> GetByTypeAsync(CategoryType type, bool activeOnly = true)
     {
         var entities = await _dao.GetByTypeAsync(type, activeOnly);
-        return entities.Select(x => _mapper.ToDto(x)).ToList();
+        return entities.Select(x => _mapper.ToDtoWithRelations(x)).ToList();
     }
 
     public async Task<List<FinancialCategoryDto>> GetRootCategoriesAsync(CategoryType? type = null)

@@ -45,7 +45,9 @@ public class FinancialCategoryDao : IFinancialCategoryDao
 
     public async Task<List<FinancialCategory>> GetAllAsync(bool activeOnly = true)
     {
-        var query = _context.FinancialCategories.AsNoTracking();
+        var query = _context.FinancialCategories
+            .AsNoTracking()
+            .Include(c => c.ParentCategory);
 
         if (activeOnly)
             query = query.Where(c => c.IsActive);
@@ -59,6 +61,7 @@ public class FinancialCategoryDao : IFinancialCategoryDao
     {
         var query = _context.FinancialCategories
             .AsNoTracking()
+            .Include(c => c.ParentCategory)
             .Where(c => c.Type == type);
 
         if (activeOnly)

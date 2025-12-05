@@ -142,7 +142,7 @@
     {
         try
         {
-            var allCostCenters = await ApiService.GetAsync<List<CostCenterDto>>("api/cost-centers") ?? new();
+            var allCostCenters = await ApiService.GetAsync<List<CostCenterDto>>("api/CostCenters") ?? new();
             
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
@@ -194,7 +194,7 @@
         {
             try
             {
-                await ApiService.PostAsync<CostCenterDto>("api/cost-centers", dto);
+                await ApiService.PostAsync<CostCenterDto>("api/CostCenters", dto);
                 Snackbar.Add("Centro de custo criado com sucesso", Severity.Success);
                 await LoadCostCenters();
             }
@@ -240,7 +240,7 @@
                     IsActive = dto.IsActive
                 };
 
-                await ApiService.PutAsync($"api/cost-centers/{costCenter.Id}", updateDto);
+                await ApiService.PutAsync($"api/CostCenters/{costCenter.Id}", updateDto);
                 Snackbar.Add("Centro de custo atualizado com sucesso", Severity.Success);
                 await LoadCostCenters();
             }
@@ -266,7 +266,7 @@
         {
             try
             {
-                await ApiService.DeleteAsync($"api/cost-centers/{costCenter.Id}");
+                await ApiService.DeleteAsync($"api/CostCenters/{costCenter.Id}");
                 Snackbar.Add("Centro de custo excluído com sucesso", Severity.Success);
                 await LoadCostCenters();
             }
@@ -281,7 +281,7 @@
     {
         try
         {
-            await ApiService.PatchAsync<object>($"api/cost-centers/{costCenter.Id}/toggle-active", null);
+            await ApiService.PatchAsync<object>($"api/CostCenters/{costCenter.Id}/toggle-active", null);
             costCenter.IsActive = !costCenter.IsActive;
             // No need to reload everything, just toggle UI state
         }
