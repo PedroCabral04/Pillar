@@ -104,7 +104,6 @@
                 <MudTh><MudTableSortLabel SortLabel="duedate" T="AccountPayableDto">Vencimento</MudTableSortLabel></MudTh>
                 <MudTh><MudTableSortLabel SortLabel="amount" T="AccountPayableDto">Valor Líquido</MudTableSortLabel></MudTh>
                 <MudTh><MudTableSortLabel SortLabel="status" T="AccountPayableDto">Status</MudTableSortLabel></MudTh>
-                <MudTh>Aprovação</MudTh>
                 <MudTh Style="width: 180px;">Ações</MudTh>
             </HeaderContent>
             <RowTemplate>
@@ -140,27 +139,6 @@
                 <MudTd DataLabel="Valor Líquido">@Currency.Format(context.NetAmount)</MudTd>
                 <MudTd DataLabel="Status">
                     <AccountStatusChip Status="@context.Status" DaysOverdue="@context.DaysOverdue" />
-                </MudTd>
-                <MudTd DataLabel="Aprovação">
-                    @if (context.RequiresApproval)
-                    {
-                        @if (context.ApprovedByUserId.HasValue)
-                        {
-                            <MudTooltip Text="@($"Aprovado por {context.ApprovedByUserName}")">
-                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="MudBlazor.Color.Success" Size="Size.Small" />
-                            </MudTooltip>
-                        }
-                        else
-                        {
-                            <MudTooltip Text="Aguardando aprovação">
-                                <MudIcon Icon="@Icons.Material.Filled.HourglassEmpty" Color="MudBlazor.Color.Warning" Size="Size.Small" />
-                            </MudTooltip>
-                        }
-                    }
-                    else
-                    {
-                        <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">-</MudText>
-                    }
                 </MudTd>
                 <MudTd DataLabel="Ações">
                     <MudStack Row="true" Spacing="0">

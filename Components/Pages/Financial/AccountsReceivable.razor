@@ -104,7 +104,6 @@
                 <MudTh>Nº Nota</MudTh>
                 <MudTh><MudTableSortLabel SortLabel="duedate" T="AccountReceivableDto">Vencimento</MudTableSortLabel></MudTh>
                 <MudTh><MudTableSortLabel SortLabel="amount" T="AccountReceivableDto">Valor Líquido</MudTableSortLabel></MudTh>
-                <MudTh>Saldo</MudTh>
                 <MudTh><MudTableSortLabel SortLabel="status" T="AccountReceivableDto">Status</MudTableSortLabel></MudTh>
                 <MudTh Style="width: 150px;">Ações</MudTh>
             </HeaderContent>
@@ -139,18 +138,6 @@
                     </MudStack>
                 </MudTd>
                 <MudTd DataLabel="Valor Líquido">@Currency.Format(context.NetAmount)</MudTd>
-                <MudTd DataLabel="Saldo">
-                    @if (context.RemainingAmount != context.NetAmount)
-                    {
-                        <MudText Color="@(context.RemainingAmount > 0 ? MudBlazor.Color.Warning : MudBlazor.Color.Success)">
-                            @Currency.Format(context.RemainingAmount)
-                        </MudText>
-                    }
-                    else
-                    {
-                        <MudText>@Currency.Format(context.RemainingAmount)</MudText>
-                    }
-                </MudTd>
                 <MudTd DataLabel="Status">
                     <AccountStatusChip Status="@context.Status" DaysOverdue="@context.DaysOverdue" />
                 </MudTd>

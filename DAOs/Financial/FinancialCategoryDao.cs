@@ -47,7 +47,8 @@ public class FinancialCategoryDao : IFinancialCategoryDao
     {
         var query = _context.FinancialCategories
             .AsNoTracking()
-            .Include(c => c.ParentCategory);
+            .Include(c => c.ParentCategory)
+            .AsQueryable();
 
         if (activeOnly)
             query = query.Where(c => c.IsActive);
