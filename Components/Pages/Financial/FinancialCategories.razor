@@ -115,11 +115,11 @@
         {
             if (type.HasValue)
             {
-                categories = await ApiService.GetAsync<List<FinancialCategoryDto>>($"api/financial-categories/by-type/{(int)type.Value}") ?? new();
+                categories = await ApiService.GetAsync<List<FinancialCategoryDto>>($"api/FinancialCategories/by-type/{(int)type.Value}") ?? new();
             }
             else
             {
-                categories = await ApiService.GetAsync<List<FinancialCategoryDto>>("api/financial-categories") ?? new();
+                categories = await ApiService.GetAsync<List<FinancialCategoryDto>>("api/FinancialCategories") ?? new();
             }
             
             // Sort by code by default to show hierarchy better
@@ -148,7 +148,7 @@
         {
             try
             {
-                await ApiService.PostAsync<FinancialCategoryDto>("api/financial-categories", dto);
+                await ApiService.PostAsync<FinancialCategoryDto>("api/FinancialCategories", dto);
                 Snackbar.Add("Categoria criada com sucesso", Severity.Success);
                 await LoadCategories(filterType);
             }
@@ -195,7 +195,7 @@
                     IsActive = dto.IsActive
                 };
 
-                await ApiService.PutAsync($"api/financial-categories/{category.Id}", updateDto);
+                await ApiService.PutAsync($"api/FinancialCategories/{category.Id}", updateDto);
                 Snackbar.Add("Categoria atualizada com sucesso", Severity.Success);
                 await LoadCategories(filterType);
             }
@@ -221,7 +221,7 @@
         {
             try
             {
-                await ApiService.DeleteAsync($"api/financial-categories/{category.Id}");
+                await ApiService.DeleteAsync($"api/FinancialCategories/{category.Id}");
                 Snackbar.Add("Categoria excluída com sucesso", Severity.Success);
                 await LoadCategories(filterType);
             }
@@ -236,7 +236,7 @@
     {
         try
         {
-            await ApiService.PatchAsync<object>($"api/financial-categories/{category.Id}/toggle-active", null);
+            await ApiService.PatchAsync<object>($"api/FinancialCategories/{category.Id}/toggle-active", null);
             category.IsActive = !category.IsActive;
         }
         catch (Exception ex)
