@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using erp.Data;
+using erp.DTOs.TimeTracking;
 using erp.Models.Identity;
 using erp.Models.TimeTracking;
 using Microsoft.EntityFrameworkCore;
@@ -25,6 +26,8 @@ public interface ITimeTrackingService
         string? observacoes,
         int updatedById,
         CancellationToken cancellationToken = default);
+    Task<PayrollEntry> AddEntryAsync(int periodId, int employeeId, CancellationToken cancellationToken = default);
+    Task UpdateEntriesAsync(IEnumerable<BulkUpdatePayrollEntryDto> entries, int updatedById, CancellationToken cancellationToken = default);
 }
 
 public class TimeTrackingService : ITimeTrackingService
@@ -34,6 +37,32 @@ public class TimeTrackingService : ITimeTrackingService
     public TimeTrackingService(ApplicationDbContext context)
     {
         _context = context;
+    }
+
+    public async Task<PayrollEntry> AddEntryAsync(int periodId, int employeeId, CancellationToken cancellationToken = default)
+    {
+        var existing = await _context.PayrollEntries
+            .AsNoTracking()
+            .FirstOrDefaultAsync(e => e.PayrollPeriodId == periodId && e.EmployeeId == employeeId, cancellationToken);
+
+        if (existing != null)
+        {
+            throw new InvalidOperationException("Colaborador já está no período.");
+        }
+
+        var entry = new PayrollEntry
+        {
+            PayrollPeriodId = periodId,
+            EmployeeId = employeeId,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _context.PayrollEntries.Add(entry);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return await _context.PayrollEntries
+            .Include(e => e.Employee)
+            .FirstAsync(e => e.Id == entry.Id, cancellationToken);
     }
 
     public async Task<List<PayrollPeriod>> GetPeriodsAsync(int? year, CancellationToken cancellationToken = default)
@@ -151,6 +180,40 @@ public class TimeTrackingService : ITimeTrackingService
         await _context.SaveChangesAsync(cancellationToken);
 
         return entry;
+    }
+
+    public async Task UpdateEntriesAsync(IEnumerable<BulkUpdatePayrollEntryDto> entries, int updatedById, CancellationToken cancellationToken = default)
+    {
+        var ids = entries.Select(e => e.Id).ToList();
+        var dbEntries = await _context.PayrollEntries
+            .Where(e => ids.Contains(e.Id))
+            .Include(e => e.PayrollPeriod)
+            .ToListAsync(cancellationToken);
+
+        var now = DateTime.UtcNow;
+        var entriesDict = entries.ToDictionary(e => e.Id);
+
+        foreach (var dbEntry in dbEntries)
+        {
+            if (entriesDict.TryGetValue(dbEntry.Id, out var dto))
+            {
+                dbEntry.Faltas = NormalizeDecimal(dto.Faltas);
+                dbEntry.Abonos = NormalizeDecimal(dto.Abonos);
+                dbEntry.HorasExtras = NormalizeDecimal(dto.HorasExtras);
+                dbEntry.Atrasos = NormalizeDecimal(dto.Atrasos);
+                dbEntry.Observacoes = string.IsNullOrWhiteSpace(dto.Observacoes) ? null : dto.Observacoes.Trim();
+                dbEntry.UpdatedAt = now;
+                dbEntry.UpdatedById = updatedById;
+
+                if (dbEntry.PayrollPeriod != null)
+                {
+                    dbEntry.PayrollPeriod.UpdatedAt = now;
+                    dbEntry.PayrollPeriod.UpdatedById = updatedById;
+                }
+            }
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
     }
 
     private static decimal? NormalizeDecimal(decimal? value)

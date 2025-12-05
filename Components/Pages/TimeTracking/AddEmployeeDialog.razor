@@ -1,0 +1,35 @@
+@using MudBlazor
+@using erp.DTOs.User
+@using Color = MudBlazor.Color
+@using Size = MudBlazor.Size
+
+<MudDialog>
+    <DialogContent>
+        <MudText>Selecione o colaborador para adicionar ao período.</MudText>
+        <MudSelect T="int" Label="Colaborador" @bind-Value="_selectedUserId" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+            @foreach (var user in AvailableUsers)
+            {
+                <MudSelectItem Value="@user.Id">@user.FullName (@user.Email)</MudSelectItem>
+            }
+        </MudSelect>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@(_selectedUserId == 0)">Adicionar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public List<UserDto> AvailableUsers { get; set; } = new();
+
+    private int _selectedUserId;
+
+    void Cancel() => MudDialog.Cancel();
+
+    void Submit()
+    {
+        MudDialog.Close(DialogResult.Ok(_selectedUserId));
+    }
+}

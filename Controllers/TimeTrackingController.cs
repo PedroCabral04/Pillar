@@ -167,6 +167,55 @@ public class TimeTrackingController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Adiciona um colaborador ao período de folha.
+    /// </summary>
+    [HttpPost("periods/{periodId:int}/entries")]
+    public async Task<ActionResult<PayrollEntryDto>> AddEntry(
+        int periodId,
+        [FromBody] int employeeId,
+        CancellationToken cancellationToken)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null)
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            var entry = await _timeTrackingService.AddEntryAsync(periodId, employeeId, cancellationToken);
+            return Ok(_mapper.ToEntryDto(entry));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Atualiza múltiplos lançamentos de uma vez.
+    /// </summary>
+    [HttpPut("entries/bulk")]
+    public async Task<IActionResult> BulkUpdateEntries(
+        [FromBody] List<BulkUpdatePayrollEntryDto> entries,
+        CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        var userId = GetCurrentUserId();
+        if (userId == null)
+        {
+            return Unauthorized();
+        }
+
+        await _timeTrackingService.UpdateEntriesAsync(entries, userId.Value, cancellationToken);
+        return NoContent();
+    }
+
     private int? GetCurrentUserId()
     {
         var claim = User.FindFirst(ClaimTypes.NameIdentifier);

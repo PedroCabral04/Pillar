@@ -56,3 +56,8 @@ public class UpdatePayrollEntryDto
     [StringLength(1000, ErrorMessage = "Observações devem ter no máximo 1000 caracteres.")]
     public string? Observacoes { get; set; }
 }
+
+public class BulkUpdatePayrollEntryDto : UpdatePayrollEntryDto
+{
+    public int Id { get; set; }
+}

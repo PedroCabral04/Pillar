@@ -1,0 +1,70 @@
+@using MudBlazor
+@using erp.DTOs.TimeTracking
+@using Color = MudBlazor.Color
+@using Size = MudBlazor.Size
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" Model="@_model">
+            <MudStack Spacing="3">
+                <MudText Typo="Typo.subtitle1">@(_model.EmployeeName)</MudText>
+                
+                <MudGrid>
+                    <MudItem xs="6">
+                        <MudNumericField @bind-Value="_model.Faltas" Label="Faltas" Variant="Variant.Outlined" Min="0" />
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudNumericField @bind-Value="_model.Abonos" Label="Abonos" Variant="Variant.Outlined" Min="0" />
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudNumericField @bind-Value="_model.HorasExtras" Label="Horas Extras" Variant="Variant.Outlined" Min="0" />
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudNumericField @bind-Value="_model.Atrasos" Label="Atrasos" Variant="Variant.Outlined" Min="0" />
+                    </MudItem>
+                </MudGrid>
+
+                <MudTextField @bind-Value="_model.Observacoes" 
+                              Label="Observações" 
+                              Variant="Variant.Outlined" 
+                              Lines="3" />
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">Salvar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public PayrollEntryDto Entry { get; set; } = new();
+
+    private PayrollEntryDto _model = new();
+    private MudForm _form = null!;
+
+    protected override void OnInitialized()
+    {
+        // Clone the entry to avoid modifying the original reference directly
+        _model = new PayrollEntryDto
+        {
+            Id = Entry.Id,
+            EmployeeId = Entry.EmployeeId,
+            EmployeeName = Entry.EmployeeName,
+            Faltas = Entry.Faltas,
+            Abonos = Entry.Abonos,
+            HorasExtras = Entry.HorasExtras,
+            Atrasos = Entry.Atrasos,
+            Observacoes = Entry.Observacoes
+        };
+    }
+
+    void Cancel() => MudDialog.Cancel();
+
+    void Submit()
+    {
+        MudDialog.Close(DialogResult.Ok(_model));
+    }
+}

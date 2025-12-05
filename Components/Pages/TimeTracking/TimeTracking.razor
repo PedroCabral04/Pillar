@@ -1,0 +1,282 @@
+@page "/time-tracking/entries"
+@using System.Globalization
+@using erp.DTOs.TimeTracking
+@using erp.DTOs.User
+@using erp.Models.TimeTracking
+@using erp.Services
+@using erp.Services.Authorization
+@using erp.Components.Shared.Dialogs
+@using MudBlazor
+@using Color = MudBlazor.Color
+@using Size = MudBlazor.Size
+@attribute [Authorize(Roles = "Administrador,Gerente,RH")]
+
+@inject IApiService ApiService
+@inject ILogger<TimeTracking> Logger
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Apontamento de Horas</PageTitle>
+
+<MudStack Spacing="3">
+    <MudPaper Class="pa-4" Elevation="2">
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudText Typo="Typo.h5">Apontamento</MudText>
+            <MudSpacer />
+            <MudSelect T="int" Label="Mês" @bind-Value="_selectedMonth" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 150px">
+                @foreach (var month in _months)
+                {
+                    <MudSelectItem Value="@month.Value">@month.Label</MudSelectItem>
+                }
+            </MudSelect>
+            <MudNumericField T="int" Label="Ano" @bind-Value="_selectedYear" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 100px" Min="2000" Max="2100" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadPeriodAsync" StartIcon="@Icons.Material.Filled.Search">Buscar</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="CreatePeriodAsync" StartIcon="@Icons.Material.Filled.Add">Novo Período</MudButton>
+        </MudStack>
+    </MudPaper>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+    }
+    else if (_period == null)
+    {
+        <MudAlert Severity="Severity.Info">Nenhum período encontrado para a data selecionada. Clique em "Novo Período" para iniciar.</MudAlert>
+    }
+    else
+    {
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+                <MudText Typo="Typo.h6">
+                    Competência: @($"{_period.ReferenceMonth:00}/{_period.ReferenceYear}")
+                    <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(_period.Status)" Class="ml-2">@_period.StatusName</MudChip>
+                </MudText>
+                <MudSpacer />
+                <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Save" OnClick="SaveChanges" Disabled="_saving">
+                    @if (_saving)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2"/>
+                    }
+                    Salvar Alterações
+                </MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd" OnClick="AddEmployeeAsync">Adicionar Colaborador</MudButton>
+            </MudStack>
+
+            <MudTable Items="@_period.Entries" Dense="true" Hover="true" Striped="true" Filter="new Func<PayrollEntryDto,bool>(FilterFunc)">
+                <ToolBarContent>
+                    <MudText Typo="Typo.h6">Colaboradores</MudText>
+                    <MudSpacer />
+                    <MudTextField @bind-Value="_searchString" Placeholder="Buscar..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+                </ToolBarContent>
+                <HeaderContent>
+                    <MudTh>Colaborador</MudTh>
+                    <MudTh>Faltas</MudTh>
+                    <MudTh>Abonos</MudTh>
+                    <MudTh>H. Extras</MudTh>
+                    <MudTh>Atrasos</MudTh>
+                    <MudTh>Observações</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Colaborador">
+                        <MudText Typo="Typo.body2">@context.EmployeeName</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@context.EmployeeEmail</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Faltas">
+                        <MudNumericField @bind-Value="context.Faltas" Format="N2" Culture="@_ptBr" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" HideSpinButtons="true" />
+                    </MudTd>
+                    <MudTd DataLabel="Abonos">
+                        <MudNumericField @bind-Value="context.Abonos" Format="N2" Culture="@_ptBr" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" HideSpinButtons="true" />
+                    </MudTd>
+                    <MudTd DataLabel="H. Extras">
+                        <MudNumericField @bind-Value="context.HorasExtras" Format="N2" Culture="@_ptBr" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" HideSpinButtons="true" />
+                    </MudTd>
+                    <MudTd DataLabel="Atrasos">
+                        <MudNumericField @bind-Value="context.Atrasos" Format="N2" Culture="@_ptBr" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" HideSpinButtons="true" />
+                    </MudTd>
+                    <MudTd DataLabel="Observações">
+                        <MudTextField @bind-Value="context.Observacoes" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager />
+                </PagerContent>
+            </MudTable>
+        </MudPaper>
+    }
+</MudStack>
+
+@code {
+    private int _selectedMonth = DateTime.Today.Month;
+    private int _selectedYear = DateTime.Today.Year;
+    private bool _loading;
+    private bool _saving;
+    private PayrollPeriodDetailDto? _period;
+    private string _searchString = "";
+    private readonly CultureInfo _ptBr = CultureInfo.GetCultureInfo("pt-BR");
+
+    private readonly List<(int Value, string Label)> _months = new()
+    {
+        (1, "Janeiro"), (2, "Fevereiro"), (3, "Março"), (4, "Abril"), (5, "Maio"), (6, "Junho"),
+        (7, "Julho"), (8, "Agosto"), (9, "Setembro"), (10, "Outubro"), (11, "Novembro"), (12, "Dezembro")
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPeriodAsync();
+    }
+
+    private async Task LoadPeriodAsync()
+    {
+        _loading = true;
+        try
+        {
+            _period = await ApiService.GetAsync<PayrollPeriodDetailDto>($"/api/time-tracking/periods/by-reference?month={_selectedMonth}&year={_selectedYear}");
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            _period = null;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar período");
+            Snackbar.Add("Erro ao carregar período.", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task CreatePeriodAsync()
+    {
+        try
+        {
+            var dto = new CreatePayrollPeriodDto { ReferenceMonth = _selectedMonth, ReferenceYear = _selectedYear };
+            var result = await ApiService.PostAsync<PayrollPeriodDetailDto>("/api/time-tracking/periods", dto);
+            if (result != null)
+            {
+                _period = result;
+                Snackbar.Add("Período criado com sucesso.", Severity.Success);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao criar período");
+            Snackbar.Add($"Erro ao criar período: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task SaveChanges()
+    {
+        if (_period == null) return;
+
+        _saving = true;
+        try
+        {
+            var updates = _period.Entries.Select(e => new BulkUpdatePayrollEntryDto
+            {
+                Id = e.Id,
+                Faltas = e.Faltas,
+                Abonos = e.Abonos,
+                HorasExtras = e.HorasExtras,
+                Atrasos = e.Atrasos,
+                Observacoes = e.Observacoes
+            }).ToList();
+
+            var response = await ApiService.PutAsync("/api/time-tracking/entries/bulk", updates);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Alterações salvas com sucesso.", Severity.Success);
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Erro ao salvar alterações: {response.StatusCode}", Severity.Error);
+                Logger.LogError("Erro ao salvar alterações: {StatusCode} {Content}", response.StatusCode, error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao salvar alterações");
+            Snackbar.Add("Erro ao salvar alterações.", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task AddEmployeeAsync()
+    {
+        if (_period == null) return;
+
+        // Get all users
+        var users = await ApiService.GetAsync<List<UserDto>>("/api/users");
+        if (users == null) return;
+
+        // Filter out users already in the period
+        var existingIds = _period.Entries.Select(e => e.EmployeeId).ToHashSet();
+        var availableUsers = users.Where(u => !existingIds.Contains(u.Id)).ToList();
+
+        if (!availableUsers.Any())
+        {
+            Snackbar.Add("Todos os usuários ativos já estão neste período.", Severity.Info);
+            return;
+        }
+
+        // Show dialog to select user
+        var parameters = new DialogParameters
+        {
+            { "ContentText", "Selecione o colaborador para adicionar:" },
+            { "ButtonText", "Adicionar" },
+            { "Color", Color.Primary }
+        };
+        
+        // We need a custom dialog for selection, but for now let's use a simple approach or create a small inline dialog component?
+        // I'll use a simple dialog with a select if possible, or just create a quick custom dialog here.
+        // Since I can't easily create another file right now without more tool calls, I'll assume I can use a generic dialog or I should have created one.
+        // I'll create a simple dialog file for this: AddEmployeeDialog.razor
+        
+        var dialog = await DialogService.ShowAsync<AddEmployeeDialog>("Adicionar Colaborador", new DialogParameters { ["AvailableUsers"] = availableUsers });
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is int selectedUserId)
+        {
+            try
+            {
+                var response = await ApiService.PostAsync<PayrollEntryDto>($"/api/time-tracking/periods/{_period.Id}/entries", selectedUserId);
+                if (response != null)
+                {
+                    _period.Entries.Add(response);
+                    Snackbar.Add("Colaborador adicionado.", Severity.Success);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Erro ao adicionar colaborador");
+                Snackbar.Add($"Erro ao adicionar colaborador: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private bool FilterFunc(PayrollEntryDto element)
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+        if (element.EmployeeName.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (element.EmployeeEmail.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        return false;
+    }
+
+    private Color GetStatusColor(int status) => (PayrollPeriodStatus)status switch
+    {
+        PayrollPeriodStatus.Draft => Color.Info,
+        PayrollPeriodStatus.Calculated => Color.Warning,
+        PayrollPeriodStatus.Approved => Color.Secondary,
+        PayrollPeriodStatus.Paid => Color.Success,
+        PayrollPeriodStatus.Locked => Color.Dark,
+        _ => Color.Default
+    };
+}
