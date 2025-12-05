@@ -282,4 +282,36 @@ public class SalesPlugin
             return $"❌ Erro ao calcular total: {ex.Message}";
         }
     }
+
+    [KernelFunction, Description("Lista os produtos mais vendidos no período (padrão: últimos 30 dias)")]
+    public async Task<string> GetTopProducts(
+        [Description("Quantidade de produtos a listar (padrão: 5)")] int limit = 5)
+    {
+        try
+        {
+            var endDate = DateTime.Now;
+            var startDate = endDate.AddDays(-30);
+            
+            var topProducts = await _salesService.GetTopProductsAsync(limit, startDate, endDate);
+            
+            if (!topProducts.Any())
+            {
+                return "📊 Não há dados de vendas suficientes para determinar os produtos mais vendidos nos últimos 30 dias.";
+            }
+
+            var items = topProducts.Select((p, index) => 
+                $"{index + 1}. **{p.productName}** — {p.quantity:N0} unidades"
+            );
+
+            return $"""
+                🏆 **Produtos Mais Vendidos (Últimos 30 dias)**
+                
+                {string.Join("\n", items)}
+                """;
+        }
+        catch (Exception ex)
+        {
+            return $"❌ Erro ao buscar produtos mais vendidos: {ex.Message}";
+        }
+    }
 }

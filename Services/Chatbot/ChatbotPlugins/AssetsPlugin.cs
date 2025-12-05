@@ -360,6 +360,29 @@ public class AssetsPlugin
         }
     }
 
+    [KernelFunction, Description("Obtém estatísticas gerais dos ativos (total, valor, status)")]
+    public async Task<string> GetAssetStats()
+    {
+        try
+        {
+            var stats = await _assetService.GetAssetStatisticsAsync();
+            
+            return $"""
+                📊 **Estatísticas de Ativos**
+                
+                **Total de Ativos:** {stats.TotalAssets}
+                **Valor Total:** R$ {stats.TotalAssetValue:N2}
+                **Em Uso:** {stats.AssignedAssets}
+                **Disponíveis:** {stats.AvailableAssets}
+                **Em Manutenção:** {stats.InMaintenanceAssets}
+                """;
+        }
+        catch (Exception ex)
+        {
+            return $"❌ Erro ao obter estatísticas: {ex.Message}";
+        }
+    }
+
     private static string GetStatusText(AssetStatus status) => status switch
     {
         AssetStatus.Available => "✅ Disponível",

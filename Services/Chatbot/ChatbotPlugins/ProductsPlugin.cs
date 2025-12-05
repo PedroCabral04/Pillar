@@ -251,4 +251,86 @@ public class ProductsPlugin
             return $"❌ Erro ao verificar estoque: {ex.Message}";
         }
     }
+
+    [KernelFunction, Description("Lista produtos com estoque baixo ou zerado")]
+    public async Task<string> GetLowStockProducts()
+    {
+        try
+        {
+            var result = await _inventoryService.SearchProductsAsync(new ProductSearchDto
+            {
+                LowStock = true,
+                PageSize = 10
+            });
+
+            if (!result.Products.Any())
+            {
+                return "✅ Todos os produtos estão com níveis de estoque adequados.";
+            }
+
+            var items = result.Products.Select(p => 
+                $"- **{p.Name}** (SKU: `{p.Sku}`) — Atual: {p.CurrentStock} (Mín: {p.MinimumStock})"
+            );
+
+            return $"""
+                ⚠️ **Produtos com Estoque Baixo**
+                
+                {string.Join("\n", items)}
+                
+                *Total de {result.TotalCount} produtos precisando de reposição.*
+                """;
+        }
+        catch (Exception ex)
+        {
+            return $"❌ Erro ao verificar estoque baixo: {ex.Message}";
+        }
+    }
+
+    [KernelFunction, Description("Obtém estatísticas gerais do inventário (total de produtos, valor em estoque, etc)")]
+    public async Task<string> GetInventoryStats()
+    {
+        try
+        {
+            var stats = await _inventoryService.GetProductStatisticsAsync();
+            
+            return $"""
+                📊 **Estatísticas do Inventário**
+                
+                **Total de Produtos:** {stats.TotalProducts}
+                **Valor Total em Estoque:** R$ {stats.TotalStockValue:N2}
+                **Produtos com Estoque Baixo:** {stats.LowStockProducts}
+                **Produtos Sem Estoque:** {stats.OutOfStockProducts}
+                """;
+        }
+        catch (Exception ex)
+        {
+            return $"❌ Erro ao obter estatísticas: {ex.Message}";
+        }
+    }
+
+    [KernelFunction, Description("Lista as categorias de produtos cadastradas")]
+    public async Task<string> GetProductCategories()
+    {
+        try
+        {
+            var result = await _inventoryService.GetCategoriesAsync(pageSize: 50);
+            
+            if (!result.Categories.Any())
+            {
+                return "📂 Nenhuma categoria de produto cadastrada.";
+            }
+
+            var categories = result.Categories.Select(c => $"- {c.Name}");
+            
+            return $"""
+                📂 **Categorias de Produtos**
+                
+                {string.Join("\n", categories)}
+                """;
+        }
+        catch (Exception ex)
+        {
+            return $"❌ Erro ao listar categorias: {ex.Message}";
+        }
+    }
 }
