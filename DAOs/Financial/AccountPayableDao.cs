@@ -105,6 +105,8 @@ public class AccountPayableDao : IAccountPayableDao
 
         if (status.HasValue)
             query = query.Where(a => a.Status == status.Value);
+        else
+            query = query.Where(a => a.Status != AccountStatus.Cancelled);
 
         if (requiresApproval.HasValue)
             query = query.Where(a => a.RequiresApproval == requiresApproval.Value);

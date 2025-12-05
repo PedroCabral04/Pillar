@@ -397,8 +397,8 @@
         await LoadCategories();
         await LoadCostCenters();
 
-        // If editing, load the account data
-        if (IsEdit && AccountId.HasValue)
+        // If editing or viewing details, load the account data
+        if ((IsEdit || IsReadOnly) && AccountId.HasValue)
         {
             await LoadAccountData();
         }

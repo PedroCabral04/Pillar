@@ -180,7 +180,10 @@ public class AccountPayableService : IAccountPayableService
         if (installments.Any())
             throw new InvalidOperationException("Não é possível excluir uma conta que possui parcelas");
 
-        await _dao.DeleteAsync(id);
+        // Soft delete (Cancel) instead of hard delete
+        entity.Status = AccountStatus.Cancelled;
+        entity.UpdatedAt = DateTime.UtcNow;
+        await _dao.UpdateAsync(entity);
     }
 
     public async Task<AccountPayableDto> ApproveAsync(int id, int userId, string? notes = null)

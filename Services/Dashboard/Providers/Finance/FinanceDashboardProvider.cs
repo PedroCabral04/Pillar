@@ -140,7 +140,6 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
                 new() { Name = "Entradas", Data = revenues },
                 new() { Name = "Saídas", Data = expenses }
             },
-            Subtitle = $"Saldo projetado: {CurrencyFormatService.FormatStatic(netTotal)}"
         };
     }
 

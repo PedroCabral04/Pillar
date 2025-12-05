@@ -99,6 +99,8 @@ public class AccountReceivableDao : IAccountReceivableDao
 
         if (status.HasValue)
             query = query.Where(a => a.Status == status.Value);
+        else
+            query = query.Where(a => a.Status != AccountStatus.Cancelled);
 
         if (dueDateFrom.HasValue)
             query = query.Where(a => a.DueDate >= dueDateFrom.Value);

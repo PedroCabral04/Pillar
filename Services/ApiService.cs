@@ -426,9 +426,70 @@ public class ApiService : IApiService
         try
         {
             using var doc = JsonDocument.Parse(content);
-            if (doc.RootElement.TryGetProperty("message", out var msg))
+            var root = doc.RootElement;
+
+            // 1. Try to find "errors" object (Validation problems)
+            if (root.TryGetProperty("errors", out var errors) && errors.ValueKind == JsonValueKind.Object)
+            {
+                var sb = new StringBuilder();
+                foreach (var property in errors.EnumerateObject())
+                {
+                    if (property.Value.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var error in property.Value.EnumerateArray())
+                        {
+                            sb.AppendLine(error.GetString());
+                        }
+                    }
+                    else
+                    {
+                        sb.AppendLine(property.Value.GetString());
+                    }
+                }
+                
+                if (sb.Length > 0)
+                    return sb.ToString().TrimEnd();
+            }
+
+            // 2. Try to find "detail" (ProblemDetails standard)
+            if (root.TryGetProperty("detail", out var detail) && detail.ValueKind == JsonValueKind.String)
+            {
+                return detail.GetString();
+            }
+
+            // 3. Try to find "title" (ProblemDetails standard)
+            if (root.TryGetProperty("title", out var title) && title.ValueKind == JsonValueKind.String)
+            {
+                return title.GetString();
+            }
+
+            // 4. Try to find "message" (Custom format)
+            if (root.TryGetProperty("message", out var msg) && msg.ValueKind == JsonValueKind.String)
             {
                 return msg.GetString();
+            }
+            
+            // 5. Fallback for simple dictionary of errors (Legacy ModelState)
+            // If the root is an object and values are arrays of strings, treat as validation errors
+            if (root.ValueKind == JsonValueKind.Object)
+            {
+                var sb = new StringBuilder();
+                var isValidation = false;
+                
+                foreach (var property in root.EnumerateObject())
+                {
+                    if (property.Value.ValueKind == JsonValueKind.Array)
+                    {
+                        isValidation = true;
+                        foreach (var error in property.Value.EnumerateArray())
+                        {
+                            sb.AppendLine(error.GetString());
+                        }
+                    }
+                }
+                
+                if (isValidation && sb.Length > 0)
+                    return sb.ToString().TrimEnd();
             }
         }
         catch

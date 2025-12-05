@@ -150,8 +150,8 @@
                                 <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" 
                                                OnClick="@(() => OpenEditDialog(context))" />
                             </MudTooltip>
-                            <MudTooltip Text="Excluir">
-                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" 
+                            <MudTooltip Text="Cancelar">
+                                <MudIconButton Icon="@Icons.Material.Filled.Cancel" Size="Size.Small" 
                                                Color="MudBlazor.Color.Error"
                                                OnClick="@(() => DeleteAccount(context))" />
                             </MudTooltip>
@@ -444,9 +444,9 @@
     private async Task DeleteAccount(AccountReceivableDto account)
     {
         var confirm = await DialogService.ShowMessageBox(
-            "Excluir Conta",
-            $"Tem certeza que deseja excluir a conta de {account.CustomerName}?",
-            yesText: "Excluir", cancelText: "Cancelar",
+            "Cancelar Conta",
+            $"Tem certeza que deseja cancelar a conta de {account.CustomerName}?",
+            yesText: "Cancelar", cancelText: "Voltar",
             options: new DialogOptions { CloseOnEscapeKey = true });
 
         if (confirm == true)
@@ -454,12 +454,12 @@
             try
             {
                 await ApiService.DeleteAsync($"api/accounts-receivable/{account.Id}");
-                Snackbar.Add("Conta excluída com sucesso!", Severity.Success);
+                Snackbar.Add("Conta cancelada com sucesso!", Severity.Success);
                 await RefreshTable();
             }
             catch (Exception ex)
             {
-                Snackbar.Add($"Erro ao excluir conta: {ex.Message}", Severity.Error);
+                Snackbar.Add($"Erro ao cancelar conta: {ex.Message}", Severity.Error);
             }
         }
     }

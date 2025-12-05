@@ -533,13 +533,20 @@
                         {
                             Show = true,
                             Name = new DonutLabelName { Show = true, FontSize = "14px", FontWeight = "600" },
-                            Value = new DonutLabelValue { Show = true, FontSize = "22px", FontWeight = "700" },
+                            Value = new DonutLabelValue 
+                            { 
+                                Show = true, 
+                                FontSize = "22px", 
+                                FontWeight = "700",
+                                Formatter = @"function (val) { return Number(val).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }"
+                            },
                             Total = new DonutLabelTotal 
                             { 
                                 Show = true, 
                                 Label = "Total", 
                                 FontSize = "13px",
-                                FontWeight = "500"
+                                FontWeight = "500",
+                                Formatter = @"function (w) { return w.globals.seriesTotals.reduce((a, b) => { return a + b }, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }"
                             }
                         }
                     },
