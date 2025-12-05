@@ -137,7 +137,7 @@
                 <MudTh>Categoria</MudTh>
                 <MudTh>Status</MudTh>
                 <MudTh>Condição</MudTh>
-                <MudTh>Atribuído a</MudTh>
+                <!-- <MudTh>Atribuído a</MudTh> -->
                 <MudTh>Localização</MudTh>
                 <MudTh Style="text-align: center">Ações</MudTh>
             </HeaderContent>
@@ -163,7 +163,7 @@
                         @GetConditionText(context.Condition)
                     </MudChip>
                 </MudTd>
-                <MudTd DataLabel="Atribuído a">
+                <!-- <MudTd DataLabel="Atribuído a">
                     @if (!string.IsNullOrEmpty(context.CurrentAssignedToUserName))
                     {
                         <MudText Typo="Typo.body2">@context.CurrentAssignedToUserName</MudText>
@@ -175,7 +175,7 @@
                     {
                         <MudText Typo="Typo.caption" Color="Color.Secondary">-</MudText>
                     }
-                </MudTd>
+                </MudTd> -->
                 <MudTd DataLabel="Localização">
                     <MudText Typo="Typo.body2">@(context.Location ?? "-")</MudText>
                 </MudTd>
