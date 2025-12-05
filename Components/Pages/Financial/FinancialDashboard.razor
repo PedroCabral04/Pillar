@@ -76,7 +76,7 @@
                                              Name="Despesas"
                                              SeriesType="SeriesType.Bar"
                                              XValue="@(e => e.Date.ToString("dd/MM"))"
-                                             YValue="@(e => e.Expense)"
+                                             YValue="@(e => Math.Abs(e.Expense))"
                                              Color="#F44336" />
 
                             <ApexPointSeries TItem="CashFlowItemDto"
@@ -289,7 +289,9 @@
         {
             new YAxis
             {
+                SeriesName = "Receitas",
                 Title = new AxisTitle { Text = "Receitas / Despesas (R$)" },
+                Min = 0,
                 Labels = new YAxisLabels
                 {
                     Formatter = @"function (value) {
@@ -299,6 +301,13 @@
             },
             new YAxis
             {
+                SeriesName = "Despesas",
+                Show = false,
+                Min = 0
+            },
+            new YAxis
+            {
+                SeriesName = "Saldo Acumulado",
                 Opposite = true,
                 Title = new AxisTitle { Text = "Saldo Acumulado (R$)" },
                 Labels = new YAxisLabels
