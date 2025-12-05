@@ -151,7 +151,7 @@ public class SalesPlugin
                 PaymentMethod = paymentMethod,
                 DiscountAmount = discountAmount,
                 Notes = notes,
-                SaleDate = DateTime.Now,
+                SaleDate = DateTime.UtcNow,
                 Status = "Pendente"
             };
 
