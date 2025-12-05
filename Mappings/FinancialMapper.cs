@@ -17,11 +17,18 @@ public partial class FinancialMapper
     public partial SupplierDto ToDtoWithRelations(Supplier supplier);
     
     // Account Receivable mappings
+    [MapperIgnoreTarget(nameof(AccountReceivableDto.NetAmount))]
+    [MapperIgnoreTarget(nameof(AccountReceivableDto.RemainingAmount))]
     public partial AccountReceivableDto ToDto(AccountReceivable account);
+    
+    [MapperIgnoreTarget(nameof(AccountReceivableSummaryDto.NetAmount))]
+    [MapperIgnoreTarget(nameof(AccountReceivableSummaryDto.RemainingAmount))]
     public partial AccountReceivableSummaryDto ToSummaryDto(AccountReceivable account);
     public partial AccountReceivable ToEntity(CreateAccountReceivableDto dto);
     public partial void UpdateEntity(UpdateAccountReceivableDto dto, AccountReceivable entity);
     
+    [MapperIgnoreTarget(nameof(AccountReceivableDto.NetAmount))]
+    [MapperIgnoreTarget(nameof(AccountReceivableDto.RemainingAmount))]
     [MapProperty(nameof(AccountReceivable.Customer.Name), nameof(AccountReceivableDto.CustomerName))]
     [MapProperty(nameof(AccountReceivable.Category.Name), nameof(AccountReceivableDto.CategoryName))]
     [MapProperty(nameof(AccountReceivable.CostCenter.Name), nameof(AccountReceivableDto.CostCenterName))]
@@ -29,15 +36,24 @@ public partial class FinancialMapper
     [MapProperty(nameof(AccountReceivable.ReceivedByUser.UserName), nameof(AccountReceivableDto.ReceivedByUserName))]
     public partial AccountReceivableDto ToDtoWithRelations(AccountReceivable account);
     
+    [MapperIgnoreTarget(nameof(AccountReceivableSummaryDto.NetAmount))]
+    [MapperIgnoreTarget(nameof(AccountReceivableSummaryDto.RemainingAmount))]
     [MapProperty(nameof(AccountReceivable.Customer.Name), nameof(AccountReceivableSummaryDto.CustomerName))]
     public partial AccountReceivableSummaryDto ToSummaryDtoWithRelations(AccountReceivable account);
     
     // Account Payable mappings
+    [MapperIgnoreTarget(nameof(AccountPayableDto.NetAmount))]
+    [MapperIgnoreTarget(nameof(AccountPayableDto.RemainingAmount))]
     public partial AccountPayableDto ToDto(AccountPayable account);
+    
+    [MapperIgnoreTarget(nameof(AccountPayableSummaryDto.NetAmount))]
+    [MapperIgnoreTarget(nameof(AccountPayableSummaryDto.RemainingAmount))]
     public partial AccountPayableSummaryDto ToSummaryDto(AccountPayable account);
     public partial AccountPayable ToEntity(CreateAccountPayableDto dto);
     public partial void UpdateEntity(UpdateAccountPayableDto dto, AccountPayable entity);
     
+    [MapperIgnoreTarget(nameof(AccountPayableDto.NetAmount))]
+    [MapperIgnoreTarget(nameof(AccountPayableDto.RemainingAmount))]
     [MapProperty(nameof(AccountPayable.Supplier.Name), nameof(AccountPayableDto.SupplierName))]
     [MapProperty(nameof(AccountPayable.Category.Name), nameof(AccountPayableDto.CategoryName))]
     [MapProperty(nameof(AccountPayable.CostCenter.Name), nameof(AccountPayableDto.CostCenterName))]
@@ -46,6 +62,8 @@ public partial class FinancialMapper
     [MapProperty(nameof(AccountPayable.ApprovedByUser.UserName), nameof(AccountPayableDto.ApprovedByUserName))]
     public partial AccountPayableDto ToDtoWithRelations(AccountPayable account);
     
+    [MapperIgnoreTarget(nameof(AccountPayableSummaryDto.NetAmount))]
+    [MapperIgnoreTarget(nameof(AccountPayableSummaryDto.RemainingAmount))]
     [MapProperty(nameof(AccountPayable.Supplier.Name), nameof(AccountPayableSummaryDto.SupplierName))]
     public partial AccountPayableSummaryDto ToSummaryDtoWithRelations(AccountPayable account);
     

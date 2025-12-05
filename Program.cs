@@ -362,6 +362,8 @@ builder.Services.AddScoped<erp.Services.Sales.ICustomerService, erp.Services.Sal
 builder.Services.AddScoped<erp.Services.Sales.ISalesService, erp.Services.Sales.SalesService>();
 
 // Financial services
+builder.Services.Configure<erp.Services.Financial.FinancialOptions>(
+    builder.Configuration.GetSection(erp.Services.Financial.FinancialOptions.SectionName));
 builder.Services.AddScoped<erp.Services.Financial.IAccountingService, erp.Services.Financial.AccountingService>();
 builder.Services.AddScoped<erp.Services.Financial.ISupplierService, erp.Services.Financial.SupplierService>();
 builder.Services.AddScoped<erp.Services.Financial.IFinancialCategoryService, erp.Services.Financial.FinancialCategoryService>();

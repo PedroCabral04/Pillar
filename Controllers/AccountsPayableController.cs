@@ -67,6 +67,7 @@ public class AccountsPayableController : ControllerBase
         [FromQuery] DateTime? dueDateTo = null,
         [FromQuery] int? categoryId = null,
         [FromQuery] int? costCenterId = null,
+        [FromQuery] string? searchText = null,
         [FromQuery] string? sortBy = null,
         [FromQuery] bool sortDescending = false)
     {
@@ -74,7 +75,7 @@ public class AccountsPayableController : ControllerBase
         {
             var (items, totalCount) = await _accountPayableService.GetPagedAsync(
                 page, pageSize, supplierId, status, dueDateFrom, dueDateTo,
-                categoryId, costCenterId, pendingApproval, sortBy, sortDescending);
+                categoryId, costCenterId, pendingApproval, sortBy, sortDescending, searchText);
             return Ok(new { Items = items, TotalCount = totalCount });
         }
         catch (Exception ex)
@@ -157,6 +158,29 @@ public class AccountsPayableController : ControllerBase
         {
             _logger.LogError(ex, "Error getting accounts pending approval");
             return StatusCode(500, "Erro ao buscar contas pendentes de aprovação");
+        }
+    }
+
+    /// <summary>
+    /// Obtém o resumo de totais por status
+    /// </summary>
+    [HttpGet("total-by-status")]
+    public async Task<ActionResult> GetTotalsByStatus()
+    {
+        try
+        {
+            var pending = await _accountPayableService.GetTotalByStatusAsync(AccountStatus.Pending);
+            var overdue = await _accountPayableService.GetTotalByStatusAsync(AccountStatus.Overdue);
+            var paid = await _accountPayableService.GetTotalByStatusAsync(AccountStatus.Paid);
+            var partiallyPaid = await _accountPayableService.GetTotalByStatusAsync(AccountStatus.PartiallyPaid);
+            var cancelled = await _accountPayableService.GetTotalByStatusAsync(AccountStatus.Cancelled);
+            
+            return Ok(new { Pending = pending, Overdue = overdue, Paid = paid, PartiallyPaid = partiallyPaid, Cancelled = cancelled });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting totals by status");
+            return StatusCode(500, "Erro ao calcular totais por status");
         }
     }
 
@@ -356,7 +380,8 @@ public class AccountsPayableController : ControllerBase
 
             var account = await _accountPayableService.PayAsync(
                 id, dto.PaidAmount, existing.PaymentMethod, dto.PaymentDate, currentUserId,
-                dto.ProofOfPaymentUrl, existing.BankSlipNumber, existing.PixKey);
+                dto.ProofOfPaymentUrl, existing.BankSlipNumber, existing.PixKey,
+                dto.AdditionalDiscount, dto.AdditionalInterest, dto.AdditionalFine);
             
             return Ok(account);
         }

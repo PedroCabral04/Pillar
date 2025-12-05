@@ -11,7 +11,7 @@ public interface IAccountPayableService
         int page, int pageSize, int? supplierId = null, AccountStatus? status = null,
         DateTime? dueDateFrom = null, DateTime? dueDateTo = null,
         int? categoryId = null, int? costCenterId = null, bool? pendingApproval = null,
-        string? sortBy = null, bool sortDescending = false);
+        string? sortBy = null, bool sortDescending = false, string? searchText = null);
     
     Task<AccountPayableDto?> GetByIdAsync(int id);
     Task<List<AccountPayableDto>> GetOverdueAsync();
@@ -26,7 +26,10 @@ public interface IAccountPayableService
     Task DeleteAsync(int id);
     
     Task<AccountPayableDto> ApproveAsync(int id, int userId, string? notes = null);
-    Task<AccountPayableDto> PayAsync(int id, decimal amount, PaymentMethod method, DateTime paymentDate, int userId, string? proofUrl = null, string? bankSlipNumber = null, string? pixKey = null);
+    Task<AccountPayableDto> PayAsync(
+        int id, decimal amount, PaymentMethod method, DateTime paymentDate, int userId, 
+        string? proofUrl = null, string? bankSlipNumber = null, string? pixKey = null,
+        decimal? additionalDiscount = null, decimal? additionalInterest = null, decimal? additionalFine = null);
     Task<List<AccountPayableDto>> CreateInstallmentsAsync(CreateAccountPayableDto baseDto, int installments, int userId, decimal monthlyInterestRate = 0);
     Task UpdateOverdueStatusAsync();
 }
@@ -36,27 +39,31 @@ public class AccountPayableService : IAccountPayableService
     private readonly IAccountPayableDao _dao;
     private readonly FinancialMapper _mapper;
     private readonly IAccountingService _accountingService;
-    private const decimal ApprovalThreshold = 5000m;
+    private readonly FinancialOptions _options;
 
     public AccountPayableService(
         IAccountPayableDao dao,
         FinancialMapper mapper,
-        IAccountingService accountingService)
+        IAccountingService accountingService,
+        Microsoft.Extensions.Options.IOptions<FinancialOptions> options)
     {
         _dao = dao;
         _mapper = mapper;
         _accountingService = accountingService;
+        _options = options.Value;
     }
+
+    private decimal ApprovalThreshold => _options.ApprovalThresholdAmount;
 
     public async Task<(List<AccountPayableDto> Items, int TotalCount)> GetPagedAsync(
         int page, int pageSize, int? supplierId = null, AccountStatus? status = null,
         DateTime? dueDateFrom = null, DateTime? dueDateTo = null,
         int? categoryId = null, int? costCenterId = null, bool? pendingApproval = null,
-        string? sortBy = null, bool sortDescending = false)
+        string? sortBy = null, bool sortDescending = false, string? searchText = null)
     {
         var (items, totalCount) = await _dao.GetPagedAsync(
             page, pageSize, supplierId, status, null, pendingApproval,
-            dueDateFrom, dueDateTo, categoryId, costCenterId, sortBy, sortDescending);
+            dueDateFrom, dueDateTo, categoryId, costCenterId, sortBy, sortDescending, searchText);
         
         var dtos = items.Select(x => MapToDto(x)).ToList();
         return (dtos, totalCount);
@@ -111,6 +118,10 @@ public class AccountPayableService : IAccountPayableService
         var entity = _mapper.ToEntity(createDto);
         entity.Status = AccountStatus.Pending;
         
+        // Ensure dates are in UTC for PostgreSQL
+        entity.IssueDate = DateTime.SpecifyKind(entity.IssueDate, DateTimeKind.Utc);
+        entity.DueDate = DateTime.SpecifyKind(entity.DueDate, DateTimeKind.Utc);
+        
         // Check if requires approval based on amount
         var netAmount = entity.OriginalAmount - entity.DiscountAmount + entity.InterestAmount + entity.FineAmount;
         if (netAmount >= ApprovalThreshold)
@@ -133,6 +144,12 @@ public class AccountPayableService : IAccountPayableService
             throw new InvalidOperationException("Não é possível editar uma conta já paga");
 
         _mapper.UpdateEntity(updateDto, entity);
+        
+        // Ensure dates are in UTC for PostgreSQL
+        entity.IssueDate = DateTime.SpecifyKind(entity.IssueDate, DateTimeKind.Utc);
+        entity.DueDate = DateTime.SpecifyKind(entity.DueDate, DateTimeKind.Utc);
+        if (entity.PaymentDate.HasValue)
+            entity.PaymentDate = DateTime.SpecifyKind(entity.PaymentDate.Value, DateTimeKind.Utc);
         
         // Re-check approval requirement if amount changed
         var netAmount = entity.OriginalAmount - entity.DiscountAmount + entity.InterestAmount + entity.FineAmount;
@@ -192,7 +209,8 @@ public class AccountPayableService : IAccountPayableService
 
     public async Task<AccountPayableDto> PayAsync(
         int id, decimal amount, PaymentMethod method, DateTime paymentDate, int userId,
-        string? proofUrl = null, string? bankSlipNumber = null, string? pixKey = null)
+        string? proofUrl = null, string? bankSlipNumber = null, string? pixKey = null,
+        decimal? additionalDiscount = null, decimal? additionalInterest = null, decimal? additionalFine = null)
     {
         var entity = await _dao.GetByIdAsync(id);
         if (entity == null)
@@ -208,27 +226,26 @@ public class AccountPayableService : IAccountPayableService
         if (amount <= 0)
             throw new ArgumentException("O valor do pagamento deve ser maior que zero");
 
-        // Calculate interest and fines if overdue
-        if (DateTime.UtcNow > entity.DueDate)
-        {
-            var (interest, fine) = _accountingService.CalculateOverdueCharges(
-                entity.OriginalAmount,
-                entity.DueDate);
-            
-            entity.InterestAmount = interest;
-            entity.FineAmount = fine;
-        }
+        // Apply additional values from payment dialog (these are adjustments at payment time)
+        if (additionalDiscount.HasValue && additionalDiscount > 0)
+            entity.DiscountAmount += additionalDiscount.Value;
+        
+        if (additionalInterest.HasValue && additionalInterest > 0)
+            entity.InterestAmount += additionalInterest.Value;
+        
+        if (additionalFine.HasValue && additionalFine > 0)
+            entity.FineAmount += additionalFine.Value;
 
         // Update payment info
         entity.PaidAmount += amount;
-        entity.PaymentDate = paymentDate;
+        entity.PaymentDate = DateTime.SpecifyKind(paymentDate, DateTimeKind.Utc);
         entity.PaymentMethod = method;
         entity.BankSlipNumber = bankSlipNumber;
         entity.PixKey = pixKey;
         entity.ProofOfPaymentUrl = proofUrl;
         entity.PaidByUserId = userId;
 
-        // Update status
+        // Update status based on the new NetAmount (which considers the additional values)
         entity.Status = _accountingService.DetermineAccountStatus(
             entity.NetAmount,
             entity.PaidAmount,
@@ -253,13 +270,17 @@ public class AccountPayableService : IAccountPayableService
 
         var createdAccounts = new List<AccountPayableDto>();
         AccountPayable? parentAccount = null;
+        
+        // Ensure base dates are in UTC for PostgreSQL
+        var issueDate = DateTime.SpecifyKind(baseDto.IssueDate, DateTimeKind.Utc);
+        var baseDueDate = DateTime.SpecifyKind(baseDto.DueDate, DateTimeKind.Utc);
 
         for (int i = 0; i < installmentCalculations.Count; i++)
         {
             var calc = installmentCalculations[i];
             
             // Calculate due date for this installment (add months)
-            var dueDate = baseDto.DueDate.AddMonths(i);
+            var dueDate = baseDueDate.AddMonths(i);
             
             var entity = new AccountPayable
             {
@@ -270,7 +291,7 @@ public class AccountPayableService : IAccountPayableService
                 InterestAmount = calc.InterestAmount,
                 FineAmount = 0,
                 PaidAmount = 0,
-                IssueDate = baseDto.IssueDate,
+                IssueDate = issueDate,
                 DueDate = dueDate,
                 Status = AccountStatus.Pending,
                 PaymentMethod = baseDto.PaymentMethod,

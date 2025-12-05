@@ -1,0 +1,32 @@
+@using erp.Models.Financial
+
+<MudChip T="string" Size="@ChipSize" Color="@GetStatusColor()" Variant="@ChipVariant">
+    @GetStatusText()
+</MudChip>
+
+@code {
+    [Parameter] public AccountStatus Status { get; set; }
+    [Parameter] public int DaysOverdue { get; set; }
+    [Parameter] public MudBlazor.Size ChipSize { get; set; } = MudBlazor.Size.Small;
+    [Parameter] public MudBlazor.Variant ChipVariant { get; set; } = MudBlazor.Variant.Filled;
+
+    private MudBlazor.Color GetStatusColor() => Status switch
+    {
+        AccountStatus.Pending => MudBlazor.Color.Info,
+        AccountStatus.Overdue => MudBlazor.Color.Error,
+        AccountStatus.Paid => MudBlazor.Color.Success,
+        AccountStatus.PartiallyPaid => MudBlazor.Color.Warning,
+        AccountStatus.Cancelled => MudBlazor.Color.Default,
+        _ => MudBlazor.Color.Default
+    };
+
+    private string GetStatusText() => Status switch
+    {
+        AccountStatus.Pending => "Pendente",
+        AccountStatus.Overdue => DaysOverdue > 0 ? $"Vencida ({DaysOverdue}d)" : "Vencida",
+        AccountStatus.Paid => "Paga",
+        AccountStatus.PartiallyPaid => "Parcial",
+        AccountStatus.Cancelled => "Cancelada",
+        _ => Status.ToString()
+    };
+}

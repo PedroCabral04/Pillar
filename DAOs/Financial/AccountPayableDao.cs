@@ -21,7 +21,8 @@ public interface IAccountPayableDao
         int? categoryId = null,
         int? costCenterId = null,
         string? sortBy = null,
-        bool sortDescending = false);
+        bool sortDescending = false,
+        string? searchText = null);
     Task<List<AccountPayable>> GetOverdueAsync();
     Task<List<AccountPayable>> GetDueSoonAsync(int days = 7);
     Task<List<AccountPayable>> GetPendingApprovalAsync();
@@ -87,7 +88,8 @@ public class AccountPayableDao : IAccountPayableDao
         int? categoryId = null,
         int? costCenterId = null,
         string? sortBy = null,
-        bool sortDescending = false)
+        bool sortDescending = false,
+        string? searchText = null)
     {
         var query = _context.AccountsPayable
             .IgnoreQueryFilters()
@@ -121,6 +123,16 @@ public class AccountPayableDao : IAccountPayableDao
 
         if (costCenterId.HasValue)
             query = query.Where(a => a.CostCenterId == costCenterId.Value);
+
+        // Apply text search
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            var search = searchText.ToLower();
+            query = query.Where(a => 
+                (a.InvoiceNumber != null && a.InvoiceNumber.ToLower().Contains(search)) ||
+                (a.Supplier != null && a.Supplier.Name.ToLower().Contains(search)) ||
+                (a.Notes != null && a.Notes.ToLower().Contains(search)));
+        }
 
         var totalCount = await query.CountAsync();
 

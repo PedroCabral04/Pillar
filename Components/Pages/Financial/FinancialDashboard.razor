@@ -12,92 +12,167 @@
             <MudIcon Icon="@Icons.Material.Filled.Dashboard" Class="mr-2" />
             Dashboard Financeiro
         </MudText>
-        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
-            <MudNumericField T="decimal" @bind-Value="_initialBalance" Label="Saldo Inicial (R$)" 
-                             Variant="Variant.Outlined" Format="N2" Style="width: 180px;"
-                             Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.AttachMoney"
-                             HelperText="Saldo atual em caixa" />
-            <MudButton Variant="Variant.Filled" Color="MudBlazor.Color.Primary" OnClick="LoadDashboardData" 
-                       StartIcon="@Icons.Material.Filled.Refresh">
-                Atualizar
-            </MudButton>
-        </MudStack>
+    </MudStack>
+
+    <!-- Quick Access Buttons -->
+    <MudStack Row="true" Spacing="2" Class="mb-4">
+        <MudButton Variant="Variant.Outlined" Color="MudBlazor.Color.Success" 
+                   StartIcon="@Icons.Material.Filled.CallReceived"
+                   OnClick="@(() => NavigateTo("/financial/accounts-receivable"))">
+            Contas a Receber
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="MudBlazor.Color.Error" 
+                   StartIcon="@Icons.Material.Filled.CallMade"
+                   OnClick="@(() => NavigateTo("/financial/accounts-payable"))">
+            Contas a Pagar
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="MudBlazor.Color.Primary" 
+                   StartIcon="@Icons.Material.Filled.LocalShipping"
+                   OnClick="@(() => NavigateTo("/financial/suppliers"))">
+            Fornecedores
+        </MudButton>
     </MudStack>
 
     @if (isLoading)
     {
         <MudProgressLinear Indeterminate="true" Color="MudBlazor.Color.Primary" />
     }
+    else if (_hasError)
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Class="mb-4">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <MudText>Ocorreu um erro ao carregar o dashboard financeiro. Por favor, tente novamente.</MudText>
+                <MudButton Variant="Variant.Text" Color="MudBlazor.Color.Inherit" OnClick="LoadDashboardData">
+                    <MudIcon Icon="@Icons.Material.Filled.Refresh" Class="mr-1" />
+                    Tentar Novamente
+                </MudButton>
+            </MudStack>
+        </MudAlert>
+    }
     else if (dashboardData != null)
     {
         <MudGrid>
-            <!-- Summary Cards -->
-            <MudItem xs="12" sm="6" md="3">
-                <MudPaper Class="pa-4" Elevation="3">
-                    <MudStack Spacing="2">
-                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start">
-                            <MudIcon Icon="@Icons.Material.Filled.CallReceived" Color="MudBlazor.Color.Success" Size="Size.Large" />
-                            <MudChip T="string" Size="Size.Small" Color="MudBlazor.Color.Success">Receitas</MudChip>
-                        </MudStack>
-                        <MudText Typo="Typo.h6" Color="Color.Secondary">Contas a Receber</MudText>
-                        <MudText Typo="Typo.h4">@Currency.Format(dashboardData.TotalReceivablePending)</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Error">
-                            Vencidas: @Currency.Format(dashboardData.TotalReceivableOverdue) (@dashboardData.ReceivablesOverdueCount)
-                        </MudText>
-                    </MudStack>
+            <!-- Main Row: Chart + Summary Cards Side by Side -->
+            <!-- Chart Column -->
+            <MudItem xs="12" lg="9">
+                <MudPaper Class="pa-4" Elevation="3" Style="height: 100%;">
+                    @if (dashboardData.CashFlowProjection.Any())
+                    {
+                        <ApexChart TItem="CashFlowItemDto"
+                                   Title="Fluxo de Caixa (Próximos 60 dias)"
+                                   Options="options"
+                                   Height="450">
+
+                            <ApexPointSeries TItem="CashFlowItemDto"
+                                             Items="dashboardData.CashFlowProjection"
+                                             Name="Receitas"
+                                             SeriesType="SeriesType.Bar"
+                                             XValue="@(e => e.Date.ToString("dd/MM"))"
+                                             YValue="@(e => e.Revenue)"
+                                             Color="#00C853" />
+
+                            <ApexPointSeries TItem="CashFlowItemDto"
+                                             Items="dashboardData.CashFlowProjection"
+                                             Name="Despesas"
+                                             SeriesType="SeriesType.Bar"
+                                             XValue="@(e => e.Date.ToString("dd/MM"))"
+                                             YValue="@(e => e.Expense)"
+                                             Color="#F44336" />
+
+                            <ApexPointSeries TItem="CashFlowItemDto"
+                                             Items="dashboardData.CashFlowProjection"
+                                             Name="Saldo Acumulado"
+                                             SeriesType="SeriesType.Line"
+                                             XValue="@(e => e.Date.ToString("dd/MM"))"
+                                             YValue="@(e => e.CumulativeBalance)"
+                                             Color="#2196F3" />
+                        </ApexChart>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.h6" Class="mb-4">Fluxo de Caixa (Próximos 60 dias)</MudText>
+                        <MudText>Sem movimentações pendentes no período.</MudText>
+                    }
                 </MudPaper>
             </MudItem>
 
-            <MudItem xs="12" sm="6" md="3">
-                <MudPaper Class="pa-4" Elevation="3">
-                    <MudStack Spacing="2">
-                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start">
-                            <MudIcon Icon="@Icons.Material.Filled.CallMade" Color="MudBlazor.Color.Error" Size="Size.Large" />
-                            <MudChip T="string" Size="Size.Small" Color="MudBlazor.Color.Error">Despesas</MudChip>
+            <!-- Summary Cards Column -->
+            <MudItem xs="12" lg="3">
+                <MudStack Spacing="2">
+                    <!-- A Receber -->
+                    <MudPaper Class="pa-3 cursor-pointer hover-card" Elevation="3" @onclick="@(() => NavigateTo("/financial/accounts-receivable"))">
+                        <MudStack Spacing="0">
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                <MudIcon Icon="@Icons.Material.Filled.CallReceived" Color="MudBlazor.Color.Success" Size="Size.Small" />
+                                <MudChip T="string" Size="Size.Small" Color="MudBlazor.Color.Success">Receitas</MudChip>
+                            </MudStack>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">A Receber (Pendente)</MudText>
+                            <MudText Typo="Typo.h6">@Currency.Format(dashboardData.TotalReceivablePending + dashboardData.TotalReceivableOverdue)</MudText>
+                            <MudText Typo="Typo.caption" Color="MudBlazor.Color.Success">
+                                Recebido: @Currency.Format(dashboardData.TotalReceivablePaid)
+                            </MudText>
+                            @if (dashboardData.ReceivablesOverdueCount > 0)
+                            {
+                                <MudText Typo="Typo.caption" Color="MudBlazor.Color.Error">
+                                    <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Class="mr-1" />
+                                    Vencidas: @Currency.Format(dashboardData.TotalReceivableOverdue) (@dashboardData.ReceivablesOverdueCount)
+                                </MudText>
+                            }
                         </MudStack>
-                        <MudText Typo="Typo.h6" Color="Color.Secondary">Contas a Pagar</MudText>
-                        <MudText Typo="Typo.h4">@Currency.Format(dashboardData.TotalPayablePending)</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Error">
-                            Vencidas: @Currency.Format(dashboardData.TotalPayableOverdue) (@dashboardData.PayablesOverdueCount)
-                        </MudText>
-                    </MudStack>
-                </MudPaper>
-            </MudItem>
+                    </MudPaper>
 
-            <MudItem xs="12" sm="6" md="3">
-                <MudPaper Class="pa-4" Elevation="3">
-                    <MudStack Spacing="2">
-                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start">
-                            <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Color="MudBlazor.Color.Info" Size="Size.Large" />
-                            <MudChip T="string" Size="Size.Small" Color="MudBlazor.Color.Info">Saldo</MudChip>
+                    <!-- A Pagar -->
+                    <MudPaper Class="pa-3 cursor-pointer hover-card" Elevation="3" @onclick="@(() => NavigateTo("/financial/accounts-payable"))">
+                        <MudStack Spacing="0">
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                <MudIcon Icon="@Icons.Material.Filled.CallMade" Color="MudBlazor.Color.Error" Size="Size.Small" />
+                                <MudChip T="string" Size="Size.Small" Color="MudBlazor.Color.Error">Despesas</MudChip>
+                            </MudStack>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">A Pagar (Pendente)</MudText>
+                            <MudText Typo="Typo.h6">@Currency.Format(dashboardData.TotalPayablePending + dashboardData.TotalPayableOverdue)</MudText>
+                            <MudText Typo="Typo.caption" Color="MudBlazor.Color.Error">
+                                Pago: @Currency.Format(dashboardData.TotalPayablePaid)
+                            </MudText>
+                            @if (dashboardData.PayablesOverdueCount > 0)
+                            {
+                                <MudText Typo="Typo.caption" Color="MudBlazor.Color.Error">
+                                    <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Class="mr-1" />
+                                    Vencidas: @Currency.Format(dashboardData.TotalPayableOverdue) (@dashboardData.PayablesOverdueCount)
+                                </MudText>
+                            }
                         </MudStack>
-                        <MudText Typo="Typo.h6" Color="Color.Secondary">Saldo Previsto</MudText>
-                        <MudText Typo="Typo.h4" Color="@(dashboardData.ForecastedBalance >= 0 ? MudBlazor.Color.Success : MudBlazor.Color.Error)">
-                            @Currency.Format(dashboardData.ForecastedBalance)
-                        </MudText>
-                        <MudText Typo="Typo.caption">
-                            (Recebíveis - Pagáveis)
-                        </MudText>
-                    </MudStack>
-                </MudPaper>
-            </MudItem>
+                    </MudPaper>
 
-            <MudItem xs="12" sm="6" md="3">
-                <MudPaper Class="pa-4" Elevation="3">
-                    <MudStack Spacing="2">
-                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start">
-                            <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Color="MudBlazor.Color.Warning" Size="Size.Large" />
-                            <MudChip T="string" Size="Size.Small" Color="MudBlazor.Color.Warning">Caixa</MudChip>
+                    <!-- Saldo Previsto -->
+                    <MudPaper Class="pa-3" Elevation="3">
+                        <MudStack Spacing="0">
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Color="MudBlazor.Color.Info" Size="Size.Small" />
+                                <MudChip T="string" Size="Size.Small" Color="MudBlazor.Color.Info">Saldo</MudChip>
+                            </MudStack>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Saldo Previsto</MudText>
+                            <MudText Typo="Typo.h6" Color="@(dashboardData.ForecastedBalance >= 0 ? MudBlazor.Color.Success : MudBlazor.Color.Error)">
+                                @Currency.Format(dashboardData.ForecastedBalance)
+                            </MudText>
+                            <MudText Typo="Typo.caption">(Realizado + Pendentes)</MudText>
                         </MudStack>
-                        <MudText Typo="Typo.h6" Color="Color.Secondary">Saldo Realizado</MudText>
-                        <MudText Typo="Typo.h4" Color="@(dashboardData.CashBalance >= 0 ? MudBlazor.Color.Success : MudBlazor.Color.Error)">
-                            @Currency.Format(dashboardData.CashBalance)
-                        </MudText>
-                         <MudText Typo="Typo.caption">
-                            (Recebido - Pago)
-                        </MudText>
-                    </MudStack>
-                </MudPaper>
+                    </MudPaper>
+
+                    <!-- Saldo Realizado -->
+                    <MudPaper Class="pa-3" Elevation="3">
+                        <MudStack Spacing="0">
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Color="MudBlazor.Color.Warning" Size="Size.Small" />
+                                <MudChip T="string" Size="Size.Small" Color="MudBlazor.Color.Warning">Caixa</MudChip>
+                            </MudStack>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Saldo Realizado</MudText>
+                            <MudText Typo="Typo.h6" Color="@(dashboardData.CashBalance >= 0 ? MudBlazor.Color.Success : MudBlazor.Color.Error)">
+                                @Currency.Format(dashboardData.CashBalance)
+                            </MudText>
+                            <MudText Typo="Typo.caption">(Recebido - Pago)</MudText>
+                        </MudStack>
+                    </MudPaper>
+                </MudStack>
             </MudItem>
 
             <!-- Cash Flow Alerts Banner -->
@@ -160,108 +235,6 @@
                     </MudItem>
                 }
             }
-
-            <!-- Charts Row -->
-            <MudItem xs="12" md="8">
-                <MudPaper Class="pa-4" Elevation="3">
-                    @if (dashboardData.CashFlowProjection.Any())
-                    {
-                        <ApexChart TItem="CashFlowItemDto"
-                                   Title="Fluxo de Caixa (Próximos 30 dias)"
-                                   Options="options">
-
-                            <ApexPointSeries TItem="CashFlowItemDto"
-                                             Items="dashboardData.CashFlowProjection"
-                                             Name="Receitas"
-                                             SeriesType="SeriesType.Bar"
-                                             XValue="@(e => e.Date.ToString("dd/MM"))"
-                                             YValue="@(e => e.Revenue)"
-                                             Color="#00C853" />
-
-                            <ApexPointSeries TItem="CashFlowItemDto"
-                                             Items="dashboardData.CashFlowProjection"
-                                             Name="Despesas"
-                                             SeriesType="SeriesType.Bar"
-                                             XValue="@(e => e.Date.ToString("dd/MM"))"
-                                             YValue="@(e => e.Expense)"
-                                             Color="#F44336" />
-
-                            <ApexPointSeries TItem="CashFlowItemDto"
-                                             Items="dashboardData.CashFlowProjection"
-                                             Name="Saldo Acumulado"
-                                             SeriesType="SeriesType.Line"
-                                             XValue="@(e => e.Date.ToString("dd/MM"))"
-                                             YValue="@(e => e.CumulativeBalance)"
-                                             Color="#2196F3" />
-                        </ApexChart>
-                    }
-                    else
-                    {
-                        <MudText Typo="Typo.h6" Class="mb-4">Fluxo de Caixa (Próximos 30 dias)</MudText>
-                        <MudText>Sem dados para projeção.</MudText>
-                    }
-                </MudPaper>
-            </MudItem>
-
-            <MudItem xs="12" md="4">
-                <MudPaper Class="pa-4" Elevation="3">
-                    <MudText Typo="Typo.h6" Class="mb-4">Aging List (A Pagar)</MudText>
-                    @if (dashboardData.PayablesAgingList.Any(x => x.Amount > 0))
-                    {
-                        <ApexChart TItem="AgingListItemDto"
-                                   Title=""
-                                   Options="donutOptions">
-                            <ApexPointSeries TItem="AgingListItemDto"
-                                             Items="dashboardData.PayablesAgingList"
-                                             Name="Valor"
-                                             SeriesType="SeriesType.Donut"
-                                             XValue="@(e => e.Period)"
-                                             YValue="@(e => e.Amount)" />
-                        </ApexChart>
-                    }
-                    else
-                    {
-                        <MudText>Sem contas em atraso.</MudText>
-                    }
-                </MudPaper>
-            </MudItem>
-
-            <!-- Tables Row -->
-            <MudItem xs="12" md="6">
-                <MudPaper Class="pa-4" Elevation="3">
-                    <MudText Typo="Typo.h6" Class="mb-4">Top 5 Clientes</MudText>
-                    <MudTable Items="@dashboardData.TopCustomers" Dense="true" Hover="true" Elevation="0">
-                        <HeaderContent>
-                            <MudTh>Cliente</MudTh>
-                            <MudTh>Transações</MudTh>
-                            <MudTh>Total</MudTh>
-                        </HeaderContent>
-                        <RowTemplate>
-                            <MudTd>@context.Name</MudTd>
-                            <MudTd>@context.TransactionCount</MudTd>
-                            <MudTd>@Currency.Format(context.TotalAmount)</MudTd>
-                        </RowTemplate>
-                    </MudTable>
-                </MudPaper>
-            </MudItem>
-
-            <MudItem xs="12" md="6">
-                <MudPaper Class="pa-4" Elevation="3">
-                    <MudText Typo="Typo.h6" Class="mb-4">Top 5 Fornecedores</MudText>
-                    <MudTable Items="@dashboardData.TopSuppliers" Dense="true" Hover="true" Elevation="0">
-                        <HeaderContent>
-                            <MudTh>Fornecedor</MudTh>
-                            <MudTh>Transações</MudTh>
-                            <MudTh>Total</MudTh>
-                        </HeaderContent>
-                        <RowTemplate>
-                            <MudTd>@context.Name</MudTd>
-                            <MudTd>@context.TransactionCount</MudTd>
-                            <MudTd>@Currency.Format(context.TotalAmount)</MudTd>
-                        </RowTemplate>
-                    </MudTable>
-                </MudPaper>
-            </MudItem>
         </MudGrid>
     }
 </MudContainer>
@@ -270,14 +243,22 @@
     [Inject] private IApiService ApiService { get; set; } = null!;
     [Inject] private ISnackbar Snackbar { get; set; } = null!;
     [Inject] private CurrencyFormatService Currency { get; set; } = null!;
+    [Inject] private NavigationManager NavigationManager { get; set; } = null!;
 
     private FinancialDashboardDto? dashboardData;
     private bool isLoading = false;
+    private bool _hasError = false;
     private decimal _initialBalance = 0;
     private bool _showAlertDetails = false;
 
     private ApexChartOptions<CashFlowItemDto> options = new();
     private ApexChartOptions<AgingListItemDto> donutOptions = new();
+    private ApexChartOptions<AgingListItemDto> donutOptionsReceivables = new();
+
+    private void NavigateTo(string url)
+    {
+        NavigationManager.NavigateTo(url);
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -360,7 +341,7 @@
             }
         };
 
-        // Donut Chart Options
+        // Donut Chart Options - Payables
         donutOptions.Chart = new Chart
         {
             Toolbar = new Toolbar { Show = false }
@@ -369,7 +350,7 @@
         {
             Pie = new PlotOptionsPie
             {
-                                Donut = new PlotOptionsDonut()
+                Donut = new PlotOptionsDonut()
             }
         };
         donutOptions.Tooltip = new Tooltip
@@ -385,6 +366,34 @@
         {
             Position = LegendPosition.Bottom
         };
+        donutOptions.Colors = new List<string> { "#F44336", "#FF5722", "#FF9800", "#FFC107" };
+
+        // Donut Chart Options - Receivables
+        donutOptionsReceivables.Chart = new Chart
+        {
+            Toolbar = new Toolbar { Show = false }
+        };
+        donutOptionsReceivables.PlotOptions = new PlotOptions
+        {
+            Pie = new PlotOptionsPie
+            {
+                Donut = new PlotOptionsDonut()
+            }
+        };
+        donutOptionsReceivables.Tooltip = new Tooltip
+        {
+            Y = new TooltipY
+            {
+                Formatter = @"function (value) {
+                    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+                }"
+            }
+        };
+        donutOptionsReceivables.Legend = new Legend
+        {
+            Position = LegendPosition.Bottom
+        };
+        donutOptionsReceivables.Colors = new List<string> { "#4CAF50", "#8BC34A", "#CDDC39", "#FFEB3B" };
 
         await LoadDashboardData();
     }
@@ -392,12 +401,18 @@
     private async Task LoadDashboardData()
     {
         isLoading = true;
+        _hasError = false;
         try
         {
             dashboardData = await ApiService.GetAsync<FinancialDashboardDto>($"api/financial-dashboard?initialBalance={_initialBalance}");
+            if (dashboardData == null)
+            {
+                _hasError = true;
+            }
         }
         catch (Exception ex)
         {
+            _hasError = true;
             Snackbar.Add($"Erro ao carregar dashboard: {ex.Message}", Severity.Error);
         }
         finally
@@ -406,3 +421,18 @@
         }
     }
 }
+
+<style>
+    .hover-card {
+        transition: all 0.3s ease;
+    }
+
+    .hover-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 16px rgba(0,0,0,0.15) !important;
+    }
+
+    .cursor-pointer {
+        cursor: pointer;
+    }
+</style>

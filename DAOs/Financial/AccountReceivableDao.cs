@@ -19,7 +19,8 @@ public interface IAccountReceivableDao
         int? categoryId = null,
         int? costCenterId = null,
         string? sortBy = null,
-        bool sortDescending = false);
+        bool sortDescending = false,
+        string? searchText = null);
     Task<List<AccountReceivable>> GetOverdueAsync();
     Task<List<AccountReceivable>> GetDueSoonAsync(int days = 7);
     Task<decimal> GetTotalByStatusAsync(AccountStatus status);
@@ -81,7 +82,8 @@ public class AccountReceivableDao : IAccountReceivableDao
         int? categoryId = null,
         int? costCenterId = null,
         string? sortBy = null,
-        bool sortDescending = false)
+        bool sortDescending = false,
+        string? searchText = null)
     {
         var query = _context.AccountsReceivable
             .IgnoreQueryFilters()
@@ -109,6 +111,16 @@ public class AccountReceivableDao : IAccountReceivableDao
 
         if (costCenterId.HasValue)
             query = query.Where(a => a.CostCenterId == costCenterId.Value);
+
+        // Apply text search
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            var search = searchText.ToLower();
+            query = query.Where(a => 
+                (a.InvoiceNumber != null && a.InvoiceNumber.ToLower().Contains(search)) ||
+                (a.Customer != null && a.Customer.Name.ToLower().Contains(search)) ||
+                (a.Notes != null && a.Notes.ToLower().Contains(search)));
+        }
 
         var totalCount = await query.CountAsync();
 

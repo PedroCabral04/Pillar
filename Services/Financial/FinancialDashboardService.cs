@@ -1,6 +1,7 @@
 using erp.DAOs.Financial;
 using erp.DTOs.Financial;
 using erp.Models.Financial;
+using Microsoft.Extensions.Options;
 
 namespace erp.Services.Financial;
 
@@ -8,13 +9,16 @@ public class FinancialDashboardService : IFinancialDashboardService
 {
     private readonly IAccountPayableDao _payableDao;
     private readonly IAccountReceivableDao _receivableDao;
+    private readonly FinancialOptions _options;
 
     public FinancialDashboardService(
         IAccountPayableDao payableDao,
-        IAccountReceivableDao receivableDao)
+        IAccountReceivableDao receivableDao,
+        IOptions<FinancialOptions> options)
     {
         _payableDao = payableDao;
         _receivableDao = receivableDao;
+        _options = options.Value;
     }
 
     public async Task<FinancialDashboardDto> GetDashboardDataAsync(DateTime? startDate = null, DateTime? endDate = null, decimal initialBalance = 0)
@@ -45,36 +49,61 @@ public class FinancialDashboardService : IFinancialDashboardService
         dto.ReceivablesCount = receivables.Count(x => x.Status != AccountStatus.Paid && x.Status != AccountStatus.Cancelled);
         dto.ReceivablesOverdueCount = receivables.Count(x => x.Status == AccountStatus.Overdue);
 
-        // Cash Flow Projection (Next 30 days) with cumulative balance
+        // Cash Flow Projection with cumulative balance
+        // Uses configurable projection and history days
         var today = DateTime.UtcNow.Date;
-        var next30Days = today.AddDays(30);
+        var projectionDays = _options.CashFlowProjectionDays;
+        var historyDays = _options.CashFlowHistoryDays;
+        var finalDate = today.AddDays(projectionDays);
         
-        var flowPayables = payables
-            .Where(x => x.DueDate >= today && x.DueDate <= next30Days && x.Status != AccountStatus.Paid && x.Status != AccountStatus.Cancelled)
+        // Get pending accounts for future projection
+        var flowPayablesPending = payables
+            .Where(x => x.DueDate >= today && x.DueDate <= finalDate && x.Status != AccountStatus.Paid && x.Status != AccountStatus.Cancelled)
             .GroupBy(x => x.DueDate.Date)
             .ToDictionary(g => g.Key, g => g.Sum(x => x.RemainingAmount));
 
-        var flowReceivables = receivables
-            .Where(x => x.DueDate >= today && x.DueDate <= next30Days && x.Status != AccountStatus.Paid && x.Status != AccountStatus.Cancelled)
+        var flowReceivablesPending = receivables
+            .Where(x => x.DueDate >= today && x.DueDate <= finalDate && x.Status != AccountStatus.Paid && x.Status != AccountStatus.Cancelled)
             .GroupBy(x => x.DueDate.Date)
             .ToDictionary(g => g.Key, g => g.Sum(x => x.RemainingAmount));
+        
+        // Get realized (paid) accounts to show what already happened
+        var flowPayablesPaid = payables
+            .Where(x => x.PaymentDate.HasValue && x.PaymentDate.Value.Date >= today.AddDays(-historyDays) && x.PaymentDate.Value.Date <= finalDate && x.Status == AccountStatus.Paid)
+            .GroupBy(x => x.PaymentDate!.Value.Date)
+            .ToDictionary(g => g.Key, g => g.Sum(x => x.PaidAmount));
+
+        var flowReceivablesPaid = receivables
+            .Where(x => x.PaymentDate.HasValue && x.PaymentDate.Value.Date >= today.AddDays(-historyDays) && x.PaymentDate.Value.Date <= finalDate && x.Status == AccountStatus.Paid)
+            .GroupBy(x => x.PaymentDate!.Value.Date)
+            .ToDictionary(g => g.Key, g => g.Sum(x => x.PaidAmount));
 
         // Calculate cumulative balance starting from initial balance
         decimal cumulativeBalance = initialBalance;
         
-        for (int i = 0; i <= 30; i++)
+        for (int i = 0; i <= projectionDays; i++)
         {
             var date = today.AddDays(i);
-            var revenue = flowReceivables.ContainsKey(date) ? flowReceivables[date] : 0;
-            var expense = flowPayables.ContainsKey(date) ? flowPayables[date] : 0;
             
-            cumulativeBalance += (revenue - expense);
+            // Pending (projected)
+            var pendingRevenue = flowReceivablesPending.GetValueOrDefault(date, 0);
+            var pendingExpense = flowPayablesPending.GetValueOrDefault(date, 0);
+            
+            // Already paid (realized) - only for today and past dates shown
+            var paidRevenue = flowReceivablesPaid.GetValueOrDefault(date, 0);
+            var paidExpense = flowPayablesPaid.GetValueOrDefault(date, 0);
+            
+            // Combine for total view
+            var totalRevenue = pendingRevenue + paidRevenue;
+            var totalExpense = pendingExpense + paidExpense;
+            
+            cumulativeBalance += (totalRevenue - totalExpense);
             
             var cashFlowItem = new CashFlowItemDto
             {
                 Date = date,
-                Expense = expense,
-                Revenue = revenue,
+                Expense = totalExpense,
+                Revenue = totalRevenue,
                 CumulativeBalance = cumulativeBalance
             };
             

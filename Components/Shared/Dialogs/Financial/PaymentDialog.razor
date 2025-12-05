@@ -1,23 +1,38 @@
 <MudDialog>
     <DialogContent>
         <MudForm @ref="form" @bind-IsValid="@success">
-            <MudDatePicker Label="Data" @bind-Date="PaymentDate" Required="true" />
-            <MudNumericField @bind-Value="PaidAmount" Label="@AmountLabel" Format="C2" Required="true" />
-            <MudNumericField @bind-Value="AdditionalDiscount" Label="Desconto Adicional" Format="C2" />
-            <MudNumericField @bind-Value="AdditionalInterest" Label="Juros Adicionais" Format="C2" />
-            <MudNumericField @bind-Value="AdditionalFine" Label="Multa Adicional" Format="C2" />
-            <MudTextField @bind-Value="Notes" Label="Observações" Lines="2" />
+            <MudStack Spacing="3">
+                <MudDatePicker Label="Data" @bind-Date="PaymentDate" Required="true" 
+                               Variant="Variant.Outlined" />
+                <MudNumericField @bind-Value="PaidAmount" Label="@AmountLabel" Format="N2" 
+                                 Required="true" Variant="Variant.Outlined"
+                                 Min="0.01m" Max="@MaxAmount"
+                                 Adornment="Adornment.Start" AdornmentText="R$"
+                                 HelperText="@($"Máximo: R$ {MaxAmount:N2}")" />
+                <MudNumericField @bind-Value="AdditionalDiscount" Label="Desconto Adicional" Format="N2" 
+                                 Variant="Variant.Outlined" Min="0m"
+                                 Adornment="Adornment.Start" AdornmentText="R$" />
+                <MudNumericField @bind-Value="AdditionalInterest" Label="Juros Adicionais" Format="N2" 
+                                 Variant="Variant.Outlined" Min="0m"
+                                 Adornment="Adornment.Start" AdornmentText="R$" />
+                <MudNumericField @bind-Value="AdditionalFine" Label="Multa Adicional" Format="N2" 
+                                 Variant="Variant.Outlined" Min="0m"
+                                 Adornment="Adornment.Start" AdornmentText="R$" />
+                <MudTextField @bind-Value="Notes" Label="Observações" Lines="2" 
+                              Variant="Variant.Outlined" />
+            </MudStack>
         </MudForm>
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Cancel" Variant="Variant.Outlined">Cancelar</MudButton>
-        <MudButton Color="MudBlazor.Color.Primary" OnClick="Submit">Confirmar</MudButton>
+        <MudButton Color="MudBlazor.Color.Primary" Variant="Variant.Filled" OnClick="Submit">Confirmar</MudButton>
     </DialogActions>
 </MudDialog>
 
 @code {
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
     [Parameter] public decimal PaidAmount { get; set; }
+    [Parameter] public decimal MaxAmount { get; set; } = decimal.MaxValue;
     [Parameter] public DateTime? PaymentDate { get; set; } = DateTime.Today;
     [Parameter] public string AmountLabel { get; set; } = "Valor Pago";
 
@@ -31,14 +46,20 @@
 
     private void Cancel() => MudDialog.Cancel();
 
-    private void Submit()
+    private async Task Submit()
     {
-        form.Validate();
+        await form.Validate();
         if (success)
         {
+            // Additional validation: amount cannot exceed max
+            if (PaidAmount > MaxAmount)
+            {
+                return;
+            }
+
             MudDialog.Close(DialogResult.Ok(new {
                 PaidAmount,
-                PaymentDate = PaymentDate ?? DateTime.Today,
+                PaymentDate = PaymentDate ?? DateTime.UtcNow.Date,
                 AdditionalDiscount,
                 AdditionalInterest,
                 AdditionalFine,
