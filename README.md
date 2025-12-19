@@ -4,9 +4,6 @@ Sistema ERP modular construído com Blazor (Server), .NET 9, MudBlazor e ASP.NET
 
 ## 🚀 Deploy Rápido
 
-### Coolify (Recomendado)
-Veja o guia completo de deploy no Coolify: **[COOLIFY_DEPLOYMENT.md](COOLIFY_DEPLOYMENT.md)**
-
 ### Docker
 ```bash
 docker-compose up -d
