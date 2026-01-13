@@ -3,6 +3,7 @@
 @using erp.DTOs.Inventory
 @using erp.Services
 @using erp.Components.Shared.Dialogs
+@using erp.Components.Shared
 @inject ISnackbar Snackbar
 @inject IApiService ApiService
 @inject IDialogService DialogService
@@ -50,13 +51,11 @@
                     </MudItem>
                     
                     <MudItem xs="12" md="6">
-                        <MudDatePicker Label="Data da Venda"
-                                      @bind-Date="_saleDate"
-                                      Variant="Variant.Outlined"
-                                      Required="true"
-                                      Editable="true"
-                                      Adornment="Adornment.Start"
-                                      AdornmentIcon="@Icons.Material.Filled.CalendarToday"/>
+                        <DatePicker Label="Data da Venda"
+                                    @bind-Date="_saleDate"
+                                    Required="true"
+                                    Adornment="Adornment.Start"
+                                    AdornmentIcon="@Icons.Material.Filled.CalendarToday"/>
                     </MudItem>
                     
                     <MudItem xs="12" md="6">

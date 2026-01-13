@@ -1,6 +1,7 @@
 @using erp.DTOs.Financial
 @using erp.DTOs.Sales
 @using erp.Models.Financial
+@using erp.Components.Shared
 
 <MudDialog>
     <TitleContent>
@@ -50,22 +51,20 @@
             </MudText>
             <MudGrid Spacing="3">
                 <MudItem xs="12" sm="6">
-                    <MudDatePicker Label="Data de Emissão" 
-                                   Date="@(Model.IssueDate == default ? DateTime.Today : Model.IssueDate)" 
-                                   DateChanged="@(d => Model.IssueDate = d ?? DateTime.Today)" 
-                                   Variant="Variant.Outlined"
-                                   Adornment="Adornment.Start"
-                                   AdornmentIcon="@Icons.Material.Filled.CalendarToday"/>
+                    <DatePicker Label="Data de Emissão"
+                                Date="@(Model.IssueDate == default ? DateTime.Today : Model.IssueDate)"
+                                DateChanged="@(d => Model.IssueDate = d ?? DateTime.Today)"
+                                Adornment="Adornment.Start"
+                                AdornmentIcon="@Icons.Material.Filled.CalendarToday"/>
                 </MudItem>
                 <MudItem xs="12" sm="6">
-                    <MudDatePicker Label="Data de Vencimento" 
-                                   Date="@(Model.DueDate == default ? DateTime.Today : Model.DueDate)" 
-                                   DateChanged="@(d => Model.DueDate = d ?? DateTime.Today)" 
-                                   Required="true" 
-                                   RequiredError="Data de vencimento é obrigatória" 
-                                   Variant="Variant.Outlined"
-                                   Adornment="Adornment.Start"
-                                   AdornmentIcon="@Icons.Material.Filled.Event"/>
+                    <DatePicker Label="Data de Vencimento"
+                                Date="@(Model.DueDate == default ? DateTime.Today : Model.DueDate)"
+                                DateChanged="@(d => Model.DueDate = d ?? DateTime.Today)"
+                                Required="true"
+                                RequiredError="Data de vencimento é obrigatória"
+                                Adornment="Adornment.Start"
+                                AdornmentIcon="@Icons.Material.Filled.Event"/>
                 </MudItem>
             </MudGrid>
 

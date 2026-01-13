@@ -130,8 +130,8 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
 
     private async Task<ChartDataResponse> GetSalesByMonthAsync(DashboardQuery query, CancellationToken ct)
     {
-        var startDate = (query.From ?? DateTime.Now.AddMonths(-11).Date).ToUniversalTime();
-        var endDate = (query.To ?? DateTime.Now.Date).ToUniversalTime();
+        var startDate = query.From?.ToUniversalTime() ?? DateTime.UtcNow.AddMonths(-11).Date;
+        var endDate = query.To?.ToUniversalTime() ?? DateTime.UtcNow.Date;
 
         var salesByMonth = await _context.Sales
             .Where(s => s.Status == "Finalizada" && 
@@ -182,8 +182,8 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
 
     private async Task<ChartDataResponse> GetTopProductsAsync(DashboardQuery query, CancellationToken ct)
     {
-        var startDate = (query.From ?? DateTime.Now.AddMonths(-1).Date).ToUniversalTime();
-        var endDate = (query.To ?? DateTime.Now.Date).ToUniversalTime();
+        var startDate = query.From ?? DateTime.UtcNow.AddMonths(-1).Date;
+        var endDate = query.To ?? DateTime.UtcNow.Date;
 
         var topProducts = await _context.SaleItems
             .Include(i => i.Sale)
@@ -224,8 +224,8 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
 
     private async Task<ChartDataResponse> GetSalesByStatusAsync(DashboardQuery query, CancellationToken ct)
     {
-        var startDate = (query.From ?? DateTime.Now.AddMonths(-1).Date).ToUniversalTime();
-        var endDate = (query.To ?? DateTime.Now.Date).ToUniversalTime();
+        var startDate = query.From ?? DateTime.UtcNow.AddMonths(-1).Date;
+        var endDate = query.To ?? DateTime.UtcNow.Date;
 
         var salesByStatus = await _context.Sales
             .Where(s => s.SaleDate >= startDate && s.SaleDate <= endDate)
@@ -262,8 +262,8 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
     {
         var filter = new SalesReportFilterDto
         {
-            StartDate = query.From ?? DateTime.Now.AddMonths(-1),
-            EndDate = query.To ?? DateTime.Now
+            StartDate = query.From?.ToUniversalTime() ?? DateTime.UtcNow.AddMonths(-1),
+            EndDate = query.To?.ToUniversalTime() ?? DateTime.UtcNow
         };
 
         var heatmapReport = await _salesReportService.GenerateSalesHeatmapAsync(filter);

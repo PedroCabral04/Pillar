@@ -1,5 +1,6 @@
 @using erp.DTOs.ServiceOrders
 @using erp.Services
+@using erp.Components.Shared
 @using MudBlazor
 @using Size = MudBlazor.Size
 @using Color = MudBlazor.Color
@@ -52,12 +53,10 @@
                     <!-- Datas -->
                     <MudStack Row="true" Spacing="2">
                         <MudItem xs="6">
-                            <MudDatePicker T="DateTime?" Label="Previsão Entrega" @bind-Date="_dto.EstimatedCompletionDate"
-                                        Variant="Variant.Outlined" Dense="true"/>
+                            <DatePicker Label="Previsão Entrega" @bind-Date="_dto.EstimatedCompletionDate" Dense="true"/>
                         </MudItem>
                         <MudItem xs="6">
-                            <MudDatePicker T="DateTime?" Label="Data Conclusão" @bind-Date="_dto.ActualCompletionDate"
-                                        Variant="Variant.Outlined" Dense="true"/>
+                            <DatePicker Label="Data Conclusão" @bind-Date="_dto.ActualCompletionDate" Dense="true"/>
                         </MudItem>
                     </MudStack>
 

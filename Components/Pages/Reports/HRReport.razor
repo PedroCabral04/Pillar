@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @using erp.DTOs.Reports
 @using erp.Services
+@using erp.Components.Shared
 @using Microsoft.AspNetCore.Authorization
 @using Color = MudBlazor.Color
 @using Size = MudBlazor.Size
@@ -27,10 +28,10 @@
                 <MudCardContent>
                     <MudGrid>
                         <MudItem xs="12" md="6">
-                            <MudDatePicker Label="Data Início" @bind-Date="_attendanceFilter.StartDate" />
+                            <DatePicker Label="Data Início" @bind-Date="_attendanceFilter.StartDate" />
                         </MudItem>
                         <MudItem xs="12" md="6">
-                            <MudDatePicker Label="Data Fim" @bind-Date="_attendanceFilter.EndDate" />
+                            <DatePicker Label="Data Fim" @bind-Date="_attendanceFilter.EndDate" />
                         </MudItem>
                         <MudItem xs="12">
                             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadAttendanceReport" StartIcon="@Icons.Material.Filled.Search">
@@ -125,10 +126,10 @@
                 <MudCardContent>
                     <MudGrid>
                         <MudItem xs="12" md="6">
-                            <MudDatePicker Label="Data Início" @bind-Date="_turnoverFilter.StartDate" />
+                            <DatePicker Label="Data Início" @bind-Date="_turnoverFilter.StartDate" />
                         </MudItem>
                         <MudItem xs="12" md="6">
-                            <MudDatePicker Label="Data Fim" @bind-Date="_turnoverFilter.EndDate" />
+                            <DatePicker Label="Data Fim" @bind-Date="_turnoverFilter.EndDate" />
                         </MudItem>
                         <MudItem xs="12">
                             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadTurnoverReport" StartIcon="@Icons.Material.Filled.Search">

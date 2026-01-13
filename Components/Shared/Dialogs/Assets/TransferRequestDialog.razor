@@ -1,6 +1,7 @@
 @using erp.DTOs.Assets
 @using erp.Services
 @using erp.Models
+@using erp.Components.Shared
 @using MudBlazor
 @using Size = MudBlazor.Size
 @using Color = MudBlazor.Color
@@ -55,12 +56,10 @@
 
                 <!-- Transfer Date -->
                 <MudItem xs="12" md="6">
-                    <MudDatePicker @bind-Date="_transferDate" 
-                                   Label="Data da Transferência" 
+                    <DatePicker @bind-Date="_transferDate"
+                                   Label="Data da Transferência"
                                    Required="true"
-                                   MinDate="@DateTime.Today"
-                                   Variant="Variant.Outlined"
-                                   DateFormat="dd/MM/yyyy"/>
+                                   MinDate="@DateTime.Today"/>
                 </MudItem>
 
                 <!-- Asset Condition -->

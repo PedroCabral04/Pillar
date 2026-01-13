@@ -1,6 +1,7 @@
 @using erp.DTOs.Assets
 @using erp.Services
 @using erp.Models
+@using erp.Components.Shared
 @using MudBlazor
 @using System.Net.Http.Headers
 @using Size = MudBlazor.Size
@@ -86,18 +87,14 @@
 
                 <!-- Document Date -->
                 <MudItem xs="12" md="6">
-                    <MudDatePicker @bind-Date="_documentDate" 
-                                   Label="Data do Documento"
-                                   Variant="Variant.Outlined"
-                                   DateFormat="dd/MM/yyyy"/>
+                    <DatePicker @bind-Date="_documentDate"
+                                   Label="Data do Documento"/>
                 </MudItem>
 
                 <!-- Expiry Date -->
                 <MudItem xs="12" md="6">
-                    <MudDatePicker @bind-Date="_expiryDate" 
-                                   Label="Data de Vencimento"
-                                   Variant="Variant.Outlined"
-                                   DateFormat="dd/MM/yyyy"/>
+                    <DatePicker @bind-Date="_expiryDate"
+                                   Label="Data de Vencimento"/>
                 </MudItem>
 
                 <!-- Description -->

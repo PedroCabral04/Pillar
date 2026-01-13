@@ -1,6 +1,7 @@
-using Microsoft.EntityFrameworkCore; 
+using Microsoft.EntityFrameworkCore;
 using DotNetEnv;
 using System;
+using System.Globalization;
 using MudBlazor.Services;
 using erp.Components;
 using erp.DAOs;
@@ -219,6 +220,11 @@ builder.Services.AddScoped(sp => {
         BaseAddress = new Uri(navigationManager.BaseUri)
     };
 });
+
+// Configuração global de cultura brasileira para formatação de datas e números
+var cultureInfo = new CultureInfo("pt-BR");
+CultureInfo.DefaultThreadCurrentCulture = cultureInfo;
+CultureInfo.DefaultThreadCurrentUICulture = cultureInfo;
 
 // Adiciona serviços de terceiros.
 builder.Services.AddMudServices(config =>

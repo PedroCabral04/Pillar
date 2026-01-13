@@ -4,6 +4,7 @@
 @using erp.DTOs.Inventory
 @using erp.Components.Shared.Dialogs
 @using erp.Components.Shared.Dialogs.Sales
+@using erp.Components.Shared
 @using MudBlazor
 @using Size = MudBlazor.Size
 @using Color = MudBlazor.Color
@@ -56,14 +57,12 @@
                     <MudSelectItem T="string" Value="@("Finalizada")">Finalizada</MudSelectItem>
                     <MudSelectItem T="string" Value="@("Cancelada")">Cancelada</MudSelectItem>
                 </MudSelect>
-                <MudDatePicker Label="Data Inicial" 
-                            @bind-Date="_startDate" 
-                            Variant="Variant.Outlined" 
+                <DatePicker Label="Data Inicial"
+                            @bind-Date="_startDate"
                             Margin="Margin.Dense"
                             Clearable="true"/>
-                <MudDatePicker Label="Data Final" 
-                            @bind-Date="_endDate" 
-                            Variant="Variant.Outlined" 
+                <DatePicker Label="Data Final"
+                            @bind-Date="_endDate"
                             Margin="Margin.Dense"
                             Clearable="true"/>
                 <MudIconButton Icon="@Icons.Material.Filled.FilterAlt" 

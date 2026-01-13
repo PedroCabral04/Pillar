@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @using erp.DTOs.Reports
 @using erp.Services
+@using erp.Components.Shared
 @using Microsoft.AspNetCore.Authorization
 @using Color = MudBlazor.Color
 @using Size = MudBlazor.Size
@@ -28,10 +29,10 @@
                 <MudCardContent>
                     <MudGrid>
                         <MudItem xs="12" md="6">
-                            <MudDatePicker Label="Data Início" @bind-Date="_cashFlowFilter.StartDate" />
+                            <DatePicker Label="Data Início" @bind-Date="_cashFlowFilter.StartDate" />
                         </MudItem>
                         <MudItem xs="12" md="6">
-                            <MudDatePicker Label="Data Fim" @bind-Date="_cashFlowFilter.EndDate" />
+                            <DatePicker Label="Data Fim" @bind-Date="_cashFlowFilter.EndDate" />
                         </MudItem>
                         <MudItem xs="12">
                             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadCashFlowReport" StartIcon="@Icons.Material.Filled.Search">
@@ -120,10 +121,10 @@
                 <MudCardContent>
                     <MudGrid>
                         <MudItem xs="12" md="6">
-                            <MudDatePicker Label="Data Início" @bind-Date="_profitLossFilter.StartDate" />
+                            <DatePicker Label="Data Início" @bind-Date="_profitLossFilter.StartDate" />
                         </MudItem>
                         <MudItem xs="12" md="6">
-                            <MudDatePicker Label="Data Fim" @bind-Date="_profitLossFilter.EndDate" />
+                            <DatePicker Label="Data Fim" @bind-Date="_profitLossFilter.EndDate" />
                         </MudItem>
                         <MudItem xs="12">
                             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadProfitLossReport" StartIcon="@Icons.Material.Filled.Search">
@@ -204,7 +205,7 @@
                 <MudCardContent>
                     <MudGrid>
                         <MudItem xs="12" md="12">
-                            <MudDatePicker Label="Data de Referência" @bind-Date="_balanceSheetFilter.StartDate" />
+                            <DatePicker Label="Data de Referência" @bind-Date="_balanceSheetFilter.StartDate" />
                         </MudItem>
                         <MudItem xs="12">
                             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadBalanceSheetReport" StartIcon="@Icons.Material.Filled.Search">

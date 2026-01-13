@@ -1,7 +1,9 @@
+@using erp.Components.Shared
+
 <MudDialog>
     <DialogContent>
         <MudForm @ref="form" @bind-IsValid="@success">
-            <MudDatePicker Label="Data" @bind-Date="PaymentDate" Required="true" />
+            <DatePicker Label="Data" @bind-Date="PaymentDate" Required="true" />
             <MudNumericField @bind-Value="PaidAmount" Label="@AmountLabel" Format="C2" Required="true" />
             <MudNumericField @bind-Value="AdditionalDiscount" Label="Desconto Adicional" Format="C2" />
             <MudNumericField @bind-Value="AdditionalInterest" Label="Juros Adicionais" Format="C2" />

@@ -1,0 +1,53 @@
+@using MudBlazor
+@using erp.Services
+@inject PreferenceService PreferenceService
+
+<MudDatePicker @bind-Date="_currentDate"
+               Label="@Label"
+               DateFormat="@PreferenceService.CurrentPreferences.Locale.DateFormat"
+               Editable="false"
+               Variant="@Variant"
+               Required="@Required"
+               RequiredError="@RequiredError"
+               Disabled="@Disabled"
+               Clearable="@Clearable"
+               Adornment="@Adornment"
+               AdornmentIcon="@AdornmentIcon"
+               Margin="@Margin"
+               Dense="@_isDense"
+               Class="@Class"
+               Style="@Style"
+               @attributes="UserAttributes" />
+
+@code {
+    [Parameter] public string Label { get; set; } = "Data";
+    [Parameter] public DateTime? Date { get; set; }
+    [Parameter] public EventCallback<DateTime?> DateChanged { get; set; }
+    [Parameter] public Variant Variant { get; set; } = Variant.Outlined;
+    [Parameter] public bool Required { get; set; }
+    [Parameter] public string? RequiredError { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool Clearable { get; set; }
+    [Parameter] public Adornment Adornment { get; set; } = Adornment.Start;
+    [Parameter] public string? AdornmentIcon { get; set; }
+    [Parameter] public Margin Margin { get; set; } = Margin.Dense;
+    [Parameter] public bool? Dense { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public string? Style { get; set; }
+    [Parameter(CaptureUnmatchedValues = true)] public Dictionary<string, object>? UserAttributes { get; set; }
+
+    private bool _isDense => Dense ?? PreferenceService.CurrentPreferences.Ui.Density == "compact";
+
+    private DateTime? _currentDate
+    {
+        get => Date;
+        set
+        {
+            if (Date != value)
+            {
+                Date = value;
+                DateChanged.InvokeAsync(value);
+            }
+        }
+    }
+}

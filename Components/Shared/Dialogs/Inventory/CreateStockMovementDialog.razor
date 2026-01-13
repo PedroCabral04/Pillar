@@ -1,4 +1,5 @@
 @using MudBlazor
+@using erp.Components.Shared
 @using erp.DTOs.Inventory
 @using erp.Services
 @inject ISnackbar Snackbar
@@ -111,11 +112,9 @@
                     </MudItem>
                     
                     <MudItem xs="12" md="6">
-                        <MudDatePicker Label="Data da Movimentação"
+                        <DatePicker Label="Data da Movimentação"
                                       @bind-Date="_movementDate"
-                                      Variant="Variant.Outlined"
                                       Required="true"
-                                      Editable="true"
                                       Adornment="Adornment.Start"
                                       AdornmentIcon="@Icons.Material.Filled.CalendarToday"/>
                     </MudItem>

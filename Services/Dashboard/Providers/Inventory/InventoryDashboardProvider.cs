@@ -142,8 +142,8 @@ public class InventoryDashboardProvider : IDashboardWidgetProvider
 
     private async Task<ChartDataResponse> GetStockMovementsAsync(DashboardQuery query, CancellationToken ct)
     {
-        var startDate = (query.From ?? DateTime.Now.AddMonths(-11).Date).ToUniversalTime();
-        var endDate = (query.To ?? DateTime.Now.Date).ToUniversalTime();
+        var startDate = query.From?.ToUniversalTime() ?? DateTime.UtcNow.AddMonths(-11).Date;
+        var endDate = query.To?.ToUniversalTime() ?? DateTime.UtcNow.Date;
 
         var movements = await _context.StockMovements
             .Where(m => m.MovementDate >= startDate && m.MovementDate <= endDate)
@@ -233,8 +233,8 @@ public class InventoryDashboardProvider : IDashboardWidgetProvider
     {
         var filter = new InventoryReportFilterDto
         {
-            StartDate = query.From ?? DateTime.Now.AddMonths(-6),
-            EndDate = query.To ?? DateTime.Now
+            StartDate = query.From?.ToUniversalTime() ?? DateTime.UtcNow.AddMonths(-6),
+            EndDate = query.To?.ToUniversalTime() ?? DateTime.UtcNow
         };
 
         var abcReport = await _inventoryReportService.GenerateABCCurveReportAsync(filter);

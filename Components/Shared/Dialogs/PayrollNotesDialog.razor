@@ -1,4 +1,5 @@
 @using MudBlazor
+@using erp.Components.Shared
 @using Color = MudBlazor.Color
 @using Size = MudBlazor.Size
 
@@ -11,12 +12,9 @@
             <MudStack Spacing="2">
                 @if (RequiresPaymentDate)
                 {
-                    <MudDatePicker Label="Data do pagamento"
+                    <DatePicker Label="Data do pagamento"
                                     @bind-Date="_paymentDate"
                                     Required="true"
-                                    DateFormat="dd/MM/yyyy"
-                                    DisplayFormat="dd/MM/yyyy"
-                                    Variant="Variant.Outlined"
                                     Margin="Margin.Dense" />
                 }
                 <MudTextField T="string"

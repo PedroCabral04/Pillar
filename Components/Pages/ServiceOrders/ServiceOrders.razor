@@ -3,6 +3,7 @@
 @using erp.Services
 @using erp.Components.Shared.Dialogs
 @using erp.Components.Shared.Dialogs.ServiceOrders
+@using erp.Components.Shared
 @using MudBlazor
 @using Size = MudBlazor.Size
 @using Color = MudBlazor.Color
@@ -59,14 +60,12 @@
                     <MudSelectItem T="string" Value="@("Delivered")">Entregue</MudSelectItem>
                     <MudSelectItem T="string" Value="@("Cancelled")">Cancelado</MudSelectItem>
                 </MudSelect>
-                <MudDatePicker Label="Data Inicial"
+                <DatePicker Label="Data Inicial"
                             @bind-Date="_startDate"
-                            Variant="Variant.Outlined"
                             Margin="Margin.Dense"
                             Clearable="true"/>
-                <MudDatePicker Label="Data Final"
+                <DatePicker Label="Data Final"
                             @bind-Date="_endDate"
-                            Variant="Variant.Outlined"
                             Margin="Margin.Dense"
                             Clearable="true"/>
                 <MudIconButton Icon="@Icons.Material.Filled.FilterAlt"

@@ -2,6 +2,7 @@
 @using erp.DTOs.Inventory
 @using erp.Services
 @using erp.Services.Inventory
+@using erp.Components.Shared
 @using System.Linq
 @inject ISnackbar Snackbar
 @inject IApiService ApiService
@@ -57,11 +58,9 @@
                     </MudItem>
                     
                     <MudItem xs="12">
-                        <MudDatePicker Label="Data da Contagem"
+                        <DatePicker Label="Data da Contagem"
                                       @bind-Date="_countDate"
-                                      Variant="Variant.Outlined"
                                       Required="true"
-                                      Editable="true"
                                       Adornment="Adornment.Start"
                                       AdornmentIcon="@Icons.Material.Filled.CalendarToday"/>
                     </MudItem>

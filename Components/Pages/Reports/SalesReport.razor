@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @using erp.DTOs.Reports
 @using erp.Services
+@using erp.Components.Shared
 @using Microsoft.AspNetCore.Authorization
 @using Color = MudBlazor.Color
 @using Size = MudBlazor.Size
@@ -35,10 +36,10 @@
         <MudCardContent>
             <MudGrid>
                 <MudItem xs="12" sm="6" md="3">
-                    <MudDatePicker Label="Data Início" @bind-Date="_filter.StartDate" />
+                    <DatePicker Label="Data Início" @bind-Date="_filter.StartDate" />
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
-                    <MudDatePicker Label="Data Fim" @bind-Date="_filter.EndDate" />
+                    <DatePicker Label="Data Fim" @bind-Date="_filter.EndDate" />
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
                     <MudSelect T="string" Label="Status" @bind-Value="_filter.Status" Clearable="true">
@@ -194,10 +195,10 @@
                 <MudCardContent>
                     <MudGrid>
                         <MudItem xs="12" sm="6" md="3">
-                            <MudDatePicker Label="Data Início" @bind-Date="_heatmapFilter.StartDate" />
+                            <DatePicker Label="Data Início" @bind-Date="_heatmapFilter.StartDate" />
                         </MudItem>
                         <MudItem xs="12" sm="6" md="3">
-                            <MudDatePicker Label="Data Fim" @bind-Date="_heatmapFilter.EndDate" />
+                            <DatePicker Label="Data Fim" @bind-Date="_heatmapFilter.EndDate" />
                         </MudItem>
                         <MudItem xs="12" sm="6" md="3">
                             <MudSelect T="string" Label="Métrica" @bind-Value="_heatmapMetric" Variant="Variant.Outlined">

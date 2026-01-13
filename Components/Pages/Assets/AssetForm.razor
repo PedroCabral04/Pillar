@@ -1,6 +1,7 @@
 @using erp.DTOs.Assets
 @using erp.Services
 @using erp.Models
+@using erp.Components.Shared
 @using MudBlazor
 @using Size = MudBlazor.Size
 @using Color = MudBlazor.Color
@@ -80,10 +81,8 @@
                 </MudItem>
 
                 <MudItem xs="12" md="3">
-                    <MudDatePicker @bind-Date="_purchaseDate"
-                                   Label="Data de Compra"
-                                   Variant="Variant.Outlined"
-                                   DateFormat="dd/MM/yyyy" />
+                    <DatePicker @bind-Date="_purchaseDate"
+                                   Label="Data de Compra" />
                 </MudItem>
 
                 <MudItem xs="12" md="3">
@@ -127,10 +126,8 @@
                 </MudItem>
 
                 <MudItem xs="12" md="4">
-                    <MudDatePicker @bind-Date="_warrantyExpiryDate"
-                                   Label="Garantia até"
-                                   Variant="Variant.Outlined"
-                                   DateFormat="dd/MM/yyyy" />
+                    <DatePicker @bind-Date="_warrantyExpiryDate"
+                                   Label="Garantia até" />
                 </MudItem>
 
                 <MudItem xs="12" md="4">

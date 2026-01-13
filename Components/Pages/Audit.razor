@@ -2,6 +2,7 @@
 @using erp.DTOs.Audit
 @using erp.Services
 @using erp.Services.Audit
+@using erp.Components.Shared
 @using MudColor = MudBlazor.Color
 @using MudSize = MudBlazor.Size
 @inject IApiService ApiService
@@ -44,14 +45,12 @@
                     </MudSelect>
                 </MudItem>
                 <MudItem xs="12" md="2">
-                    <MudDatePicker @bind-Date="_startDate" 
-                                   Label="Data Inicial" 
-                                   Variant="Variant.Outlined" />
+                    <DatePicker @bind-Date="_startDate"
+                                   Label="Data Inicial" />
                 </MudItem>
                 <MudItem xs="12" md="2">
-                    <MudDatePicker @bind-Date="_endDate" 
-                                   Label="Data Final" 
-                                   Variant="Variant.Outlined" />
+                    <DatePicker @bind-Date="_endDate"
+                                   Label="Data Final" />
                 </MudItem>
                 <MudItem xs="12" Class="d-flex gap-2">
                     <MudButton Variant="Variant.Filled" 

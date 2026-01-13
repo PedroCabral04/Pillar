@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Globalization;
 using Microsoft.SemanticKernel;
 using erp.Services.Sales;
 using erp.Services.Inventory;
@@ -100,7 +101,7 @@ public class SalesPlugin
                     }
                 },
                 Notes = notes,
-                SaleDate = DateTime.Now,
+                SaleDate = DateTime.UtcNow,
                 Status = "Pendente"
             };
 
@@ -157,14 +158,14 @@ public class SalesPlugin
     {
         try
         {
-            if (!DateTime.TryParse(startDate, out var start))
+            if (!DateTime.TryParseExact(startDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var start))
             {
-                return "❌ Data inicial inválida. Use o formato: yyyy-MM-dd";
+                return "❌ Data inicial inválida. Use o formato: yyyy-MM-dd (ex: 2026-01-15)";
             }
 
-            if (!DateTime.TryParse(endDate, out var end))
+            if (!DateTime.TryParseExact(endDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var end))
             {
-                return "❌ Data final inválida. Use o formato: yyyy-MM-dd";
+                return "❌ Data final inválida. Use o formato: yyyy-MM-dd (ex: 2026-01-15)";
             }
 
             var total = await _salesService.GetTotalSalesAsync(start, end);

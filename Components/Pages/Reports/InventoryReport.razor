@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @using erp.DTOs.Reports
 @using erp.Services
+@using erp.Components.Shared
 @using Microsoft.AspNetCore.Authorization
 @using Color = MudBlazor.Color
 @using Size = MudBlazor.Size
@@ -29,10 +30,10 @@
                 <MudCardContent>
                     <MudGrid>
                         <MudItem xs="12" md="4">
-                            <MudDatePicker Label="Data Início" @bind-Date="_abcFilter.StartDate" />
+                            <DatePicker Label="Data Início" @bind-Date="_abcFilter.StartDate" />
                         </MudItem>
                         <MudItem xs="12" md="4">
-                            <MudDatePicker Label="Data Fim" @bind-Date="_abcFilter.EndDate" />
+                            <DatePicker Label="Data Fim" @bind-Date="_abcFilter.EndDate" />
                         </MudItem>
                         <MudItem xs="12" md="4">
                             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadABCCurveReport" StartIcon="@Icons.Material.Filled.Search" Class="mt-4">
@@ -262,10 +263,10 @@
                 <MudCardContent>
                     <MudGrid>
                         <MudItem xs="12" md="6">
-                            <MudDatePicker Label="Data Início" @bind-Date="_stockMovementFilter.StartDate" />
+                            <DatePicker Label="Data Início" @bind-Date="_stockMovementFilter.StartDate" />
                         </MudItem>
                         <MudItem xs="12" md="6">
-                            <MudDatePicker Label="Data Fim" @bind-Date="_stockMovementFilter.EndDate" />
+                            <DatePicker Label="Data Fim" @bind-Date="_stockMovementFilter.EndDate" />
                         </MudItem>
                         <MudItem xs="12">
                             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadStockMovementReport" StartIcon="@Icons.Material.Filled.Search">

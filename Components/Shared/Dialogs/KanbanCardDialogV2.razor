@@ -2,6 +2,7 @@
 @using erp.DTOs.Kanban
 @using erp.Models.Kanban
 @using erp.Services
+@using erp.Components.Shared
 @using MudBlazor
 @inject IApiService Api
 
@@ -48,12 +49,9 @@
 
                     <MudGrid>
                         <MudItem xs="12" sm="6">
-                            <MudDatePicker @bind-Date="_dueDate"
+                            <DatePicker @bind-Date="_dueDate"
                                            Label="Data de Vencimento"
-                                           Variant="Variant.Outlined"
                                            Clearable="true"
-                                           DateFormat="dd/MM/yyyy"
-                                           Placeholder="Selecione..."
                                            Adornment="Adornment.Start"
                                            AdornmentIcon="@Icons.Material.Filled.CalendarToday" />
                         </MudItem>

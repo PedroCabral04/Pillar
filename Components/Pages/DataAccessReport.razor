@@ -2,6 +2,7 @@
 @using erp.DTOs.Audit
 @using erp.Models.Audit
 @using erp.Services
+@using erp.Components.Shared
 @using MudColor = MudBlazor.Color
 @using MudSize = MudBlazor.Size
 @using MudAlign = MudBlazor.Align
@@ -21,13 +22,13 @@
     <MudPaper Class="pa-4 mb-4">
         <MudGrid>
             <MudItem xs="12" md="3">
-                <MudDatePicker Label="Data Inicial" 
+                <DatePicker Label="Data Inicial"
                               @bind-Date="_startDate"
                               MaxDate="DateTime.Today"
                               Clearable="true" />
             </MudItem>
             <MudItem xs="12" md="3">
-                <MudDatePicker Label="Data Final" 
+                <DatePicker Label="Data Final"
                               @bind-Date="_endDate"
                               MaxDate="DateTime.Today"
                               Clearable="true" />
