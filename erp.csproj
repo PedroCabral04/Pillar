@@ -67,7 +67,4 @@
       <Compile Remove="Pillar.AppHost\**\*.cs" />
       <Compile Remove="Pillar.ServiceDefaults\**\*.cs" />
     </ItemGroup>
-    <ItemGroup>
-      <ProjectReference Include="Pillar.ServiceDefaults\Pillar.ServiceDefaults.csproj" />
-    </ItemGroup>
 </Project>
