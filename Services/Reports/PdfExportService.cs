@@ -3,6 +3,7 @@ using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using erp.DTOs.Reports;
 using erp.DTOs.Sales;
+using erp.DTOs.ServiceOrders;
 
 namespace erp.Services.Reports;
 
@@ -14,6 +15,7 @@ public interface IPdfExportService
     byte[] ExportStockLevelsReportToPdf(StockLevelsReportDto report, InventoryReportFilterDto filter);
     byte[] ExportHeadcountReportToPdf(HeadcountReportDto report, HRReportFilterDto filter);
     byte[] ExportSaleToPdf(SaleDto sale, string? logoPath = null);
+    byte[] ExportServiceOrderToPdf(ServiceOrderDto order, string? logoPath = null);
 }
 
 public class PdfExportService : IPdfExportService
@@ -669,6 +671,284 @@ public class PdfExportService : IPdfExportService
                     {
                         row.RelativeItem().Text($"Documento gerado em {DateTime.Now:dd/MM/yyyy HH:mm}").FontSize(8).FontColor(Colors.Grey.Medium);
                         row.RelativeItem().AlignCenter().Text("Pillar ERP").FontSize(8).FontColor(Colors.Grey.Medium);
+                        row.RelativeItem().AlignRight().Text(x =>
+                        {
+                            x.Span("Página ").FontSize(8).FontColor(Colors.Grey.Medium);
+                            x.CurrentPageNumber().FontSize(8).FontColor(Colors.Grey.Medium);
+                        });
+                    });
+                });
+            });
+        });
+
+        return document.GeneratePdf();
+    }
+
+    public byte[] ExportServiceOrderToPdf(ServiceOrderDto order, string? logoPath = null)
+    {
+        var headerColor = Colors.Blue.Darken1;
+
+        var statusColor = order.Status switch
+        {
+            "Open" => Colors.Grey.Lighten1,
+            "InProgress" => Colors.Blue.Lighten3,
+            "WaitingCustomer" => Colors.Orange.Lighten3,
+            "WaitingParts" => Colors.Yellow.Lighten3,
+            "Completed" => Colors.Green.Lighten3,
+            "Delivered" => Colors.Green.Darken2,
+            "Cancelled" => Colors.Red.Lighten3,
+            _ => Colors.Grey.Lighten2
+        };
+
+        var document = Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A4);
+                page.Margin(2, Unit.Centimetre);
+                page.PageColor(Colors.White);
+                page.DefaultTextStyle(x => x.FontSize(10));
+
+                page.Header().Column(headerCol =>
+                {
+                    headerCol.Item().Row(row =>
+                    {
+                        row.RelativeItem().Column(logoCol =>
+                        {
+                            if (!string.IsNullOrEmpty(logoPath) && File.Exists(logoPath))
+                            {
+                                try
+                                {
+                                    logoCol.Item().Height(50).Image(logoPath, ImageScaling.FitHeight);
+                                }
+                                catch
+                                {
+                                    logoCol.Item().Text("Pillar ERP").Bold().FontSize(24).FontColor(headerColor);
+                                }
+                            }
+                            else
+                            {
+                                logoCol.Item().Text("Pillar ERP").Bold().FontSize(24).FontColor(headerColor);
+                            }
+                            logoCol.Item().Text("Assistência Técnica").FontSize(10).FontColor(Colors.Grey.Medium);
+                        });
+
+                        row.ConstantItem(20);
+
+                        row.RelativeItem().AlignRight().Column(infoCol =>
+                        {
+                            infoCol.Item().Text("ORDEM DE SERVIÇO").SemiBold().FontSize(16).FontColor(headerColor);
+                            infoCol.Item().Text(order.OrderNumber).Bold().FontSize(20).FontColor(headerColor);
+                            infoCol.Item().AlignRight().Background(statusColor).Padding(4)
+                                .Text(order.StatusDisplay).FontColor(Colors.White).FontSize(10).Bold();
+                        });
+                    });
+
+                    headerCol.Item().PaddingTop(10).LineHorizontal(2).LineColor(headerColor);
+                });
+
+                page.Content().PaddingVertical(15).Column(column =>
+                {
+                    column.Spacing(12);
+
+                    // Dados da Ordem e Cliente
+                    column.Item().Grid(grid =>
+                    {
+                        grid.VerticalSpacing(5);
+                        grid.HorizontalSpacing(10);
+                        grid.Columns(2);
+
+                        grid.Item().Column(col =>
+                        {
+                            col.Item().Text("DADOS DA ORDEM").SemiBold().FontSize(11).FontColor(headerColor);
+                            col.Item().PaddingTop(3);
+                            col.Item().Text($"Data Entrada: {order.EntryDate:dd/MM/yyyy}");
+                            if (order.EstimatedCompletionDate.HasValue)
+                                col.Item().Text($"Previsão: {order.EstimatedCompletionDate.Value:dd/MM/yyyy}");
+                            if (order.ActualCompletionDate.HasValue)
+                                col.Item().Text($"Conclusão: {order.ActualCompletionDate.Value:dd/MM/yyyy}");
+                            if (!string.IsNullOrEmpty(order.WarrantyType))
+                                col.Item().Text($"Garantia: {order.WarrantyType}");
+                        });
+
+                        grid.Item(2).Column(col =>
+                        {
+                            col.Item().Text("DADOS DO CLIENTE").SemiBold().FontSize(11).FontColor(headerColor);
+                            col.Item().PaddingTop(3);
+                            if (order.Customer != null)
+                            {
+                                col.Item().Text(order.Customer.Name).Bold();
+                                if (!string.IsNullOrEmpty(order.Customer.Document))
+                                    col.Item().Text($"Doc: {order.Customer.Document}");
+                                if (!string.IsNullOrEmpty(order.Customer.Mobile))
+                                    col.Item().Text($"Tel: {order.Customer.Mobile}");
+                                else if (!string.IsNullOrEmpty(order.Customer.Phone))
+                                    col.Item().Text($"Tel: {order.Customer.Phone}");
+                            }
+                            else
+                            {
+                                col.Item().Text("Cliente não informado").FontColor(Colors.Grey.Medium);
+                            }
+                        });
+                    });
+
+                    // Informações do Aparelho
+                    if (!string.IsNullOrEmpty(order.DeviceBrand) || !string.IsNullOrEmpty(order.DeviceModel))
+                    {
+                        column.Item().Background(Colors.Blue.Lighten4).Padding(10).Border(1).BorderColor(Colors.Blue.Lighten2).Column(deviceCol =>
+                        {
+                            deviceCol.Item().Text("APARELHO").SemiBold().FontSize(11).FontColor(headerColor);
+                            deviceCol.Item().PaddingTop(5);
+                            deviceCol.Item().Grid(grid =>
+                            {
+                                grid.VerticalSpacing(3);
+                                grid.HorizontalSpacing(15);
+                                grid.Columns(2);
+
+                                if (!string.IsNullOrEmpty(order.DeviceBrand))
+                                    grid.Item().Text($"Marca: {order.DeviceBrand}");
+                                if (!string.IsNullOrEmpty(order.DeviceModel))
+                                    grid.Item(2).Text($"Modelo: {order.DeviceModel}");
+                                if (!string.IsNullOrEmpty(order.DeviceType))
+                                    grid.Item().Text($"Tipo: {order.DeviceType}");
+                                if (!string.IsNullOrEmpty(order.SerialNumber))
+                                    grid.Item(2).Text($"Serial: {order.SerialNumber}");
+                            });
+                        });
+                    }
+
+                    // Descrição do Problema
+                    if (!string.IsNullOrWhiteSpace(order.ProblemDescription))
+                    {
+                        column.Item().Background(Colors.Orange.Lighten4).BorderLeft(4).BorderColor(Colors.Orange.Medium).Padding(10).Column(probCol =>
+                        {
+                            probCol.Item().Text("PROBLEMA RELATADO").SemiBold().FontColor(Colors.Orange.Darken2);
+                            probCol.Item().PaddingTop(5).Text(order.ProblemDescription);
+                        });
+                    }
+
+                    // Serviços Realizados
+                    if (order.Items.Any())
+                    {
+                        column.Item().Text($"SERVIÇOS REALIZADOS ({order.Items.Count})").SemiBold().FontSize(11).FontColor(headerColor);
+
+                        column.Item().Table(table =>
+                        {
+                            table.ColumnsDefinition(columns =>
+                            {
+                                columns.RelativeColumn(3);
+                                columns.ConstantColumn(60);
+                                columns.ConstantColumn(70);
+                            });
+
+                            table.Header(header =>
+                            {
+                                header.Cell().Element(HeaderCellStyle).Text("Descrição");
+                                header.Cell().Element(HeaderCellStyle).Text("Tipo");
+                                header.Cell().Element(HeaderCellStyle).AlignRight().Text("Valor");
+
+                                IContainer HeaderCellStyle(IContainer container)
+                                {
+                                    return container
+                                        .DefaultTextStyle(x => x.SemiBold().FontColor(Colors.White))
+                                        .Background(headerColor)
+                                        .PaddingVertical(6)
+                                        .PaddingHorizontal(8);
+                                }
+                            });
+
+                            foreach (var item in order.Items)
+                            {
+                                table.Cell().Element(CellStyle).Text(item.Description);
+                                table.Cell().Element(CellStyle).Text(item.ServiceType ?? "-");
+                                table.Cell().Element(CellStyle).AlignRight().Text(CurrencyFormatService.FormatStatic(item.Price)).Bold();
+
+                                IContainer CellStyle(IContainer container)
+                                {
+                                    return container
+                                        .BorderBottom(1)
+                                        .BorderColor(Colors.Grey.Lighten2)
+                                        .PaddingVertical(6)
+                                        .PaddingHorizontal(8);
+                                }
+                            }
+                        });
+                    }
+
+                    // Notas Técnicas (se houver)
+                    if (!string.IsNullOrWhiteSpace(order.TechnicalNotes))
+                    {
+                        column.Item().Background(Colors.Grey.Lighten4).Padding(8).Column(notesCol =>
+                        {
+                            notesCol.Item().Text("NOTAS TÉCNICAS").SemiBold().FontSize(9);
+                            notesCol.Item().PaddingTop(3).Text(order.TechnicalNotes).FontSize(9);
+                        });
+                    }
+
+                    // Notas ao Cliente
+                    if (!string.IsNullOrWhiteSpace(order.CustomerNotes))
+                    {
+                        column.Item().Background(Colors.Green.Lighten4).Padding(8).Column(notesCol =>
+                        {
+                            notesCol.Item().Text("OBSERVAÇÕES").SemiBold().FontSize(9);
+                            notesCol.Item().PaddingTop(3).Text(order.CustomerNotes).FontSize(9);
+                        });
+                    }
+
+                    // Totais
+                    column.Item().AlignRight().Width(220).Background(headerColor).Padding(12).Column(totalsCol =>
+                    {
+                        totalsCol.Item().Row(row =>
+                        {
+                            row.RelativeItem().Text("Total dos Serviços").FontColor(Colors.White);
+                            row.ConstantItem(70).AlignRight().Text(CurrencyFormatService.FormatStatic(order.TotalAmount)).FontColor(Colors.White);
+                        });
+                        if (order.DiscountAmount > 0)
+                        {
+                            totalsCol.Item().PaddingTop(3).Row(row =>
+                            {
+                                row.RelativeItem().Text("Desconto").FontColor(Colors.White);
+                                row.ConstantItem(70).AlignRight().Text($"- {CurrencyFormatService.FormatStatic(order.DiscountAmount)}").FontColor(Colors.White);
+                            });
+                        }
+                        totalsCol.Item().PaddingTop(6).LineHorizontal(1).LineColor(Colors.White);
+                        totalsCol.Item().PaddingTop(6).Row(row =>
+                        {
+                            row.RelativeItem().Text("TOTAL").Bold().FontSize(13).FontColor(Colors.White);
+                            row.ConstantItem(70).AlignRight().Text(CurrencyFormatService.FormatStatic(order.NetAmount)).Bold().FontSize(13).FontColor(Colors.White);
+                        });
+                    });
+
+                    // Área de Assinatura
+                    column.Item().PaddingTop(20).Column(sigCol =>
+                    {
+                        sigCol.Item().Grid(grid =>
+                        {
+                            grid.Columns(2);
+                            grid.HorizontalSpacing(40);
+
+                            grid.Item().Column(col =>
+                            {
+                                col.Item().Height(50).BorderBottom(1).BorderColor(Colors.Black);
+                                col.Item().PaddingTop(5).AlignCenter().Text("Assinatura do Técnico");
+                            });
+
+                            grid.Item(2).Column(col =>
+                            {
+                                col.Item().Height(50).BorderBottom(1).BorderColor(Colors.Black);
+                                col.Item().PaddingTop(5).AlignCenter().Text("Assinatura do Cliente");
+                            });
+                        });
+                    });
+                });
+
+                page.Footer().Column(footerCol =>
+                {
+                    footerCol.Item().LineHorizontal(1).LineColor(Colors.Grey.Lighten2);
+                    footerCol.Item().PaddingTop(5).Row(row =>
+                    {
+                        row.RelativeItem().Text($"Documento gerado em {DateTime.Now:dd/MM/yyyy HH:mm}").FontSize(8).FontColor(Colors.Grey.Medium);
+                        row.RelativeItem().AlignCenter().Text("Pillar ERP - Ordem de Serviço").FontSize(8).FontColor(Colors.Grey.Medium);
                         row.RelativeItem().AlignRight().Text(x =>
                         {
                             x.Span("Página ").FontSize(8).FontColor(Colors.Grey.Medium);

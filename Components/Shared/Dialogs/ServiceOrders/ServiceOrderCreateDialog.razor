@@ -1,0 +1,223 @@
+@using erp.DTOs.ServiceOrders
+@using erp.DTOs.Sales
+@using erp.Services
+@using MudBlazor
+@using Size = MudBlazor.Size
+@using Color = MudBlazor.Color
+
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="@_form" @bind-IsValid="@_isValid" @bind-Errors="@_errors">
+            <MudStack Spacing="3">
+                <!-- Cliente -->
+                <MudSelect T="int?" Label="Cliente" @bind-Value="_dto.CustomerId"
+                        Variant="Variant.Outlined" Dense="true"
+                        SearchBox="true" SearchBoxPlaceholder="Buscar cliente..."
+                        Required="true" RequiredError="Cliente é obrigatório">
+                    @if (_customers != null)
+                    {
+                        @foreach (var customer in _customers)
+                        {
+                            <MudSelectItem T="int?" Value="@customer.Id">@customer.Name - @customer.Document</MudSelectItem>
+                        }
+                    }
+                </MudSelect>
+
+                <!-- Datas -->
+                <MudStack Row="true" Spacing="2">
+                    <MudItem xs="6">
+                        <MudDatePicker T="DateTime?" Label="Data Entrada" @bind-Date="_entryDate"
+                                    Variant="Variant.Outlined" Dense="true" Required="true"/>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudDatePicker T="DateTime?" Label="Previsão Entrega" @bind-Date="_dto.EstimatedCompletionDate"
+                                    Variant="Variant.Outlined" Dense="true"/>
+                    </MudItem>
+                </MudStack>
+
+                <!-- Informações do Aparelho -->
+                <MudText Typo="Typo.subtitle2" Class="mt-2">Informações do Aparelho</MudText>
+                <MudStack Row="true" Spacing="2">
+                    <MudItem xs="6">
+                        <MudTextField T="string" Label="Marca" @bind-Value="_dto.DeviceBrand"
+                                    Variant="Variant.Outlined" Dense="true"/>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudTextField T="string" Label="Modelo" @bind-Value="_dto.DeviceModel"
+                                    Variant="Variant.Outlined" Dense="true"/>
+                    </MudItem>
+                </MudStack>
+                <MudStack Row="true" Spacing="2">
+                    <MudItem xs="6">
+                        <MudSelect T="string" Label="Tipo" @bind-Value="_dto.DeviceType"
+                                Variant="Variant.Outlined" Dense="true">
+                            <MudSelectItem T="string" Value="@("Smartphone")">Smartphone</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Tablet")">Tablet</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Notebook")">Notebook</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Desktop")">Desktop</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Smartwatch")">Smartwatch</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("VideoGame")">Video Game</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("TV")">TV</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Other")">Outro</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudTextField T="string" Label="Número de Série" @bind-Value="_dto.SerialNumber"
+                                    Variant="Variant.Outlined" Dense="true"/>
+                    </MudItem>
+                </MudStack>
+                <MudTextField T="string" Label="Senha do Aparelho (opcional)" @bind-Value="_dto.Password"
+                            Variant="Variant.Outlined" Dense="true" InputType="InputType.Password"/>
+
+                <!-- Problema -->
+                <MudTextField T="string" Label="Descrição do Problema" @bind-Value="_dto.ProblemDescription"
+                            Variant="Variant.Outlined" Dense="true" Multiline="true" Lines="3"
+                            Required="true" RequiredError="Descrição do problema é obrigatória"/>
+
+                <!-- Serviços -->
+                <MudText Typo="Typo.subtitle2">Serviços a Realizar</MudText>
+                @foreach (var item in _dto.Items)
+                {
+                    <MudPaper Class="pa-3 mb-2">
+                        <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                            <MudItem xs="5">
+                                <MudTextField T="string" @bind-Value="item.Description" Label="Descrição"
+                                            Variant="Variant.Outlined" Dense="true" Required="true"/>
+                            </MudItem>
+                            <MudItem xs="3">
+                                <MudNumericField T="decimal" @bind-Value="item.Price" Label="Preço"
+                                            Variant="Variant.Outlined" Dense="true" Required="true"/>
+                            </MudItem>
+                            <MudItem xs="3">
+                                <MudTextField T="string" @bind-Value="item.ServiceType" Label="Tipo"
+                                            Variant="Variant.Outlined" Dense="true"/>
+                            </MudItem>
+                            <MudItem xs="1">
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                                            OnClick="@(() => RemoveItem(item))"/>
+                            </MudItem>
+                        </MudStack>
+                    </MudPaper>
+                }
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="AddItem"
+                        StartIcon="@Icons.Material.Filled.Add" Size="Size.Small" Class="mb-2">
+                    Adicionar Serviço
+                </MudButton>
+
+                <!-- Notas e Garantia -->
+                <MudStack Row="true" Spacing="2">
+                    <MudItem xs="6">
+                        <MudTextField T="string" Label="Notas Técnicas" @bind-Value="_dto.TechnicalNotes"
+                                    Variant="Variant.Outlined" Dense="true" Multiline="true" Lines="2"/>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudTextField T="string" Label="Notas ao Cliente" @bind-Value="_dto.CustomerNotes"
+                                    Variant="Variant.Outlined" Dense="true" Multiline="true" Lines="2"/>
+                    </MudItem>
+                </MudStack>
+
+                <MudStack Row="true" Spacing="2">
+                    <MudItem xs="6">
+                        <MudSelect T="string" Label="Garantia" @bind-Value="_dto.WarrantyType"
+                                Variant="Variant.Outlined" Dense="true">
+                            <MudSelectItem T="string" Value="@("")">Sem garantia</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("30 dias")">30 dias</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("90 dias")">90 dias</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudNumericField T="decimal" Label="Desconto" @bind-Value="_dto.DiscountAmount"
+                                    Variant="Variant.Outlined" Dense="true" Min="0"/>
+                    </MudItem>
+                </MudStack>
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="@(!_isValid)">
+            Criar Ordem
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private MudForm? _form;
+    private bool _isValid;
+    private string[] _errors = Array.Empty<string>();
+    private readonly CreateServiceOrderDto _dto = new() { Status = "Open" };
+    private DateTime? _entryDate = DateTime.Now;
+    private List<CustomerDto>? _customers;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCustomers();
+    }
+
+    private async Task LoadCustomers()
+    {
+        try
+        {
+            var response = await ApiService.GetAsync<List<CustomerDto>>("/api/sales/customers");
+            if (response != null)
+            {
+                _customers = response.Where(c => c.IsActive).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar clientes: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void AddItem()
+    {
+        _dto.Items.Add(new CreateServiceOrderItemDto());
+    }
+
+    private void RemoveItem(CreateServiceOrderItemDto item)
+    {
+        _dto.Items.Remove(item);
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private async Task Submit()
+    {
+        await _form!.Validate();
+
+        if (!_isValid)
+            return;
+
+        if (_dto.Items.Count == 0)
+        {
+            Snackbar.Add("Adicione pelo menos um serviço", Severity.Warning);
+            return;
+        }
+
+        _dto.EntryDate = _entryDate ?? DateTime.Now;
+
+        try
+        {
+            var response = await ApiService.PostAsync<ServiceOrderDto>("/api/service-orders", _dto);
+            if (response != null)
+            {
+                Snackbar.Add($"Ordem de serviço {response.OrderNumber} criada com sucesso!", Severity.Success);
+                MudDialog.Close();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao criar ordem: {ex.Message}", Severity.Error);
+        }
+    }
+}

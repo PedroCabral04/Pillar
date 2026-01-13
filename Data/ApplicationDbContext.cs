@@ -45,7 +45,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<Models.Sales.Customer> Customers { get; set; } = null!;
     public DbSet<Models.Sales.Sale> Sales { get; set; } = null!;
     public DbSet<Models.Sales.SaleItem> SaleItems { get; set; } = null!;
-    
+
+    // Service Orders
+    public DbSet<Models.ServiceOrders.ServiceOrder> ServiceOrders { get; set; } = null!;
+    public DbSet<Models.ServiceOrders.ServiceOrderItem> ServiceOrderItems { get; set; } = null!;
+
     // Financial
     public DbSet<Supplier> Suppliers { get; set; } = null!;
     public DbSet<AccountReceivable> AccountsReceivable { get; set; } = null!;
@@ -910,7 +914,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         
         // Sales model configuration
         ConfigureSalesModels(modelBuilder);
-        
+
+        // Service Orders model configuration
+        ConfigureServiceOrderModels(modelBuilder);
+
         // Financial model configuration
         ConfigureFinancialModels(modelBuilder);
         
@@ -1296,7 +1303,78 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }
-    
+
+    private void ConfigureServiceOrderModels(ModelBuilder modelBuilder)
+    {
+        // ServiceOrder
+        modelBuilder.Entity<Models.ServiceOrders.ServiceOrder>(entity =>
+        {
+            entity.ToTable("ServiceOrders");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.OrderNumber).HasMaxLength(20).IsRequired();
+            entity.HasIndex(e => e.OrderNumber).IsUnique();
+
+            entity.Property(e => e.Status).HasMaxLength(50).IsRequired();
+            entity.HasIndex(e => e.Status);
+
+            entity.Property(e => e.DeviceBrand).HasMaxLength(100);
+            entity.Property(e => e.DeviceModel).HasMaxLength(100);
+            entity.Property(e => e.DeviceType).HasMaxLength(50);
+            entity.Property(e => e.SerialNumber).HasMaxLength(100);
+            entity.Property(e => e.Password).HasMaxLength(20);
+            entity.Property(e => e.Accessories).HasColumnType("jsonb");
+
+            entity.Property(e => e.ProblemDescription).HasMaxLength(2000);
+            entity.Property(e => e.TechnicalNotes).HasMaxLength(2000);
+            entity.Property(e => e.CustomerNotes).HasMaxLength(2000);
+
+            entity.Property(e => e.TotalAmount).HasPrecision(18, 2);
+            entity.Property(e => e.DiscountAmount).HasPrecision(18, 2);
+            entity.Property(e => e.NetAmount).HasPrecision(18, 2);
+
+            entity.Property(e => e.WarrantyType).HasMaxLength(50);
+
+            entity.HasIndex(e => e.CustomerId);
+            entity.HasIndex(e => e.EntryDate);
+            entity.HasIndex(e => e.UserId);
+
+            entity.HasOne(e => e.Customer)
+                .WithMany()
+                .HasForeignKey(e => e.CustomerId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasMany(e => e.Items)
+                .WithOne(i => i.ServiceOrder)
+                .HasForeignKey(i => i.ServiceOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ServiceOrderItem
+        modelBuilder.Entity<Models.ServiceOrders.ServiceOrderItem>(entity =>
+        {
+            entity.ToTable("ServiceOrderItems");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Description).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.ServiceType).HasMaxLength(50);
+            entity.Property(e => e.Price).HasPrecision(18, 2);
+            entity.Property(e => e.TechnicalDetails).HasMaxLength(2000);
+
+            entity.HasIndex(e => e.ServiceOrderId);
+
+            entity.HasOne(e => e.ServiceOrder)
+                .WithMany(o => o.Items)
+                .HasForeignKey(e => e.ServiceOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
     private void ConfigureFinancialModels(ModelBuilder modelBuilder)
     {
         // Supplier
@@ -2127,6 +2205,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         modelBuilder.Entity<Models.Sales.Customer>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
         modelBuilder.Entity<Models.Sales.Sale>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
         modelBuilder.Entity<Models.Sales.SaleItem>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
+
+        // Service Orders
+        modelBuilder.Entity<Models.ServiceOrders.ServiceOrder>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
+        modelBuilder.Entity<Models.ServiceOrders.ServiceOrderItem>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
 
         // Financial
         modelBuilder.Entity<Supplier>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);

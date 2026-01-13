@@ -1,0 +1,197 @@
+@using erp.DTOs.ServiceOrders
+@using erp.Services
+@using MudBlazor
+@using Size = MudBlazor.Size
+@using Color = MudBlazor.Color
+
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudDialog>
+    <DialogContent>
+        @if (_order == null)
+        {
+            <MudProgressCircular Color="Color.Primary" Class="ma-auto" />
+        }
+        else
+        {
+            <MudStack Spacing="3">
+                <!-- Header -->
+                <MudPaper Class="pa-4" Elevation="0">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                        <MudStack Spacing="1">
+                            <MudText Typo="Typo.h6">@_order.OrderNumber</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                Criado em @_order.CreatedAt.ToString("dd/MM/yyyy HH:mm")
+                            </MudText>
+                        </MudStack>
+                        <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(_order.Status)">
+                            @_order.StatusDisplay
+                        </MudChip>
+                    </MudStack>
+                </MudPaper>
+
+                <!-- Cliente -->
+                @if (_order.Customer != null)
+                {
+                    <MudPaper Class="pa-3" Elevation="0">
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">Cliente</MudText>
+                        <MudText Typo="Typo.body1">@_order.Customer.Name</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            @_order.Customer.Document
+                        </MudText>
+                        @if (!string.IsNullOrEmpty(_order.Customer.Mobile))
+                        {
+                            <MudText Typo="Typo.body2">@_order.Customer.Mobile</MudText>
+                        }
+                    </MudPaper>
+                }
+
+                <!-- Aparelho -->
+                @if (!string.IsNullOrEmpty(_order.DeviceBrand) || !string.IsNullOrEmpty(_order.DeviceModel))
+                {
+                    <MudPaper Class="pa-3" Elevation="0">
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">Aparelho</MudText>
+                        <MudStack Row="true" Spacing="3">
+                            @if (!string.IsNullOrEmpty(_order.DeviceBrand))
+                            {
+                                <MudText Typo="Typo.body2"><strong>Marca:</strong> @_order.DeviceBrand</MudText>
+                            }
+                            @if (!string.IsNullOrEmpty(_order.DeviceModel))
+                            {
+                                <MudText Typo="Typo.body2"><strong>Modelo:</strong> @_order.DeviceModel</MudText>
+                            }
+                            @if (!string.IsNullOrEmpty(_order.DeviceType))
+                            {
+                                <MudText Typo="Typo.body2"><strong>Tipo:</strong> @_order.DeviceType</MudText>
+                            }
+                            @if (!string.IsNullOrEmpty(_order.SerialNumber))
+                            {
+                                <MudText Typo="Typo.body2"><strong>Serial:</strong> @_order.SerialNumber</MudText>
+                            }
+                        </MudStack>
+                    </MudPaper>
+                }
+
+                <!-- Problema -->
+                @if (!string.IsNullOrEmpty(_order.ProblemDescription))
+                {
+                    <MudPaper Class="pa-3" Elevation="0" Style="background: #fff3e0;">
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">Problema Relatado</MudText>
+                        <MudText Typo="Typo.body2">@_order.ProblemDescription</MudText>
+                    </MudPaper>
+                }
+
+                <!-- Serviços -->
+                @if (_order.Items.Any())
+                {
+                    <MudPaper Class="pa-3" Elevation="0">
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">Serviços Realizados</MudText>
+                        @foreach (var item in _order.Items)
+                        {
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mb-2">
+                                <MudText Typo="Typo.body2">@item.Description</MudText>
+                                <MudText Typo="Typo.body2" Style="font-weight: 600;">
+                                    @Currency.Format(item.Price)
+                                </MudText>
+                            </MudStack>
+                        }
+                    </MudPaper>
+                }
+
+                <!-- Totais -->
+                <MudPaper Class="pa-3" Elevation="0">
+                    <MudStack Spacing="2" AlignItems="AlignItems.End" Style="align-items: flex-end;">
+                        <MudText Typo="Typo.body2">Total: @Currency.Format(_order.TotalAmount)</MudText>
+                        @if (_order.DiscountAmount > 0)
+                        {
+                            <MudText Typo="Typo.body2">Desconto: -@Currency.Format(_order.DiscountAmount)</MudText>
+                        }
+                        <MudText Typo="Typo.h6" Color="Color.Primary">
+                            Total a Pagar: @Currency.Format(_order.NetAmount)
+                        </MudText>
+                    </MudStack>
+                </MudPaper>
+
+                <!-- Notas -->
+                @if (!string.IsNullOrEmpty(_order.CustomerNotes))
+                {
+                    <MudPaper Class="pa-3" Elevation="0">
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">Observações</MudText>
+                        <MudText Typo="Typo.body2">@_order.CustomerNotes</MudText>
+                    </MudPaper>
+                }
+            </MudStack>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Fechar</MudButton>
+        <MudButton Color="Color.Primary" StartIcon="@Icons.Material.Filled.Print" OnClick="Print">
+            Imprimir
+        </MudButton>
+        @if (_order != null && _order.Status != "Cancelled" && _order.Status != "Delivered")
+        {
+            <MudButton Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit" OnClick="Edit">
+                Editar
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int OrderId { get; set; }
+
+    @inject CurrencyFormatService Currency
+
+    private ServiceOrderDto? _order;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadOrder();
+    }
+
+    private async Task LoadOrder()
+    {
+        try
+        {
+            _order = await ApiService.GetAsync<ServiceOrderDto>($"/api/service-orders/{OrderId}");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar ordem: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private Color GetStatusColor(string status)
+    {
+        return status switch
+        {
+            "Open" => Color.Default,
+            "InProgress" => Color.Primary,
+            "WaitingCustomer" => Color.Warning,
+            "WaitingParts" => Color.Tertiary,
+            "Completed" => Color.Success,
+            "Delivered" => Color.Dark,
+            "Cancelled" => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private async Task Print()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true };
+        await DialogService.ShowAsync<ServiceOrderPrintDialog>("", new DialogParameters { ["OrderId"] = OrderId }, options);
+    }
+
+    private void Edit()
+    {
+        MudDialog.Close(DialogResult.Ok(OrderId));
+    }
+}

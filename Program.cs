@@ -331,6 +331,9 @@ builder.Services.AddScoped<erp.Services.Inventory.IStockCountService, erp.Servic
 builder.Services.AddScoped<erp.Services.Sales.ICustomerService, erp.Services.Sales.CustomerService>();
 builder.Services.AddScoped<erp.Services.Sales.ISalesService, erp.Services.Sales.SalesService>();
 
+// Service Orders services
+builder.Services.AddScoped<erp.Services.ServiceOrders.IServiceOrderService, erp.Services.ServiceOrders.ServiceOrderService>();
+
 // Financial services
 builder.Services.AddScoped<erp.Services.Financial.IAccountingService, erp.Services.Financial.AccountingService>();
 builder.Services.AddScoped<erp.Services.Financial.ISupplierService, erp.Services.Financial.SupplierService>();
@@ -405,6 +408,7 @@ builder.Services.AddScoped<ProductMapper, ProductMapper>();
 builder.Services.AddScoped<StockMovementMapper, StockMovementMapper>();
 builder.Services.AddScoped<StockCountMapper, StockCountMapper>();
 builder.Services.AddScoped<SalesMapper, SalesMapper>();
+builder.Services.AddScoped<ServiceOrderMapper, ServiceOrderMapper>();
 builder.Services.AddScoped<TimeTrackingMapper, TimeTrackingMapper>();
 builder.Services.AddScoped<PayrollMapper, PayrollMapper>();
 builder.Services.AddScoped<erp.Mappings.FinancialMapper, erp.Mappings.FinancialMapper>();

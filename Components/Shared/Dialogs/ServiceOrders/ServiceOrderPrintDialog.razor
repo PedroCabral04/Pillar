@@ -1,0 +1,228 @@
+@using erp.DTOs.ServiceOrders
+@using erp.Services
+@using MudBlazor
+@using Microsoft.JSInterop
+@using MudColor = MudBlazor.Color
+@using MudSize = MudBlazor.Size
+
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+<MudDialog>
+    <TitleContent>
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudText Typo="Typo.h6">Imprimir Ordem de Serviço</MudText>
+            <MudSpacer/>
+            <MudButton Icon="@Icons.Material.Filled.Close" Variant="Variant.Text" Color="MudColor.Default"
+                        OnClick="Cancel" Size="MudSize.Small"/>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        @if (_order == null)
+        {
+            <MudProgressCircular Color="MudColor.Primary" Class="ma-auto" />
+        }
+        else
+        {
+            <MudStack Spacing="3" Class="print-container">
+                <!-- Preview -->
+                <div id="print-area" class="print-preview pa-4" style="background: white; border: 1px solid #ddd; max-height: 500px; overflow: auto;">
+                    <div style="text-align: center; margin-bottom: 20px; border-bottom: 2px solid #0066cc; padding-bottom: 10px;">
+                        <div style="font-size: 24px; font-weight: bold; color: #0066cc;">PILLAR ERP</div>
+                        <div>Assistência Técnica</div>
+                        <div style="margin-top: 10px;">
+                            <span style="font-size: 20px; font-weight: bold;">@_order.OrderNumber</span>
+                            <span class="ml-2 px-2 py-1 rounded" style="background: @GetStatusHex(_order.Status); color: white; font-size: 12px;">@_order.StatusDisplay</span>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 15px;">
+                        <div>
+                            <div style="font-weight: bold; color: #0066cc;">DADOS DA ORDEM</div>
+                            <div>Data Entrada: @_order.EntryDate.ToString("dd/MM/yyyy")</div>
+                            @if (_order.EstimatedCompletionDate.HasValue)
+                            {
+                                <div>Previsão: @_order.EstimatedCompletionDate.Value.ToString("dd/MM/yyyy")</div>
+                            }
+                            @if (_order.ActualCompletionDate.HasValue)
+                            {
+                                <div>Conclusão: @_order.ActualCompletionDate.Value.ToString("dd/MM/yyyy")</div>
+                            }
+                        </div>
+                        <div>
+                            <div style="font-weight: bold; color: #0066cc;">DADOS DO CLIENTE</div>
+                            @if (_order.Customer != null)
+                            {
+                                <div>@_order.Customer.Name</div>
+                                @if (!string.IsNullOrEmpty(_order.Customer.Document))
+                                {
+                                    <div>Doc: @_order.Customer.Document</div>
+                                }
+                                @if (!string.IsNullOrEmpty(_order.Customer.Mobile))
+                                {
+                                    <div>Tel: @_order.Customer.Mobile</div>
+                                }
+                            }
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(_order.DeviceBrand) || !string.IsNullOrEmpty(_order.DeviceModel))
+                    {
+                        <div style="background: #e3f2fd; padding: 10px; border: 1px solid #90caf9; margin-bottom: 15px;">
+                            <div style="font-weight: bold; color: #0066cc;">APARELHO</div>
+                            <div>@_order.DeviceBrand @_order.DeviceModel</div>
+                            @if (!string.IsNullOrEmpty(_order.DeviceType))
+                            {
+                                <div>Tipo: @_order.DeviceType</div>
+                            }
+                            @if (!string.IsNullOrEmpty(_order.SerialNumber))
+                            {
+                                <div>Serial: @_order.SerialNumber</div>
+                            }
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(_order.ProblemDescription))
+                    {
+                        <div style="background: #fff3e0; border-left: 4px solid #ff9800; padding: 10px; margin-bottom: 15px;">
+                            <div style="font-weight: bold;">PROBLEMA RELATADO</div>
+                            <div>@_order.ProblemDescription</div>
+                        </div>
+                    }
+
+                    @if (_order.Items.Any())
+                    {
+                        <div style="margin-bottom: 15px;">
+                            <div style="font-weight: bold; color: #0066cc;">SERVIÇOS REALIZADOS (@_order.Items.Count)</div>
+                            <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                                <thead>
+                                    <tr style="background: #0066cc; color: white;">
+                                        <th style="padding: 8px; text-align: left;">Descrição</th>
+                                        <th style="padding: 8px; text-align: right;">Valor</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in _order.Items)
+                                    {
+                                        <tr style="border-bottom: 1px solid #ddd;">
+                                            <td style="padding: 8px;">@item.Description</td>
+                                            <td style="padding: 8px; text-align: right;">@item.Price:F2</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(_order.CustomerNotes))
+                    {
+                        <div style="background: #e8f5e9; padding: 8px; margin-bottom: 15px;">
+                            <div style="font-weight: bold;">OBSERVAÇÕES</div>
+                            <div>@_order.CustomerNotes</div>
+                        </div>
+                    }
+
+                    <div style="background: #0066cc; color: white; padding: 12px; width: 220px; margin-left: auto;">
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>TOTAL</span>
+                            <span>@_order.NetAmount:F2</span>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 40px;">
+                        <div style="text-align: center;">
+                            <div style="border-bottom: 1px solid black; height: 50px;"></div>
+                            <div>Assinatura do Técnico</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="border-bottom: 1px solid black; height: 50px;"></div>
+                            <div>Assinatura do Cliente</div>
+                        </div>
+                    </div>
+                </div>
+            </MudStack>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Fechar</MudButton>
+        <MudButton Color="MudColor.Primary" StartIcon="@Icons.Material.Filled.Download" OnClick="DownloadPdf">
+            Baixar PDF
+        </MudButton>
+        <MudButton Color="MudColor.Primary" StartIcon="@Icons.Material.Filled.Print" OnClick="Print">
+            Imprimir
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int OrderId { get; set; }
+
+    private ServiceOrderDto? _order;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadOrder();
+    }
+
+    private async Task LoadOrder()
+    {
+        try
+        {
+            _order = await ApiService.GetAsync<ServiceOrderDto>($"/api/service-orders/{OrderId}");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar ordem: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private string GetStatusHex(string status)
+    {
+        return status switch
+        {
+            "Open" => "#6c757d",
+            "InProgress" => "#0d6efd",
+            "WaitingCustomer" => "#fd7e14",
+            "WaitingParts" => "#ffc107",
+            "Completed" => "#198754",
+            "Delivered" => "#0f5132",
+            "Cancelled" => "#dc3545",
+            _ => "#6c757d"
+        };
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private async Task DownloadPdf()
+    {
+        try
+        {
+            var response = await ApiService.GetAsync($"/api/service-orders/{OrderId}/export/pdf");
+            var pdfBytes = await response.Content.ReadAsByteArrayAsync();
+            await JS.InvokeVoidAsync("downloadFile", $"OS_{_order!.OrderNumber}.pdf", Convert.ToBase64String(pdfBytes));
+            Snackbar.Add("PDF baixado com sucesso!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao baixar PDF: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task Print()
+    {
+        try
+        {
+            var printUrl = $"/api/service-orders/{OrderId}/print";
+            await JS.InvokeVoidAsync("open", printUrl, "_blank");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao abrir impressão: {ex.Message}", Severity.Error);
+        }
+    }
+}

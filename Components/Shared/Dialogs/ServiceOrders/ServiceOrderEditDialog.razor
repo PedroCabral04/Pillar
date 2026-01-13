@@ -1,0 +1,164 @@
+@using erp.DTOs.ServiceOrders
+@using erp.Services
+@using MudBlazor
+@using Size = MudBlazor.Size
+@using Color = MudBlazor.Color
+
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudDialog>
+    <DialogContent>
+        @if (_order == null || _dto == null)
+        {
+            <MudProgressCircular Color="Color.Primary" Class="ma-auto" />
+        }
+        else
+        {
+            <MudForm @ref="@_form" @bind-IsValid="@_isValid" @bind-Errors="@_errors">
+                <MudStack Spacing="3">
+                    <!-- Informações do Aparelho (Read-only) -->
+                    <MudPaper Class="pa-3" Elevation="0" Style="background: #f5f5f5;">
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">Aparelho (não editável)</MudText>
+                        <MudText Typo="Typo.body2">
+                            @if (!string.IsNullOrEmpty(_order.DeviceBrand) || !string.IsNullOrEmpty(_order.DeviceModel))
+                            {
+                                <text>@_order.DeviceBrand @_order.DeviceModel</text>
+                            }
+                            else
+                            {
+                                <text>-</text>
+                            }
+                        </MudText>
+                        @if (!string.IsNullOrEmpty(_order.SerialNumber))
+                        {
+                            <MudText Typo="Typo.body2">Serial: @_order.SerialNumber</MudText>
+                        }
+                    </MudPaper>
+
+                    <!-- Status -->
+                    <MudSelect T="string" Label="Status" @bind-Value="_dto.Status"
+                            Variant="Variant.Outlined" Dense="true" Required="true">
+                        <MudSelectItem T="string" Value="@("Open")">Aberto</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("InProgress")">Em Andamento</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("WaitingCustomer")">Aguardando Cliente</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("WaitingParts")">Aguardando Peças</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("Completed")">Concluído</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("Delivered")">Entregue</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("Cancelled")">Cancelado</MudSelectItem>
+                    </MudSelect>
+
+                    <!-- Datas -->
+                    <MudStack Row="true" Spacing="2">
+                        <MudItem xs="6">
+                            <MudDatePicker T="DateTime?" Label="Previsão Entrega" @bind-Date="_dto.EstimatedCompletionDate"
+                                        Variant="Variant.Outlined" Dense="true"/>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudDatePicker T="DateTime?" Label="Data Conclusão" @bind-Date="_dto.ActualCompletionDate"
+                                        Variant="Variant.Outlined" Dense="true"/>
+                        </MudItem>
+                    </MudStack>
+
+                    <!-- Notas -->
+                    <MudTextField T="string" Label="Notas Técnicas" @bind-Value="_dto.TechnicalNotes"
+                                Variant="Variant.Outlined" Dense="true" Multiline="true" Lines="3"/>
+                    <MudTextField T="string" Label="Notas ao Cliente" @bind-Value="_dto.CustomerNotes"
+                                Variant="Variant.Outlined" Dense="true" Multiline="true" Lines="2"/>
+
+                    <!-- Garantia -->
+                    <MudStack Row="true" Spacing="2">
+                        <MudItem xs="6">
+                            <MudSelect T="string" Label="Garantia" @bind-Value="_dto.WarrantyType"
+                                    Variant="Variant.Outlined" Dense="true">
+                                <MudSelectItem T="string" Value="@("")">Sem garantia</MudSelectItem>
+                                <MudSelectItem T="string" Value="@("30 dias")">30 dias</MudSelectItem>
+                                <MudSelectItem T="string" Value="@("90 dias")">90 dias</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudNumericField T="decimal" Label="Desconto" @bind-Value="_dto.DiscountAmount"
+                                        Variant="Variant.Outlined" Dense="true" Min="0"/>
+                        </MudItem>
+                    </MudStack>
+                </MudStack>
+            </MudForm>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="@(!_isValid)">
+            Salvar
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int OrderId { get; set; }
+
+    private MudForm? _form;
+    private bool _isValid;
+    private string[] _errors = Array.Empty<string>();
+    private ServiceOrderDto? _order;
+    private UpdateServiceOrderDto? _dto;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadOrder();
+    }
+
+    private async Task LoadOrder()
+    {
+        try
+        {
+            _order = await ApiService.GetAsync<ServiceOrderDto>($"/api/service-orders/{OrderId}");
+            if (_order != null)
+            {
+                _dto = new UpdateServiceOrderDto
+                {
+                    Status = _order.Status,
+                    ProblemDescription = _order.ProblemDescription,
+                    TechnicalNotes = _order.TechnicalNotes,
+                    CustomerNotes = _order.CustomerNotes,
+                    DiscountAmount = _order.DiscountAmount,
+                    EstimatedCompletionDate = _order.EstimatedCompletionDate,
+                    ActualCompletionDate = _order.ActualCompletionDate,
+                    WarrantyType = _order.WarrantyType
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar ordem: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private async Task Submit()
+    {
+        await _form!.Validate();
+
+        if (!_isValid || _dto == null)
+            return;
+
+        try
+        {
+            var response = await ApiService.PutAsync<ServiceOrderDto>($"/api/service-orders/{OrderId}", _dto);
+            if (response != null)
+            {
+                Snackbar.Add($"Ordem {_order!.OrderNumber} atualizada com sucesso!", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(response));
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao atualizar ordem: {ex.Message}", Severity.Error);
+        }
+    }
+}
