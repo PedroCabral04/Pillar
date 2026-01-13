@@ -608,19 +608,19 @@
     private string FormatValue(decimal value)
     {
         var unit = Definition.Unit?.ToLowerInvariant() ?? "";
-        
+
         return unit switch
         {
-            "r$" or "brl" or "reais" => value.ToString("C2", new CultureInfo("pt-BR")),
+            "r$" or "brl" or "reais" => value.ToString("C2", CultureInfo.CurrentCulture),
             "%" or "percent" or "percentual" => $"{value:N1}%",
-            "un" or "unidades" or "qtd" => value >= 1000 
-                ? $"{value / 1000:N1}k" 
-                : value.ToString("N0", new CultureInfo("pt-BR")),
-            _ => value >= 1_000_000 
+            "un" or "unidades" or "qtd" => value >= 1000
+                ? $"{value / 1000:N1}k"
+                : value.ToString("N0", CultureInfo.CurrentCulture),
+            _ => value >= 1_000_000
                 ? $"{value / 1_000_000:N2}M"
-                : value >= 1000 
-                    ? $"{value / 1000:N1}k" 
-                    : value.ToString("N2", new CultureInfo("pt-BR"))
+                : value >= 1000
+                    ? $"{value / 1000:N1}k"
+                    : value.ToString("N2", CultureInfo.CurrentCulture)
         };
     }
     

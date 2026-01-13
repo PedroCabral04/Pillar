@@ -92,7 +92,7 @@
                                      Variant="Variant.Outlined"
                                      Adornment="Adornment.Start"
                                      AdornmentText="R$"
-                                     Culture="@BrazilCulture" />
+                                     Culture="@System.Globalization.CultureInfo.CurrentCulture" />
                 </MudItem>
 
                 <MudItem xs="12" md="4">
@@ -189,7 +189,6 @@
 
     private DateTime? _purchaseDate;
     private DateTime? _warrantyExpiryDate;
-    private System.Globalization.CultureInfo BrazilCulture { get; } = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
 
     protected override async Task OnInitializedAsync()
     {

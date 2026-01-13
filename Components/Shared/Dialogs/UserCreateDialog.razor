@@ -155,12 +155,12 @@
                     </MudItem>
                     
                     <MudItem xs="12" md="6">
-                        <MudNumericField T="decimal?" 
+                        <MudNumericField T="decimal?"
                                          Label="Salário"
                                          @bind-Value="_newUser.Salary"
                                          Variant="Variant.Outlined"
                                          Format="C2"
-                                         Culture="@(new System.Globalization.CultureInfo("pt-BR"))"
+                                         Culture="@System.Globalization.CultureInfo.CurrentCulture"
                                          Adornment="Adornment.Start"
                                          AdornmentIcon="@Icons.Material.Filled.AttachMoney"/>
                     </MudItem>
