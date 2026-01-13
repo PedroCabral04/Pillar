@@ -21,6 +21,12 @@ public class SaleItem : IAuditable
     [Precision(18, 2)]
     public decimal UnitPrice { get; set; }
     
+    /// <summary>
+    /// Cost price at the time of sale, used for commission calculation
+    /// </summary>
+    [Precision(18, 2)]
+    public decimal CostPrice { get; set; }
+    
     [Precision(18, 2)]
     public decimal Discount { get; set; }
     

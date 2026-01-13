@@ -61,7 +61,7 @@ public class SupplierService : ISupplierService
         var (items, totalCount) = await _supplierDao.GetPagedAsync(
             page, pageSize, search, activeOnly, sortBy, sortDescending);
 
-        var dtos = items.Select(s => _mapper.ToSummaryDto(s)).ToList();
+        var dtos = items.Select(s => _mapper.ToSummaryDtoWithRelations(s)).ToList();
         return (dtos, totalCount);
     }
 

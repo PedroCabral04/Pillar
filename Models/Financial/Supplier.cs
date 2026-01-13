@@ -70,8 +70,8 @@ public class Supplier : IAuditable, IMustHaveTenant
     public string? Website { get; set; }
     
     // Categorização
-    [MaxLength(100)]
-    public string? Category { get; set; } // Matéria-prima, Serviços, etc.
+    public int? CategoryId { get; set; }
+    public virtual FinancialCategory? Category { get; set; }
     
     // Financeiro
     public decimal MinimumOrderValue { get; set; } = 0;

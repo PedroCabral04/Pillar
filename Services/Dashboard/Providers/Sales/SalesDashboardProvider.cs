@@ -24,6 +24,17 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
         new DashboardWidgetDefinition
         {
             ProviderKey = Key,
+            WidgetKey = "sales-today",
+            Title = "Vendas de Hoje",
+            Description = "Resumo das vendas finalizadas hoje",
+            ChartType = DashboardChartType.Bar,
+            Icon = "mdi-cash-register",
+            Unit = "R$",
+            RequiredRoles = new[] { "Vendas", "Administrador" }
+        },
+        new DashboardWidgetDefinition
+        {
+            ProviderKey = Key,
             WidgetKey = "sales-by-month",
             Title = "Vendas por Mês",
             Description = "Total de vendas agregadas por mês",
@@ -71,11 +82,49 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
     {
         return widgetKey switch
         {
+            "sales-today" => GetSalesTodayAsync(query, ct),
             "sales-by-month" => GetSalesByMonthAsync(query, ct),
             "top-products" => GetTopProductsAsync(query, ct),
             "sales-by-status" => GetSalesByStatusAsync(query, ct),
             "sales-peak-hours" => GetSalesPeakHoursAsync(query, ct),
             _ => throw new KeyNotFoundException($"Widget '{widgetKey}' not found in provider '{Key}'.")
+        };
+    }
+
+    private async Task<ChartDataResponse> GetSalesTodayAsync(DashboardQuery query, CancellationToken ct)
+    {
+        var today = DateTime.UtcNow.Date;
+        var tomorrow = today.AddDays(1);
+
+        var todaySales = await _context.Sales
+            .Where(s => s.Status == "Finalizada" &&
+                       s.SaleDate >= today &&
+                       s.SaleDate < tomorrow)
+            .Select(s => new
+            {
+                s.Id,
+                s.NetAmount,
+                s.SaleDate
+            })
+            .ToListAsync(ct);
+
+        var totalAmount = todaySales.Sum(s => s.NetAmount);
+        var salesCount = todaySales.Count;
+
+        return new ChartDataResponse
+        {
+            Categories = new List<string> { "Total", "Quantidade" },
+            Series = new List<ChartSeriesDto>
+            {
+                new() { Name = "Valor", Data = new List<decimal> { totalAmount, salesCount } }
+            },
+            Subtitle = $"{salesCount} venda(s) | Total: {CurrencyFormatService.FormatStatic(totalAmount)}",
+            Meta = new Dictionary<string, object>
+            {
+                { "TotalAmount", totalAmount },
+                { "SalesCount", salesCount },
+                { "Today", today.ToString("yyyy-MM-dd") }
+            }
         };
     }
 

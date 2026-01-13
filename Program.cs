@@ -339,6 +339,7 @@ builder.Services.AddScoped<erp.Services.Financial.ICostCenterService, erp.Servic
 builder.Services.AddScoped<erp.Services.Financial.IAccountReceivableService, erp.Services.Financial.AccountReceivableService>();
 builder.Services.AddScoped<erp.Services.Financial.IAccountPayableService, erp.Services.Financial.AccountPayableService>();
 builder.Services.AddScoped<erp.Services.Financial.IFinancialDashboardService, erp.Services.Financial.FinancialDashboardService>();
+builder.Services.AddScoped<erp.Services.Financial.ICommissionService, erp.Services.Financial.CommissionService>();
 
 // Financial DAOs
 builder.Services.AddScoped<erp.DAOs.Financial.ISupplierDao, erp.DAOs.Financial.SupplierDao>();
@@ -346,6 +347,7 @@ builder.Services.AddScoped<erp.DAOs.Financial.IFinancialCategoryDao, erp.DAOs.Fi
 builder.Services.AddScoped<erp.DAOs.Financial.ICostCenterDao, erp.DAOs.Financial.CostCenterDao>();
 builder.Services.AddScoped<erp.DAOs.Financial.IAccountReceivableDao, erp.DAOs.Financial.AccountReceivableDao>();
 builder.Services.AddScoped<erp.DAOs.Financial.IAccountPayableDao, erp.DAOs.Financial.AccountPayableDao>();
+builder.Services.AddScoped<erp.DAOs.Financial.ICommissionDao, erp.DAOs.Financial.CommissionDao>();
 
 // Financial validation services (BrazilianDocumentValidator is static, no DI needed)
 builder.Services.AddHttpClient<erp.Services.Financial.Validation.IViaCepService, erp.Services.Financial.Validation.ViaCepService>();

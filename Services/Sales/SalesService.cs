@@ -3,6 +3,7 @@ using erp.Data;
 using erp.DTOs.Sales;
 using erp.Models.Sales;
 using erp.Mappings;
+using erp.Services.Financial;
 
 namespace erp.Services.Sales;
 
@@ -11,15 +12,18 @@ public class SalesService : ISalesService
     private readonly ApplicationDbContext _context;
     private readonly SalesMapper _mapper;
     private readonly ILogger<SalesService> _logger;
+    private readonly ICommissionService? _commissionService;
 
     public SalesService(
         ApplicationDbContext context,
         SalesMapper mapper,
-        ILogger<SalesService> logger)
+        ILogger<SalesService> logger,
+        ICommissionService? commissionService = null)
     {
         _context = context;
         _mapper = mapper;
         _logger = logger;
+        _commissionService = commissionService;
     }
 
     public async Task<SaleDto> CreateAsync(CreateSaleDto dto, int userId)
@@ -71,6 +75,7 @@ public class SalesService : ISalesService
                 ProductId = itemDto.ProductId,
                 Quantity = itemDto.Quantity,
                 UnitPrice = itemDto.UnitPrice,
+                CostPrice = product.CostPrice, // Capture cost price at sale time for commission calculation
                 Discount = itemDto.Discount,
                 Total = itemTotal
             };
@@ -257,6 +262,19 @@ public class SalesService : ISalesService
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
 
+            // Cancel commissions when sale is cancelled
+            if (_commissionService != null && wasFinalized)
+            {
+                try
+                {
+                    await _commissionService.CancelCommissionsForSaleAsync(id);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Erro ao cancelar comissões para venda {SaleId}", id);
+                }
+            }
+
             return true;
         }
         catch (Exception ex)
@@ -336,6 +354,19 @@ public class SalesService : ISalesService
 
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
+
+            // Calculate commissions after sale is finalized
+            if (_commissionService != null)
+            {
+                try
+                {
+                    await _commissionService.CalculateCommissionsForSaleAsync(id);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Erro ao calcular comissões para venda {SaleId}", id);
+                }
+            }
 
             _logger.LogInformation(
                 "Venda {SaleNumber} finalizada com sucesso. {ItemCount} itens processados.",

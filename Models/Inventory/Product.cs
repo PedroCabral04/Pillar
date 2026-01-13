@@ -46,6 +46,9 @@ public class Product : IAuditable, IMustHaveTenant
     public decimal CostPrice { get; set; } = 0;
     public decimal SalePrice { get; set; } = 0;
     public decimal? WholesalePrice { get; set; }
+
+    // Comissão (% sobre o lucro)
+    public decimal CommissionPercent { get; set; } = 0; // 0 = sem comissão
     
     // Fiscais
     public string? NcmCode { get; set; }

@@ -141,11 +141,20 @@
                 <MudTabPanel Text="Financeiro" Icon="@Icons.Material.Filled.AttachMoney">
                     <MudGrid Spacing="3">
                         <MudItem xs="12" sm="6">
-                            <MudTextField @bind-Value="Model.Category" 
-                                          Label="Categoria" 
-                                          Variant="Variant.Outlined"
-                                          Adornment="Adornment.Start"
-                                          AdornmentIcon="@Icons.Material.Filled.Category"/>
+                            <MudSelect T="int?" @bind-Value="Model.CategoryId"
+                                       Label="Categoria"
+                                       Variant="Variant.Outlined"
+                                       Adornment="Adornment.Start"
+                                       AdornmentIcon="@Icons.Material.Filled.Category"
+                                       Dense="true">
+                                @if (_categories != null)
+                                {
+                                    @foreach (var cat in _categories)
+                                    {
+                                        <MudSelectItem T="int?" Value="@cat.Id">@cat.Name</MudSelectItem>
+                                    }
+                                }
+                            </MudSelect>
                         </MudItem>
                         <MudItem xs="12" sm="6">
                             <MudTextField @bind-Value="Model.PaymentMethod" 
@@ -232,17 +241,39 @@
 @code {
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
     [Parameter] public CreateSupplierDto Model { get; set; } = new() { Name = "", TaxId = "" };
+    [Inject] private HttpClient HttpClient { get; set; } = null!;
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
 
     private MudForm form = null!;
     private bool success;
     private bool _saving = false;
-    
+    private List<FinancialCategoryDto>? _categories;
+
     // Máscaras de entrada
     private PatternMask _cnpjMask = new PatternMask("00.000.000/0000-00");
     private PatternMask _cpfMask = new PatternMask("000.000.000-00");
     private PatternMask _phoneMask = new PatternMask("(00) 0000-0000");
     private PatternMask _mobileMask = new PatternMask("(00) 00000-0000");
     private PatternMask _cepMask = new PatternMask("00000-000");
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCategoriesAsync();
+    }
+
+    private async Task LoadCategoriesAsync()
+    {
+        try
+        {
+            var response = await HttpClient.GetFromJsonAsync<List<FinancialCategoryDto>>("api/financial-categories");
+            _categories = response?.Where(c => c.IsActive).ToList() ?? new List<FinancialCategoryDto>();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar categorias: {ex.Message}", Severity.Error);
+            _categories = new List<FinancialCategoryDto>();
+        }
+    }
 
     private string? ValidateTaxId(string value)
     {
