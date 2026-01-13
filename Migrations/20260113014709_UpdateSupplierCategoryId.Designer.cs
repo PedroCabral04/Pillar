@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using erp.Data;
@@ -11,9 +12,11 @@ using erp.Data;
 namespace erp.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260113014709_UpdateSupplierCategoryId")]
+    partial class UpdateSupplierCategoryId
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -308,8 +311,8 @@ namespace erp.Migrations
                         .HasColumnType("character varying(500)");
 
                     b.Property<string>("Icon")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
@@ -666,85 +669,6 @@ namespace erp.Migrations
                     b.ToTable("AuditLogs", (string)null);
                 });
 
-            modelBuilder.Entity("erp.Models.Chatbot.ChatConversation", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsArchived")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("LastMessageAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("TenantId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId");
-
-                    b.HasIndex("UserId");
-
-                    b.HasIndex("UserId", "CreatedAt");
-
-                    b.HasIndex("UserId", "IsArchived");
-
-                    b.ToTable("ChatConversations", (string)null);
-                });
-
-            modelBuilder.Entity("erp.Models.Chatbot.ChatMessage", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("ConversationId")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("IsError")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("Order")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Role")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<DateTime>("Timestamp")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ConversationId");
-
-                    b.HasIndex("ConversationId", "Order");
-
-                    b.ToTable("ChatMessages", (string)null);
-                });
-
             modelBuilder.Entity("erp.Models.Dashboard.UserDashboardLayout", b =>
                 {
                     b.Property<int>("Id")
@@ -1075,85 +999,6 @@ namespace erp.Migrations
                     b.ToTable("AccountsReceivable", (string)null);
                 });
 
-            modelBuilder.Entity("erp.Models.Financial.Commission", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<decimal>("CommissionAmount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<decimal>("CommissionPercent")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("CreatedByUserId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("PaidDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("PayrollId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ProductId")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("ProfitAmount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<int>("SaleId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("SaleItemId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TenantId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("UpdatedByUserId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedByUserId");
-
-                    b.HasIndex("PayrollId");
-
-                    b.HasIndex("ProductId");
-
-                    b.HasIndex("SaleId");
-
-                    b.HasIndex("SaleItemId");
-
-                    b.HasIndex("Status");
-
-                    b.HasIndex("UpdatedByUserId");
-
-                    b.HasIndex("UserId");
-
-                    b.HasIndex("UserId", "Status", "CreatedAt");
-
-                    b.ToTable("Commissions", (string)null);
-                });
-
             modelBuilder.Entity("erp.Models.Financial.CostCenter", b =>
                 {
                     b.Property<int>("Id")
@@ -1399,14 +1244,6 @@ namespace erp.Migrations
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .HasColumnType("text");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("Icon")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("Name")
                         .HasMaxLength(256)
@@ -1721,52 +1558,6 @@ namespace erp.Migrations
                     b.ToTable("Departments", (string)null);
                 });
 
-            modelBuilder.Entity("erp.Models.Identity.ModulePermission", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<int>("DisplayOrder")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
-
-                    b.Property<string>("Icon")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
-
-                    b.Property<string>("ModuleKey")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("DisplayOrder");
-
-                    b.HasIndex("ModuleKey")
-                        .IsUnique();
-
-                    b.ToTable("ModulePermissions", (string)null);
-                });
-
             modelBuilder.Entity("erp.Models.Identity.Position", b =>
                 {
                     b.Property<int>("Id")
@@ -1823,38 +1614,6 @@ namespace erp.Migrations
                     b.HasIndex("DefaultDepartmentId");
 
                     b.ToTable("Positions", (string)null);
-                });
-
-            modelBuilder.Entity("erp.Models.Identity.RoleModulePermission", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("GrantedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("GrantedByUserId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ModulePermissionId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("RoleId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("GrantedByUserId");
-
-                    b.HasIndex("ModulePermissionId");
-
-                    b.HasIndex("RoleId", "ModulePermissionId")
-                        .IsUnique();
-
-                    b.ToTable("RoleModulePermissions", (string)null);
                 });
 
             modelBuilder.Entity("erp.Models.Inventory.Brand", b =>
@@ -1922,13 +1681,8 @@ namespace erp.Migrations
                     b.Property<decimal>("CofinsRate")
                         .HasColumnType("numeric");
 
-                    b.Property<decimal>("CommissionPercent")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)");
-
                     b.Property<decimal>("CostPrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
+                        .HasColumnType("numeric");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1990,8 +1744,7 @@ namespace erp.Migrations
                         .HasColumnType("numeric");
 
                     b.Property<decimal>("SalePrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
+                        .HasColumnType("numeric");
 
                     b.Property<string>("Sku")
                         .IsRequired()
@@ -2029,8 +1782,7 @@ namespace erp.Migrations
                         .HasColumnType("numeric");
 
                     b.Property<decimal?>("WholesalePrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal?>("Width")
                         .HasColumnType("numeric");
@@ -3134,10 +2886,6 @@ namespace erp.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<decimal>("CostPrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
                     b.Property<decimal>("Discount")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
@@ -3361,10 +3109,10 @@ namespace erp.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<decimal?>("Abonos")
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("decimal(5,2)");
 
                     b.Property<decimal?>("Atrasos")
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("decimal(5,2)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -3373,10 +3121,10 @@ namespace erp.Migrations
                         .HasColumnType("integer");
 
                     b.Property<decimal?>("Faltas")
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("decimal(5,2)");
 
                     b.Property<decimal?>("HorasExtras")
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("decimal(5,2)");
 
                     b.Property<string>("Observacoes")
                         .HasMaxLength(1000)
@@ -3748,28 +3496,6 @@ namespace erp.Migrations
                     b.Navigation("ToDepartment");
                 });
 
-            modelBuilder.Entity("erp.Models.Chatbot.ChatConversation", b =>
-                {
-                    b.HasOne("erp.Models.Identity.ApplicationUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("erp.Models.Chatbot.ChatMessage", b =>
-                {
-                    b.HasOne("erp.Models.Chatbot.ChatConversation", "Conversation")
-                        .WithMany("Messages")
-                        .HasForeignKey("ConversationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Conversation");
-                });
-
             modelBuilder.Entity("erp.Models.Dashboard.UserDashboardLayout", b =>
                 {
                     b.HasOne("erp.Models.Identity.ApplicationUser", "User")
@@ -3892,63 +3618,6 @@ namespace erp.Migrations
                     b.Navigation("ReceivedByUser");
                 });
 
-            modelBuilder.Entity("erp.Models.Financial.Commission", b =>
-                {
-                    b.HasOne("erp.Models.Identity.ApplicationUser", "CreatedByUser")
-                        .WithMany()
-                        .HasForeignKey("CreatedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("erp.Models.Payroll.PayrollResult", "Payroll")
-                        .WithMany()
-                        .HasForeignKey("PayrollId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("erp.Models.Inventory.Product", "Product")
-                        .WithMany()
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("erp.Models.Sales.Sale", "Sale")
-                        .WithMany()
-                        .HasForeignKey("SaleId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("erp.Models.Sales.SaleItem", "SaleItem")
-                        .WithMany()
-                        .HasForeignKey("SaleItemId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("erp.Models.Identity.ApplicationUser", "UpdatedByUser")
-                        .WithMany()
-                        .HasForeignKey("UpdatedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("erp.Models.Identity.ApplicationUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("CreatedByUser");
-
-                    b.Navigation("Payroll");
-
-                    b.Navigation("Product");
-
-                    b.Navigation("Sale");
-
-                    b.Navigation("SaleItem");
-
-                    b.Navigation("UpdatedByUser");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("erp.Models.Financial.CostCenter", b =>
                 {
                     b.HasOne("erp.Models.Identity.ApplicationUser", "Manager")
@@ -4036,32 +3705,6 @@ namespace erp.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("DefaultDepartment");
-                });
-
-            modelBuilder.Entity("erp.Models.Identity.RoleModulePermission", b =>
-                {
-                    b.HasOne("erp.Models.Identity.ApplicationUser", "GrantedByUser")
-                        .WithMany()
-                        .HasForeignKey("GrantedByUserId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("erp.Models.Identity.ModulePermission", "ModulePermission")
-                        .WithMany("RolePermissions")
-                        .HasForeignKey("ModulePermissionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("erp.Models.Identity.ApplicationRole", "Role")
-                        .WithMany("ModulePermissions")
-                        .HasForeignKey("RoleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("GrantedByUser");
-
-                    b.Navigation("ModulePermission");
-
-                    b.Navigation("Role");
                 });
 
             modelBuilder.Entity("erp.Models.Inventory.Product", b =>
@@ -4553,11 +4196,6 @@ namespace erp.Migrations
                     b.Navigation("Assets");
                 });
 
-            modelBuilder.Entity("erp.Models.Chatbot.ChatConversation", b =>
-                {
-                    b.Navigation("Messages");
-                });
-
             modelBuilder.Entity("erp.Models.Financial.AccountPayable", b =>
                 {
                     b.Navigation("Installments");
@@ -4589,11 +4227,6 @@ namespace erp.Migrations
                     b.Navigation("AccountsPayable");
                 });
 
-            modelBuilder.Entity("erp.Models.Identity.ApplicationRole", b =>
-                {
-                    b.Navigation("ModulePermissions");
-                });
-
             modelBuilder.Entity("erp.Models.Identity.ApplicationUser", b =>
                 {
                     b.Navigation("TenantMemberships");
@@ -4604,11 +4237,6 @@ namespace erp.Migrations
                     b.Navigation("Employees");
 
                     b.Navigation("SubDepartments");
-                });
-
-            modelBuilder.Entity("erp.Models.Identity.ModulePermission", b =>
-                {
-                    b.Navigation("RolePermissions");
                 });
 
             modelBuilder.Entity("erp.Models.Identity.Position", b =>

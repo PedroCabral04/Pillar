@@ -905,7 +905,7 @@ public sealed class DemoDataSeeder
             .RuleFor(s => s.Street, f => f.Address.StreetAddress())
             .RuleFor(s => s.City, f => f.Address.City())
             .RuleFor(s => s.State, f => f.Address.StateAbbr())
-            .RuleFor(s => s.Category, f => f.Commerce.Department())
+            .RuleFor(s => s.CategoryId, (int?)null)
             .RuleFor(s => s.MinimumOrderValue, f => Math.Round(f.Random.Decimal(500, 10000), 2))
             .RuleFor(s => s.PaymentTermDays, f => f.Random.Int(15, 60))
             .RuleFor(s => s.PaymentMethod, f => f.PickRandom(PaymentMethods))

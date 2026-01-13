@@ -44,6 +44,7 @@ public class SupplierDao : ISupplierDao
         return await _context.Suppliers
             .AsNoTracking()
             .Include(s => s.CreatedByUser)
+            .Include(s => s.Category)
             .Include(s => s.AccountsPayable)
             .FirstOrDefaultAsync(s => s.Id == id);
     }
@@ -61,14 +62,16 @@ public class SupplierDao : ISupplierDao
     }
 
     public async Task<(List<Supplier> Items, int TotalCount)> GetPagedAsync(
-        int page, 
-        int pageSize, 
-        string? search = null, 
+        int page,
+        int pageSize,
+        string? search = null,
         bool? activeOnly = null,
         string? sortBy = null,
         bool sortDescending = false)
     {
-        var query = _context.Suppliers.AsNoTracking();
+        var query = _context.Suppliers
+            .Include(s => s.Category)
+            .AsNoTracking();
 
         // Apply filters
         if (activeOnly.HasValue)

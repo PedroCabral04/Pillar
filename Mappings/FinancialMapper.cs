@@ -12,9 +12,13 @@ public partial class FinancialMapper
     public partial SupplierSummaryDto ToSummaryDto(Supplier supplier);
     public partial Supplier ToEntity(CreateSupplierDto dto);
     public partial void UpdateEntity(UpdateSupplierDto dto, Supplier entity);
-    
+
     [MapProperty(nameof(Supplier.CreatedByUser.UserName), nameof(SupplierDto.CreatedByUserName))]
+    [MapProperty(nameof(Supplier.Category.Name), nameof(SupplierDto.CategoryName))]
     public partial SupplierDto ToDtoWithRelations(Supplier supplier);
+
+    [MapProperty(nameof(Supplier.Category.Name), nameof(SupplierSummaryDto.CategoryName))]
+    public partial SupplierSummaryDto ToSummaryDtoWithRelations(Supplier supplier);
     
     // Account Receivable mappings
     [MapperIgnoreTarget(nameof(AccountReceivableDto.NetAmount))]

@@ -54,6 +54,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<AccountPayable> AccountsPayable { get; set; } = null!;
     public DbSet<FinancialCategory> FinancialCategories { get; set; } = null!;
     public DbSet<CostCenter> CostCenters { get; set; } = null!;
+    public DbSet<Commission> Commissions { get; set; } = null!;
     
     // HR Management
     public DbSet<Department> Departments { get; set; } = null!;
@@ -1014,6 +1015,12 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             p.Property(x => x.NcmCode).HasMaxLength(10);
             p.Property(x => x.CestCode).HasMaxLength(10);
             p.Property(x => x.MainImageUrl).HasMaxLength(500);
+
+            // Pricing precision
+            p.Property(x => x.CostPrice).HasPrecision(18, 2);
+            p.Property(x => x.SalePrice).HasPrecision(18, 2);
+            p.Property(x => x.WholesalePrice).HasPrecision(18, 2);
+            p.Property(x => x.CommissionPercent).HasPrecision(5, 2);
             
             // Indexes
             p.HasIndex(x => x.Sku).IsUnique();
@@ -1291,14 +1298,19 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             s.Property(x => x.MobilePhone).HasMaxLength(20);
             s.Property(x => x.Email).HasMaxLength(200);
             s.Property(x => x.Website).HasMaxLength(200);
-            s.Property(x => x.Category).HasMaxLength(100);
             s.Property(x => x.PaymentMethod).HasMaxLength(50);
-            
+
             s.HasIndex(x => x.TaxId).IsUnique();
             s.HasIndex(x => x.Name);
             s.HasIndex(x => x.Email);
             s.HasIndex(x => x.IsActive);
-            
+            s.HasIndex(x => x.CategoryId);
+
+            s.HasOne(x => x.Category)
+                .WithMany()
+                .HasForeignKey(x => x.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             s.HasOne(x => x.CreatedByUser)
                 .WithMany()
                 .HasForeignKey(x => x.CreatedByUserId)
@@ -1472,6 +1484,59 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             c.HasOne(x => x.CreatedByUser)
                 .WithMany()
                 .HasForeignKey(x => x.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // Commission
+        modelBuilder.Entity<Commission>(c =>
+        {
+            c.ToTable("Commissions");
+            c.HasKey(x => x.Id);
+            c.Property(x => x.ProfitAmount).HasPrecision(18, 2);
+            c.Property(x => x.CommissionPercent).HasPrecision(5, 2);
+            c.Property(x => x.CommissionAmount).HasPrecision(18, 2);
+
+            c.HasIndex(x => x.SaleId);
+            c.HasIndex(x => x.SaleItemId);
+            c.HasIndex(x => x.ProductId);
+            c.HasIndex(x => x.UserId);
+            c.HasIndex(x => x.Status);
+            c.HasIndex(x => x.PayrollId);
+            c.HasIndex(x => new { x.UserId, x.Status, x.CreatedAt });
+
+            c.HasOne(x => x.Sale)
+                .WithMany()
+                .HasForeignKey(x => x.SaleId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            c.HasOne(x => x.SaleItem)
+                .WithMany()
+                .HasForeignKey(x => x.SaleItemId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            c.HasOne(x => x.Product)
+                .WithMany()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            c.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            c.HasOne(x => x.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            c.HasOne(x => x.UpdatedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.UpdatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            c.HasOne(x => x.Payroll)
+                .WithMany()
+                .HasForeignKey(x => x.PayrollId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }

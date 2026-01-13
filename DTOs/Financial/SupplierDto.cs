@@ -10,7 +10,7 @@ public class CreateSupplierDto
     public required string TaxId { get; set; }
     public string? StateRegistration { get; set; }
     public string? MunicipalRegistration { get; set; }
-    
+
     // Address
     public string? ZipCode { get; set; }
     public string? Street { get; set; }
@@ -20,21 +20,21 @@ public class CreateSupplierDto
     public string? City { get; set; }
     public string? State { get; set; }
     public string Country { get; set; } = "Brasil";
-    
+
     // Contact
     public string? Phone { get; set; }
     public string? MobilePhone { get; set; }
     public string? Email { get; set; }
     public string? Website { get; set; }
-    
+
     // Financial
-    public string? Category { get; set; }
+    public int? CategoryId { get; set; }
     public decimal MinimumOrderValue { get; set; } = 0;
     public int DeliveryLeadTimeDays { get; set; } = 0;
     public int PaymentTermDays { get; set; } = 30;
     public string PaymentMethod { get; set; } = "Boleto";
     public bool IsPreferred { get; set; } = false;
-    
+
     public string? Notes { get; set; }
     public bool IsActive { get; set; } = true;
 }
@@ -57,7 +57,7 @@ public class SupplierDto
     public required string TaxId { get; set; }
     public string? StateRegistration { get; set; }
     public string? MunicipalRegistration { get; set; }
-    
+
     // Address
     public string? ZipCode { get; set; }
     public string? Street { get; set; }
@@ -67,21 +67,22 @@ public class SupplierDto
     public string? City { get; set; }
     public string? State { get; set; }
     public string Country { get; set; } = "Brasil";
-    
+
     // Contact
     public string? Phone { get; set; }
     public string? MobilePhone { get; set; }
     public string? Email { get; set; }
     public string? Website { get; set; }
-    
+
     // Financial
-    public string? Category { get; set; }
+    public int? CategoryId { get; set; }
+    public string? CategoryName { get; set; }
     public decimal MinimumOrderValue { get; set; }
     public int DeliveryLeadTimeDays { get; set; }
     public int PaymentTermDays { get; set; }
     public string PaymentMethod { get; set; } = string.Empty;
     public bool IsPreferred { get; set; }
-    
+
     public string? Notes { get; set; }
     public bool IsActive { get; set; }
     public DateTime CreatedAt { get; set; }
@@ -101,7 +102,8 @@ public class SupplierSummaryDto
     public required string TaxId { get; set; }
     public string? Email { get; set; }
     public string? Phone { get; set; }
-    public string? Category { get; set; }
+    public int? CategoryId { get; set; }
+    public string? CategoryName { get; set; }
     public bool IsPreferred { get; set; }
     public bool IsActive { get; set; }
 }
