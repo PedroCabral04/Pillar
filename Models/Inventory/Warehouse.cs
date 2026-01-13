@@ -1,8 +1,10 @@
 namespace erp.Models.Inventory;
 
-public class Warehouse
+public class Warehouse : IMustHaveTenant
 {
     public int Id { get; set; }
+
+    public int TenantId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string Code { get; set; } = string.Empty;
     public string? Address { get; set; }

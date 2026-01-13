@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using erp.Models.Identity;
+using erp.Models;
 
 namespace erp.Models.Kanban;
 
@@ -28,9 +29,11 @@ public enum KanbanHistoryAction
 /// <summary>
 /// Histórico de atividades em cards do Kanban
 /// </summary>
-public class KanbanCardHistory
+public class KanbanCardHistory : IMustHaveTenant
 {
     public int Id { get; set; }
+
+    public int TenantId { get; set; }
 
     public int CardId { get; set; }
     public KanbanCard Card { get; set; } = null!;

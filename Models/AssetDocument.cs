@@ -5,9 +5,11 @@ namespace erp.Models;
 /// <summary>
 /// Documento anexado a um ativo (nota fiscal, garantia, manual, etc.)
 /// </summary>
-public class AssetDocument
+public class AssetDocument : IMustHaveTenant
 {
     public int Id { get; set; }
+
+    public int TenantId { get; set; }
     
     public int AssetId { get; set; }
     

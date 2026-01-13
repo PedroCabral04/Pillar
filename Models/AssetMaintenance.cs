@@ -5,9 +5,11 @@ namespace erp.Models;
 /// <summary>
 /// Registro de manutenção de ativos
 /// </summary>
-public class AssetMaintenance
+public class AssetMaintenance : IMustHaveTenant
 {
     public int Id { get; set; }
+
+    public int TenantId { get; set; }
     
     public int AssetId { get; set; }
     

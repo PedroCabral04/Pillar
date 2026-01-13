@@ -2,15 +2,18 @@ using System.ComponentModel.DataAnnotations;
 using erp.Models.Audit;
 using erp.Models.Identity;
 using erp.Models.Sales;
+using erp.Models;
 
 namespace erp.Models.Financial;
 
 /// <summary>
 /// Represents an account receivable (conta a receber)
 /// </summary>
-public class AccountReceivable : IAuditable
+public class AccountReceivable : IAuditable, IMustHaveTenant
 {
     public int Id { get; set; }
+
+    public int TenantId { get; set; }
     
     // Relacionamentos
     public int CustomerId { get; set; }

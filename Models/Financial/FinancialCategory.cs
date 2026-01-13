@@ -1,13 +1,16 @@
 using System.ComponentModel.DataAnnotations;
+using erp.Models;
 
 namespace erp.Models.Financial;
 
 /// <summary>
 /// Represents a financial category for revenue or expenses
 /// </summary>
-public class FinancialCategory
+public class FinancialCategory : IMustHaveTenant
 {
     public int Id { get; set; }
+
+    public int TenantId { get; set; }
     
     [Required]
     [MaxLength(200)]

@@ -1,14 +1,17 @@
 using System.ComponentModel.DataAnnotations;
 using erp.Models.Identity;
+using erp.Models;
 
 namespace erp.Models.Kanban;
 
 /// <summary>
 /// Comentários em cards do Kanban
 /// </summary>
-public class KanbanComment
+public class KanbanComment : IMustHaveTenant
 {
     public int Id { get; set; }
+
+    public int TenantId { get; set; }
 
     public int CardId { get; set; }
     public KanbanCard Card { get; set; } = null!;

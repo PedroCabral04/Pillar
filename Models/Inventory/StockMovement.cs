@@ -1,11 +1,14 @@
 using erp.Models.Identity;
 using erp.Models.Audit;
+using erp.Models;
 
 namespace erp.Models.Inventory;
 
-public class StockMovement : IAuditable
+public class StockMovement : IAuditable, IMustHaveTenant
 {
     public int Id { get; set; }
+
+    public int TenantId { get; set; }
     
     // Relacionamentos
     public int ProductId { get; set; }

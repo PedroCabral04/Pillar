@@ -2,16 +2,19 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
 using erp.Models.Identity;
 using erp.Models.Audit;
+using erp.Models;
 
 namespace erp.Models.Sales;
 
 /// <summary>
 /// Represents a sale transaction
 /// </summary>
-public class Sale : IAuditable
+public class Sale : IAuditable, IMustHaveTenant
 {
     public int Id { get; set; }
-    
+
+    public int TenantId { get; set; }
+
     [Required]
     [MaxLength(20)]
     public string SaleNumber { get; set; } = string.Empty;

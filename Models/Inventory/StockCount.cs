@@ -1,10 +1,13 @@
 using erp.Models.Identity;
+using erp.Models;
 
 namespace erp.Models.Inventory;
 
-public class StockCount
+public class StockCount : IMustHaveTenant
 {
     public int Id { get; set; }
+
+    public int TenantId { get; set; }
     public string CountNumber { get; set; } = string.Empty;
     public DateTime CountDate { get; set; } = DateTime.UtcNow;
     public DateTime? ClosedDate { get; set; }

@@ -5,9 +5,11 @@ namespace erp.Models;
 /// <summary>
 /// Transferência de ativo entre localizações/departamentos
 /// </summary>
-public class AssetTransfer
+public class AssetTransfer : IMustHaveTenant
 {
     public int Id { get; set; }
+
+    public int TenantId { get; set; }
     
     public int AssetId { get; set; }
     

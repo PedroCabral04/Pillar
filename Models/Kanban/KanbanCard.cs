@@ -2,12 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using erp.Models.Identity;
+using erp.Models;
 
 namespace erp.Models.Kanban;
 
-public class KanbanCard
+public class KanbanCard : IMustHaveTenant
 {
     public int Id { get; set; }
+
+    public int TenantId { get; set; }
 
     public int ColumnId { get; set; }
     public KanbanColumn Column { get; set; } = null!;

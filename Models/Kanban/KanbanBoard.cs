@@ -2,12 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using erp.Models.Identity;
+using erp.Models;
 
 namespace erp.Models.Kanban;
 
-public class KanbanBoard
+public class KanbanBoard : IMustHaveTenant
 {
     public int Id { get; set; }
+
+    public int TenantId { get; set; }
 
     [MaxLength(200)]
     public string Name { get; set; } = "Meu quadro";

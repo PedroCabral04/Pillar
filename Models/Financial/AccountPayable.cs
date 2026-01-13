@@ -1,15 +1,18 @@
 using System.ComponentModel.DataAnnotations;
 using erp.Models.Audit;
 using erp.Models.Identity;
+using erp.Models;
 
 namespace erp.Models.Financial;
 
 /// <summary>
 /// Represents an account payable (conta a pagar)
 /// </summary>
-public class AccountPayable : IAuditable
+public class AccountPayable : IAuditable, IMustHaveTenant
 {
     public int Id { get; set; }
+
+    public int TenantId { get; set; }
     
     // Relacionamentos
     public int SupplierId { get; set; }

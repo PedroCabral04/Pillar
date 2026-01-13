@@ -1,14 +1,17 @@
 using System.ComponentModel.DataAnnotations;
 using erp.Models.Identity;
+using erp.Models;
 
 namespace erp.Models.Financial;
 
 /// <summary>
 /// Represents a cost center for financial tracking
 /// </summary>
-public class CostCenter
+public class CostCenter : IMustHaveTenant
 {
     public int Id { get; set; }
+
+    public int TenantId { get; set; }
     
     [Required]
     [MaxLength(200)]

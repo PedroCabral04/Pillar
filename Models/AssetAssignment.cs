@@ -5,9 +5,11 @@ namespace erp.Models;
 /// <summary>
 /// Atribuição de ativo a um funcionário
 /// </summary>
-public class AssetAssignment
+public class AssetAssignment : IMustHaveTenant
 {
     public int Id { get; set; }
+
+    public int TenantId { get; set; }
     
     public int AssetId { get; set; }
     

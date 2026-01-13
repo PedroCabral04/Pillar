@@ -88,6 +88,20 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     // Serviços injetados para auditoria
     private readonly IHttpContextAccessor? _httpContextAccessor;
     private readonly erp.Services.Tenancy.ITenantContextAccessor? _tenantContextAccessor;
+
+    /// <summary>
+    /// Gets the current tenant ID from the tenant context accessor.
+    /// Returns null if no tenant context is available (used in query filters).
+    /// </summary>
+    private int? CurrentTenantId => _tenantContextAccessor?.Current?.TenantId;
+
+    /// <summary>
+    /// Determines if tenant filtering should be applied.
+    /// Returns false when no tenant context exists (allowing all data access).
+    /// </summary>
+    private bool ShouldApplyTenantFilter => _tenantContextAccessor != null 
+        && _tenantContextAccessor.Current != null 
+        && _tenantContextAccessor.Current.TenantId.HasValue;
     
     // Construtor adicional para injeção de IHttpContextAccessor
     public ApplicationDbContext(
@@ -181,20 +195,66 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     private void SetTenantId()
     {
         var currentTenantId = _tenantContextAccessor?.Current?.TenantId;
-        if (!currentTenantId.HasValue) return;
 
         var entries = ChangeTracker.Entries()
-            .Where(e => e.Entity is IMustHaveTenant && e.State == EntityState.Added);
+            .Where(e => e.Entity is IMustHaveTenant && e.State == EntityState.Added)
+            .ToList();
+
+        if (!entries.Any()) return;
 
         foreach (var entry in entries)
         {
             var entity = (IMustHaveTenant)entry.Entity;
-            // Only set if not already set (allows explicit override)
-            if (entity.TenantId == 0)
+            
+            // If TenantId is already explicitly set, validate it's not 0
+            if (entity.TenantId != 0)
             {
-                entity.TenantId = currentTenantId.Value;
+                continue; // Already has a valid tenant, skip
+            }
+            
+            // Try to inherit TenantId from parent entity (for child entities like SaleItem, KanbanColumn, etc.)
+            var inheritedTenantId = TryGetParentTenantId(entry);
+            if (inheritedTenantId.HasValue && inheritedTenantId.Value != 0)
+            {
+                entity.TenantId = inheritedTenantId.Value;
+                continue;
+            }
+            
+            // If no tenant context and TenantId is 0, this is a data integrity issue
+            if (!currentTenantId.HasValue || currentTenantId.Value == 0)
+            {
+                var entityType = entry.Entity.GetType().Name;
+                throw new InvalidOperationException(
+                    $"Cannot save entity '{entityType}' without tenant context. " +
+                    $"Entities implementing IMustHaveTenant require a valid TenantId. " +
+                    $"Ensure the request has a valid tenant context (subdomain, X-Tenant header, or user claim).");
+            }
+            
+            entity.TenantId = currentTenantId.Value;
+        }
+    }
+
+    /// <summary>
+    /// Tries to get TenantId from a parent entity via navigation properties.
+    /// This ensures child entities inherit the same TenantId as their parent.
+    /// </summary>
+    private int? TryGetParentTenantId(EntityEntry entry)
+    {
+        // Check all navigation properties for a parent that implements IMustHaveTenant
+        foreach (var navigation in entry.Navigations)
+        {
+            // Skip collection navigations - we only want single references (parent)
+            if (navigation.Metadata.IsCollection)
+                continue;
+            
+            var navigationValue = navigation.CurrentValue;
+            if (navigationValue is IMustHaveTenant parentTenant && parentTenant.TenantId != 0)
+            {
+                return parentTenant.TenantId;
             }
         }
+        
+        return null;
     }
 
     private void SetAuditProperties()
@@ -878,23 +938,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         ConfigureDashboardModels(modelBuilder);
 
         // Apply Global Query Filters for Multi-Tenancy
-        // This ensures that queries only return data for the current tenant
-        // Note: This filter is applied to the CLR type, so it works for all derived types too
+        // These filters ensure queries only return data for the current tenant.
+        // When no tenant context exists (tests, admin operations, anonymous endpoints), all data is accessible.
+        // The filter pattern: skip filter if no tenant context, otherwise match entity.TenantId to current tenant.
         
-        // We need to capture the tenant ID in a local variable for the expression tree
-        // However, since OnModelCreating runs once per app lifetime (cached), we can't use _tenantContextAccessor here directly.
-        // Instead, we use a Global Query Filter that references a property on the DbContext or a service.
-        // But EF Core Global Query Filters are defined in OnModelCreating.
-        // The standard way is to define the filter using a lambda that accesses a property on the DbContext instance.
-        // But we don't have a TenantId property on ApplicationDbContext.
-        // We can add one, or use the accessor via an expression.
-        
-        // Actually, the best way is to use a method on the context or a property.
-        // Let's add a CurrentTenantId property to ApplicationDbContext that delegates to the accessor.
-        
-        modelBuilder.Entity<Models.Inventory.Product>().HasQueryFilter(p => _tenantContextAccessor == null || _tenantContextAccessor.Current == null || !_tenantContextAccessor.Current.TenantId.HasValue || p.TenantId == _tenantContextAccessor.Current.TenantId.GetValueOrDefault());
-        modelBuilder.Entity<Models.Sales.Customer>().HasQueryFilter(c => _tenantContextAccessor == null || _tenantContextAccessor.Current == null || !_tenantContextAccessor.Current.TenantId.HasValue || c.TenantId == _tenantContextAccessor.Current.TenantId.GetValueOrDefault());
-        modelBuilder.Entity<Models.Financial.Supplier>().HasQueryFilter(s => _tenantContextAccessor == null || _tenantContextAccessor.Current == null || !_tenantContextAccessor.Current.TenantId.HasValue || s.TenantId == _tenantContextAccessor.Current.TenantId.GetValueOrDefault());
+        ConfigureTenantQueryFilters(modelBuilder);
     }
 
     private void ConfigureTenancyModels(ModelBuilder modelBuilder)
@@ -1826,13 +1874,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             a.HasIndex(x => new { x.TenantId, x.EntityName, x.Timestamp })
                 .HasDatabaseName("idx_audit_tenant_entity_timeline");
             
-            // Query filter para multi-tenancy
+            // Query filter para multi-tenancy (allows system logs with TenantId == 0)
             a.HasQueryFilter(log => 
-                _tenantContextAccessor == null || 
-                _tenantContextAccessor.Current == null || 
-                !_tenantContextAccessor.Current.TenantId.HasValue || 
-                log.TenantId == 0 || // Logs sem tenant (sistema)
-                log.TenantId == _tenantContextAccessor.Current.TenantId.GetValueOrDefault());
+                !ShouldApplyTenantFilter || 
+                log.TenantId == 0 || // System logs (no tenant)
+                log.TenantId == CurrentTenantId);
         });
     }
 
@@ -2061,5 +2107,52 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .HasForeignKey(x => x.ModifiedByUserId)
                 .OnDelete(DeleteBehavior.SetNull);
         });
+    }
+
+    /// <summary>
+    /// Configures global query filters for all tenant-scoped entities.
+    /// Filters ensure queries only return data for the current tenant when a tenant context exists.
+    /// When no tenant context is available (tests, admin operations, anonymous endpoints), all data is accessible.
+    /// </summary>
+    private void ConfigureTenantQueryFilters(ModelBuilder modelBuilder)
+    {
+        // Inventory
+        modelBuilder.Entity<Models.Inventory.Product>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
+        modelBuilder.Entity<Models.Inventory.StockMovement>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
+        modelBuilder.Entity<Models.Inventory.Warehouse>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
+        modelBuilder.Entity<Models.Inventory.StockCount>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
+        modelBuilder.Entity<Models.Inventory.StockCountItem>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
+
+        // Sales
+        modelBuilder.Entity<Models.Sales.Customer>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
+        modelBuilder.Entity<Models.Sales.Sale>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
+        modelBuilder.Entity<Models.Sales.SaleItem>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
+
+        // Financial
+        modelBuilder.Entity<Supplier>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
+        modelBuilder.Entity<AccountReceivable>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
+        modelBuilder.Entity<AccountPayable>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
+        modelBuilder.Entity<FinancialCategory>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
+        modelBuilder.Entity<CostCenter>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
+
+        // Assets
+        modelBuilder.Entity<Asset>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
+        modelBuilder.Entity<AssetAssignment>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
+        modelBuilder.Entity<AssetCategory>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
+        modelBuilder.Entity<AssetMaintenance>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
+        modelBuilder.Entity<AssetTransfer>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
+        modelBuilder.Entity<AssetDocument>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
+
+        // Kanban
+        modelBuilder.Entity<Models.Kanban.KanbanBoard>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
+        modelBuilder.Entity<Models.Kanban.KanbanColumn>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
+        modelBuilder.Entity<Models.Kanban.KanbanCard>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
+        modelBuilder.Entity<Models.Kanban.KanbanLabel>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
+        modelBuilder.Entity<Models.Kanban.KanbanComment>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
+        modelBuilder.Entity<Models.Kanban.KanbanCardHistory>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
+
+        // HR
+        modelBuilder.Entity<Department>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
+        modelBuilder.Entity<Position>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
     }
 }

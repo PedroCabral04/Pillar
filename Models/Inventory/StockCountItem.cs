@@ -1,8 +1,10 @@
 namespace erp.Models.Inventory;
 
-public class StockCountItem
+public class StockCountItem : IMustHaveTenant
 {
     public int Id { get; set; }
+
+    public int TenantId { get; set; }
     public int StockCountId { get; set; }
     public virtual StockCount StockCount { get; set; } = null!;
     

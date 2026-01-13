@@ -3,9 +3,11 @@ namespace erp.Models;
 /// <summary>
 /// Categoria de ativos (Computadores, Móveis, Veículos, etc.)
 /// </summary>
-public class AssetCategory
+public class AssetCategory : IMustHaveTenant
 {
     public int Id { get; set; }
+
+    public int TenantId { get; set; }
     
     public string Name { get; set; } = string.Empty;
     

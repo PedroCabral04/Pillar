@@ -1,11 +1,14 @@
 using System.ComponentModel.DataAnnotations;
 using erp.Models.Audit;
+using erp.Models;
 
 namespace erp.Models.Identity;
 
-public class Department : IAuditable
+public class Department : IAuditable, IMustHaveTenant
 {
     public int Id { get; set; }
+
+    public int TenantId { get; set; }
     
     [Required]
     [MaxLength(100)]

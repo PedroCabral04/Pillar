@@ -3,9 +3,11 @@ namespace erp.Models;
 /// <summary>
 /// Ativo da empresa (equipamento, móvel, veículo, etc.)
 /// </summary>
-public class Asset
+public class Asset : IMustHaveTenant
 {
     public int Id { get; set; }
+
+    public int TenantId { get; set; }
     
     /// <summary>
     /// Código único do ativo (ex: COMP-001, VEI-042)

@@ -1,13 +1,16 @@
 using System.ComponentModel.DataAnnotations;
+using erp.Models;
 
 namespace erp.Models.Kanban;
 
 /// <summary>
 /// Etiquetas compartilhadas no quadro Kanban para categorização de cards
 /// </summary>
-public class KanbanLabel
+public class KanbanLabel : IMustHaveTenant
 {
     public int Id { get; set; }
+
+    public int TenantId { get; set; }
 
     public int BoardId { get; set; }
     public KanbanBoard Board { get; set; } = null!;
