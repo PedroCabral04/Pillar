@@ -90,9 +90,9 @@
             <MudTd DataLabel="Data">@context.SaleDate.ToString("dd/MM/yyyy")</MudTd>
             <MudTd DataLabel="Cliente">@(context.CustomerName ?? "Cliente não informado")</MudTd>
             <MudTd DataLabel="Vendedor">@context.UserName</MudTd>
-            <MudTd DataLabel="Total" Style="text-align: right">@context.TotalAmount.ToString("C2")</MudTd>
+            <MudTd DataLabel="Total" Style="text-align: right">@Currency.Format(context.TotalAmount)</MudTd>
             <MudTd DataLabel="Líquido" Style="text-align: right">
-                <MudText Typo="Typo.body2" Style="font-weight: 600">@context.NetAmount.ToString("C2")</MudText>
+                <MudText Typo="Typo.body2" Style="font-weight: 600">@Currency.Format(context.NetAmount)</MudText>
             </MudTd>
             <MudTd DataLabel="Status">
                 <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">@context.Status</MudChip>

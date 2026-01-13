@@ -124,7 +124,7 @@
                         <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
                             <div>
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">Valor em Estoque</MudText>
-                                <MudText Typo="Typo.h6">@_statistics.TotalStockValue.ToString("C0")</MudText>
+                                <MudText Typo="Typo.h6">@Currency.Format(_statistics.TotalStockValue, decimals: 0)</MudText>
                             </div>
                             <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Color="Color.Success" Size="Size.Large"/>
                         </MudStack>

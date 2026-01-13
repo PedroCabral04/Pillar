@@ -1,6 +1,4 @@
-@page "/time-tracking/payroll-disabled"
-@* PAGE DISABLED - REPLACED BY TimeTracking.razor *@
-@using System.Globalization
+@page "/time-tracking/payroll"
 @using erp.DTOs.Payroll
 @using erp.Models.Payroll
 @using erp.Models.TimeTracking
@@ -17,6 +15,7 @@
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
 @inject IDialogService DialogService
+@inject CurrencyFormatService Currency
 
 <PageTitle>Folha de Pagamento</PageTitle>
 
@@ -304,7 +303,6 @@
 </MudStack>
 
 @code {
-    private readonly CultureInfo _ptBr = new("pt-BR");
     private readonly List<(int Value, string Label)> _months = new()
     {
         (1, "Janeiro"), (2, "Fevereiro"), (3, "Março"), (4, "Abril"), (5, "Maio"), (6, "Junho"),
@@ -684,7 +682,7 @@
         _ => "N/D"
     };
 
-    private string FormatCurrency(decimal value) => value.ToString("C", _ptBr);
+    private string FormatCurrency(decimal value) => Currency.Format(value);
     private string FormatCompetence(int month, int year) => $"{month:00}/{year}";
     private string FormatDate(DateTime? date) => date?.ToLocalTime().ToString("dd/MM/yyyy") ?? "—";
     private string FormatDateTime(DateTime? date) => date?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "—";

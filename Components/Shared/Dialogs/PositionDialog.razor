@@ -53,7 +53,7 @@
                                      Label="Salário Mínimo"
                                      Variant="Variant.Outlined"
                                      Format="C2"
-                                     Culture="@(new System.Globalization.CultureInfo("pt-BR"))"
+                                     Culture="@System.Globalization.CultureInfo.CurrentCulture"
                                      Min="0"
                                      HideSpinButtons="true"/>
 
@@ -61,7 +61,7 @@
                                      Label="Salário Máximo"
                                      Variant="Variant.Outlined"
                                      Format="C2"
-                                     Culture="@(new System.Globalization.CultureInfo("pt-BR"))"
+                                     Culture="@System.Globalization.CultureInfo.CurrentCulture"
                                      Min="0"
                                      HideSpinButtons="true"/>
                 </MudStack>

@@ -296,7 +296,7 @@
                                                  Adornment="Adornment.Start"
                                                  AdornmentIcon="@Icons.Material.Filled.AttachMoney"
                                                  Format="N2"
-                                                 Culture="@BrazilCulture"
+                                                 Culture="@System.Globalization.CultureInfo.CurrentCulture"
                                                  HelperText="Valor pago na aquisição" />
                             </MudItem>
 
@@ -419,32 +419,6 @@
     private DateTime? _purchaseDate;
     private DateTime? _warrantyExpiryDate;
     private System.Globalization.CultureInfo BrazilCulture { get; } = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
-
-    // Quick category creation
-    private bool _showCategoryPopover = false;
-    private string _newCategoryName = "";
-    private string _newCategoryIcon = Icons.Material.Filled.Category;
-    private bool _creatingCategory = false;
-
-    // Preset icons for quick category creation
-    private readonly List<(string Value, string Label)> _iconOptions = new()
-    {
-        (Icons.Material.Filled.Computer, "Computadores"),
-        (Icons.Material.Filled.Laptop, "Notebooks"),
-        (Icons.Material.Filled.PhoneAndroid, "Celulares"),
-        (Icons.Material.Filled.Tablet, "Tablets"),
-        (Icons.Material.Filled.Monitor, "Monitores"),
-        (Icons.Material.Filled.Print, "Impressoras"),
-        (Icons.Material.Filled.Chair, "Mobiliário"),
-        (Icons.Material.Filled.DirectionsCar, "Veículos"),
-        (Icons.Material.Filled.Construction, "Ferramentas"),
-        (Icons.Material.Filled.ElectricalServices, "Elétricos"),
-        (Icons.Material.Filled.AcUnit, "Ar Condicionado"),
-        (Icons.Material.Filled.Kitchen, "Eletrodomésticos"),
-        (Icons.Material.Filled.Videocam, "Audiovisual"),
-        (Icons.Material.Filled.Security, "Segurança"),
-        (Icons.Material.Filled.Category, "Outros"),
-    };
 
     protected override async Task OnInitializedAsync()
     {
