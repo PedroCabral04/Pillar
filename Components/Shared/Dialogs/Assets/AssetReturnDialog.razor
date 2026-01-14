@@ -1,0 +1,175 @@
+@using erp.DTOs.Assets
+@using erp.Services
+@using erp.Models
+@using MudBlazor
+@using Size = MudBlazor.Size
+@using Color = MudBlazor.Color
+
+@inject IApiService ApiService
+@inject ILogger<AssetReturnDialog> Logger
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.AssignmentReturn" Color="Color.Warning" Size="Size.Large" />
+            <MudText Typo="Typo.h6">Devolver Ativo</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" Model="_model" Class="pa-2">
+            <MudStack Spacing="3">
+                @if (Asset != null)
+                {
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Text" Dense="true">
+                        <MudStack Spacing="1">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                <MudIcon Icon="@Icons.Material.Filled.Inventory2" Size="Size.Small" />
+                                <MudText Typo="Typo.body2">
+                                    <strong>@Asset.AssetCode</strong> - @Asset.Name
+                                </MudText>
+                            </MudStack>
+                            @if (!string.IsNullOrEmpty(Asset.CurrentAssignedToUserName))
+                            {
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                    <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" />
+                                    <MudText Typo="Typo.body2">
+                                        Atribuído a: <strong>@Asset.CurrentAssignedToUserName</strong>
+                                        @if (Asset.CurrentAssignedDate.HasValue)
+                                        {
+                                            <text> desde @Asset.CurrentAssignedDate.Value.ToString("dd/MM/yyyy")</text>
+                                        }
+                                    </MudText>
+                                </MudStack>
+                            }
+                        </MudStack>
+                    </MudAlert>
+                }
+
+                <MudDatePicker @bind-Date="_returnedDate"
+                               Label="Data de Devolução"
+                               Variant="Variant.Outlined"
+                               DateFormat="dd/MM/yyyy"
+                               Adornment="Adornment.Start"
+                               AdornmentIcon="@Icons.Material.Filled.CalendarMonth"
+                               HelperText="Data em que o ativo foi devolvido" />
+
+                <MudSelect T="AssetCondition" @bind-Value="_model.ConditionOnReturn"
+                           Label="Condição na Devolução"
+                           Required="true"
+                           Variant="Variant.Outlined"
+                           Adornment="Adornment.Start"
+                           AdornmentIcon="@Icons.Material.Filled.StarRate"
+                           HelperText="Estado do ativo no momento da devolução">
+                    <MudSelectItem T="AssetCondition" Value="@AssetCondition.Excellent">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                            <MudRating ReadOnly="true" SelectedValue="5" Size="Size.Small" />
+                            <MudText>Excelente</MudText>
+                        </MudStack>
+                    </MudSelectItem>
+                    <MudSelectItem T="AssetCondition" Value="@AssetCondition.Good">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                            <MudRating ReadOnly="true" SelectedValue="4" Size="Size.Small" />
+                            <MudText>Bom</MudText>
+                        </MudStack>
+                    </MudSelectItem>
+                    <MudSelectItem T="AssetCondition" Value="@AssetCondition.Fair">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                            <MudRating ReadOnly="true" SelectedValue="3" Size="Size.Small" />
+                            <MudText>Regular</MudText>
+                        </MudStack>
+                    </MudSelectItem>
+                    <MudSelectItem T="AssetCondition" Value="@AssetCondition.Poor">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                            <MudRating ReadOnly="true" SelectedValue="2" Size="Size.Small" />
+                            <MudText>Ruim</MudText>
+                        </MudStack>
+                    </MudSelectItem>
+                    <MudSelectItem T="AssetCondition" Value="@AssetCondition.Damaged">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                            <MudRating ReadOnly="true" SelectedValue="1" Size="Size.Small" />
+                            <MudText>Danificado</MudText>
+                        </MudStack>
+                    </MudSelectItem>
+                </MudSelect>
+
+                <MudTextField @bind-Value="_model.ReturnNotes"
+                              Label="Observações"
+                              Variant="Variant.Outlined"
+                              Lines="3"
+                              Placeholder="Observações sobre a devolução..."
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Notes"
+                              HelperText="Notas opcionais sobre a devolução do ativo" />
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Close" Disabled="_saving">
+            Cancelar
+        </MudButton>
+        <MudButton Color="Color.Warning" Variant="Variant.Filled" OnClick="Save" 
+                   Disabled="_saving" StartIcon="@(_saving ? null : Icons.Material.Filled.AssignmentReturn)">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <text>Registrando...</text>
+            }
+            else
+            {
+                <text>Registrar Devolução</text>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public AssetDto? Asset { get; set; }
+    [Parameter] public int AssignmentId { get; set; }
+
+    private MudForm? _form;
+    private ReturnAssetDto _model = new();
+    private DateTime? _returnedDate = DateTime.Today;
+    private bool _saving = false;
+
+    protected override void OnInitialized()
+    {
+        _model.ConditionOnReturn = Asset?.Condition ?? AssetCondition.Good;
+    }
+
+    private async Task Save()
+    {
+        await _form!.Validate();
+        if (!_form.IsValid)
+        {
+            return;
+        }
+
+        _saving = true;
+
+        try
+        {
+            _model.ReturnedDate = _returnedDate?.ToUniversalTime() ?? DateTime.UtcNow;
+
+            var result = await ApiService.PostAsync<AssetAssignmentDto>($"/api/assets/assignments/{AssignmentId}/return", _model);
+            
+            if (result != null)
+            {
+                Snackbar.Add("Devolução registrada com sucesso!", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(result));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao registrar devolução");
+            Snackbar.Add($"Erro ao registrar devolução: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

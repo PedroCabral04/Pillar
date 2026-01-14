@@ -61,7 +61,7 @@ namespace erp.Controllers
         private IQueryable<ApplicationRole> ApplyTenantScope(IQueryable<ApplicationRole> query)
         {
             var tenantId = GetScopedTenantId();
-            return tenantId.HasValue ? query.Where(r => r.TenantId == tenantId.Value) : query;
+            return tenantId.HasValue ? query.Where(r => r.TenantId == tenantId.Value || r.TenantId == null) : query;
         }
 
         private bool UserVisible(ApplicationUser? user)

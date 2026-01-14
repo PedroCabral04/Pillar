@@ -24,7 +24,7 @@ public class AccountsReceivableController : ControllerBase
     }
 
     /// <summary>
-    /// Get paginated accounts receivable with filters
+    /// Obtém contas a receber paginadas com filtros
     /// </summary>
     [HttpGet]
     public async Task<ActionResult> GetPaged(
@@ -36,15 +36,16 @@ public class AccountsReceivableController : ControllerBase
         [FromQuery] DateTime? dueDateTo = null,
         [FromQuery] int? categoryId = null,
         [FromQuery] int? costCenterId = null,
+        [FromQuery] string? searchText = null,
         [FromQuery] string? sortBy = null,
         [FromQuery] bool sortDescending = false)
     {
         try
         {
-            var result = await _accountReceivableService.GetPagedAsync(
+            var (items, totalCount) = await _accountReceivableService.GetPagedAsync(
                 page, pageSize, customerId, status, dueDateFrom, dueDateTo,
-                categoryId, costCenterId, sortBy, sortDescending);
-            return Ok(result);
+                categoryId, costCenterId, sortBy, sortDescending, searchText);
+            return Ok(new { Items = items, TotalCount = totalCount });
         }
         catch (Exception ex)
         {
@@ -54,7 +55,7 @@ public class AccountsReceivableController : ControllerBase
     }
 
     /// <summary>
-    /// Get account receivable by ID
+    /// Obtém conta a receber por ID
     /// </summary>
     [HttpGet("{id}")]
     public async Task<ActionResult<AccountReceivableDto>> GetById(int id)
@@ -76,7 +77,7 @@ public class AccountsReceivableController : ControllerBase
     }
 
     /// <summary>
-    /// Get overdue accounts receivable
+    /// Obtém contas a receber vencidas
     /// </summary>
     [HttpGet("overdue")]
     public async Task<ActionResult<List<AccountReceivableDto>>> GetOverdue()
@@ -94,7 +95,7 @@ public class AccountsReceivableController : ControllerBase
     }
 
     /// <summary>
-    /// Get accounts receivable due soon (within days)
+    /// Obtém contas a receber com vencimento em breve (dentro de X dias)
     /// </summary>
     [HttpGet("due-soon")]
     public async Task<ActionResult<List<AccountReceivableDto>>> GetDueSoon([FromQuery] int days = 7)
@@ -112,7 +113,30 @@ public class AccountsReceivableController : ControllerBase
     }
 
     /// <summary>
-    /// Get total amounts by status
+    /// Obtém o resumo de totais por status
+    /// </summary>
+    [HttpGet("total-by-status")]
+    public async Task<ActionResult> GetTotalsByStatus()
+    {
+        try
+        {
+            var pending = await _accountReceivableService.GetTotalByStatusAsync(AccountStatus.Pending);
+            var overdue = await _accountReceivableService.GetTotalByStatusAsync(AccountStatus.Overdue);
+            var paid = await _accountReceivableService.GetTotalByStatusAsync(AccountStatus.Paid);
+            var partiallyPaid = await _accountReceivableService.GetTotalByStatusAsync(AccountStatus.PartiallyPaid);
+            var cancelled = await _accountReceivableService.GetTotalByStatusAsync(AccountStatus.Cancelled);
+            
+            return Ok(new { Pending = pending, Overdue = overdue, Paid = paid, PartiallyPaid = partiallyPaid, Cancelled = cancelled });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting totals by status");
+            return StatusCode(500, "Erro ao calcular totais por status");
+        }
+    }
+
+    /// <summary>
+    /// Obtém o total de valores por status
     /// </summary>
     [HttpGet("totals/by-status/{status}")]
     public async Task<ActionResult<decimal>> GetTotalByStatus(AccountStatus status)
@@ -130,7 +154,7 @@ public class AccountsReceivableController : ControllerBase
     }
 
     /// <summary>
-    /// Get total amounts by customer
+    /// Obtém o total de valores por cliente
     /// </summary>
     [HttpGet("totals/by-customer/{customerId}")]
     public async Task<ActionResult<decimal>> GetTotalByCustomer(int customerId)
@@ -148,7 +172,7 @@ public class AccountsReceivableController : ControllerBase
     }
 
     /// <summary>
-    /// Get installments of a parent account
+    /// Obtém parcelas de uma conta pai
     /// </summary>
     [HttpGet("{parentId}/installments")]
     public async Task<ActionResult<List<AccountReceivableDto>>> GetInstallments(int parentId)
@@ -166,7 +190,7 @@ public class AccountsReceivableController : ControllerBase
     }
 
     /// <summary>
-    /// Create new account receivable
+    /// Cria nova conta a receber
     /// </summary>
     [HttpPost]
     public async Task<ActionResult<AccountReceivableDto>> Create([FromBody] CreateAccountReceivableDto dto)
@@ -194,7 +218,7 @@ public class AccountsReceivableController : ControllerBase
     }
 
     /// <summary>
-    /// Update existing account receivable
+    /// Atualiza conta a receber existente
     /// </summary>
     [HttpPut("{id}")]
     public async Task<ActionResult<AccountReceivableDto>> Update(int id, [FromBody] UpdateAccountReceivableDto dto)
@@ -226,7 +250,7 @@ public class AccountsReceivableController : ControllerBase
     }
 
     /// <summary>
-    /// Delete account receivable
+    /// Exclui conta a receber
     /// </summary>
     [HttpDelete("{id}")]
     public async Task<ActionResult> Delete(int id)
@@ -248,7 +272,7 @@ public class AccountsReceivableController : ControllerBase
     }
 
     /// <summary>
-    /// Receive payment for an account
+    /// Recebe pagamento de uma conta
     /// </summary>
     [HttpPost("{id}/receive")]
     public async Task<ActionResult<AccountReceivableDto>> ReceivePayment(
@@ -272,7 +296,8 @@ public class AccountsReceivableController : ControllerBase
 
             var account = await _accountReceivableService.ReceivePaymentAsync(
                 id, dto.PaidAmount, existing.PaymentMethod, dto.PaymentDate, currentUserId,
-                existing.BankSlipNumber, existing.PixKey);
+                existing.BankSlipNumber, existing.PixKey,
+                dto.AdditionalDiscount, dto.AdditionalInterest, dto.AdditionalFine);
             
             return Ok(account);
         }
@@ -288,7 +313,7 @@ public class AccountsReceivableController : ControllerBase
     }
 
     /// <summary>
-    /// Create installments from a base account
+    /// Cria parcelas a partir de uma conta base
     /// </summary>
     [HttpPost("{id}/installments")]
     public async Task<ActionResult<List<AccountReceivableDto>>> CreateInstallments(
@@ -347,7 +372,7 @@ public class AccountsReceivableController : ControllerBase
     }
 
     /// <summary>
-    /// Update overdue status for all accounts (batch operation)
+    /// Atualiza o status de vencimento para todas as contas (operação em lote)
     /// </summary>
     [HttpPost("update-overdue-status")]
     public async Task<ActionResult> UpdateOverdueStatus()

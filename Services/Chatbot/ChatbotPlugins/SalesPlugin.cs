@@ -15,11 +15,14 @@ public class SalesPlugin
 {
     private readonly ISalesService _salesService;
     private readonly IInventoryService _inventoryService;
+    private readonly IChatbotCacheService _cacheService;
+    private const string PluginName = "SalesPlugin";
 
-    public SalesPlugin(ISalesService salesService, IInventoryService inventoryService)
+    public SalesPlugin(ISalesService salesService, IInventoryService inventoryService, IChatbotCacheService cacheService)
     {
         _salesService = salesService;
         _inventoryService = inventoryService;
+        _cacheService = cacheService;
     }
 
     [KernelFunction, Description("Lista as vendas recentes")]
@@ -28,6 +31,14 @@ public class SalesPlugin
     {
         try
         {
+            // Tentar obter do cache
+            var cacheKey = $"limit:{limit}";
+            var cachedResult = _cacheService.GetPluginData<string>(PluginName, nameof(ListRecentSales), cacheKey);
+            if (cachedResult != null)
+            {
+                return cachedResult;
+            }
+
             var result = await _salesService.SearchAsync(
                 search: null,
                 status: null,
@@ -39,31 +50,59 @@ public class SalesPlugin
 
             if (!result.items.Any())
             {
-                return "Não há vendas registradas no momento.";
+                return "📊 Não há vendas registradas no momento.";
             }
 
             var salesList = result.items.Select(s => 
-                $"- Venda #{s.Id} ({s.CreatedAt:dd/MM/yyyy}) - " +
-                $"Total: R$ {s.TotalAmount:F2} - " +
-                $"Status: {s.Status}"
+                $"| #{s.Id} | {s.CreatedAt:dd/MM/yyyy} | R$ {s.TotalAmount:N2} | {s.Status} |"
             );
 
-            return $"Vendas recentes:\n{string.Join("\n", salesList)}";
+            var remaining = result.total - limit;
+            var moreText = remaining > 0 ? $"\n\n*...e mais {remaining} vendas.*" : "";
+
+            var response = $"""
+                🛒 **Vendas Recentes** ({result.total} total)
+                
+                | Venda | Data | Total | Status |
+                |-------|------|-------|--------|
+                {string.Join("\n", salesList)}
+                {moreText}
+                """;
+            
+            // Armazenar no cache
+            _cacheService.SetPluginData(PluginName, nameof(ListRecentSales), response, cacheKey);
+            
+            return response;
         }
         catch (Exception ex)
         {
-            return $"Erro ao listar vendas: {ex.Message}";
+            return $"❌ Erro ao listar vendas: {ex.Message}";
         }
     }
 
-    [KernelFunction, Description("Cria uma nova venda/pedido no sistema")]
+    [KernelFunction, Description("Cria uma nova venda/pedido no sistema. Campos obrigatórios: SKU do produto e quantidade. Campos opcionais: ID do cliente, método de pagamento, desconto, observações.")]
     public async Task<string> CreateSale(
-        [Description("SKU do produto")] string productSku,
-        [Description("Quantidade do produto")] int quantity,
+        [Description("SKU do produto (obrigatório)")] string productSku,
+        [Description("Quantidade do produto (obrigatório)")] int quantity,
+        [Description("ID do cliente (opcional, deixe vazio para venda sem cliente)")] int? customerId = null,
+        [Description("Método de pagamento (opcional). Exemplos: Dinheiro, Cartão de Crédito, Cartão de Débito, PIX, Boleto")] string? paymentMethod = null,
+        [Description("Desconto em reais a aplicar no total (opcional, padrão: 0)")] decimal discountAmount = 0,
         [Description("Observações adicionais (opcional)")] string? notes = null)
     {
         try
         {
+            // Validar quantidade
+            if (quantity <= 0)
+            {
+                return "❌ A quantidade deve ser maior que zero.";
+            }
+
+            // Validar desconto
+            if (discountAmount < 0)
+            {
+                return "❌ O desconto não pode ser negativo.";
+            }
+
             // Buscar produto
             var result = await _inventoryService.SearchProductsAsync(new ProductSearchDto
             {
@@ -75,17 +114,26 @@ public class SalesPlugin
 
             if (product == null)
             {
-                return $"❌ Produto com SKU '{productSku}' não encontrado. " +
-                       $"Por favor, verifique o código do produto.";
+                return $"❌ Produto com SKU **'{productSku}'** não encontrado.";
             }
 
             // Verificar estoque
             if (product.CurrentStock < quantity)
             {
-                return $"❌ Estoque insuficiente!\n" +
-                       $"Produto: {product.Name}\n" +
-                       $"Solicitado: {quantity} unidades\n" +
-                       $"Disponível: {product.CurrentStock} unidades";
+                return $"""
+                    ❌ **Estoque Insuficiente!**
+                    
+                    - **Produto:** {product.Name}
+                    - **Solicitado:** {quantity} un.
+                    - **Disponível:** {product.CurrentStock} un.
+                    """;
+            }
+
+            // Calcular subtotal e verificar desconto
+            var subtotal = product.SalePrice * quantity;
+            if (discountAmount > subtotal)
+            {
+                return $"❌ O desconto (R$ {discountAmount:N2}) não pode ser maior que o subtotal (R$ {subtotal:N2}).";
             }
 
             var saleDto = new CreateSaleDto
@@ -100,20 +148,40 @@ public class SalesPlugin
                         Discount = 0
                     }
                 },
+                CustomerId = customerId,
+                PaymentMethod = paymentMethod,
+                DiscountAmount = discountAmount,
                 Notes = notes,
                 SaleDate = DateTime.UtcNow,
                 Status = "Pendente"
             };
 
-            var createdSale = await _salesService.CreateAsync(saleDto, 1); // TODO: Obter userId do contexto
+            var createdSale = await _salesService.CreateAsync(saleDto, 1);
 
-            return $"✅ Venda registrada com sucesso!\n" +
-                   $"Venda: #{createdSale.Id}\n" +
-                   $"Produto: {product.Name}\n" +
-                   $"Quantidade: {quantity} unidades\n" +
-                   $"Valor unitário: R$ {product.SalePrice:F2}\n" +
-                   $"Total: R$ {createdSale.TotalAmount:F2}\n" +
-                   $"Status: {createdSale.Status}";
+            // Invalidar cache após criar venda
+            _cacheService.InvalidatePluginCache(PluginName);
+            _cacheService.InvalidatePluginCache("ProductsPlugin"); // Estoque mudou
+
+            var customerInfo = customerId.HasValue ? $"Cliente #{customerId}" : "Venda sem cliente";
+            var paymentInfo = !string.IsNullOrEmpty(paymentMethod) ? paymentMethod : "Não informado";
+            var discountInfo = discountAmount > 0 ? $"R$ {discountAmount:N2}" : "—";
+
+            return $"""
+                ✅ **Venda Registrada!**
+                
+                | Campo | Valor |
+                |-------|-------|
+                | **Venda** | #{createdSale.Id} |
+                | **Cliente** | {customerInfo} |
+                | **Produto** | {product.Name} |
+                | **Quantidade** | {quantity} un. |
+                | **Preço Unitário** | R$ {product.SalePrice:N2} |
+                | **Subtotal** | R$ {subtotal:N2} |
+                | **Desconto** | {discountInfo} |
+                | **Total** | R$ {createdSale.TotalAmount:N2} |
+                | **Pagamento** | {paymentInfo} |
+                | **Status** | {createdSale.Status} |
+                """;
         }
         catch (Exception ex)
         {
@@ -131,23 +199,34 @@ public class SalesPlugin
 
             if (sale == null)
             {
-                return $"Venda #{saleId} não encontrada.";
+                return $"🔍 Venda **#{saleId}** não encontrada.";
             }
 
-            var itemsList = sale.Items.Select(item =>
-                $"  - {item.Quantity}x {item.ProductName} @ R$ {item.UnitPrice:F2} = R$ {item.Total:F2}"
+            var itemsTable = sale.Items.Select(item =>
+                $"| {item.Quantity}x | {item.ProductName} | R$ {item.UnitPrice:N2} | R$ {item.Total:N2} |"
             );
 
-            return $"📋 Detalhes da Venda #{sale.Id}\n" +
-                   $"Data: {sale.CreatedAt:dd/MM/yyyy HH:mm}\n" +
-                   $"Status: {sale.Status}\n" +
-                   $"\nItens:\n{string.Join("\n", itemsList)}\n" +
-                   $"\n💰 Total: R$ {sale.TotalAmount:F2}" +
-                   (string.IsNullOrEmpty(sale.Notes) ? "" : $"\n\nObservações: {sale.Notes}");
+            var notesSection = string.IsNullOrEmpty(sale.Notes) ? "" : $"\n\n> **Obs:** {sale.Notes}";
+
+            return $"""
+                📋 **Venda #{sale.Id}**
+                
+                - **Data:** {sale.CreatedAt:dd/MM/yyyy HH:mm}
+                - **Status:** {sale.Status}
+                
+                **Itens:**
+                
+                | Qtd | Produto | Unit. | Subtotal |
+                |-----|---------|-------|----------|
+                {string.Join("\n", itemsTable)}
+                
+                ---
+                💰 **Total: R$ {sale.TotalAmount:N2}**{notesSection}
+                """;
         }
         catch (Exception ex)
         {
-            return $"Erro ao buscar venda: {ex.Message}";
+            return $"❌ Erro ao buscar venda: {ex.Message}";
         }
     }
 
@@ -183,20 +262,57 @@ public class SalesPlugin
 
             if (count == 0)
             {
-                return $"Nenhuma venda encontrada entre {start:dd/MM/yyyy} e {end:dd/MM/yyyy}.";
+                return $"📊 Nenhuma venda entre **{start:dd/MM/yyyy}** e **{end:dd/MM/yyyy}**.";
             }
 
             var average = total / count;
 
-            return $"📊 Resumo de Vendas\n" +
-                   $"Período: {start:dd/MM/yyyy} a {end:dd/MM/yyyy}\n" +
-                   $"Quantidade de vendas: {count}\n" +
-                   $"Valor total: R$ {total:F2}\n" +
-                   $"Ticket médio: R$ {average:F2}";
+            return $"""
+                📊 **Resumo de Vendas**
+                
+                | Métrica | Valor |
+                |---------|-------|
+                | **Período** | {start:dd/MM/yyyy} a {end:dd/MM/yyyy} |
+                | **Quantidade** | {count} vendas |
+                | **Total** | R$ {total:N2} |
+                | **Ticket médio** | R$ {average:N2} |
+                """;
         }
         catch (Exception ex)
         {
-            return $"Erro ao calcular total de vendas: {ex.Message}";
+            return $"❌ Erro ao calcular total: {ex.Message}";
+        }
+    }
+
+    [KernelFunction, Description("Lista os produtos mais vendidos no período (padrão: últimos 30 dias)")]
+    public async Task<string> GetTopProducts(
+        [Description("Quantidade de produtos a listar (padrão: 5)")] int limit = 5)
+    {
+        try
+        {
+            var endDate = DateTime.Now;
+            var startDate = endDate.AddDays(-30);
+            
+            var topProducts = await _salesService.GetTopProductsAsync(limit, startDate, endDate);
+            
+            if (!topProducts.Any())
+            {
+                return "📊 Não há dados de vendas suficientes para determinar os produtos mais vendidos nos últimos 30 dias.";
+            }
+
+            var items = topProducts.Select((p, index) => 
+                $"{index + 1}. **{p.productName}** — {p.quantity:N0} unidades"
+            );
+
+            return $"""
+                🏆 **Produtos Mais Vendidos (Últimos 30 dias)**
+                
+                {string.Join("\n", items)}
+                """;
+        }
+        catch (Exception ex)
+        {
+            return $"❌ Erro ao buscar produtos mais vendidos: {ex.Message}";
         }
     }
 }

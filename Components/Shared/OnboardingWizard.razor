@@ -54,7 +54,8 @@
                     <MudButton Variant="Variant.Outlined" 
                               Color="MudBlazor.Color.Primary" 
                               OnClick="@(() => NavigateTo(CurrentStep.Target))"
-                              Class="mb-4">
+                              Class="mb-4"
+                              Disabled="@_isProcessing">
                         Ir para página
                     </MudButton>
                 }
@@ -63,7 +64,7 @@
                     
                     @if (CurrentStepIndex > 0)
                     {
-                        <MudButton OnClick="PreviousStep" Variant="Variant.Text">Voltar</MudButton>
+                        <MudButton OnClick="PreviousStep" Variant="Variant.Text" Disabled="@_isProcessing">Voltar</MudButton>
                     }
                     
                     <MudSpacer />
@@ -82,11 +83,31 @@
 
                     @if (CurrentStepIndex < (CurrentTour?.Steps.Count ?? 0) - 1)
                     {
-                        <MudButton OnClick="NextStep" Variant="Variant.Filled" Color="MudBlazor.Color.Primary">Próximo</MudButton>
+                        <MudButton OnClick="NextStep" Variant="Variant.Filled" Color="MudBlazor.Color.Primary" Disabled="@_isProcessing">
+                            @if (_isProcessing)
+                            {
+                                <MudProgressCircular Class="ms-n1" Size="MudBlazor.Size.Small" Indeterminate="true"/>
+                                <MudText Class="ms-2">Processando</MudText>
+                            }
+                            else
+                            {
+                                <MudText>Próximo</MudText>
+                            }
+                        </MudButton>
                     }
                     else
                     {
-                        <MudButton OnClick="CompleteTour" Variant="Variant.Filled" Color="MudBlazor.Color.Success">Começar!</MudButton>
+                        <MudButton OnClick="CompleteTour" Variant="Variant.Filled" Color="MudBlazor.Color.Success" Disabled="@_isProcessing">
+                            @if (_isProcessing)
+                            {
+                                <MudProgressCircular Class="ms-n1" Size="MudBlazor.Size.Small" Indeterminate="true"/>
+                                <MudText Class="ms-2">Processando</MudText>
+                            }
+                            else
+                            {
+                                <MudText>Começar!</MudText>
+                            }
+                        </MudButton>
                     }
                 </div>
             </div>
@@ -103,6 +124,7 @@
     private TourDto? CurrentTour;
     private StepDto? CurrentStep;
     private int CurrentStepIndex = 0;
+    private bool _isProcessing = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -130,21 +152,31 @@
 
     private async Task NextStep()
     {
+        if (_isProcessing) return;
         if (CurrentTour == null || CurrentStepIndex >= CurrentTour.Steps.Count - 1) return;
 
-        CurrentStepIndex++;
-        CurrentStep = CurrentTour.Steps[CurrentStepIndex];
-        
-        // Save progress
-        if (!string.IsNullOrEmpty(UserId))
+        try
         {
-            // Mark the previous step as completed (service expects 0-based index)
-            await OnboardingService.CompleteStepAsync(UserId, TourId, CurrentStepIndex - 1);
+            _isProcessing = true;
+            CurrentStepIndex++;
+            CurrentStep = CurrentTour.Steps[CurrentStepIndex];
+            
+            // Save progress
+            if (!string.IsNullOrEmpty(UserId))
+            {
+                // Mark the previous step as completed (service expects 0-based index)
+                await OnboardingService.CompleteStepAsync(UserId, TourId, CurrentStepIndex - 1);
+            }
+        }
+        finally
+        {
+            _isProcessing = false;
         }
     }
 
     private void PreviousStep()
     {
+        if (_isProcessing) return;
         if (CurrentStepIndex <= 0) return;
 
         CurrentStepIndex--;
@@ -153,53 +185,73 @@
 
     private async Task CompleteTour()
     {
-        if (!string.IsNullOrEmpty(UserId))
+        if (_isProcessing) return;
+
+        try
         {
-            await OnboardingService.CompleteTourAsync(UserId, TourId);
+            _isProcessing = true;
+            if (!string.IsNullOrEmpty(UserId))
+            {
+                await OnboardingService.CompleteTourAsync(UserId, TourId);
+            }
+            MudDialog.Close(DialogResult.Ok(true));
         }
-        MudDialog.Close(DialogResult.Ok(true));
+        finally
+        {
+            _isProcessing = false;
+        }
     }
 
     private async Task NavigateTo(string url)
     {
-        // When navigating away from the wizard to a target page, persist the current step as completed
-        if (!string.IsNullOrEmpty(UserId))
-        {
-            await OnboardingService.CompleteStepAsync(UserId, TourId, CurrentStepIndex);
-        }
+        if (_isProcessing) return;
 
-        // Close dialog first so navigation is clean; MainLayout will reopen the wizard at saved step
         try
         {
-            MudDialog.Close(DialogResult.Ok(false));
-        }
-        catch {}
-
-        // Mark resume pending for the layout and show a simple info snackbar
-        if (!string.IsNullOrEmpty(UserId))
-        {
-            ResumeService.SetPendingResume(UserId, TourId);
-        }
-
-        Snackbar.Add("Você pode continuar o tour quando quiser. Use o botão 'Continuar tour' no canto inferior direito.", Severity.Info, config =>
-        {
-            config.VisibleStateDuration = 8000;
-            config.HideTransitionDuration = 300;
-            config.ShowTransitionDuration = 200;
-            config.SnackbarVariant = Variant.Filled;
-            config.Action = "Continuar";
-            config.ActionVariant = Variant.Filled;
-            config.ActionColor = MudBlazor.Color.Primary;
-            config.OnClick = async snackbar =>
+            _isProcessing = true;
+            // When navigating away from the wizard to a target page, persist the current step as completed
+            if (!string.IsNullOrEmpty(UserId))
             {
-                // Clear pending marker and reopen the wizard dialog to resume
-                ResumeService.ClearPendingResume();
-                var parameters = new DialogParameters { ["TourId"] = TourId, ["UserId"] = UserId };
-                var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium };
-                await DialogService.ShowAsync<OnboardingWizard>("", parameters, options);
-            };
-        });
+                await OnboardingService.CompleteStepAsync(UserId, TourId, CurrentStepIndex);
+            }
 
-        NavigationManager.NavigateTo(url);
+            // Close dialog first so navigation is clean; MainLayout will reopen the wizard at saved step
+            try
+            {
+                MudDialog.Close(DialogResult.Ok(false));
+            }
+            catch {}
+
+            // Mark resume pending for the layout and show a simple info snackbar
+            if (!string.IsNullOrEmpty(UserId))
+            {
+                ResumeService.SetPendingResume(UserId, TourId);
+            }
+
+            Snackbar.Add("Você pode continuar o tour quando quiser. Use o botão 'Continuar tour' no canto inferior direito.", Severity.Info, config =>
+            {
+                config.VisibleStateDuration = 8000;
+                config.HideTransitionDuration = 300;
+                config.ShowTransitionDuration = 200;
+                config.SnackbarVariant = Variant.Filled;
+                config.Action = "Continuar";
+                config.ActionVariant = Variant.Filled;
+                config.ActionColor = MudBlazor.Color.Primary;
+                config.OnClick = async snackbar =>
+                {
+                    // Clear pending marker and reopen the wizard dialog to resume
+                    ResumeService.ClearPendingResume();
+                    var parameters = new DialogParameters { ["TourId"] = TourId, ["UserId"] = UserId };
+                    var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium };
+                    await DialogService.ShowAsync<OnboardingWizard>("", parameters, options);
+                };
+            });
+
+            NavigationManager.NavigateTo(url);
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
     }
 }

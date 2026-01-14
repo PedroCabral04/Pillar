@@ -1,17 +1,19 @@
 @page "/inventory/movements"
 @using erp.DTOs.Inventory
 @using erp.Services
+@using erp.Services.Authorization
 @using erp.Components.Shared.Dialogs.Inventory
 @using erp.Components.Shared
 @using MudBlazor
 @using Size = MudBlazor.Size
 @using Color = MudBlazor.Color
-@attribute [Authorize]
+@attribute [Authorize(Policy = ModulePolicies.Inventory)]
 
 @inject IApiService ApiService
 @inject ILogger<StockMovements> Logger
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject ITablePreferenceService TablePreferences
 
 <PageTitle>Movimentações de Estoque - Pillar ERP</PageTitle>
 
@@ -28,104 +30,155 @@
 
     @if (_loadError != null)
     {
-        <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
+        <MudAlert Severity="Severity.Error" Class="mb-4">@_loadError</MudAlert>
     }
 
-    <MudTable T="StockMovementDto" ServerData="ServerReload" 
-            Dense="false" Hover="true" Elevation="2" @ref="_table" Striped="true" Loading="@_loading">
-        <ToolBarContent>
-            <MudText Typo="Typo.h5">Histórico de Movimentações</MudText>
-            <MudSpacer/>
-            <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
-                <MudTextField T="string" ValueChanged="OnSearch" Immediate="false" Placeholder="Procurar produto" 
-                            Variant="Variant.Outlined" Margin="Margin.Dense"
-                            Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
-                            Clearable="true" Style="min-width: 200px;"/>
+    <!-- Filters -->
+    <MudPaper Elevation="2" Class="pa-4 mb-4">
+        <MudGrid>
+            <MudItem xs="12" sm="6" md="3">
+                <MudTextField T="string" 
+                              ValueChanged="OnSearch" 
+                              Placeholder="Buscar por produto..." 
+                              Variant="Variant.Outlined" 
+                              Margin="Margin.Dense"
+                              Adornment="Adornment.Start" 
+                              AdornmentIcon="@Icons.Material.Filled.Search" 
+                              Clearable="true"
+                              DebounceInterval="400"/>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="2">
                 <MudSelect T="string" 
-                        Value="_typeFilter" 
-                        ValueChanged="OnTypeFilterChanged"
-                        Label="Tipo" 
-                        Variant="Variant.Outlined" 
-                        Margin="Margin.Dense"
-                        Clearable="true"
-                        Style="min-width: 150px;">
+                           Value="_typeFilter" 
+                           ValueChanged="OnTypeFilterChanged"
+                           Label="Tipo" 
+                           Variant="Variant.Outlined" 
+                           Margin="Margin.Dense"
+                           Clearable="true">
                     <MudSelectItem T="string" Value="@("Entrada")">Entrada</MudSelectItem>
                     <MudSelectItem T="string" Value="@("Saída")">Saída</MudSelectItem>
                     <MudSelectItem T="string" Value="@("Ajuste")">Ajuste</MudSelectItem>
                     <MudSelectItem T="string" Value="@("Transferência")">Transferência</MudSelectItem>
                 </MudSelect>
-                <DatePicker Label="Data Inicial"
-                            @bind-Date="_startDate"
-                            Margin="Margin.Dense"
-                            Clearable="true"/>
-                <DatePicker Label="Data Final"
-                            @bind-Date="_endDate"
-                            Margin="Margin.Dense"
-                            Clearable="true"/>
-                <MudIconButton Icon="@Icons.Material.Filled.FilterAlt" 
-                            Color="Color.Primary"
-                            OnClick="ApplyDateFilter"/>
-            </MudStack>
-        </ToolBarContent>
-        <HeaderContent>
-            <MudTh>Data</MudTh>
-            <MudTh>Produto</MudTh>
-            <MudTh>Tipo</MudTh>
-            <MudTh>Motivo</MudTh>
-            <MudTh Style="text-align: right">Quantidade</MudTh>
-            <MudTh Style="text-align: right">Estoque Anterior</MudTh>
-            <MudTh Style="text-align: right">Estoque Atual</MudTh>
-            <MudTh>Documento</MudTh>
-            <MudTh>Usuário</MudTh>
-        </HeaderContent>
-        <RowTemplate>
-            <MudTd DataLabel="Data">
-                <MudText Typo="Typo.body2">@context.MovementDate.ToString("dd/MM/yyyy")</MudText>
-                <MudText Typo="Typo.caption" Color="Color.Secondary">@context.MovementDate.ToString("HH:mm")</MudText>
-            </MudTd>
-            <MudTd DataLabel="Produto">
-                <MudText Typo="Typo.body2">@context.ProductName</MudText>
-                <MudText Typo="Typo.caption" Color="Color.Secondary" Style="font-family: monospace">@context.ProductSku</MudText>
-            </MudTd>
-            <MudTd DataLabel="Tipo">
-                <MudChip T="string" Size="Size.Small" Color="@GetTypeColor(context.TypeName)">
-                    @context.TypeName
-                </MudChip>
-            </MudTd>
-            <MudTd DataLabel="Motivo">@context.ReasonName</MudTd>
-            <MudTd DataLabel="Quantidade" Style="text-align: right">
-                <MudText Typo="Typo.body2" Style="@GetQuantityStyle(context.TypeName)">
-                    @(context.TypeName == "Entrada" || context.TypeName == "Ajuste" ? "+" : "-")@context.Quantity.ToString("N2")
+            </MudItem>
+            <MudItem xs="12" sm="6" md="2">
+                <MudDatePicker Label="Data Inicial" 
+                               @bind-Date="_startDate" 
+                               Variant="Variant.Outlined" 
+                               Margin="Margin.Dense"
+                               Clearable="true"/>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="2">
+                <MudDatePicker Label="Data Final" 
+                               @bind-Date="_endDate" 
+                               Variant="Variant.Outlined" 
+                               Margin="Margin.Dense"
+                               Clearable="true"/>
+            </MudItem>
+            <MudItem xs="12" sm="12" md="3" Class="d-flex align-center justify-end">
+                <MudButton Variant="Variant.Text" 
+                           StartIcon="@Icons.Material.Filled.FilterAltOff"
+                           OnClick="ClearFilters"
+                           Size="Size.Small">
+                    Limpar
+                </MudButton>
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Search"
+                           OnClick="@(() => _table?.ReloadServerData())"
+                           Size="Size.Small"
+                           Class="ml-2">
+                    Filtrar
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <!-- Table -->
+    <MudPaper Elevation="2" Class="pa-4">
+        <MudTable T="StockMovementDto" 
+                  ServerData="ServerReload" 
+                  Dense="true" 
+                  Hover="true" 
+                  Elevation="0" 
+                  @ref="_table" 
+                  Striped="true" 
+                  Loading="@_loading" 
+                  LoadingProgressColor="Color.Primary"
+                  RowsPerPage="@_defaultPageSize">
+            <ToolBarContent>
+                <MudText Typo="Typo.h6">
+                    <MudIcon Icon="@Icons.Material.Filled.History" Class="mr-2"/>
+                    Histórico
                 </MudText>
-            </MudTd>
-            <MudTd DataLabel="Anterior" Style="text-align: right">@context.PreviousStock.ToString("N2")</MudTd>
-            <MudTd DataLabel="Atual" Style="text-align: right">
-                <MudText Typo="Typo.body2" Style="font-weight: 600">@context.CurrentStock.ToString("N2")</MudText>
-            </MudTd>
-            <MudTd DataLabel="Documento">
-                @if (!string.IsNullOrEmpty(context.DocumentNumber))
-                {
-                    <MudText Typo="Typo.caption" Style="font-family: monospace">@context.DocumentNumber</MudText>
-                }
-                else
-                {
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">-</MudText>
-                }
-            </MudTd>
-            <MudTd DataLabel="Usuário">
-                <MudText Typo="Typo.caption">@context.CreatedByUserName</MudText>
-            </MudTd>
-        </RowTemplate>
-        <NoRecordsContent>
-            <MudText>Nenhuma movimentação encontrada</MudText>
-        </NoRecordsContent>
-        <LoadingContent>
-            <MudText>Carregando...</MudText>
-        </LoadingContent>
-        <PagerContent>
-            <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
-        </PagerContent>
-    </MudTable>
+                <MudSpacer/>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    @if (_totalItems > 0)
+                    {
+                        <text>@_totalItems registros</text>
+                    }
+                </MudText>
+            </ToolBarContent>
+            <HeaderContent>
+                <MudTh>Data</MudTh>
+                <MudTh>Produto</MudTh>
+                <MudTh>Tipo</MudTh>
+                <MudTh>Motivo</MudTh>
+                <MudTh Style="text-align: right">Quantidade</MudTh>
+                <MudTh Style="text-align: right">Estoque Anterior</MudTh>
+                <MudTh Style="text-align: right">Estoque Atual</MudTh>
+                <MudTh>Documento</MudTh>
+                <MudTh>Usuário</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Data">
+                    <MudText Typo="Typo.body2">@context.MovementDate.ToString("dd/MM/yyyy")</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@context.MovementDate.ToString("HH:mm")</MudText>
+                </MudTd>
+                <MudTd DataLabel="Produto">
+                    <MudText Typo="Typo.body2">@context.ProductName</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Style="font-family: monospace">@context.ProductSku</MudText>
+                </MudTd>
+                <MudTd DataLabel="Tipo">
+                    <MudChip T="string" Size="Size.Small" Color="@GetTypeColor(context.TypeName)" Variant="Variant.Filled">
+                        @TranslateMovementType(context.TypeName)
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Motivo">@TranslateMovementReason(context.ReasonName)</MudTd>
+                <MudTd DataLabel="Quantidade" Style="text-align: right">
+                    <MudText Typo="Typo.body2" Style="@GetQuantityStyle(context.TypeName)">
+                        @GetQuantityPrefix(context.TypeName)@context.Quantity.ToString("N2")
+                    </MudText>
+                </MudTd>
+                <MudTd DataLabel="Anterior" Style="text-align: right">@context.PreviousStock.ToString("N2")</MudTd>
+                <MudTd DataLabel="Atual" Style="text-align: right">
+                    <MudText Typo="Typo.body2" Style="font-weight: 600">@context.CurrentStock.ToString("N2")</MudText>
+                </MudTd>
+                <MudTd DataLabel="Documento">
+                    @if (!string.IsNullOrEmpty(context.DocumentNumber))
+                    {
+                        <MudText Typo="Typo.caption" Style="font-family: monospace">@context.DocumentNumber</MudText>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">-</MudText>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Usuário">
+                    <MudText Typo="Typo.caption">@context.CreatedByUserName</MudText>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText>Nenhuma movimentação encontrada</MudText>
+            </NoRecordsContent>
+            <LoadingContent>
+                <MudText>Carregando...</MudText>
+            </LoadingContent>
+            <PagerContent>
+                <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+            </PagerContent>
+        </MudTable>
+    </MudPaper>
 </MudContainer>
 
 @code {
@@ -136,6 +189,23 @@
     private DateTime? _startDate;
     private DateTime? _endDate;
     private bool _loading = false;
+    private int _totalItems = 0;
+    
+    // Table preferences
+    private string? _currentSortLabel;
+    private bool _sortDescending;
+    private int _defaultPageSize = 25;
+
+    protected override void OnInitialized()
+    {
+        _defaultPageSize = TablePreferences.GetPageSize();
+        var defaultSort = TablePreferences.GetDefaultSort("Movimentações");
+        if (defaultSort.HasValue)
+        {
+            _currentSortLabel = defaultSort.Value.field;
+            _sortDescending = defaultSort.Value.descending;
+        }
+    }
 
     private async Task<TableData<StockMovementDto>> ServerReload(TableState state, CancellationToken ct)
     {
@@ -145,11 +215,35 @@
             var page = state.Page + 1;
             var pageSize = state.PageSize;
 
+            // Handle sorting - use preference as fallback when no sort is selected
+            string? sortBy = null;
+            bool sortDescending = false;
+            
+            if (string.IsNullOrEmpty(state.SortLabel))
+            {
+                if (!string.IsNullOrEmpty(_currentSortLabel))
+                {
+                    sortBy = _currentSortLabel;
+                    sortDescending = _sortDescending;
+                }
+            }
+            else
+            {
+                sortBy = state.SortLabel;
+                sortDescending = state.SortDirection == SortDirection.Descending;
+            }
+
             var queryParams = new List<string>
             {
                 $"page={page}",
                 $"pageSize={pageSize}"
             };
+
+            if (!string.IsNullOrEmpty(sortBy))
+            {
+                queryParams.Add($"sortBy={sortBy}");
+                queryParams.Add($"sortDescending={sortDescending}");
+            }
 
             if (!string.IsNullOrWhiteSpace(_searchString))
             {
@@ -176,6 +270,7 @@
 
             if (response != null)
             {
+                _totalItems = response.TotalItems;
                 return new TableData<StockMovementDto>
                 {
                     Items = response.Items,
@@ -183,6 +278,7 @@
                 };
             }
 
+            _totalItems = 0;
             return new TableData<StockMovementDto> { Items = Array.Empty<StockMovementDto>(), TotalItems = 0 };
         }
         catch (Exception ex)
@@ -190,6 +286,7 @@
             Logger.LogError(ex, "Erro ao carregar movimentações");
             _loadError = "Erro ao carregar movimentações: " + ex.Message;
             Snackbar.Add(_loadError, Severity.Error);
+            _totalItems = 0;
             return new TableData<StockMovementDto> { Items = Array.Empty<StockMovementDto>(), TotalItems = 0 };
         }
         finally
@@ -215,6 +312,15 @@
         _table?.ReloadServerData();
     }
 
+    private void ClearFilters()
+    {
+        _searchString = null;
+        _typeFilter = null;
+        _startDate = null;
+        _endDate = null;
+        _table?.ReloadServerData();
+    }
+
     private async Task OpenCreateDialog()
     {
         var options = new DialogOptions 
@@ -235,27 +341,97 @@
 
     private Color GetTypeColor(string type)
     {
-        return type switch
+        return NormalizeKey(type) switch
         {
-            "Entrada" => Color.Success,
-            "Saída" => Color.Error,
-            "Ajuste" => Color.Warning,
-            "Transferência" => Color.Info,
+            "entrada" or "in" => Color.Success,
+            "saida" or "saída" or "out" => Color.Error,
+            "ajuste" or "adjustment" => Color.Warning,
+            "transferencia" or "transferência" or "transfer" => Color.Info,
             _ => Color.Default
         };
     }
 
     private string GetQuantityStyle(string type)
     {
-        var color = type switch
+        var color = NormalizeKey(type) switch
         {
-            "Entrada" => "color: var(--mud-palette-success);",
-            "Saída" => "color: var(--mud-palette-error);",
-            "Ajuste" => "color: var(--mud-palette-warning);",
+            "entrada" or "in" => "color: var(--mud-palette-success);",
+            "saida" or "saída" or "out" => "color: var(--mud-palette-error);",
+            "ajuste" or "adjustment" => "color: var(--mud-palette-warning);",
             _ => ""
         };
         return $"font-weight: 600; {color}";
     }
+
+    private string GetQuantityPrefix(string type)
+    {
+        return PositiveMovementTypes.Contains(type ?? string.Empty) ? "+" : "-";
+    }
+
+    private string TranslateMovementType(string? type)
+    {
+        if (string.IsNullOrWhiteSpace(type))
+            return string.Empty;
+
+        return MovementTypeTranslations.TryGetValue(type, out var translated)
+            ? translated
+            : type;
+    }
+
+    private string TranslateMovementReason(string? reason)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+            return string.Empty;
+
+        return MovementReasonTranslations.TryGetValue(reason, out var translated)
+            ? translated
+            : reason;
+    }
+
+    private static string NormalizeKey(string? value)
+    {
+        return value?.Trim().ToLowerInvariant() ?? string.Empty;
+    }
+
+    private static readonly HashSet<string> PositiveMovementTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Entrada",
+        "In",
+        "Ajuste",
+        "Adjustment"
+    };
+
+    private static readonly Dictionary<string, string> MovementTypeTranslations = new(StringComparer.OrdinalIgnoreCase)
+    {
+        { "In", "Entrada" },
+        { "Out", "Saída" },
+        { "Transfer", "Transferência" },
+        { "Entrada", "Entrada" },
+        { "Saída", "Saída" },
+        { "Transferência", "Transferência" }
+    };
+
+    private static readonly Dictionary<string, string> MovementReasonTranslations = new(StringComparer.OrdinalIgnoreCase)
+    {
+        { "Purchase", "Compra" },
+        { "Sale", "Venda" },
+        { "Return", "Devolução" },
+        { "Adjustment", "Ajuste" },
+        { "Production", "Produção" },
+        { "Loss", "Perda" },
+        { "Donation", "Doação" },
+        { "Transfer", "Transferência" },
+        { "InitialBalance", "Saldo Inicial" },
+        { "Compra", "Compra" },
+        { "Venda", "Venda" },
+        { "Devolução", "Devolução" },
+        { "Ajuste", "Ajuste" },
+        { "Produção", "Produção" },
+        { "Perda", "Perda" },
+        { "Doação", "Doação" },
+        { "Transferência", "Transferência" },
+        { "Saldo Inicial", "Saldo Inicial" }
+    };
     
     public class PaginatedResponse<T>
     {

@@ -28,6 +28,14 @@ public class TimeTrackingController : ControllerBase
         _mapper = mapper;
     }
 
+    /// <summary>
+    /// Recupera uma lista de resumos dos períodos de folha (payroll).
+    /// </summary>
+    /// <param name="year">Opcional. Filtra os períodos pelo ano de referência.</param>
+    /// <param name="cancellationToken">Token para cancelamento da requisição.</param>
+    /// <returns>Lista de <see cref="PayrollPeriodSummaryDto"/> com resumo dos períodos encontrados.</returns>
+    /// <response code="200">Retorna a lista de períodos (mesmo que vazia).</response>
+    /// <response code="401">Usuário não autorizado a acessar o recurso.</response>
     [HttpGet("periods")]
     public async Task<ActionResult<IEnumerable<PayrollPeriodSummaryDto>>> GetPeriods(
         [FromQuery] int? year,
@@ -38,6 +46,14 @@ public class TimeTrackingController : ControllerBase
         return Ok(payload);
     }
 
+    /// <summary>
+    /// Recupera o detalhe de um período de folha por seu identificador.
+    /// </summary>
+    /// <param name="id">Identificador do período.</param>
+    /// <param name="cancellationToken">Token para cancelamento da requisição.</param>
+    /// <returns>Detalhes do período como <see cref="PayrollPeriodDetailDto"/>.</returns>
+    /// <response code="200">Retorna o período solicitado.</response>
+    /// <response code="404">Período não encontrado.</response>
     [HttpGet("periods/{id:int}")]
     public async Task<ActionResult<PayrollPeriodDetailDto>> GetPeriodById(
         int id,
@@ -52,6 +68,15 @@ public class TimeTrackingController : ControllerBase
         return Ok(_mapper.ToDetailDto(period));
     }
 
+    /// <summary>
+    /// Recupera o detalhe de um período de folha baseado em mês e ano de referência.
+    /// </summary>
+    /// <param name="month">Mês de referência (1-12).</param>
+    /// <param name="year">Ano de referência (ex: 2025).</param>
+    /// <param name="cancellationToken">Token para cancelamento da requisição.</param>
+    /// <returns>Detalhes do período correspondente, se existir.</returns>
+    /// <response code="200">Retorna o período correspondente ao mês/ano.</response>
+    /// <response code="404">Período não encontrado para a referência informada.</response>
     [HttpGet("periods/by-reference")]
     public async Task<ActionResult<PayrollPeriodDetailDto>> GetPeriodByReference(
         [FromQuery] int month,
@@ -67,6 +92,15 @@ public class TimeTrackingController : ControllerBase
         return Ok(_mapper.ToDetailDto(period));
     }
 
+    /// <summary>
+    /// Cria um novo período de folha para um mês/ano de referência.
+    /// </summary>
+    /// <param name="dto">Objeto com dados necessários para criação (<see cref="CreatePayrollPeriodDto"/>).</param>
+    /// <param name="cancellationToken">Token para cancelamento da requisição.</param>
+    /// <returns>O período criado com detalhes.</returns>
+    /// <response code="201">Período criado com sucesso. Retorna o recurso criado.</response>
+    /// <response code="400">Dados inválidos na requisição.</response>
+    /// <response code="409">Conflito: já existe um período com a mesma referência.</response>
     [HttpPost("periods")]
     public async Task<ActionResult<PayrollPeriodDetailDto>> CreatePeriod(
         [FromBody] CreatePayrollPeriodDto dto,
@@ -95,6 +129,16 @@ public class TimeTrackingController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Atualiza um lançamento (entry) de folha existente.
+    /// </summary>
+    /// <param name="entryId">Identificador do lançamento a ser atualizado.</param>
+    /// <param name="dto">Objeto com os campos editáveis (<see cref="UpdatePayrollEntryDto"/>).</param>
+    /// <param name="cancellationToken">Token para cancelamento da requisição.</param>
+    /// <returns>O lançamento atualizado como <see cref="PayrollEntryDto"/>.</returns>
+    /// <response code="200">Retorna o lançamento atualizado.</response>
+    /// <response code="400">Dados inválidos na requisição.</response>
+    /// <response code="404">Lançamento não encontrado.</response>
     [HttpPut("entries/{entryId:int}")]
     public async Task<ActionResult<PayrollEntryDto>> UpdateEntry(
         int entryId,
@@ -121,6 +165,55 @@ public class TimeTrackingController : ControllerBase
         {
             return NotFound();
         }
+    }
+
+    /// <summary>
+    /// Adiciona um colaborador ao período de folha.
+    /// </summary>
+    [HttpPost("periods/{periodId:int}/entries")]
+    public async Task<ActionResult<PayrollEntryDto>> AddEntry(
+        int periodId,
+        [FromBody] int employeeId,
+        CancellationToken cancellationToken)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null)
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            var entry = await _timeTrackingService.AddEntryAsync(periodId, employeeId, cancellationToken);
+            return Ok(_mapper.ToEntryDto(entry));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Atualiza múltiplos lançamentos de uma vez.
+    /// </summary>
+    [HttpPut("entries/bulk")]
+    public async Task<IActionResult> BulkUpdateEntries(
+        [FromBody] List<BulkUpdatePayrollEntryDto> entries,
+        CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        var userId = GetCurrentUserId();
+        if (userId == null)
+        {
+            return Unauthorized();
+        }
+
+        await _timeTrackingService.UpdateEntriesAsync(entries, userId.Value, cancellationToken);
+        return NoContent();
     }
 
     private int? GetCurrentUserId()

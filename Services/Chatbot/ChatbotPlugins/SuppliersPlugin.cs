@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using Microsoft.SemanticKernel;
 using erp.Services.Financial;
+using erp.Services.Financial.Validation;
 using erp.DTOs.Financial;
 
 namespace erp.Services.Chatbot.ChatbotPlugins;
@@ -32,14 +33,23 @@ public class SuppliersPlugin
 
             if (!suppliers.Any())
             {
-                return $"🔍 Nenhum fornecedor encontrado com o termo '{searchTerm}'.";
+                return $"🔍 Nenhum fornecedor encontrado com **'{searchTerm}'**.";
             }
 
-            var supplierList = suppliers.Select(s =>
-                $"- **{s.TradeName ?? s.Name}** (CNPJ: {FormatDocument(s.TaxId)}) - {(s.IsActive ? "✅ Ativo" : "❌ Inativo")}"
+            var list = suppliers.Select(s =>
+                $"| {s.TradeName ?? s.Name} | {FormatDocument(s.TaxId)} | {(s.IsActive ? "✅" : "❌")} |"
             );
+            
+            var remaining = total - maxResults;
+            var moreText = remaining > 0 ? $"\n\n*...e mais {remaining} fornecedores.*" : "";
 
-            return $"🏢 **Fornecedores encontrados ({total} total):**\n{string.Join("\n", supplierList)}";
+            return $"""
+                🏢 **Fornecedores Encontrados** ({total} total)
+                
+                | Nome | CNPJ/CPF | Ativo |
+                |------|----------|-------|
+                {string.Join("\n", list)}{moreText}
+                """;
         }
         catch (Exception ex)
         {
@@ -68,30 +78,50 @@ public class SuppliersPlugin
         }
     }
 
-    [KernelFunction, Description("Lista todos os fornecedores cadastrados")]
+    [KernelFunction, Description("Lista todos os fornecedores cadastrados. Use página > 1 para ver mais.")]
     public async Task<string> ListSuppliers(
-        [Description("Número máximo de fornecedores a retornar")] int maxResults = 20,
+        [Description("Número máximo de fornecedores a retornar por página")] int maxResults = 10,
+        [Description("Número da página (1 = primeira, 2 = próxima, etc)")] int page = 1,
         [Description("Filtrar apenas fornecedores ativos?")] bool activeOnly = true)
     {
         try
         {
             var (suppliers, total) = await _supplierService.GetPagedAsync(
-                page: 1, 
+                page: page, 
                 pageSize: maxResults, 
                 search: null, 
                 activeOnly: activeOnly);
 
+            if (!suppliers.Any() && page == 1)
+            {
+                return "🏢 Não há fornecedores cadastrados.";
+            }
+            
             if (!suppliers.Any())
             {
-                return "🏢 Não há fornecedores cadastrados no momento.";
+                return $"🏢 Não há mais fornecedores. Total: {total} fornecedores.";
             }
 
-            var supplierList = suppliers.Select(s =>
-                $"- **{s.TradeName ?? s.Name}** (ID: {s.Id}) - CNPJ: {FormatDocument(s.TaxId)} - {(s.IsActive ? "✅ Ativo" : "❌ Inativo")}"
+            var list = suppliers.Select(s =>
+                $"| {s.Id} | {s.TradeName ?? s.Name} | {FormatDocument(s.TaxId)} | {(s.IsActive ? "✅" : "❌")} |"
             );
 
-            var statusText = activeOnly ? " ativos" : "";
-            return $"🏢 **Fornecedores{statusText} ({total} total):**\n{string.Join("\n", supplierList)}";
+            var statusText = activeOnly ? " Ativos" : "";
+            var shown = (page - 1) * maxResults + suppliers.Count();
+            var remaining = total - shown;
+            
+            var pageInfo = page > 1 ? $" (Página {page})" : "";
+            var moreText = remaining > 0 
+                ? $"\n\n*Exibindo {shown} de {total}. Peça \"listar fornecedores página {page + 1}\" para ver mais.*" 
+                : "";
+            
+            return $"""
+                🏢 **Fornecedores{statusText}**{pageInfo} ({total} total)
+                
+                | ID | Nome | CNPJ/CPF | Ativo |
+                |----|------|----------|-------|
+                {string.Join("\n", list)}{moreText}
+                """;
         }
         catch (Exception ex)
         {
@@ -200,43 +230,79 @@ public class SuppliersPlugin
         }
     }
 
-    [KernelFunction, Description("Cadastra um novo fornecedor no sistema")]
+    [KernelFunction, Description("Cadastra um novo fornecedor no sistema. Campos obrigatórios: razão social e CNPJ/CPF. Campos opcionais: nome fantasia, email, telefone, celular, website, logradouro, número, bairro, cidade, estado, CEP.")]
     public async Task<string> CreateSupplier(
-        [Description("Razão social do fornecedor")] string name,
-        [Description("CNPJ ou CPF do fornecedor")] string taxId,
+        [Description("Razão social do fornecedor (obrigatório)")] string name,
+        [Description("CNPJ (14 dígitos) ou CPF (11 dígitos) do fornecedor (obrigatório)")] string taxId,
         [Description("Nome fantasia (opcional)")] string? tradeName = null,
         [Description("Email do fornecedor (opcional)")] string? email = null,
-        [Description("Telefone do fornecedor (opcional)")] string? phone = null,
-        [Description("Endereço do fornecedor (opcional)")] string? address = null,
+        [Description("Telefone fixo do fornecedor (opcional)")] string? phone = null,
+        [Description("Celular do fornecedor (opcional)")] string? mobilePhone = null,
+        [Description("Website do fornecedor (opcional)")] string? website = null,
+        [Description("Logradouro/Rua (opcional)")] string? street = null,
+        [Description("Número do endereço (opcional)")] string? number = null,
+        [Description("Bairro (opcional)")] string? district = null,
         [Description("Cidade (opcional)")] string? city = null,
-        [Description("Estado/UF (opcional)")] string? state = null,
+        [Description("Estado/UF (opcional, ex: SP, RJ, MG)")] string? state = null,
         [Description("CEP (opcional)")] string? zipCode = null)
     {
         try
         {
+            // Limpar e validar documento
+            var cleanTaxId = BrazilianDocumentValidator.RemoveFormatting(taxId);
+
+            // Validar documento
+            if (!BrazilianDocumentValidator.IsValidDocument(cleanTaxId))
+            {
+                var docType = cleanTaxId.Length <= 11 ? "CPF" : "CNPJ";
+                return $"❌ **{docType} inválido!**\n\nO documento informado não passou na validação. Verifique se os dígitos estão corretos.";
+            }
+
+            var docTypeLabel = cleanTaxId.Length == 11 ? "CPF" : "CNPJ";
+
             var createDto = new CreateSupplierDto
             {
                 Name = name,
                 TradeName = tradeName,
-                TaxId = taxId,
+                TaxId = cleanTaxId,
                 Email = email,
                 Phone = phone,
-                Street = address,
+                MobilePhone = mobilePhone,
+                Website = website,
+                Street = street,
+                Number = number,
+                District = district,
                 City = city,
-                State = state,
+                State = state?.ToUpperInvariant(),
                 ZipCode = zipCode?.Replace("-", ""),
                 IsActive = true
             };
 
             var supplier = await _supplierService.CreateAsync(createDto, currentUserId: 1); // TODO: obter userId do contexto
 
-            return $"✅ **Fornecedor cadastrado com sucesso!**\n\n" +
-                   $"**ID:** {supplier.Id}\n" +
-                   $"**Razão Social:** {supplier.Name}\n" +
-                   $"**Nome Fantasia:** {supplier.TradeName ?? "Não informado"}\n" +
-                   $"**CNPJ/CPF:** {FormatDocument(supplier.TaxId)}\n" +
-                   $"**Email:** {supplier.Email ?? "Não informado"}\n" +
-                   $"**Telefone:** {supplier.Phone ?? "Não informado"}";
+            var addressParts = new List<string>();
+            if (!string.IsNullOrEmpty(street)) addressParts.Add(street);
+            if (!string.IsNullOrEmpty(number)) addressParts.Add($"nº {number}");
+            if (!string.IsNullOrEmpty(district)) addressParts.Add(district);
+            if (!string.IsNullOrEmpty(city)) addressParts.Add(city);
+            if (!string.IsNullOrEmpty(state)) addressParts.Add(state.ToUpperInvariant());
+            var addressDisplay = addressParts.Any() ? string.Join(", ", addressParts) : "—";
+
+            return $"""
+                ✅ **Fornecedor Cadastrado!**
+                
+                | Campo | Valor |
+                |-------|-------|
+                | **ID** | {supplier.Id} |
+                | **Razão Social** | {supplier.Name} |
+                | **Nome Fantasia** | {supplier.TradeName ?? "—"} |
+                | **{docTypeLabel}** | {FormatDocument(supplier.TaxId)} |
+                | **Email** | {supplier.Email ?? "—"} |
+                | **Telefone** | {supplier.Phone ?? "—"} |
+                | **Celular** | {supplier.MobilePhone ?? "—"} |
+                | **Website** | {supplier.Website ?? "—"} |
+                | **Endereço** | {addressDisplay} |
+                """;
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("Já existe"))
         {
@@ -257,25 +323,26 @@ public class SuppliersPlugin
         var addressParts = new List<string>();
         if (!string.IsNullOrEmpty(supplier.Street)) addressParts.Add(supplier.Street);
         if (!string.IsNullOrEmpty(supplier.Number)) addressParts.Add($"Nº {supplier.Number}");
-        if (!string.IsNullOrEmpty(supplier.Complement)) addressParts.Add(supplier.Complement);
         if (!string.IsNullOrEmpty(supplier.District)) addressParts.Add(supplier.District);
         if (!string.IsNullOrEmpty(supplier.City)) addressParts.Add(supplier.City);
         if (!string.IsNullOrEmpty(supplier.State)) addressParts.Add(supplier.State);
-        if (!string.IsNullOrEmpty(supplier.ZipCode)) addressParts.Add($"CEP: {FormatCep(supplier.ZipCode)}");
 
-        var fullAddress = addressParts.Any() ? string.Join(", ", addressParts) : "Não informado";
+        var fullAddress = addressParts.Any() ? string.Join(", ", addressParts) : "—";
 
-        return $"🏢 **Detalhes do Fornecedor:**\n\n" +
-               $"**ID:** {supplier.Id}\n" +
-               $"**Razão Social:** {supplier.Name}\n" +
-               $"**Nome Fantasia:** {supplier.TradeName ?? "Não informado"}\n" +
-               $"**CNPJ/CPF:** {FormatDocument(supplier.TaxId)}\n" +
-               $"**Email:** {supplier.Email ?? "Não informado"}\n" +
-               $"**Telefone:** {supplier.Phone ?? "Não informado"}\n" +
-               $"**Endereço:** {fullAddress}\n" +
-               $"**Website:** {supplier.Website ?? "Não informado"}\n" +
-               $"**Status:** {(supplier.IsActive ? "✅ Ativo" : "❌ Inativo")}\n" +
-               $"**Observações:** {supplier.Notes ?? "Nenhuma"}";
+        return $"""
+            🏢 **Fornecedor #{supplier.Id}**
+            
+            | Campo | Valor |
+            |-------|-------|
+            | **Razão Social** | {supplier.Name} |
+            | **Fantasia** | {supplier.TradeName ?? "—"} |
+            | **CNPJ/CPF** | {FormatDocument(supplier.TaxId)} |
+            | **Email** | {supplier.Email ?? "—"} |
+            | **Telefone** | {supplier.Phone ?? "—"} |
+            | **Endereço** | {fullAddress} |
+            | **Website** | {supplier.Website ?? "—"} |
+            | **Status** | {(supplier.IsActive ? "✅ Ativo" : "❌ Inativo")} |
+            """;
     }
 
     private static string FormatDocument(string document)

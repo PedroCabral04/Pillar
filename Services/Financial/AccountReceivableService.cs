@@ -11,7 +11,7 @@ public interface IAccountReceivableService
         int page, int pageSize, int? customerId = null, AccountStatus? status = null,
         DateTime? dueDateFrom = null, DateTime? dueDateTo = null,
         int? categoryId = null, int? costCenterId = null,
-        string? sortBy = null, bool sortDescending = false);
+        string? sortBy = null, bool sortDescending = false, string? searchText = null);
     
     Task<AccountReceivableDto?> GetByIdAsync(int id);
     Task<List<AccountReceivableDto>> GetOverdueAsync();
@@ -24,7 +24,10 @@ public interface IAccountReceivableService
     Task<AccountReceivableDto> UpdateAsync(int id, UpdateAccountReceivableDto updateDto, int userId);
     Task DeleteAsync(int id);
     
-    Task<AccountReceivableDto> ReceivePaymentAsync(int id, decimal amount, PaymentMethod method, DateTime paymentDate, int userId, string? bankSlipNumber = null, string? pixKey = null);
+    Task<AccountReceivableDto> ReceivePaymentAsync(
+        int id, decimal amount, PaymentMethod method, DateTime paymentDate, int userId, 
+        string? bankSlipNumber = null, string? pixKey = null,
+        decimal? additionalDiscount = null, decimal? additionalInterest = null, decimal? additionalFine = null);
     Task<List<AccountReceivableDto>> CreateInstallmentsAsync(CreateAccountReceivableDto baseDto, int installments, int userId, decimal monthlyInterestRate = 0);
     Task UpdateOverdueStatusAsync();
 }
@@ -49,11 +52,11 @@ public class AccountReceivableService : IAccountReceivableService
         int page, int pageSize, int? customerId = null, AccountStatus? status = null,
         DateTime? dueDateFrom = null, DateTime? dueDateTo = null,
         int? categoryId = null, int? costCenterId = null,
-        string? sortBy = null, bool sortDescending = false)
+        string? sortBy = null, bool sortDescending = false, string? searchText = null)
     {
         var (items, totalCount) = await _dao.GetPagedAsync(
             page, pageSize, customerId, status, dueDateFrom, dueDateTo,
-            categoryId, costCenterId, sortBy, sortDescending);
+            categoryId, costCenterId, sortBy, sortDescending, searchText);
         
         var dtos = items.Select(x => MapToDto(x)).ToList();
         return (dtos, totalCount);
@@ -100,6 +103,11 @@ public class AccountReceivableService : IAccountReceivableService
 
         var entity = _mapper.ToEntity(createDto);
         entity.Status = AccountStatus.Pending;
+        
+        // Ensure dates are in UTC for PostgreSQL
+        entity.IssueDate = DateTime.SpecifyKind(entity.IssueDate, DateTimeKind.Utc);
+        entity.DueDate = DateTime.SpecifyKind(entity.DueDate, DateTimeKind.Utc);
+        
         entity.CreatedAt = DateTime.UtcNow;
         entity.CreatedByUserId = userId;
 
@@ -117,6 +125,13 @@ public class AccountReceivableService : IAccountReceivableService
             throw new InvalidOperationException("Não é possível editar uma conta já paga");
 
         _mapper.UpdateEntity(updateDto, entity);
+        
+        // Ensure dates are in UTC for PostgreSQL
+        entity.IssueDate = DateTime.SpecifyKind(entity.IssueDate, DateTimeKind.Utc);
+        entity.DueDate = DateTime.SpecifyKind(entity.DueDate, DateTimeKind.Utc);
+        if (entity.PaymentDate.HasValue)
+            entity.PaymentDate = DateTime.SpecifyKind(entity.PaymentDate.Value, DateTimeKind.Utc);
+        
         entity.UpdatedAt = DateTime.UtcNow;
 
         var updated = await _dao.UpdateAsync(entity);
@@ -137,12 +152,16 @@ public class AccountReceivableService : IAccountReceivableService
         if (installments.Any())
             throw new InvalidOperationException("Não é possível excluir uma conta que possui parcelas");
 
-        await _dao.DeleteAsync(id);
+        // Soft delete (Cancel) instead of hard delete
+        entity.Status = AccountStatus.Cancelled;
+        entity.UpdatedAt = DateTime.UtcNow;
+        await _dao.UpdateAsync(entity);
     }
 
     public async Task<AccountReceivableDto> ReceivePaymentAsync(
         int id, decimal amount, PaymentMethod method, DateTime paymentDate, int userId,
-        string? bankSlipNumber = null, string? pixKey = null)
+        string? bankSlipNumber = null, string? pixKey = null,
+        decimal? additionalDiscount = null, decimal? additionalInterest = null, decimal? additionalFine = null)
     {
         var entity = await _dao.GetByIdAsync(id);
         if (entity == null)
@@ -154,26 +173,25 @@ public class AccountReceivableService : IAccountReceivableService
         if (amount <= 0)
             throw new ArgumentException("O valor do pagamento deve ser maior que zero");
 
-        // Calculate interest and fines if overdue
-        if (DateTime.UtcNow > entity.DueDate)
-        {
-            var (interest, fine) = _accountingService.CalculateOverdueCharges(
-                entity.OriginalAmount,
-                entity.DueDate);
-            
-            entity.InterestAmount = interest;
-            entity.FineAmount = fine;
-        }
+        // Apply additional values from payment dialog (these are adjustments at payment time)
+        if (additionalDiscount.HasValue && additionalDiscount > 0)
+            entity.DiscountAmount += additionalDiscount.Value;
+        
+        if (additionalInterest.HasValue && additionalInterest > 0)
+            entity.InterestAmount += additionalInterest.Value;
+        
+        if (additionalFine.HasValue && additionalFine > 0)
+            entity.FineAmount += additionalFine.Value;
 
         // Update payment info
         entity.PaidAmount += amount;
-        entity.PaymentDate = paymentDate;
+        entity.PaymentDate = DateTime.SpecifyKind(paymentDate, DateTimeKind.Utc);
         entity.PaymentMethod = method;
         entity.BankSlipNumber = bankSlipNumber;
         entity.PixKey = pixKey;
         entity.ReceivedByUserId = userId;
 
-        // Update status
+        // Update status based on the new NetAmount (which considers the additional values)
         entity.Status = _accountingService.DetermineAccountStatus(
             entity.NetAmount,
             entity.PaidAmount,
@@ -198,13 +216,17 @@ public class AccountReceivableService : IAccountReceivableService
 
         var createdAccounts = new List<AccountReceivableDto>();
         AccountReceivable? parentAccount = null;
+        
+        // Ensure base dates are in UTC for PostgreSQL
+        var issueDate = DateTime.SpecifyKind(baseDto.IssueDate, DateTimeKind.Utc);
+        var baseDueDate = DateTime.SpecifyKind(baseDto.DueDate, DateTimeKind.Utc);
 
         for (int i = 0; i < installmentCalculations.Count; i++)
         {
             var calc = installmentCalculations[i];
             
             // Calculate due date for this installment (add months)
-            var dueDate = baseDto.DueDate.AddMonths(i);
+            var dueDate = baseDueDate.AddMonths(i);
             
             var entity = new AccountReceivable
             {
@@ -215,7 +237,7 @@ public class AccountReceivableService : IAccountReceivableService
                 InterestAmount = calc.InterestAmount,
                 FineAmount = 0,
                 PaidAmount = 0,
-                IssueDate = baseDto.IssueDate,
+                IssueDate = issueDate,
                 DueDate = dueDate,
                 Status = AccountStatus.Pending,
                 PaymentMethod = baseDto.PaymentMethod,

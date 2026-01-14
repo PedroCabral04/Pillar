@@ -118,6 +118,10 @@ public class AssetDao : IAssetDao
     {
         _context.Assets.Add(asset);
         await _context.SaveChangesAsync();
+        
+        // Reload with Category navigation property
+        await _context.Entry(asset).Reference(a => a.Category).LoadAsync();
+        
         return asset;
     }
 
@@ -126,6 +130,10 @@ public class AssetDao : IAssetDao
         asset.UpdatedAt = DateTime.UtcNow;
         _context.Assets.Update(asset);
         await _context.SaveChangesAsync();
+        
+        // Reload with Category navigation property
+        await _context.Entry(asset).Reference(a => a.Category).LoadAsync();
+        
         return asset;
     }
 

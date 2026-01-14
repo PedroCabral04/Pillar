@@ -70,3 +70,4 @@ public partial class AssetMapper
     
     public partial AssetTransfer CreateDtoToTransfer(CreateAssetTransferDto dto);
 }
+

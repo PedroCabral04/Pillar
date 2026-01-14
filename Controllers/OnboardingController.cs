@@ -18,6 +18,10 @@ public class OnboardingController : ControllerBase
         _onboardingService = onboardingService;
     }
 
+    /// <summary>
+    /// Retorna as tours de onboarding disponíveis para o usuário autenticado.
+    /// </summary>
+    /// <returns>Lista de <see cref="OnboardingTour"/> que o usuário pode iniciar.</returns>
     [HttpGet("tours")]
     public ActionResult<List<OnboardingTour>> GetTours()
     {
@@ -33,6 +37,11 @@ public class OnboardingController : ControllerBase
         return Ok(tours);
     }
 
+    /// <summary>
+    /// Retorna os metadados de uma tour específica por id.
+    /// </summary>
+    /// <param name="tourId">Identificador da tour.</param>
+    /// <returns>Objeto <see cref="OnboardingTour"/> ou 404 se não encontrado.</returns>
     [HttpGet("tours/{tourId}")]
     public ActionResult<OnboardingTour> GetTour(string tourId)
     {
@@ -45,6 +54,11 @@ public class OnboardingController : ControllerBase
         return Ok(tour);
     }
 
+    /// <summary>
+    /// Recupera o progresso do usuário para a tour especificada.
+    /// </summary>
+    /// <param name="tourId">Identificador da tour.</param>
+    /// <returns>Objeto <see cref="OnboardingProgress"/> ou 404 se não existir.</returns>
     [HttpGet("progress/{tourId}")]
     public async Task<ActionResult<OnboardingProgress>> GetProgress(string tourId)
     {
@@ -63,6 +77,11 @@ public class OnboardingController : ControllerBase
         return Ok(progress);
     }
 
+    /// <summary>
+    /// Marca uma tour como concluída para o usuário autenticado.
+    /// </summary>
+    /// <param name="tourId">Identificador da tour a ser concluída.</param>
+    /// <returns>Resposta HTTP 200 em caso de sucesso.</returns>
     [HttpPost("complete/{tourId}")]
     public async Task<ActionResult> CompleteTour(string tourId)
     {
@@ -76,6 +95,11 @@ public class OnboardingController : ControllerBase
         return Ok(new { message = "Tour completed successfully" });
     }
 
+    /// <summary>
+    /// Marca a tour como pulada pelo usuário autenticado.
+    /// </summary>
+    /// <param name="tourId">Identificador da tour a ser pulada.</param>
+    /// <returns>Resposta HTTP 200 em caso de sucesso.</returns>
     [HttpPost("skip/{tourId}")]
     public async Task<ActionResult> SkipTour(string tourId)
     {
@@ -89,6 +113,11 @@ public class OnboardingController : ControllerBase
         return Ok(new { message = "Tour skipped successfully" });
     }
 
+    /// <summary>
+    /// Restaura o estado da tour para o usuário (reseta progresso).
+    /// </summary>
+    /// <param name="tourId">Identificador da tour a resetar.</param>
+    /// <returns>Resposta HTTP 200 em caso de sucesso.</returns>
     [HttpPost("reset/{tourId}")]
     public async Task<ActionResult> ResetTour(string tourId)
     {
@@ -102,6 +131,12 @@ public class OnboardingController : ControllerBase
         return Ok(new { message = "Tour reset successfully" });
     }
 
+    /// <summary>
+    /// Salva o progresso do usuário em uma tour específica.
+    /// </summary>
+    /// <param name="tourId">Identificador da tour.</param>
+    /// <param name="request">Objeto com o passo atual e se está completo.</param>
+    /// <returns>Resposta HTTP 200 em caso de sucesso.</returns>
     [HttpPost("progress/{tourId}")]
     public async Task<ActionResult> SaveProgress(string tourId, [FromBody] SaveProgressRequest request)
     {
@@ -118,6 +153,9 @@ public class OnboardingController : ControllerBase
 
 public class SaveProgressRequest
 {
+    /// <summary>Passo atual da tour que o usuário alcançou.</summary>
     public int CurrentStep { get; set; }
+
+    /// <summary>Indica se a tour está marcada como concluída.</summary>
     public bool IsCompleted { get; set; }
 }

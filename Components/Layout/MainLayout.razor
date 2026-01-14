@@ -64,13 +64,12 @@
                                aria-label="@(_isSidebarLocked ? "Recolher menu lateral" : "Expandir menu lateral")" />
                 
                 <div class="d-flex align-center">
-                    <MudAvatar Size="MudBlazor.Size.Medium"
-                               Class="me-2"
-                               Square="true"
-                               Image="@_branding.LogoUrl"
-                               Text="@_branding.Initials"
-                               Style="@($"background-color:{_branding.PrimaryColor};color:white;")" />
-                    <MudText Typo="Typo.h6" Style="font-weight: 600;">@_branding.TenantName</MudText>
+                    <MudImage Src='@(_branding.LogoUrl ?? "/logo.png")' 
+                              Alt="@_branding.TenantName"
+                              Height="32"
+                              ObjectFit="ObjectFit.Contain"
+                              Class="me-2" />
+                    @* <MudText Typo="Typo.h6" Style="font-weight: 600;">@_branding.TenantName</MudText> *@
                 </div>
 
                 <MudSpacer />
@@ -104,7 +103,7 @@
                        OpenMiniOnHover="false"
                        ClipMode="DrawerClipMode.Always"
                        Elevation="0"
-                       Width="280px"
+                       Width="250px"
                        MiniWidth="64px"
                        Style="border-right: 1px solid var(--mud-palette-lines-default);"
                        @onmouseenter="OnSidebarMouseEnter"
@@ -118,10 +117,6 @@
                 </div>
                 @Body
             </MudMainContent>
-
-            <MudScrollToTop>
-                <MudFab Color="MudBlazor.Color.Tertiary" StartIcon="@Icons.Material.Filled.ArrowCircleUp" />
-            </MudScrollToTop>
         }
     </MudHidden>
     
@@ -164,6 +159,7 @@
     private bool _isMouseOver = false;
     private System.Threading.CancellationTokenSource? _closeCts;
     private IJSObjectReference? _activityMonitor;
+    private IJSObjectReference? _shortcutsModule;
     private DotNetObjectReference<MainLayout>? _dotNetRef;
 
     private bool _mobileDrawerOpen;
@@ -185,8 +181,16 @@
     protected override void OnInitialized()
     {
         ApplyTenantBranding();
+        // Subscribe to branding changes
+        BrandingProvider.BrandingChanged += OnBrandingChanged;
         // Subscribe to resume requests
         if (OnboardingResumeService != null) OnboardingResumeService.Changed += OnboardingResumeChanged;
+    }
+
+    private void OnBrandingChanged(object? sender, EventArgs e)
+    {
+        ApplyTenantBranding();
+        InvokeAsync(StateHasChanged);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -196,6 +200,8 @@
             await PreferenceService.InitializeAsync();
             ThemeService.InitializeTheme();
             ApplyCulture();
+            ApplySidebarPreference();
+            await ApplyFontSizePreference();
             PreferenceService.OnPreferenceChanged += OnPreferenceChanged;
             
             // Detecta se é mobile
@@ -214,6 +220,12 @@
                 _dotNetRef = DotNetObjectReference.Create(this);
                 var timeout = PreferenceService.CurrentPreferences.Security.AutoLogoutMinutes;
                 _activityMonitor = await JsRuntime.InvokeAsync<IJSObjectReference>("erpAuth.monitorActivity", _dotNetRef, timeout);
+
+                // Setup Keyboard Shortcuts
+                if (PreferenceService.CurrentPreferences.Ui.KeyboardShortcutsEnabled)
+                {
+                    _shortcutsModule = await JsRuntime.InvokeAsync<IJSObjectReference>("erpShortcuts.initialize", _dotNetRef);
+                }
             }
             catch (JSDisconnectedException)
             {
@@ -244,6 +256,7 @@
     public async ValueTask DisposeAsync()
     {
         PreferenceService.OnPreferenceChanged -= OnPreferenceChanged;
+        BrandingProvider.BrandingChanged -= OnBrandingChanged;
         _closeCts?.Cancel();
         _closeCts?.Dispose();
         _dotNetRef?.Dispose();
@@ -252,6 +265,11 @@
         if (_activityMonitor != null)
         {
             try { await _activityMonitor.InvokeVoidAsync("dispose"); await _activityMonitor.DisposeAsync(); } catch {}
+        }
+        
+        if (_shortcutsModule != null)
+        {
+            try { await _shortcutsModule.InvokeVoidAsync("dispose"); await _shortcutsModule.DisposeAsync(); } catch {}
         }
     }
 
@@ -372,8 +390,52 @@
     private async void OnPreferenceChanged()
     {
         ApplyCulture();
+        ApplySidebarPreference();
+        await ApplyFontSizePreference();
         await UpdateAutoLogout();
+        await UpdateKeyboardShortcuts();
         await InvokeAsync(StateHasChanged);
+    }
+
+    private void ApplySidebarPreference()
+    {
+        // Apply sidebar persistent preference (only for desktop)
+        if (!_isMobileView)
+        {
+            _isSidebarLocked = PreferenceService.CurrentPreferences.Ui.SidebarPersistent;
+        }
+    }
+
+    private async Task ApplyFontSizePreference()
+    {
+        try
+        {
+            var fontSize = PreferenceService.CurrentPreferences?.Ui?.FontSize ?? "base";
+            await JsRuntime.InvokeVoidAsync("erpResponsive.setFontSizeClass", fontSize);
+        }
+        catch (JSDisconnectedException) { }
+        catch (TaskCanceledException) { }
+        catch { }
+    }
+
+    private async Task UpdateKeyboardShortcuts()
+    {
+        try
+        {
+            if (PreferenceService.CurrentPreferences.Ui.KeyboardShortcutsEnabled && _shortcutsModule == null)
+            {
+                // Enable shortcuts
+                _shortcutsModule = await JsRuntime.InvokeAsync<IJSObjectReference>("erpShortcuts.initialize", _dotNetRef);
+            }
+            else if (!PreferenceService.CurrentPreferences.Ui.KeyboardShortcutsEnabled && _shortcutsModule != null)
+            {
+                // Disable shortcuts
+                await _shortcutsModule.InvokeVoidAsync("dispose");
+                await _shortcutsModule.DisposeAsync();
+                _shortcutsModule = null;
+            }
+        }
+        catch { }
     }
 
     [JSInvokable]
@@ -388,6 +450,19 @@
         {
             NavigationManager.NavigateTo("/login", forceLoad: true);
         }
+    }
+
+    [JSInvokable]
+    public void NavigateFromShortcut(string route)
+    {
+        NavigationManager.NavigateTo(route);
+    }
+
+    [JSInvokable]
+    public void ToggleSidebarFromShortcut()
+    {
+        ToggleDrawer();
+        InvokeAsync(StateHasChanged);
     }
     
     private async Task UpdateAutoLogout()

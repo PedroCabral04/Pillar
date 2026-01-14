@@ -1,7 +1,9 @@
 using System.ComponentModel;
 using Microsoft.SemanticKernel;
 using erp.Services.Sales;
+using erp.Services.Financial.Validation;
 using erp.DTOs.Sales;
+using erp.Models.Sales;
 
 namespace erp.Services.Chatbot.ChatbotPlugins;
 
@@ -28,14 +30,23 @@ public class CustomersPlugin
 
             if (!customers.Any())
             {
-                return $"🔍 Nenhum cliente encontrado com o termo '{searchTerm}'.";
+                return $"🔍 Nenhum cliente encontrado com **'{searchTerm}'**.";
             }
 
-            var customerList = customers.Select(c =>
-                $"- **{c.Name}** (Doc: {FormatDocument(c.Document)}) - {(c.IsActive ? "✅ Ativo" : "❌ Inativo")} - Email: {c.Email ?? "Não informado"}"
+            var list = customers.Select(c =>
+                $"| {c.Name} | {FormatDocument(c.Document)} | {(c.IsActive ? "✅" : "❌")} | {c.Email ?? "—"} |"
             );
+            
+            var remaining = total - maxResults;
+            var moreText = remaining > 0 ? $"\n\n*...e mais {remaining} clientes.*" : "";
 
-            return $"👥 **Clientes encontrados ({total} total):**\n{string.Join("\n", customerList)}";
+            return $"""
+                👥 **Clientes Encontrados** ({total} total)
+                
+                | Nome | Documento | Ativo | Email |
+                |------|-----------|-------|-------|
+                {string.Join("\n", list)}{moreText}
+                """;
         }
         catch (Exception ex)
         {
@@ -88,42 +99,80 @@ public class CustomersPlugin
         }
     }
 
-    [KernelFunction, Description("Cadastra um novo cliente no sistema")]
+    [KernelFunction, Description("Cadastra um novo cliente no sistema. Campos obrigatórios: nome e documento (CPF ou CNPJ). Campos opcionais: nome fantasia, email, telefone, celular, endereço, número, bairro, cidade, estado, CEP, tipo (PF ou PJ).")]
     public async Task<string> CreateCustomer(
-        [Description("Nome completo ou razão social do cliente")] string name,
-        [Description("Documento do cliente (CPF ou CNPJ)")] string document,
+        [Description("Nome completo (pessoa física) ou razão social (pessoa jurídica) - obrigatório")] string name,
+        [Description("Documento do cliente: CPF (11 dígitos) ou CNPJ (14 dígitos) - obrigatório")] string document,
+        [Description("Nome fantasia (opcional, mais usado para PJ)")] string? tradeName = null,
         [Description("Email do cliente (opcional)")] string? email = null,
-        [Description("Telefone do cliente (opcional)")] string? phone = null,
-        [Description("Endereço do cliente (opcional)")] string? address = null,
+        [Description("Telefone fixo do cliente (opcional)")] string? phone = null,
+        [Description("Celular do cliente (opcional)")] string? mobile = null,
+        [Description("Logradouro/Rua (opcional)")] string? street = null,
+        [Description("Número do endereço (opcional)")] string? number = null,
+        [Description("Bairro (opcional)")] string? neighborhood = null,
         [Description("Cidade do cliente (opcional)")] string? city = null,
-        [Description("Estado/UF do cliente (opcional)")] string? state = null,
+        [Description("Estado/UF do cliente (opcional, ex: SP, RJ, MG)")] string? state = null,
         [Description("CEP do cliente (opcional)")] string? zipCode = null)
     {
         try
         {
             // Remove formatação do documento
-            var cleanDocument = document.Replace(".", "").Replace("-", "").Replace("/", "").Trim();
+            var cleanDocument = BrazilianDocumentValidator.RemoveFormatting(document);
+
+            // Validar documento
+            if (!BrazilianDocumentValidator.IsValidDocument(cleanDocument))
+            {
+                var docType = cleanDocument.Length <= 11 ? "CPF" : "CNPJ";
+                return $"❌ **{docType} inválido!**\n\nO documento informado não passou na validação. Verifique se os dígitos estão corretos.";
+            }
+
+            // Determinar tipo de cliente baseado no documento
+            var customerType = cleanDocument.Length == 11 ? CustomerType.Individual : CustomerType.Business;
+            var docTypeLabel = cleanDocument.Length == 11 ? "CPF" : "CNPJ";
+
+            // Montar endereço completo se houver logradouro
+            string? fullAddress = null;
+            if (!string.IsNullOrWhiteSpace(street))
+            {
+                var addressParts = new List<string> { street };
+                if (!string.IsNullOrWhiteSpace(number)) addressParts.Add($"nº {number}");
+                fullAddress = string.Join(", ", addressParts);
+            }
 
             var createDto = new CreateCustomerDto
             {
                 Name = name,
+                TradeName = tradeName,
                 Document = cleanDocument,
                 Email = email,
                 Phone = phone,
-                Address = address,
+                Mobile = mobile,
+                Address = fullAddress,
+                Neighborhood = neighborhood,
                 City = city,
-                State = state,
-                ZipCode = zipCode?.Replace("-", "")
+                State = state?.ToUpperInvariant(),
+                ZipCode = zipCode?.Replace("-", ""),
+                Type = customerType
             };
 
             var customer = await _customerService.CreateAsync(createDto);
 
-            return $"✅ **Cliente cadastrado com sucesso!**\n\n" +
-                   $"**ID:** {customer.Id}\n" +
-                   $"**Nome:** {customer.Name}\n" +
-                   $"**Documento:** {FormatDocument(customer.Document)}\n" +
-                   $"**Email:** {customer.Email ?? "Não informado"}\n" +
-                   $"**Telefone:** {customer.Phone ?? "Não informado"}";
+            var addressDisplay = string.Join(", ", new[] { fullAddress, neighborhood, city, state }.Where(s => !string.IsNullOrEmpty(s)));
+
+            return $"""
+                ✅ **Cliente Cadastrado!**
+                
+                | Campo | Valor |
+                |-------|-------|
+                | **ID** | {customer.Id} |
+                | **Tipo** | {(customerType == CustomerType.Individual ? "👤 Pessoa Física" : "🏢 Pessoa Jurídica")} |
+                | **Nome** | {customer.Name} |
+                | **{docTypeLabel}** | {FormatDocument(customer.Document)} |
+                | **Email** | {customer.Email ?? "—"} |
+                | **Telefone** | {customer.Phone ?? "—"} |
+                | **Celular** | {customer.Mobile ?? "—"} |
+                | **Endereço** | {(string.IsNullOrEmpty(addressDisplay) ? "—" : addressDisplay)} |
+                """;
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("já existe"))
         {
@@ -135,9 +184,10 @@ public class CustomersPlugin
         }
     }
 
-    [KernelFunction, Description("Lista os clientes mais recentes cadastrados no sistema")]
+    [KernelFunction, Description("Lista os clientes cadastrados no sistema. Use página > 1 para ver mais.")]
     public async Task<string> ListRecentCustomers(
-        [Description("Número máximo de clientes a retornar")] int maxResults = 15,
+        [Description("Número máximo de clientes a retornar por página")] int maxResults = 10,
+        [Description("Número da página (1 = primeira, 2 = próxima, etc)")] int page = 1,
         [Description("Filtrar apenas clientes ativos? (true/false/null para todos)")] bool? activeOnly = null)
     {
         try
@@ -145,26 +195,45 @@ public class CustomersPlugin
             var (customers, total) = await _customerService.SearchAsync(
                 search: null, 
                 isActive: activeOnly, 
-                page: 1, 
+                page: page, 
                 pageSize: maxResults);
 
+            if (!customers.Any() && page == 1)
+            {
+                return "👥 Não há clientes cadastrados.";
+            }
+            
             if (!customers.Any())
             {
-                return "👥 Não há clientes cadastrados no momento.";
+                return $"👥 Não há mais clientes. Total: {total} clientes.";
             }
 
-            var customerList = customers.Select(c =>
-                $"- **{c.Name}** (ID: {c.Id}) - Doc: {FormatDocument(c.Document)} - {(c.IsActive ? "✅ Ativo" : "❌ Inativo")}"
+            var list = customers.Select(c =>
+                $"| {c.Id} | {c.Name} | {FormatDocument(c.Document)} | {(c.IsActive ? "✅" : "❌")} |"
             );
 
             var statusFilter = activeOnly switch
             {
-                true => " ativos",
-                false => " inativos",
+                true => " Ativos",
+                false => " Inativos",
                 _ => ""
             };
+            
+            var shown = (page - 1) * maxResults + customers.Count();
+            var remaining = total - shown;
+            
+            var pageInfo = page > 1 ? $" (Página {page})" : "";
+            var moreText = remaining > 0 
+                ? $"\n\n*Exibindo {shown} de {total}. Peça \"listar clientes página {page + 1}\" para ver mais.*" 
+                : "";
 
-            return $"👥 **Clientes{statusFilter} ({total} total):**\n{string.Join("\n", customerList)}";
+            return $"""
+                👥 **Clientes{statusFilter}**{pageInfo} ({total} total)
+                
+                | ID | Nome | Documento | Ativo |
+                |----|------|-----------|-------|
+                {string.Join("\n", list)}{moreText}
+                """;
         }
         catch (Exception ex)
         {
@@ -180,17 +249,21 @@ public class CustomersPlugin
         if (!string.IsNullOrEmpty(customer.State)) addressParts.Add(customer.State);
         if (!string.IsNullOrEmpty(customer.ZipCode)) addressParts.Add($"CEP: {FormatCep(customer.ZipCode)}");
 
-        var fullAddress = addressParts.Any() ? string.Join(", ", addressParts) : "Não informado";
+        var fullAddress = addressParts.Any() ? string.Join(", ", addressParts) : "—";
 
-        return $"👤 **Detalhes do Cliente:**\n\n" +
-               $"**ID:** {customer.Id}\n" +
-               $"**Nome:** {customer.Name}\n" +
-               $"**Documento:** {FormatDocument(customer.Document)}\n" +
-               $"**Email:** {customer.Email ?? "Não informado"}\n" +
-               $"**Telefone:** {customer.Phone ?? "Não informado"}\n" +
-               $"**Endereço:** {fullAddress}\n" +
-               $"**Status:** {(customer.IsActive ? "✅ Ativo" : "❌ Inativo")}\n" +
-               $"**Cadastrado em:** {customer.CreatedAt:dd/MM/yyyy HH:mm}";
+        return $"""
+            👤 **Cliente #{customer.Id}**
+            
+            | Campo | Valor |
+            |-------|-------|
+            | **Nome** | {customer.Name} |
+            | **Documento** | {FormatDocument(customer.Document)} |
+            | **Email** | {customer.Email ?? "—"} |
+            | **Telefone** | {customer.Phone ?? "—"} |
+            | **Endereço** | {fullAddress} |
+            | **Status** | {(customer.IsActive ? "✅ Ativo" : "❌ Inativo")} |
+            | **Cadastro** | {customer.CreatedAt:dd/MM/yyyy HH:mm} |
+            """;
     }
 
     private static string FormatDocument(string document)

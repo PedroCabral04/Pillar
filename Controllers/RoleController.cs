@@ -36,7 +36,7 @@ namespace erp.Controllers
         private IQueryable<ApplicationRole> ApplyTenantScope(IQueryable<ApplicationRole> query)
         {
             var tenantId = GetScopedTenantId();
-            return tenantId.HasValue ? query.Where(role => role.TenantId == tenantId.Value) : query;
+            return tenantId.HasValue ? query.Where(role => role.TenantId == tenantId.Value || role.TenantId == null) : query;
         }
 
         /// <summary>

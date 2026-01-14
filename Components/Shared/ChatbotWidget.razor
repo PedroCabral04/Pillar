@@ -4,6 +4,11 @@
 @inject IApiService ApiService
 @inject ISnackbar Snackbar
 @inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+
+@using System.Text.RegularExpressions
+@using System.Text.Encodings.Web
+@using Markdig
 
 <div class="chatbot-widget">
     @if (_isOpen)
@@ -23,6 +28,23 @@
                     </div>
                 </div>
                 <div class="chat-header-actions">
+                    <MudTooltip Text="Salvar conversa" Placement="Placement.Bottom">
+                        <MudIconButton Icon="@Icons.Material.Filled.Save" 
+                                       Color="MudBlazor.Color.Inherit" 
+                                       OnClick="SaveConversation"
+                                       Size="MudBlazor.Size.Small"
+                                       Disabled="@(!_messages.Any() || _isSaving)"
+                                       Style="color: rgba(255,255,255,0.8);"
+                                       aria-label="Salvar conversa"/>
+                    </MudTooltip>
+                    <MudTooltip Text="Abrir em nova guia" Placement="Placement.Bottom">
+                        <MudIconButton Icon="@Icons.Material.Filled.OpenInNew" 
+                                       Color="MudBlazor.Color.Inherit" 
+                                       OnClick="OpenInNewTab"
+                                       Size="MudBlazor.Size.Small"
+                                       Style="color: rgba(255,255,255,0.8);"
+                                       aria-label="Abrir em nova guia"/>
+                    </MudTooltip>
                     <MudTooltip Text="Limpar conversa" Placement="Placement.Bottom">
                         <MudIconButton Icon="@Icons.Material.Filled.Refresh" 
                                        Color="MudBlazor.Color.Inherit" 
@@ -62,8 +84,45 @@
                 {
                     @foreach (var message in _messages)
                     {
-                        <div class="chat-message @(message.IsError ? "chat-message-error" : message.Role == "user" ? "chat-message-user" : "chat-message-assistant")">
-                            <span>@message.Content</span>
+                        var messageId = message.Id;
+                        var isLongMessage = message.Role == "assistant" && !message.IsError && message.Content.Length > MaxCollapsedLength;
+                        var isExpanded = _expandedMessages.Contains(messageId);
+                        
+                        <div class="chat-message @(message.IsError ? "chat-message-error" : message.Role == "user" ? "chat-message-user" : "chat-message-assistant") @(isLongMessage && !isExpanded ? "collapsed" : "")">
+                            <div class="message-content">
+                                @if (isLongMessage && !isExpanded)
+                                {
+                                    @RenderMessage(TruncateMessage(message.Content))
+                                }
+                                else
+                                {
+                                    @RenderMessage(message.Content)
+                                }
+                            </div>
+                            @if (isLongMessage && !isExpanded)
+                            {
+                                <div class="message-expand-overlay">
+                                    <MudButton Size="MudBlazor.Size.Small" 
+                                               Variant="Variant.Text" 
+                                               Color="MudBlazor.Color.Primary"
+                                               StartIcon="@Icons.Material.Filled.ExpandMore"
+                                               OnClick="@(() => ExpandMessage(messageId))">
+                                        Ver mais
+                                    </MudButton>
+                                </div>
+                            }
+                            @if (isLongMessage && isExpanded)
+                            {
+                                <div class="message-collapse-button">
+                                    <MudButton Size="MudBlazor.Size.Small" 
+                                               Variant="Variant.Text" 
+                                               Color="MudBlazor.Color.Primary"
+                                               StartIcon="@Icons.Material.Filled.ExpandLess"
+                                               OnClick="@(() => CollapseMessage(messageId))">
+                                        Ver menos
+                                    </MudButton>
+                                </div>
+                            }
                         </div>
                     }
                     
@@ -127,12 +186,46 @@
 </div>
 
 @code {
+    private const int MaxCollapsedLength = 500;
+    private static readonly MarkdownPipeline _markdownPipeline = new MarkdownPipelineBuilder()
+        .UseAdvancedExtensions()
+        .Build();
+    
     private bool _isOpen = false;
     private bool _isProcessing = false;
+    private bool _isSaving = false;
     private string _currentMessage = string.Empty;
     private List<ChatMessageDto> _messages = new();
     private List<string> _suggestedActions = new();
     private ElementReference _messagesContainer;
+    private HashSet<string> _expandedMessages = new();
+
+    private void ExpandMessage(string messageId)
+    {
+        _expandedMessages.Add(messageId);
+        StateHasChanged();
+    }
+
+    private void CollapseMessage(string messageId)
+    {
+        _expandedMessages.Remove(messageId);
+        StateHasChanged();
+    }
+
+    private string TruncateMessage(string message)
+    {
+        if (message.Length <= MaxCollapsedLength)
+            return message;
+        
+        // Tenta cortar em um ponto natural (fim de linha ou espaço)
+        var truncateAt = message.LastIndexOf('\n', MaxCollapsedLength);
+        if (truncateAt < MaxCollapsedLength / 2)
+            truncateAt = message.LastIndexOf(' ', MaxCollapsedLength);
+        if (truncateAt < MaxCollapsedLength / 2)
+            truncateAt = MaxCollapsedLength;
+        
+        return message[..truncateAt] + "...";
+    }
 
     protected override void OnInitialized()
     {
@@ -171,6 +264,75 @@
                 "O que você pode fazer?",
                 "Listar produtos",
             };
+        }
+    }
+    
+    private async Task SaveConversation()
+    {
+        if (!_messages.Any() || _isSaving)
+            return;
+        
+        _isSaving = true;
+        StateHasChanged();
+        
+        try
+        {
+            // Create a new conversation with the first user message to generate title
+            var firstUserMessage = _messages.FirstOrDefault(m => m.Role == "user")?.Content;
+            var createRequest = new CreateConversationDto 
+            { 
+                InitialMessage = null // We'll add messages manually
+            };
+            
+            var newConversation = await ApiService.PostAsync<ChatConversationDto>("api/chatbot/conversations", createRequest);
+            
+            if (newConversation != null)
+            {
+                // Send each message pair to the conversation
+                foreach (var message in _messages.Where(m => m.Role == "user" && !m.IsError))
+                {
+                    var request = new SendMessageToConversationDto { Message = message.Content };
+                    await ApiService.PostAsync<ConversationMessageResponseDto>(
+                        $"api/chatbot/conversations/{newConversation.Id}/messages", 
+                        request);
+                }
+                
+                Snackbar.Add("Conversa salva com sucesso!", Severity.Success);
+                
+                // Clear widget after saving
+                _messages.Clear();
+                _suggestedActions = new List<string>
+                {
+                    "O que você pode fazer?",
+                    "Listar produtos",
+                };
+            }
+            else
+            {
+                Snackbar.Add("Erro ao salvar conversa", Severity.Error);
+            }
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("Erro ao salvar conversa", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+            StateHasChanged();
+        }
+    }
+    
+    private async Task OpenInNewTab()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("open", "/chatbot", "_blank");
+        }
+        catch
+        {
+            // Fallback - navigate in same tab
+            NavigationManager.NavigateTo("/chatbot");
         }
     }
 
@@ -269,6 +431,29 @@
         _currentMessage = action;
         await SendMessage();
     }
+
+    private MarkupString RenderMessage(string message)
+    {
+        if (string.IsNullOrEmpty(message))
+            return new MarkupString(string.Empty);
+
+        try
+        {
+            // Usar Markdig para converter Markdown para HTML
+            var html = Markdig.Markdown.ToHtml(message, _markdownPipeline);
+            return new MarkupString(html);
+        }
+        catch
+        {
+            // Fallback: apenas encode e quebras de linha
+            var encoded = HtmlEncoder.Default.Encode(message);
+            var withBreaks = encoded
+                .Replace("\r\n", "<br>")
+                .Replace("\r", "<br>")
+                .Replace("\n", "<br>");
+            return new MarkupString(withBreaks);
+        }
+    }
 }
 
 <style>
@@ -310,7 +495,7 @@
     position: fixed;
     bottom: 96px;
     right: 24px;
-    width: 380px;
+    width: 450px;
     height: 560px;
     max-height: calc(100vh - 140px);
     border-radius: 16px;
@@ -457,6 +642,139 @@
     border-bottom-left-radius: 4px;
     box-shadow: 0 1px 4px rgba(0,0,0,0.06);
     border: 1px solid var(--mud-palette-lines-default);
+}
+
+/* Estilos para mensagens colapsadas */
+.chat-message.collapsed {
+    position: relative;
+}
+
+.chat-message.collapsed .message-content {
+    max-height: 180px;
+    overflow: hidden;
+    position: relative;
+}
+
+.chat-message.collapsed .message-content::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 40px;
+    background: linear-gradient(transparent, var(--mud-palette-surface));
+    pointer-events: none;
+}
+
+.message-expand-overlay {
+    display: flex;
+    justify-content: center;
+    padding-top: 4px;
+    margin-top: 4px;
+}
+
+.message-collapse-button {
+    display: flex;
+    justify-content: center;
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px solid var(--mud-palette-lines-default);
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Estilos para elementos Markdown dentro das mensagens */
+.chat-message-assistant p {
+    margin: 0 0 8px 0;
+}
+
+.chat-message-assistant p:last-child {
+    margin-bottom: 0;
+}
+
+.chat-message-assistant ul,
+.chat-message-assistant ol {
+    margin: 8px 0;
+    padding-left: 20px;
+}
+
+.chat-message-assistant li {
+    margin: 4px 0;
+}
+
+.chat-message-assistant h1,
+.chat-message-assistant h2,
+.chat-message-assistant h3,
+.chat-message-assistant h4 {
+    margin: 12px 0 8px 0;
+    font-weight: 600;
+}
+
+.chat-message-assistant h1 { font-size: 1.1rem; }
+.chat-message-assistant h2 { font-size: 1.05rem; }
+.chat-message-assistant h3 { font-size: 1rem; }
+.chat-message-assistant h4 { font-size: 0.95rem; }
+
+.chat-message-assistant code {
+    background: rgba(0,0,0,0.06);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 0.85em;
+}
+
+.chat-message-assistant pre {
+    background: rgba(0,0,0,0.06);
+    padding: 10px;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 8px 0;
+}
+
+.chat-message-assistant pre code {
+    background: none;
+    padding: 0;
+}
+
+.chat-message-assistant blockquote {
+    border-left: 3px solid var(--mud-palette-primary);
+    margin: 8px 0;
+    padding-left: 12px;
+    color: var(--mud-palette-text-secondary);
+}
+
+.chat-message-assistant table {
+    border-collapse: collapse;
+    margin: 8px 0;
+    width: 100%;
+    font-size: 0.85rem;
+}
+
+.chat-message-assistant th,
+.chat-message-assistant td {
+    border: 1px solid var(--mud-palette-lines-default);
+    padding: 6px 8px;
+    text-align: left;
+}
+
+.chat-message-assistant th {
+    background: rgba(0,0,0,0.04);
+    font-weight: 600;
+}
+
+.chat-message-assistant strong {
+    color: var(--mud-palette-primary);
+}
+
+.chat-message-assistant a {
+    color: var(--mud-palette-primary);
+    text-decoration: underline;
+}
+
+.chat-message-assistant hr {
+    border: none;
+    border-top: 1px solid var(--mud-palette-lines-default);
+    margin: 12px 0;
 }
 
 .chat-message-error {

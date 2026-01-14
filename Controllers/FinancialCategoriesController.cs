@@ -22,7 +22,7 @@ public class FinancialCategoriesController : ControllerBase
     }
 
     /// <summary>
-    /// Get all financial categories
+    /// Obter todas as categorias financeiras
     /// </summary>
     [HttpGet]
     public async Task<ActionResult<List<FinancialCategoryDto>>> GetAll([FromQuery] bool activeOnly = false)
@@ -40,7 +40,7 @@ public class FinancialCategoriesController : ControllerBase
     }
 
     /// <summary>
-    /// Get category by ID
+    /// Obter categoria por ID
     /// </summary>
     [HttpGet("{id}")]
     public async Task<ActionResult<FinancialCategoryDto>> GetById(int id)
@@ -62,7 +62,7 @@ public class FinancialCategoriesController : ControllerBase
     }
 
     /// <summary>
-    /// Get categories by type (Revenue or Expense)
+    /// Obter categorias por tipo (Receita ou Despesa)
     /// </summary>
     [HttpGet("by-type/{type}")]
     public async Task<ActionResult<List<FinancialCategoryDto>>> GetByType(CategoryType type, [FromQuery] bool activeOnly = false)
@@ -80,7 +80,7 @@ public class FinancialCategoriesController : ControllerBase
     }
 
     /// <summary>
-    /// Get root categories (no parent)
+    /// Obter categorias raiz (sem pai)
     /// </summary>
     [HttpGet("root")]
     public async Task<ActionResult<List<FinancialCategoryDto>>> GetRootCategories()
@@ -98,7 +98,7 @@ public class FinancialCategoriesController : ControllerBase
     }
 
     /// <summary>
-    /// Get subcategories of a parent category
+    /// Obter subcategorias de uma categoria pai
     /// </summary>
     [HttpGet("{parentId}/subcategories")]
     public async Task<ActionResult<List<FinancialCategoryDto>>> GetSubCategories(int parentId)
@@ -116,7 +116,7 @@ public class FinancialCategoriesController : ControllerBase
     }
 
     /// <summary>
-    /// Create new category
+    /// Criar nova categoria
     /// </summary>
     [HttpPost]
     public async Task<ActionResult<FinancialCategoryDto>> Create([FromBody] CreateFinancialCategoryDto dto)
@@ -144,7 +144,7 @@ public class FinancialCategoriesController : ControllerBase
     }
 
     /// <summary>
-    /// Update existing category
+    /// Atualizar categoria existente
     /// </summary>
     [HttpPut("{id}")]
     public async Task<ActionResult<FinancialCategoryDto>> Update(int id, [FromBody] UpdateFinancialCategoryDto dto)
@@ -176,7 +176,7 @@ public class FinancialCategoriesController : ControllerBase
     }
 
     /// <summary>
-    /// Delete category
+    /// Excluir categoria
     /// </summary>
     [HttpDelete("{id}")]
     public async Task<ActionResult> Delete(int id)

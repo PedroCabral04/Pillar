@@ -122,6 +122,7 @@
             _categories = response?.Items ?? new List<ProductCategoryDto>();
             
             // Preenche os dados da categoria atual
+            _updateCategory.Id = Category.Id;
             _updateCategory.Name = Category.Name;
             _updateCategory.Code = Category.Code;
             _updateCategory.ParentCategoryId = Category.ParentCategoryId;

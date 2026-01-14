@@ -61,7 +61,7 @@ public class AccountPayableDto
     public decimal InterestAmount { get; set; }
     public decimal FineAmount { get; set; }
     public decimal PaidAmount { get; set; }
-    public decimal NetAmount { get; set; }
+    public decimal NetAmount => OriginalAmount - DiscountAmount + InterestAmount + FineAmount;
     public decimal RemainingAmount => NetAmount - PaidAmount;
     
     public DateTime IssueDate { get; set; }
@@ -145,7 +145,11 @@ public class AccountPayableSummaryDto
     public int Id { get; set; }
     public string? SupplierName { get; set; }
     public string? InvoiceNumber { get; set; }
-    public decimal NetAmount { get; set; }
+    public decimal OriginalAmount { get; set; }
+    public decimal DiscountAmount { get; set; }
+    public decimal InterestAmount { get; set; }
+    public decimal FineAmount { get; set; }
+    public decimal NetAmount => OriginalAmount - DiscountAmount + InterestAmount + FineAmount;
     public decimal PaidAmount { get; set; }
     public decimal RemainingAmount => NetAmount - PaidAmount;
     public DateTime DueDate { get; set; }

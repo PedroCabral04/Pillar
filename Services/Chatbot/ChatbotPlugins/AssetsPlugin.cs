@@ -17,9 +17,10 @@ public class AssetsPlugin
         _assetService = assetService;
     }
 
-    [KernelFunction, Description("Lista todos os ativos cadastrados no sistema")]
+    [KernelFunction, Description("Lista todos os ativos cadastrados no sistema. Use página > 1 para ver mais.")]
     public async Task<string> ListAssets(
-        [Description("Número máximo de ativos a retornar")] int maxResults = 20)
+        [Description("Número máximo de ativos a retornar por página")] int maxResults = 10,
+        [Description("Número da página (1 = primeira, 2 = próxima, etc)")] int page = 1)
     {
         try
         {
@@ -27,14 +28,36 @@ public class AssetsPlugin
 
             if (!assets.Any())
             {
-                return "Não há ativos cadastrados no momento.";
+                return "📦 Não há ativos cadastrados no momento.";
             }
 
-            var assetList = assets.Take(maxResults).Select(a =>
-                $"- **{a.Name}** (Código: {a.AssetCode}) - Status: {GetStatusText(a.Status)} - {(a.CurrentAssignedToUserName != null ? $"Atribuído a: {a.CurrentAssignedToUserName}" : "Disponível")}"
-            );
+            var skip = (page - 1) * maxResults;
+            var paged = assets.Skip(skip).Take(maxResults);
+            
+            if (!paged.Any())
+            {
+                return $"📦 Não há mais ativos. Total: {assets.Count} ativos.";
+            }
 
-            return $"📦 **Ativos cadastrados ({assets.Count} total):**\n{string.Join("\n", assetList)}";
+            var assetList = paged.Select(a =>
+                $"| `{a.AssetCode}` | {a.Name} | {GetStatusText(a.Status)} | {a.CurrentAssignedToUserName ?? "—"} |"
+            );
+            
+            var shown = skip + paged.Count();
+            var remaining = assets.Count - shown;
+            
+            var pageInfo = page > 1 ? $" (Página {page})" : "";
+            var moreText = remaining > 0 
+                ? $"\n\n*Exibindo {shown} de {assets.Count}. Peça \"listar ativos página {page + 1}\" para ver mais.*" 
+                : "";
+
+            return $"""
+                📦 **Ativos Cadastrados**{pageInfo} ({assets.Count} total)
+                
+                | Código | Nome | Status | Responsável |
+                |--------|------|--------|-------------|
+                {string.Join("\n", assetList)}{moreText}
+                """;
         }
         catch (Exception ex)
         {
@@ -48,12 +71,10 @@ public class AssetsPlugin
     {
         try
         {
-            // Primeiro tenta buscar por código exato
             var asset = await _assetService.GetAssetByCodeAsync(searchTerm);
 
             if (asset == null)
             {
-                // Se não encontrar por código, busca na lista geral pelo nome
                 var allAssets = await _assetService.GetAllAssetsAsync();
                 asset = allAssets.FirstOrDefault(a =>
                     a.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
@@ -62,23 +83,28 @@ public class AssetsPlugin
 
             if (asset == null)
             {
-                return $"🔍 Ativo '{searchTerm}' não encontrado. Verifique o código ou nome do ativo.";
+                return $"🔍 Ativo **'{searchTerm}'** não encontrado.";
             }
 
             var assignmentInfo = asset.CurrentAssignedToUserName != null
-                ? $"Atribuído a: {asset.CurrentAssignedToUserName} desde {asset.CurrentAssignedDate:dd/MM/yyyy}"
-                : "Não atribuído (disponível)";
+                ? $"{asset.CurrentAssignedToUserName} (desde {asset.CurrentAssignedDate:dd/MM/yyyy})"
+                : "— (disponível)";
 
-            return $"📦 **Ativo encontrado:**\n" +
-                   $"**Código:** {asset.AssetCode}\n" +
-                   $"**Nome:** {asset.Name}\n" +
-                   $"**Descrição:** {asset.Description ?? "Sem descrição"}\n" +
-                   $"**Categoria:** {asset.CategoryName}\n" +
-                   $"**Status:** {GetStatusText(asset.Status)}\n" +
-                   $"**Condição:** {GetConditionText(asset.Condition)}\n" +
-                   $"**Localização:** {asset.Location ?? "Não informada"}\n" +
-                   $"**{assignmentInfo}**\n" +
-                   $"**Valor de compra:** {(asset.PurchaseValue.HasValue ? $"R$ {asset.PurchaseValue:F2}" : "Não informado")}";
+            return $"""
+                📦 **Ativo Encontrado**
+                
+                | Campo | Valor |
+                |-------|-------|
+                | **Código** | `{asset.AssetCode}` |
+                | **Nome** | {asset.Name} |
+                | **Descrição** | {asset.Description ?? "—"} |
+                | **Categoria** | {asset.CategoryName} |
+                | **Status** | {GetStatusText(asset.Status)} |
+                | **Condição** | {GetConditionText(asset.Condition)} |
+                | **Local** | {asset.Location ?? "—"} |
+                | **Responsável** | {assignmentInfo} |
+                | **Valor** | {(asset.PurchaseValue.HasValue ? $"R$ {asset.PurchaseValue:N2}" : "—")} |
+                """;
         }
         catch (Exception ex)
         {
@@ -96,32 +122,36 @@ public class AssetsPlugin
 
             if (asset == null)
             {
-                return $"🔍 Ativo com ID {assetId} não encontrado.";
+                return $"🔍 Ativo com ID **{assetId}** não encontrado.";
             }
 
             var assignmentInfo = asset.CurrentAssignedToUserName != null
-                ? $"Atribuído a: {asset.CurrentAssignedToUserName} desde {asset.CurrentAssignedDate:dd/MM/yyyy}"
-                : "Não atribuído (disponível)";
+                ? $"{asset.CurrentAssignedToUserName} (desde {asset.CurrentAssignedDate:dd/MM/yyyy})"
+                : "— (disponível)";
 
-            return $"📦 **Detalhes do Ativo:**\n" +
-                   $"**ID:** {asset.Id}\n" +
-                   $"**Código:** {asset.AssetCode}\n" +
-                   $"**Nome:** {asset.Name}\n" +
-                   $"**Descrição:** {asset.Description ?? "Sem descrição"}\n" +
-                   $"**Categoria:** {asset.CategoryName}\n" +
-                   $"**Status:** {GetStatusText(asset.Status)}\n" +
-                   $"**Condição:** {GetConditionText(asset.Condition)}\n" +
-                   $"**Localização:** {asset.Location ?? "Não informada"}\n" +
-                   $"**Número de série:** {asset.SerialNumber ?? "Não informado"}\n" +
-                   $"**Fabricante:** {asset.Manufacturer ?? "Não informado"}\n" +
-                   $"**Modelo:** {asset.Model ?? "Não informado"}\n" +
-                   $"**{assignmentInfo}**\n" +
-                   $"**Valor de compra:** {(asset.PurchaseValue.HasValue ? $"R$ {asset.PurchaseValue:F2}" : "Não informado")}\n" +
-                   $"**Data de compra:** {(asset.PurchaseDate.HasValue ? asset.PurchaseDate.Value.ToString("dd/MM/yyyy") : "Não informada")}";
+            return $"""
+                📦 **Detalhes do Ativo #{asset.Id}**
+                
+                | Campo | Valor |
+                |-------|-------|
+                | **Código** | `{asset.AssetCode}` |
+                | **Nome** | {asset.Name} |
+                | **Descrição** | {asset.Description ?? "—"} |
+                | **Categoria** | {asset.CategoryName} |
+                | **Status** | {GetStatusText(asset.Status)} |
+                | **Condição** | {GetConditionText(asset.Condition)} |
+                | **Local** | {asset.Location ?? "—"} |
+                | **Nº Série** | {asset.SerialNumber ?? "—"} |
+                | **Fabricante** | {asset.Manufacturer ?? "—"} |
+                | **Modelo** | {asset.Model ?? "—"} |
+                | **Responsável** | {assignmentInfo} |
+                | **Valor** | {(asset.PurchaseValue.HasValue ? $"R$ {asset.PurchaseValue:N2}" : "—")} |
+                | **Data Compra** | {(asset.PurchaseDate.HasValue ? asset.PurchaseDate.Value.ToString("dd/MM/yyyy") : "—")} |
+                """;
         }
         catch (Exception ex)
         {
-            return $"❌ Erro ao buscar detalhes do ativo: {ex.Message}";
+            return $"❌ Erro ao buscar detalhes: {ex.Message}";
         }
     }
 
@@ -135,18 +165,27 @@ public class AssetsPlugin
 
             if (!assignments.Any())
             {
-                return $"👤 O usuário com ID {userId} não possui ativos atribuídos no momento.";
+                return $"👤 O usuário (ID: {userId}) não possui ativos atribuídos.";
             }
 
-            var assetList = assignments.Select(a =>
-                $"- **{a.AssetName}** (Código: {a.AssetCode}) - Desde: {a.AssignedDate:dd/MM/yyyy}"
+            var assetList = assignments.Take(10).Select(a =>
+                $"| `{a.AssetCode}` | {a.AssetName} | {a.AssignedDate:dd/MM/yyyy} |"
             );
+            
+            var remaining = assignments.Count() - 10;
+            var moreText = remaining > 0 ? $"\n\n*...e mais {remaining} ativos.*" : "";
 
-            return $"👤 **Ativos atribuídos ao usuário (ID: {userId}):**\n{string.Join("\n", assetList)}";
+            return $"""
+                👤 **Ativos do Usuário** (ID: {userId})
+                
+                | Código | Nome | Desde |
+                |--------|------|-------|
+                {string.Join("\n", assetList)}{moreText}
+                """;
         }
         catch (Exception ex)
         {
-            return $"❌ Erro ao buscar ativos do usuário: {ex.Message}";
+            return $"❌ Erro ao buscar ativos: {ex.Message}";
         }
     }
 
@@ -159,18 +198,27 @@ public class AssetsPlugin
 
             if (!maintenances.Any())
             {
-                return "✅ Não há manutenções em atraso no momento.";
+                return "✅ Não há manutenções em atraso.";
             }
 
-            var maintenanceList = maintenances.Select(m =>
-                $"- **{m.AssetName}** ({m.AssetCode}) - {m.Description} - Agendada para: {m.ScheduledDate:dd/MM/yyyy} - Custo: R$ {m.Cost:F2}"
+            var list = maintenances.Take(10).Select(m =>
+                $"| `{m.AssetCode}` | {m.AssetName} | {m.Description} | {m.ScheduledDate:dd/MM} | R$ {m.Cost:N2} |"
             );
+            
+            var remaining = maintenances.Count - 10;
+            var moreText = remaining > 0 ? $"\n\n*...e mais {remaining} manutenções.*" : "";
 
-            return $"⚠️ **Manutenções em atraso ({maintenances.Count}):**\n{string.Join("\n", maintenanceList)}";
+            return $"""
+                ⚠️ **Manutenções em Atraso** ({maintenances.Count})
+                
+                | Código | Ativo | Descrição | Agendado | Custo |
+                |--------|-------|-----------|----------|-------|
+                {string.Join("\n", list)}{moreText}
+                """;
         }
         catch (Exception ex)
         {
-            return $"❌ Erro ao buscar manutenções em atraso: {ex.Message}";
+            return $"❌ Erro ao buscar manutenções: {ex.Message}";
         }
     }
 
@@ -183,18 +231,27 @@ public class AssetsPlugin
 
             if (!maintenances.Any())
             {
-                return "📅 Não há manutenções agendadas no momento.";
+                return "📅 Não há manutenções agendadas.";
             }
 
-            var maintenanceList = maintenances.Select(m =>
-                $"- **{m.AssetName}** ({m.AssetCode}) - {m.Description} - Data: {m.ScheduledDate:dd/MM/yyyy} - Custo: R$ {m.Cost:F2}"
+            var list = maintenances.Take(10).Select(m =>
+                $"| `{m.AssetCode}` | {m.AssetName} | {m.Description} | {m.ScheduledDate:dd/MM} | R$ {m.Cost:N2} |"
             );
+            
+            var remaining = maintenances.Count - 10;
+            var moreText = remaining > 0 ? $"\n\n*...e mais {remaining} manutenções.*" : "";
 
-            return $"📅 **Manutenções agendadas ({maintenances.Count}):**\n{string.Join("\n", maintenanceList)}";
+            return $"""
+                📅 **Manutenções Agendadas** ({maintenances.Count})
+                
+                | Código | Ativo | Descrição | Data | Custo |
+                |--------|-------|-----------|------|-------|
+                {string.Join("\n", list)}{moreText}
+                """;
         }
         catch (Exception ex)
         {
-            return $"❌ Erro ao buscar manutenções agendadas: {ex.Message}";
+            return $"❌ Erro ao buscar manutenções: {ex.Message}";
         }
     }
 
@@ -206,23 +263,31 @@ public class AssetsPlugin
             var stats = await _assetService.GetAssetStatisticsAsync();
 
             var categoryBreakdown = stats.AssetsByCategory.Any()
-                ? string.Join(", ", stats.AssetsByCategory.Select(kvp => $"{kvp.Key}: {kvp.Value}"))
-                : "Nenhum dado";
+                ? string.Join(", ", stats.AssetsByCategory.Take(5).Select(kvp => $"{kvp.Key}: {kvp.Value}"))
+                : "—";
 
-            return $"📊 **Estatísticas de Ativos:**\n\n" +
-                   $"**Total de ativos:** {stats.TotalAssets}\n" +
-                   $"**Disponíveis:** {stats.AvailableAssets}\n" +
-                   $"**Em uso:** {stats.AssignedAssets}\n" +
-                   $"**Em manutenção:** {stats.InMaintenanceAssets}\n" +
-                   $"**Desativados:** {stats.RetiredAssets}\n\n" +
-                   $"**Valor total do patrimônio:** R$ {stats.TotalAssetValue:N2}\n\n" +
-                   $"**Manutenções agendadas:** {stats.ScheduledMaintenances}\n" +
-                   $"**Manutenções em atraso:** {stats.OverdueMaintenances}\n\n" +
-                   $"**Por categoria:** {categoryBreakdown}";
+            return $"""
+                📊 **Estatísticas de Ativos**
+                
+                | Métrica | Valor |
+                |---------|-------|
+                | **Total** | {stats.TotalAssets} |
+                | **Disponíveis** | {stats.AvailableAssets} |
+                | **Em Uso** | {stats.AssignedAssets} |
+                | **Manutenção** | {stats.InMaintenanceAssets} |
+                | **Desativados** | {stats.RetiredAssets} |
+                
+                ---
+                💰 **Valor Total:** R$ {stats.TotalAssetValue:N2}
+                
+                🔧 **Manutenções:** {stats.ScheduledMaintenances} agendadas, {stats.OverdueMaintenances} atrasadas
+                
+                📁 **Categorias:** {categoryBreakdown}
+                """;
         }
         catch (Exception ex)
         {
-            return $"❌ Erro ao obter estatísticas de ativos: {ex.Message}";
+            return $"❌ Erro ao obter estatísticas: {ex.Message}";
         }
     }
 
@@ -234,25 +299,34 @@ public class AssetsPlugin
         {
             if (!Enum.TryParse<AssetStatus>(status, ignoreCase: true, out var assetStatus))
             {
-                return "❌ Status inválido. Use: Available, InUse, Maintenance ou Retired.";
+                return "❌ Status inválido. Use: `Available`, `InUse`, `Maintenance` ou `Retired`.";
             }
 
             var assets = await _assetService.GetAssetsByStatusAsync(assetStatus);
 
             if (!assets.Any())
             {
-                return $"📦 Não há ativos com status '{GetStatusText(assetStatus)}'.";
+                return $"📦 Nenhum ativo com status **{GetStatusText(assetStatus)}**.";
             }
 
-            var assetList = assets.Select(a =>
-                $"- **{a.Name}** (Código: {a.AssetCode}) - {a.CategoryName}"
+            var list = assets.Take(10).Select(a =>
+                $"| `{a.AssetCode}` | {a.Name} | {a.CategoryName} |"
             );
+            
+            var remaining = assets.Count - 10;
+            var moreText = remaining > 0 ? $"\n\n*...e mais {remaining} ativos.*" : "";
 
-            return $"📦 **Ativos com status '{GetStatusText(assetStatus)}' ({assets.Count}):**\n{string.Join("\n", assetList)}";
+            return $"""
+                📦 **Ativos {GetStatusText(assetStatus)}** ({assets.Count})
+                
+                | Código | Nome | Categoria |
+                |--------|------|-----------|
+                {string.Join("\n", list)}{moreText}
+                """;
         }
         catch (Exception ex)
         {
-            return $"❌ Erro ao buscar ativos por status: {ex.Message}";
+            return $"❌ Erro ao buscar ativos: {ex.Message}";
         }
     }
 
@@ -268,15 +342,44 @@ public class AssetsPlugin
                 return "📁 Não há categorias de ativos cadastradas.";
             }
 
-            var categoryList = categories.Select(c =>
-                $"- **{c.Name}** - {c.Description ?? "Sem descrição"}"
+            var list = categories.Take(15).Select(c =>
+                $"| {c.Name} | {c.Description ?? "—"} |"
             );
 
-            return $"📁 **Categorias de ativos ({categories.Count}):**\n{string.Join("\n", categoryList)}";
+            return $"""
+                📁 **Categorias de Ativos** ({categories.Count})
+                
+                | Categoria | Descrição |
+                |-----------|-----------|
+                {string.Join("\n", list)}
+                """;
         }
         catch (Exception ex)
         {
             return $"❌ Erro ao listar categorias: {ex.Message}";
+        }
+    }
+
+    [KernelFunction, Description("Obtém estatísticas gerais dos ativos (total, valor, status)")]
+    public async Task<string> GetAssetStats()
+    {
+        try
+        {
+            var stats = await _assetService.GetAssetStatisticsAsync();
+            
+            return $"""
+                📊 **Estatísticas de Ativos**
+                
+                **Total de Ativos:** {stats.TotalAssets}
+                **Valor Total:** R$ {stats.TotalAssetValue:N2}
+                **Em Uso:** {stats.AssignedAssets}
+                **Disponíveis:** {stats.AvailableAssets}
+                **Em Manutenção:** {stats.InMaintenanceAssets}
+                """;
+        }
+        catch (Exception ex)
+        {
+            return $"❌ Erro ao obter estatísticas: {ex.Message}";
         }
     }
 

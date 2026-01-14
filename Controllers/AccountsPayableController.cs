@@ -67,15 +67,16 @@ public class AccountsPayableController : ControllerBase
         [FromQuery] DateTime? dueDateTo = null,
         [FromQuery] int? categoryId = null,
         [FromQuery] int? costCenterId = null,
+        [FromQuery] string? searchText = null,
         [FromQuery] string? sortBy = null,
         [FromQuery] bool sortDescending = false)
     {
         try
         {
-            var result = await _accountPayableService.GetPagedAsync(
+            var (items, totalCount) = await _accountPayableService.GetPagedAsync(
                 page, pageSize, supplierId, status, dueDateFrom, dueDateTo,
-                categoryId, costCenterId, pendingApproval, sortBy, sortDescending);
-            return Ok(result);
+                categoryId, costCenterId, pendingApproval, sortBy, sortDescending, searchText);
+            return Ok(new { Items = items, TotalCount = totalCount });
         }
         catch (Exception ex)
         {
@@ -85,7 +86,7 @@ public class AccountsPayableController : ControllerBase
     }
 
     /// <summary>
-    /// Get account payable by ID
+    /// Obtém conta a pagar por ID
     /// </summary>
     [HttpGet("{id}")]
     public async Task<ActionResult<AccountPayableDto>> GetById(int id)
@@ -107,7 +108,7 @@ public class AccountsPayableController : ControllerBase
     }
 
     /// <summary>
-    /// Get overdue accounts payable
+    /// Obtém contas a pagar vencidas
     /// </summary>
     [HttpGet("overdue")]
     public async Task<ActionResult<List<AccountPayableDto>>> GetOverdue()
@@ -125,7 +126,7 @@ public class AccountsPayableController : ControllerBase
     }
 
     /// <summary>
-    /// Get accounts payable due soon (within days)
+    /// Obtém contas a pagar com vencimento em breve (dentro de X dias)
     /// </summary>
     [HttpGet("due-soon")]
     public async Task<ActionResult<List<AccountPayableDto>>> GetDueSoon([FromQuery] int days = 7)
@@ -143,7 +144,7 @@ public class AccountsPayableController : ControllerBase
     }
 
     /// <summary>
-    /// Get accounts pending approval
+    /// Obtém contas pendentes de aprovação
     /// </summary>
     [HttpGet("pending-approval")]
     public async Task<ActionResult<List<AccountPayableDto>>> GetPendingApproval()
@@ -161,7 +162,30 @@ public class AccountsPayableController : ControllerBase
     }
 
     /// <summary>
-    /// Get total amounts by status
+    /// Obtém o resumo de totais por status
+    /// </summary>
+    [HttpGet("total-by-status")]
+    public async Task<ActionResult> GetTotalsByStatus()
+    {
+        try
+        {
+            var pending = await _accountPayableService.GetTotalByStatusAsync(AccountStatus.Pending);
+            var overdue = await _accountPayableService.GetTotalByStatusAsync(AccountStatus.Overdue);
+            var paid = await _accountPayableService.GetTotalByStatusAsync(AccountStatus.Paid);
+            var partiallyPaid = await _accountPayableService.GetTotalByStatusAsync(AccountStatus.PartiallyPaid);
+            var cancelled = await _accountPayableService.GetTotalByStatusAsync(AccountStatus.Cancelled);
+            
+            return Ok(new { Pending = pending, Overdue = overdue, Paid = paid, PartiallyPaid = partiallyPaid, Cancelled = cancelled });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting totals by status");
+            return StatusCode(500, "Erro ao calcular totais por status");
+        }
+    }
+
+    /// <summary>
+    /// Obtém o total de valores por status
     /// </summary>
     [HttpGet("totals/by-status/{status}")]
     public async Task<ActionResult<decimal>> GetTotalByStatus(AccountStatus status)
@@ -179,7 +203,7 @@ public class AccountsPayableController : ControllerBase
     }
 
     /// <summary>
-    /// Get total amounts by supplier
+    /// Obtém o total de valores por fornecedor
     /// </summary>
     [HttpGet("totals/by-supplier/{supplierId}")]
     public async Task<ActionResult<decimal>> GetTotalBySupplier(int supplierId)
@@ -197,7 +221,7 @@ public class AccountsPayableController : ControllerBase
     }
 
     /// <summary>
-    /// Get installments of a parent account
+    /// Obtém parcelas de uma conta pai
     /// </summary>
     [HttpGet("{parentId}/installments")]
     public async Task<ActionResult<List<AccountPayableDto>>> GetInstallments(int parentId)
@@ -215,7 +239,7 @@ public class AccountsPayableController : ControllerBase
     }
 
     /// <summary>
-    /// Create new account payable
+    /// Cria nova conta a pagar
     /// </summary>
     [HttpPost]
     public async Task<ActionResult<AccountPayableDto>> Create([FromBody] CreateAccountPayableDto dto)
@@ -243,7 +267,7 @@ public class AccountsPayableController : ControllerBase
     }
 
     /// <summary>
-    /// Update existing account payable
+    /// Atualiza conta a pagar existente
     /// </summary>
     [HttpPut("{id}")]
     public async Task<ActionResult<AccountPayableDto>> Update(int id, [FromBody] UpdateAccountPayableDto dto)
@@ -275,7 +299,7 @@ public class AccountsPayableController : ControllerBase
     }
 
     /// <summary>
-    /// Delete account payable
+    /// Exclui conta a pagar
     /// </summary>
     [HttpDelete("{id}")]
     public async Task<ActionResult> Delete(int id)
@@ -297,7 +321,7 @@ public class AccountsPayableController : ControllerBase
     }
 
     /// <summary>
-    /// Approve an account payable
+    /// Aprova uma conta a pagar
     /// </summary>
     [HttpPost("{id}/approve")]
     [Authorize(Roles = "Administrador,Gerente")]
@@ -332,7 +356,7 @@ public class AccountsPayableController : ControllerBase
     }
 
     /// <summary>
-    /// Pay an account payable
+    /// Registra o pagamento de uma conta a pagar
     /// </summary>
     [HttpPost("{id}/pay")]
     public async Task<ActionResult<AccountPayableDto>> Pay(
@@ -356,7 +380,8 @@ public class AccountsPayableController : ControllerBase
 
             var account = await _accountPayableService.PayAsync(
                 id, dto.PaidAmount, existing.PaymentMethod, dto.PaymentDate, currentUserId,
-                dto.ProofOfPaymentUrl, existing.BankSlipNumber, existing.PixKey);
+                dto.ProofOfPaymentUrl, existing.BankSlipNumber, existing.PixKey,
+                dto.AdditionalDiscount, dto.AdditionalInterest, dto.AdditionalFine);
             
             return Ok(account);
         }
@@ -372,7 +397,7 @@ public class AccountsPayableController : ControllerBase
     }
 
     /// <summary>
-    /// Create installments from a base account
+    /// Cria parcelas a partir de uma conta base
     /// </summary>
     [HttpPost("{id}/installments")]
     public async Task<ActionResult<List<AccountPayableDto>>> CreateInstallments(
@@ -432,7 +457,7 @@ public class AccountsPayableController : ControllerBase
     }
 
     /// <summary>
-    /// Update overdue status for all accounts (batch operation)
+    /// Atualiza o status de vencimento de todas as contas (operação em lote)
     /// </summary>
     [HttpPost("update-overdue-status")]
     public async Task<ActionResult> UpdateOverdueStatus()

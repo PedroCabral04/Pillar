@@ -8,6 +8,7 @@
 @using erp.DTOs.Role
 @using erp.Services
 @using erp.Services.Validation
+@using erp.Services.Financial.Validation
 @inject IUserValidationService ValidationService
 
 <MudDialog Class="user-dialog">
@@ -48,12 +49,9 @@
                                       @bind-Value="_newUser.Username"
                                       Validation="@(new Func<string, Task<string?>>(ValidateUsernameAsync))"
                                       Immediate="true"
-                                      Debounce="500"
-                                      HelperText="@_usernameHelperText"
-                                      HelperTextOnFocus="true"
+                                      HelperText="Mínimo 3 caracteres"
                                       Adornment="Adornment.Start"
-                                      AdornmentIcon="@_usernameIcon"
-                                      AdornmentColor="@_usernameAdornmentColor"/>
+                                      AdornmentIcon="@Icons.Material.Filled.Person"/>
                     </MudItem>
                     
                     <MudItem xs="12" md="6">
@@ -94,8 +92,14 @@
                                       Placeholder="000.000.000-00"
                                       Mask="@(new PatternMask("000.000.000-00"))"
                                       @bind-Value="_newUser.Cpf"
+                                      Validation="@(new Func<string, Task<string?>>(ValidateCpfAsync))"
+                                      Immediate="true"
+                                      Debounce="500"
+                                      HelperText="@_cpfHelperText"
+                                      HelperTextOnFocus="true"
                                       Adornment="Adornment.Start"
-                                      AdornmentIcon="@Icons.Material.Filled.Badge"/>
+                                      AdornmentIcon="@_cpfIcon"
+                                      AdornmentColor="@_cpfAdornmentColor"/>
                     </MudItem>
                     
                     <MudItem xs="12" md="6">
@@ -257,17 +261,20 @@
     private MudForm? _form;
 
     // Estados de validação assíncrona
-    private string _usernameHelperText = "Mínimo 3 caracteres";
     private string _emailHelperText = "exemplo@empresa.com";
-    private string _usernameIcon = Icons.Material.Filled.Person;
     private string _emailIcon = Icons.Material.Filled.Email;
-    private MudBlazor.Color _usernameAdornmentColor = MudBlazor.Color.Default;
     private MudBlazor.Color _emailAdornmentColor = MudBlazor.Color.Default;
     
-    private System.Threading.CancellationTokenSource? _usernameValidationCts;
+    private string _cpfHelperText = "000.000.000-00";
+    private string _cpfIcon = Icons.Material.Filled.Badge;
+    private MudBlazor.Color _cpfAdornmentColor = MudBlazor.Color.Default;
+
     private System.Threading.CancellationTokenSource? _emailValidationCts;
-    private System.Threading.Timer? _usernameDebounceTimer;
     private System.Threading.Timer? _emailDebounceTimer;
+    
+    private System.Threading.CancellationTokenSource? _cpfValidationCts;
+    private System.Threading.Timer? _cpfDebounceTimer;
+    
     private const int DebounceDelayMs = 500;
 
     // Regras de validação do formulário (client-side)
@@ -297,47 +304,61 @@
     
     private void Cancel() => MudDialog.Cancel();
 
+    private string? ValidateFullName(string fullname)
+    {
+        if (string.IsNullOrWhiteSpace(fullname))
+            return "Nome é obrigatório";
+
+        if (fullname.Trim().Length < 3)
+            return "Nome deve ter pelo menos 3 caracteres";
+
+        if (fullname.Trim().Length > 100)
+            return "Nome não pode exceder 100 caracteres";
+
+        return null;
+    }
+
     /// <summary>
-    /// Validação assíncrona do username com feedback visual e debounce
+    /// Validação assíncrona do CPF com feedback visual e debounce
     /// </summary>
-    private async Task<string?> ValidateUsernameAsync(string username)
+    private async Task<string?> ValidateCpfAsync(string cpf)
     {
         // Validações básicas síncronas
-        if (string.IsNullOrWhiteSpace(username))
+        if (string.IsNullOrWhiteSpace(cpf))
         {
-            _usernameHelperText = "Nome é obrigatório";
-            _usernameIcon = Icons.Material.Filled.Person;
-            _usernameAdornmentColor = MudBlazor.Color.Default;
-            return "Nome é obrigatório";
+            _cpfHelperText = "CPF é obrigatório";
+            _cpfIcon = Icons.Material.Filled.Badge;
+            _cpfAdornmentColor = MudBlazor.Color.Default;
+            // Retorna null se vazio para não mostrar erro vermelho imediatamente, 
+            // mas o Required do form pegaria se houvesse. 
+            // Como não tem Required attribute no DTO para CPF (aparentemente), 
+            // vamos considerar opcional ou validar se preenchido.
+            // Se for obrigatório, descomentar abaixo:
+            // return "CPF é obrigatório";
+            return null; 
         }
 
-        if (username.Trim().Length < 3)
+        var cleanCpf = BrazilianDocumentValidator.RemoveFormatting(cpf);
+        
+        if (cleanCpf.Length < 11)
         {
-            _usernameHelperText = "Nome deve ter pelo menos 3 caracteres";
-            _usernameIcon = Icons.Material.Filled.Warning;
-            _usernameAdornmentColor = MudBlazor.Color.Warning;
-            return "Nome deve ter pelo menos 3 caracteres";
-        }
-
-        if (username.Trim().Length > 50)
-        {
-            _usernameHelperText = "Nome não pode exceder 50 caracteres";
-            _usernameIcon = Icons.Material.Filled.Warning;
-            _usernameAdornmentColor = MudBlazor.Color.Warning;
-            return "Nome não pode exceder 50 caracteres";
+            _cpfHelperText = "CPF incompleto";
+            _cpfIcon = Icons.Material.Filled.Warning;
+            _cpfAdornmentColor = MudBlazor.Color.Warning;
+            return "CPF incompleto";
         }
 
         // Cancela validação anterior e timer de debounce
-        _usernameValidationCts?.Cancel();
-        _usernameDebounceTimer?.Dispose();
+        _cpfValidationCts?.Cancel();
+        _cpfDebounceTimer?.Dispose();
         
-        _usernameValidationCts = new System.Threading.CancellationTokenSource();
-        var localCts = _usernameValidationCts;
+        _cpfValidationCts = new System.Threading.CancellationTokenSource();
+        var localCts = _cpfValidationCts;
 
         // Cria TaskCompletionSource para aguardar o timer de debounce
         var tcs = new TaskCompletionSource<bool>();
 
-        _usernameDebounceTimer = new System.Threading.Timer(_ =>
+        _cpfDebounceTimer = new System.Threading.Timer(_ =>
         {
             tcs.TrySetResult(true);
         }, null, DebounceDelayMs, System.Threading.Timeout.Infinite);
@@ -352,46 +373,49 @@
                 return null;
 
             // Feedback visual de carregamento
-            _usernameHelperText = "Verificando disponibilidade...";
-            _usernameIcon = Icons.Material.Filled.HourglassEmpty;
-            _usernameAdornmentColor = MudBlazor.Color.Info;
+            _cpfHelperText = "Validando CPF...";
+            _cpfIcon = Icons.Material.Filled.HourglassEmpty;
+            _cpfAdornmentColor = MudBlazor.Color.Info;
             await InvokeAsync(StateHasChanged);
 
-            var isAvailable = await ValidationService.IsUsernameAvailableAsync(username);
+            // Simula um pequeno delay se necessário ou apenas valida
+            // Como a validação é local (algoritmo), é rápida, mas mantemos o padrão async/debounce
+            await Task.Delay(100); 
 
             if (localCts.IsCancellationRequested)
                 return null;
 
-            if (isAvailable)
+            var isValid = BrazilianDocumentValidator.IsValidCpf(cpf);
+
+            if (isValid)
             {
-                _usernameHelperText = "✓ Nome disponível";
-                _usernameIcon = Icons.Material.Filled.CheckCircle;
-                _usernameAdornmentColor = MudBlazor.Color.Success;
+                _cpfHelperText = "✓ CPF válido";
+                _cpfIcon = Icons.Material.Filled.CheckCircle;
+                _cpfAdornmentColor = MudBlazor.Color.Success;
                 await InvokeAsync(StateHasChanged);
                 return null; // Válido
             }
             else
             {
-                _usernameHelperText = "Este nome já está em uso";
-                _usernameIcon = Icons.Material.Filled.Error;
-                _usernameAdornmentColor = MudBlazor.Color.Error;
+                _cpfHelperText = "CPF inválido";
+                _cpfIcon = Icons.Material.Filled.Error;
+                _cpfAdornmentColor = MudBlazor.Color.Error;
                 await InvokeAsync(StateHasChanged);
-                return "Este nome já está em uso";
+                return "CPF inválido";
             }
         }
         catch (OperationCanceledException)
         {
-            // Validação cancelada, ignorar
             return null;
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Erro ao validar username");
-            _usernameHelperText = "Erro ao verificar disponibilidade";
-            _usernameIcon = Icons.Material.Filled.Warning;
-            _usernameAdornmentColor = MudBlazor.Color.Warning;
+            Logger.LogError(ex, "Erro ao validar CPF");
+            _cpfHelperText = "Erro ao validar";
+            _cpfIcon = Icons.Material.Filled.Warning;
+            _cpfAdornmentColor = MudBlazor.Color.Warning;
             await InvokeAsync(StateHasChanged);
-            return null; // Não bloqueia em caso de erro
+            return null;
         }
     }
 
@@ -581,6 +605,10 @@
 
             _submitting = true;
             _newUser.RoleIds = _selectedRoles.Select(r => r.Id).ToList();
+            
+            // Define o Username igual ao Email para garantir unicidade e validade (sem espaços)
+            _newUser.Username = _newUser.Email;
+
             var response = await ApiService.PostAsJsonAsync("api/users", _newUser);
             
             if (response.IsSuccessStatusCode)
@@ -612,8 +640,11 @@
         return roleName.ToLower() switch
         {
             "administrador" => Icons.Material.Filled.AdminPanelSettings,
-            "gerente" => Icons.Material.Filled.ManageAccounts,
-            "vendedor" => Icons.Material.Filled.StoreMallDirectory,
+            "gerente" => Icons.Material.Filled.SupervisorAccount,
+            "vendedor" => Icons.Material.Filled.PointOfSale,
+            "estoque" => Icons.Material.Filled.Inventory,
+            "rh" => Icons.Material.Filled.Badge,
+            "financeiro" => Icons.Material.Filled.AccountBalance,
             _ => Icons.Material.Filled.Person
         };
     }
@@ -625,18 +656,22 @@
             "administrador" => "Acesso total ao sistema",
             "gerente" => "Gerenciar equipes e relatórios",
             "vendedor" => "Registro de vendas e atendimento",
-            _ => "Usuário comum"
+            "estoque" => "Controle de estoque e produtos",
+            "rh" => "Recursos Humanos e folha",
+            "financeiro" => "Gestão financeira",
+            _ => "Usuário do sistema"
         };
     }
 
     public void Dispose()
     {
-        _usernameValidationCts?.Cancel();
-        _usernameValidationCts?.Dispose();
         _emailValidationCts?.Cancel();
         _emailValidationCts?.Dispose();
-        _usernameDebounceTimer?.Dispose();
         _emailDebounceTimer?.Dispose();
+        
+        _cpfValidationCts?.Cancel();
+        _cpfValidationCts?.Dispose();
+        _cpfDebounceTimer?.Dispose();
     }
 }
 

@@ -4,12 +4,14 @@
 @using erp.DTOs.User
 @using erp.DTOs.Role
 @using erp.Services
-@attribute [Authorize]
+@using erp.Services.Authorization
+@attribute [Authorize(Policy = ModulePolicies.HR)]
 
 @inject IApiService ApiService
 @inject ILogger<Users> Logger
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject ITablePreferenceService TablePreferences
 @implements IDisposable;
 
 <PageTitle>Gerenciar Usuários - Pillar ERP</PageTitle>
@@ -32,7 +34,7 @@
 }
 
 <MudTable T="UserDto" ServerData="new Func<TableState, CancellationToken, Task<TableData<UserDto>>>(ServerReload)" 
-          Dense="false" Hover="true" Elevation="2" @ref="_table" Striped='true'>
+          Dense="false" Hover="true" Elevation="2" @ref="_table" Striped='true' RowsPerPage="@_defaultPageSize">
     <ToolBarContent>
         <MudText Typo="Typo.h5">Usuários Cadastrados</MudText>
         <MudSpacer/>
@@ -167,12 +169,26 @@
     private const int DebounceDelayMs = 600;
     
     private string? _loadError;
+    
+    // Table preferences
+    private string? _currentSortLabel;
+    private bool _sortDescending;
+    private int _defaultPageSize = 25;
 
     protected override async Task OnInitializedAsync()
     {
         _debounceTimer = new System.Timers.Timer(DebounceDelayMs);
         _debounceTimer.Elapsed += OnDebounceTimerElapsed;
         _debounceTimer.AutoReset = false;
+        
+        // Load table preferences
+        _defaultPageSize = TablePreferences.GetPageSize();
+        var defaultSort = TablePreferences.GetDefaultSort("Usuários");
+        if (defaultSort.HasValue)
+        {
+            _currentSortLabel = defaultSort.Value.field;
+            _sortDescending = defaultSort.Value.descending;
+        }
         
         // Load available roles for filter
         try
@@ -244,15 +260,25 @@
 
             _totalItems = data.Count();
 
-            data = state.SortLabel switch
+            // Handle sorting - use preference as fallback when no sort is selected
+            var sortLabel = state.SortLabel;
+            var sortDirection = state.SortDirection;
+            
+            if (string.IsNullOrEmpty(sortLabel) && !string.IsNullOrEmpty(_currentSortLabel))
             {
-                "username" => data.OrderByDirection(state.SortDirection, u => u.Username),
-                "email" => data.OrderByDirection(state.SortDirection, u => u.Email),
-                "phone" => data.OrderByDirection(state.SortDirection, u => u.Phone),
-                "department" => data.OrderByDirection(state.SortDirection, u => u.DepartmentName ?? ""),
-                "position" => data.OrderByDirection(state.SortDirection, u => u.PositionTitle ?? ""),
-                "roles" => data.OrderByDirection(state.SortDirection, u => string.Join(",", u.RoleNames)),
-                "active" => data.OrderByDirection(state.SortDirection, u => u.IsActive),
+                sortLabel = _currentSortLabel;
+                sortDirection = _sortDescending ? SortDirection.Descending : SortDirection.Ascending;
+            }
+
+            data = sortLabel switch
+            {
+                "username" => data.OrderByDirection(sortDirection, u => u.Username),
+                "email" => data.OrderByDirection(sortDirection, u => u.Email),
+                "phone" => data.OrderByDirection(sortDirection, u => u.Phone),
+                "department" => data.OrderByDirection(sortDirection, u => u.DepartmentName ?? ""),
+                "position" => data.OrderByDirection(sortDirection, u => u.PositionTitle ?? ""),
+                "roles" => data.OrderByDirection(sortDirection, u => string.Join(",", u.RoleNames)),
+                "active" => data.OrderByDirection(sortDirection, u => u.IsActive),
                 _ => data
             };
 
@@ -333,7 +359,7 @@
     private async Task ShowUserUpdateDialog(int userId)
     {
         var options = new DialogOptions { CloseOnEscapeKey = true, CloseButton = true, MaxWidth = MaxWidth.Medium };
-        var parameters = new DialogParameters<UserUpdateDialog> { { x => x.UserId, userId } };
+        var parameters = new DialogParameters { { "UserId", userId } };
 
         var userName = _users?.FirstOrDefault(u => u.Id == userId)?.Username ?? "usuário";
         var dialog = await DialogService.ShowAsync<UserUpdateDialog>($"Alterar {userName}", parameters, options);

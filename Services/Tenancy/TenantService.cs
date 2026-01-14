@@ -13,13 +13,23 @@ public class TenantService : ITenantService
     private readonly TenantMapper _mapper;
     private readonly ILogger<TenantService> _logger;
     private readonly ITenantProvisioningService _provisioningService;
+    private readonly ITenantContextAccessor _tenantContextAccessor;
+    private readonly ITenantBrandingProvider _brandingProvider;
 
-    public TenantService(ApplicationDbContext db, TenantMapper mapper, ILogger<TenantService> logger, ITenantProvisioningService provisioningService)
+    public TenantService(
+        ApplicationDbContext db, 
+        TenantMapper mapper, 
+        ILogger<TenantService> logger, 
+        ITenantProvisioningService provisioningService,
+        ITenantContextAccessor tenantContextAccessor,
+        ITenantBrandingProvider brandingProvider)
     {
         _db = db;
         _mapper = mapper;
         _logger = logger;
         _provisioningService = provisioningService;
+        _tenantContextAccessor = tenantContextAccessor;
+        _brandingProvider = brandingProvider;
     }
 
     public async Task<IEnumerable<TenantDto>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -98,6 +108,28 @@ public class TenantService : ITenantService
         }
 
         _mapper.UpdateTenantFromDto(dto, tenant);
+        
+        // Handle branding update manually to ensure proper EF Core tracking
+        if (dto.Branding is not null)
+        {
+            if (tenant.Branding is null)
+            {
+                // Create new branding if it doesn't exist
+                tenant.Branding = _mapper.TenantBrandingDtoToEntity(dto.Branding);
+            }
+            else
+            {
+                // Update existing branding
+                _mapper.UpdateBrandingFromDto(dto.Branding, tenant.Branding);
+            }
+        }
+        else if (tenant.Branding is not null)
+        {
+            // Remove branding if DTO has null branding
+            _db.Remove(tenant.Branding);
+            tenant.Branding = null;
+        }
+        
         tenant.UpdatedAt = DateTime.UtcNow;
         if (dto.DatabaseName is not null)
         {
@@ -116,6 +148,13 @@ public class TenantService : ITenantService
         }
 
         await _db.SaveChangesAsync(cancellationToken);
+
+        // If updating the current user's tenant, refresh the context
+        if (_tenantContextAccessor.Current.TenantId == tenant.Id)
+        {
+            _tenantContextAccessor.SetTenant(tenant);
+            _brandingProvider.NotifyBrandingChanged();
+        }
 
         return _mapper.TenantToTenantDto(tenant);
     }

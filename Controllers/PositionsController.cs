@@ -11,6 +11,10 @@ namespace erp.Controllers;
 [ApiController]
 [Route("api/positions")]
 [Authorize]
+/// <summary>
+/// Controller que expõe operações CRUD para cargos (positions).
+/// Permite listar, recuperar por id, criar, atualizar e excluir cargos.
+/// </summary>
 public class PositionsController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
@@ -20,6 +24,10 @@ public class PositionsController : ControllerBase
         _context = context;
     }
     
+    /// <summary>
+    /// Retorna a lista completa de cargos com informações relevantes.
+    /// </summary>
+    /// <returns>Lista de <see cref="PositionDto"/> com os cargos encontrados.</returns>
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<PositionDto>>> GetAllPositions()
@@ -50,6 +58,11 @@ public class PositionsController : ControllerBase
         return Ok(dtos);
     }
     
+    /// <summary>
+    /// Recupera um cargo por seu identificador.
+    /// </summary>
+    /// <param name="id">Identificador do cargo.</param>
+    /// <returns>Um <see cref="PositionDto"/> representando o cargo ou 404 se não encontrado.</returns>
     [HttpGet("{id}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -85,6 +98,11 @@ public class PositionsController : ControllerBase
         return Ok(dto);
     }
     
+    /// <summary>
+    /// Cria um novo cargo no sistema.
+    /// </summary>
+    /// <param name="createDto">Dados necessários para criar o cargo.</param>
+    /// <returns>Um <see cref="PositionDto"/> com o cargo criado (HTTP 201).</returns>
     [HttpPost]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -127,6 +145,12 @@ public class PositionsController : ControllerBase
         return CreatedAtAction(nameof(GetPositionById), new { id = dto.Id }, dto);
     }
     
+    /// <summary>
+    /// Atualiza um cargo existente.
+    /// </summary>
+    /// <param name="id">Identificador do cargo a ser atualizado.</param>
+    /// <param name="updateDto">Dados atualizados do cargo.</param>
+    /// <returns>HTTP 204 em caso de sucesso ou 404 se não encontrado.</returns>
     [HttpPut("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -152,6 +176,11 @@ public class PositionsController : ControllerBase
         return NoContent();
     }
     
+    /// <summary>
+    /// Remove um cargo do sistema se não houver funcionários atribuídos.
+    /// </summary>
+    /// <param name="id">Identificador do cargo a ser removido.</param>
+    /// <returns>HTTP 204 se removido, 404 se não encontrado ou 400 se houver funcionários vinculados.</returns>
     [HttpDelete("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

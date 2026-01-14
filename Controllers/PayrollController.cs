@@ -26,6 +26,13 @@ public class PayrollController : ControllerBase
         _mapper = mapper;
     }
 
+    /// <summary>
+    /// Retorna os períodos de folha registrados no sistema, com filtros opcionais.
+    /// </summary>
+    /// <param name="year">Ano de referência (opcional).</param>
+    /// <param name="status">Filtro por status do período (opcional).</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>Lista de <see cref="PayrollPeriodListDto"/>.</returns>
     [HttpGet("periods")]
     public async Task<ActionResult<IEnumerable<PayrollPeriodListDto>>> GetPeriods(
         [FromQuery] int? year,
@@ -43,6 +50,12 @@ public class PayrollController : ControllerBase
         return Ok(payload);
     }
 
+    /// <summary>
+    /// Retorna os detalhes de um período de folha específico.
+    /// </summary>
+    /// <param name="id">Identificador do período.</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>Objeto <see cref="PayrollPeriodDetailDto"/> ou 404 se não existir.</returns>
     [HttpGet("periods/{id:int}")]
     public async Task<ActionResult<PayrollPeriodDetailDto>> GetPeriod(int id, CancellationToken cancellationToken)
     {
@@ -57,6 +70,12 @@ public class PayrollController : ControllerBase
         return Ok(dto);
     }
 
+    /// <summary>
+    /// Cria um novo período de folha para o mês/ano referenciados.
+    /// </summary>
+    /// <param name="request">Dados de criação do período.</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>Objeto criado <see cref="PayrollPeriodDetailDto"/> com código 201.</returns>
     [HttpPost("periods")]
     public async Task<ActionResult<PayrollPeriodDetailDto>> CreatePeriod([FromBody] CreatePayrollPeriodRequest request, CancellationToken cancellationToken)
     {
@@ -77,6 +96,12 @@ public class PayrollController : ControllerBase
         return CreatedAtAction(nameof(GetPeriod), new { id = response.Id }, response);
     }
 
+    /// <summary>
+    /// Executa o cálculo da folha para o período especificado.
+    /// </summary>
+    /// <param name="id">Identificador do período.</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>Detalhes do período após o cálculo.</returns>
     [HttpPost("periods/{id:int}/calculate")]
     public async Task<ActionResult<PayrollPeriodDetailDto>> Calculate(int id, CancellationToken cancellationToken)
     {
@@ -92,6 +117,13 @@ public class PayrollController : ControllerBase
         return Ok(dto);
     }
 
+    /// <summary>
+    /// Aprova o período de folha, registrando notas opcionais.
+    /// </summary>
+    /// <param name="id">Identificador do período.</param>
+    /// <param name="request">Dados da aprovação (ex.: notas).</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>Detalhes do período após aprovação.</returns>
     [HttpPost("periods/{id:int}/approve")]
     public async Task<ActionResult<PayrollPeriodDetailDto>> Approve(
         int id,
@@ -110,6 +142,13 @@ public class PayrollController : ControllerBase
         return Ok(dto);
     }
 
+    /// <summary>
+    /// Marca o período como pago e registra a data de pagamento.
+    /// </summary>
+    /// <param name="id">Identificador do período.</param>
+    /// <param name="request">Dados de pagamento (data e notas).</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>Detalhes do período após a marcação como pago.</returns>
     [HttpPost("periods/{id:int}/pay")]
     public async Task<ActionResult<PayrollPeriodDetailDto>> Pay(
         int id,
@@ -133,6 +172,13 @@ public class PayrollController : ControllerBase
         return Ok(dto);
     }
 
+    /// <summary>
+    /// Gera o holerite (slip) para um resultado de período específico.
+    /// </summary>
+    /// <param name="periodId">Identificador do período.</param>
+    /// <param name="resultId">Identificador do resultado do funcionário.</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>DTO do holerite gerado.</returns>
     [HttpPost("periods/{periodId:int}/results/{resultId:int}/slip")]
     public async Task<ActionResult<PayrollSlipDto>> GenerateSlip(int periodId, int resultId, CancellationToken cancellationToken)
     {
@@ -146,6 +192,13 @@ public class PayrollController : ControllerBase
         return Ok(CreateSlipDto(slip));
     }
 
+    /// <summary>
+    /// Faz o download do arquivo do holerite (PDF/arquivo gerado) para o resultado especificado.
+    /// </summary>
+    /// <param name="periodId">Identificador do período.</param>
+    /// <param name="resultId">Identificador do resultado do funcionário.</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>Arquivo do tipo apropriado ou 404 se não existir.</returns>
     [HttpGet("periods/{periodId:int}/results/{resultId:int}/slip")]
     public async Task<IActionResult> DownloadSlip(int periodId, int resultId, CancellationToken cancellationToken)
     {

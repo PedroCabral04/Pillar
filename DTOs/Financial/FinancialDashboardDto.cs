@@ -15,8 +15,16 @@ public class FinancialDashboardDto
     public decimal TotalPayablePaid { get; set; }
     public decimal TotalPayablePending { get; set; }
     
+    /// <summary>
+    /// Saldo Realizado: o que já entrou - o que já saiu (somente contas pagas)
+    /// </summary>
     public decimal CashBalance => TotalReceivablePaid - TotalPayablePaid;
-    public decimal ForecastedBalance => TotalReceivable - TotalPayable;
+    
+    /// <summary>
+    /// Saldo Previsto: Saldo Realizado + Pendentes a Receber - Pendentes a Pagar
+    /// Representa o que você terá quando todas as contas pendentes forem quitadas
+    /// </summary>
+    public decimal ForecastedBalance => CashBalance + (TotalReceivablePending + TotalReceivableOverdue) - (TotalPayablePending + TotalPayableOverdue);
     
     public int ReceivablesCount { get; set; }
     public int ReceivablesOverdueCount { get; set; }

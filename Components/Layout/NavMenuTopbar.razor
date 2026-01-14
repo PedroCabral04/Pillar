@@ -9,13 +9,11 @@
 
 <MudAppBar Elevation="2" Dense="false" Class="px-3">
     <div class="d-flex align-center mr-6">
-        <MudAvatar Size="MudBlazor.Size.Medium"
-               Class="me-2"
-               Square="true"
-               Image="@_branding.LogoUrl"
-               Text="@_branding.Initials"
-               Style="@($"background-color:{_branding.PrimaryColor};color:white;")" />
-        <MudText Typo="Typo.h5" Style="font-weight: 600;">@_branding.TenantName</MudText>
+        <MudImage Src="@(_branding.LogoUrl ?? "/logo.png")" 
+                  Alt="@_branding.TenantName"
+                  Height="32"
+                  ObjectFit="ObjectFit.Contain"
+                  Class="me-2" />
     </div>
     
     <MudButton 
@@ -59,7 +57,7 @@
         <MudMenuItem Href="inventory/products" Icon="@Icons.Material.Filled.Category">Produtos</MudMenuItem>
         <MudMenuItem Href="inventory/categories" Icon="@Icons.Material.Filled.FolderOpen">Categorias</MudMenuItem>
         <MudMenuItem Href="inventory/movements" Icon="@Icons.Material.Filled.SwapHoriz">Movimentações</MudMenuItem>
-        <MudMenuItem Href="inventory/counts" Icon="@Icons.Material.Filled.Checklist">Contagens</MudMenuItem>
+        <!-- <MudMenuItem Href="inventory/counts" Icon="@Icons.Material.Filled.Checklist">Contagens</MudMenuItem> -->
     </MudMenu>
 
     <MudMenu 
@@ -71,8 +69,8 @@
              StartIcon="@Icons.Material.Filled.ArrowDropDown"
              EndIcon="">
         <MudMenuItem Href="financial/dashboard" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudMenuItem>
-        <MudMenuItem Href="financial/receivables" Icon="@Icons.Material.Filled.CallReceived">Contas a Receber</MudMenuItem>
-        <MudMenuItem Href="financial/payables" Icon="@Icons.Material.Filled.CallMade">Contas a Pagar</MudMenuItem>
+        <MudMenuItem Href="financial/accounts-receivable" Icon="@Icons.Material.Filled.CallReceived">Contas a Receber</MudMenuItem>
+        <MudMenuItem Href="financial/accounts-payable" Icon="@Icons.Material.Filled.CallMade">Contas a Pagar</MudMenuItem>
         <MudMenuItem Href="financial/suppliers" Icon="@Icons.Material.Filled.LocalShipping">Fornecedores</MudMenuItem>
         <MudMenuItem Href="financial/categories" Icon="@Icons.Material.Filled.Category">Categorias</MudMenuItem>
         <MudMenuItem Href="financial/costcenters" Icon="@Icons.Material.Filled.AccountBalanceWallet">Centros de Custo</MudMenuItem>
@@ -150,6 +148,7 @@
         _branding = BrandingProvider.GetCurrentBranding();
         currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
         NavigationManager.LocationChanged += OnLocationChanged;
+        BrandingProvider.BrandingChanged += OnBrandingChanged;
     }
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
@@ -170,6 +169,7 @@
     public void Dispose()
     {
         NavigationManager.LocationChanged -= OnLocationChanged;
+        BrandingProvider.BrandingChanged -= OnBrandingChanged;
     }
 
     [Inject] IJSRuntime JS { get; set; } = null!;
@@ -200,5 +200,11 @@
                 NavigationManager.NavigateTo("/login", forceLoad: true);
             }
         }
+    }
+
+    private void OnBrandingChanged(object? sender, EventArgs e)
+    {
+        _branding = BrandingProvider.GetCurrentBranding();
+        InvokeAsync(StateHasChanged);
     }
 }

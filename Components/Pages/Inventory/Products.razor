@@ -1,11 +1,12 @@
 @page "/inventory/products"
 @using erp.DTOs.Inventory
 @using erp.Services
+@using erp.Services.Authorization
 @using erp.Components.Shared.Dialogs.Inventory
 @using MudBlazor
 @using Size = MudBlazor.Size
 @using Color = MudBlazor.Color
-@attribute [Authorize]
+@attribute [Authorize(Policy = ModulePolicies.Inventory)]
 
 @inject IApiService ApiService
 @inject ILogger<Products> Logger
@@ -13,6 +14,7 @@
 @inject IDialogService DialogService
 @inject IJSRuntime JS
 @inject CurrencyFormatService Currency
+@inject ITablePreferenceService TablePreferences
 
 <PageTitle>Produtos - Pillar ERP</PageTitle>
 
@@ -30,7 +32,7 @@
                     {
                         <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2"/>
                     }
-                    Exportar CSV
+                    Exportar
                 </MudButton>
             </MudButtonGroup>
             <MudButton Color="Color.Primary" 
@@ -211,7 +213,7 @@
                   Striped="true" 
                   Loading="@_loading"
                   LoadingProgressColor="Color.Primary"
-                  RowsPerPage="25">
+                  RowsPerPage="@_defaultPageSize">
             <ToolBarContent>
                 <MudText Typo="Typo.h6">
                     <MudIcon Icon="@Icons.Material.Filled.ViewList" Class="mr-2"/>
@@ -311,7 +313,7 @@
                 </MudStack>
             </LoadingContent>
             <PagerContent>
-                <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" 
+                <MudTablePager PageSizeOptions="@_pageSizeOptions" 
                                InfoFormat="Mostrando {first_item} a {last_item} de {all_items} produtos"
                                RowsPerPageString="Itens por página:"/>
             </PagerContent>
@@ -333,9 +335,28 @@
     private List<ProductCategoryDto> _categories = new();
     private string? _currentSortLabel;
     private bool _sortDescending;
+    
+    // Table preferences
+    private int[] _pageSizeOptions = new[] { 10, 25, 50, 100 };
+    private int _defaultPageSize = 25;
 
     protected override async Task OnInitializedAsync()
     {
+        // Apply table preferences
+        _defaultPageSize = TablePreferences.GetPageSize();
+        var defaultSort = TablePreferences.GetDefaultSort("Produtos");
+        if (defaultSort.HasValue)
+        {
+            _currentSortLabel = defaultSort.Value.field;
+            _sortDescending = defaultSort.Value.descending;
+        }
+        
+        // Ensure user's preferred page size is in the options
+        if (!_pageSizeOptions.Contains(_defaultPageSize))
+        {
+            _pageSizeOptions = _pageSizeOptions.Append(_defaultPageSize).OrderBy(x => x).ToArray();
+        }
+
         await LoadStatistics();
         await LoadCategories();
     }
@@ -373,9 +394,21 @@
             var page = state.Page + 1;
             var pageSize = state.PageSize;
 
-            // Handle sorting
-            var sortBy = state.SortLabel ?? "name";
-            var sortDescending = state.SortDirection == SortDirection.Descending;
+            // Handle sorting - use preference as fallback when no sort is selected
+            string sortBy;
+            bool sortDescending;
+            
+            if (string.IsNullOrEmpty(state.SortLabel))
+            {
+                // Apply default sort from preferences
+                sortBy = _currentSortLabel ?? "name";
+                sortDescending = _sortDescending;
+            }
+            else
+            {
+                sortBy = state.SortLabel;
+                sortDescending = state.SortDirection == SortDirection.Descending;
+            }
 
             var queryParams = new List<string>
             {

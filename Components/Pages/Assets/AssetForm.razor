@@ -11,10 +11,19 @@
 @inject ISnackbar Snackbar
 
 <MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Inventory2" Color="Color.Primary" Size="Size.Large" />
+            <MudText Typo="Typo.h6">@(IsEditMode ? "Editar Ativo" : "Novo Ativo")</MudText>
+        </MudStack>
+    </TitleContent>
     <DialogContent>
         @if (_loading)
         {
-            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            <MudStack AlignItems="AlignItems.Center" Class="py-8">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Carregando...</MudText>
+            </MudStack>
         }
         else if (_loadError != null)
         {
@@ -22,63 +31,147 @@
         }
         else
         {
-            <MudForm @ref="_form" Model="_model">
-                <MudGrid>
-                    <MudItem xs="12">
-                        <MudText Typo="Typo.h6" Class="mb-2">@(IsEditMode ? "Editar Ativo" : "Cadastrar Novo Ativo")</MudText>
-                    </MudItem>
-                <MudItem xs="12" md="4">
-                    <MudTextField @bind-Value="_model.AssetCode"
-                                  Label="Código do Ativo"
-                                  Required="true"
-                                  Variant="Variant.Outlined"
-                                  Placeholder="Ex: COMP-001" />
-                </MudItem>
+            <MudForm @ref="_form" Model="_model" Class="pa-2">
+                <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4" 
+                         Style="min-height: 380px;" Color="Color.Primary">
+                    
+                    @* Tab 1: Identification *@
+                    <MudTabPanel Text="Identificação" Icon="@Icons.Material.Filled.Badge">
+                        <MudGrid Spacing="3">
+                            <MudItem xs="12" sm="4">
+                                <MudTextField @bind-Value="_model.AssetCode"
+                                              Label="Código do Ativo"
+                                              Required="true"
+                                              RequiredError="Código é obrigatório"
+                                              Variant="Variant.Outlined"
+                                              Placeholder="Ex: COMP-001"
+                                              Adornment="Adornment.Start"
+                                              AdornmentIcon="@Icons.Material.Filled.QrCode"
+                                              HelperText="Código único de identificação" />
+                            </MudItem>
 
-                <MudItem xs="12" md="8">
-                    <MudTextField @bind-Value="_model.Name"
-                                  Label="Nome do Ativo"
-                                  Required="true"
-                                  Variant="Variant.Outlined"
-                                  Placeholder="Ex: Notebook Dell Latitude 5490" />
-                </MudItem>
+                            <MudItem xs="12" sm="8">
+                                <MudTextField @bind-Value="_model.Name"
+                                              Label="Nome do Ativo"
+                                              Required="true"
+                                              RequiredError="Nome é obrigatório"
+                                              Variant="Variant.Outlined"
+                                              Placeholder="Ex: Notebook Dell Latitude 5490"
+                                              Adornment="Adornment.Start"
+                                              AdornmentIcon="@Icons.Material.Filled.Inventory2" />
+                            </MudItem>
 
-                <MudItem xs="12" md="6">
-                    <MudSelect @bind-Value="_model.CategoryId"
-                               Label="Categoria"
-                               Required="true"
-                               Variant="Variant.Outlined">
-                        @foreach (var category in _categories)
-                        {
-                            <MudSelectItem Value="@category.Id">@category.Name</MudSelectItem>
-                        }
-                    </MudSelect>
-                </MudItem>
+                            <MudItem xs="12" sm="9">
+                                <MudSelect T="int" @bind-Value="_model.CategoryId"
+                                           Label="Categoria"
+                                           Required="true"
+                                           RequiredError="Categoria é obrigatória"
+                                           Variant="Variant.Outlined"
+                                           Adornment="Adornment.Start"
+                                           AdornmentIcon="@Icons.Material.Filled.Category"
+                                           HelperText="Selecione a categoria do ativo"
+                                           Placeholder="Selecione uma categoria"
+                                           ToStringFunc="@(id => _categories.FirstOrDefault(c => c.Id == id)?.Name ?? "Selecione uma categoria")">
+                                    @if (!_categories.Any())
+                                    {
+                                        <MudSelectItem T="int" Value="0" Disabled="true">
+                                            <MudText Color="Color.Secondary">Nenhuma categoria cadastrada</MudText>
+                                        </MudSelectItem>
+                                    }
+                                    @foreach (var category in _categories)
+                                    {
+                                        <MudSelectItem T="int" Value="@category.Id">
+                                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                                <MudIcon Icon="@(category.Icon ?? Icons.Material.Filled.Category)" Size="Size.Small" />
+                                                <MudText>@category.Name</MudText>
+                                            </MudStack>
+                                        </MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </MudItem>
 
-                <MudItem xs="12" md="6">
-                    <MudTextField @bind-Value="_model.Location"
-                                  Label="Localização"
-                                  Variant="Variant.Outlined"
-                                  Placeholder="Ex: Sala 201, Andar 3" />
-                </MudItem>
+                            <MudItem xs="12" sm="3">
+                                <MudTooltip Text="Adicionar nova categoria">
+                                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" 
+                                               FullWidth="true" Style="height: 56px;"
+                                               StartIcon="@Icons.Material.Filled.Add"
+                                               OnClick="OpenQuickCategoryPopover">
+                                        Nova
+                                    </MudButton>
+                                </MudTooltip>
+                                <MudPopover Open="@_showCategoryPopover" Fixed="true" Class="pa-4" 
+                                            AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight"
+                                            Style="min-width: 300px;">
+                                    <MudStack Spacing="2">
+                                        <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">
+                                            <MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Small" Class="mr-1" />
+                                            Nova Categoria
+                                        </MudText>
+                                        <MudTextField @bind-Value="_newCategoryName" 
+                                                      Label="Nome" 
+                                                      Variant="Variant.Outlined"
+                                                      Margin="Margin.Dense"
+                                                      Placeholder="Ex: Computadores" />
+                                        <MudSelect T="string" @bind-Value="_newCategoryIcon"
+                                                   Label="Ícone"
+                                                   Variant="Variant.Outlined"
+                                                   Margin="Margin.Dense">
+                                            @foreach (var iconOption in _iconOptions)
+                                            {
+                                                <MudSelectItem T="string" Value="@iconOption.Value">
+                                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                                        <MudIcon Icon="@iconOption.Value" Size="Size.Small" />
+                                                        <MudText>@iconOption.Label</MudText>
+                                                    </MudStack>
+                                                </MudSelectItem>
+                                            }
+                                        </MudSelect>
+                                        <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="1">
+                                            <MudButton Size="Size.Small" OnClick="CloseCategoryPopover">Cancelar</MudButton>
+                                            <MudButton Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled"
+                                                       OnClick="CreateQuickCategory" Disabled="_creatingCategory">
+                                                @if (_creatingCategory)
+                                                {
+                                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
+                                                }
+                                                Criar
+                                            </MudButton>
+                                        </MudStack>
+                                    </MudStack>
+                                </MudPopover>
+                            </MudItem>
 
-                <MudItem xs="12" md="6">
-                    <MudTextField @bind-Value="_model.SerialNumber"
-                                  Label="Número de Série"
-                                  Variant="Variant.Outlined" />
-                </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudTextField @bind-Value="_model.SerialNumber"
+                                              Label="Número de Série"
+                                              Variant="Variant.Outlined"
+                                              Adornment="Adornment.Start"
+                                              AdornmentIcon="@Icons.Material.Filled.Numbers"
+                                              HelperText="Número de série do fabricante" />
+                            </MudItem>
 
-                <MudItem xs="12" md="6">
-                    <MudTextField @bind-Value="_model.Manufacturer"
-                                  Label="Fabricante"
-                                  Variant="Variant.Outlined" />
-                </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudTextField @bind-Value="_model.Location"
+                                              Label="Localização"
+                                              Variant="Variant.Outlined"
+                                              Placeholder="Ex: Sala 201, Andar 3"
+                                              Adornment="Adornment.Start"
+                                              AdornmentIcon="@Icons.Material.Filled.LocationOn" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudTabPanel>
 
-                <MudItem xs="12" md="6">
-                    <MudTextField @bind-Value="_model.Model"
-                                  Label="Modelo"
-                                  Variant="Variant.Outlined" />
-                </MudItem>
+                    @* Tab 2: Technical Details *@
+                    <MudTabPanel Text="Detalhes" Icon="@Icons.Material.Filled.Settings">
+                        <MudGrid Spacing="3">
+                            <MudItem xs="12" sm="6">
+                                <MudTextField @bind-Value="_model.Manufacturer"
+                                              Label="Fabricante"
+                                              Variant="Variant.Outlined"
+                                              Placeholder="Ex: Dell, HP, Lenovo"
+                                              Adornment="Adornment.Start"
+                                              AdornmentIcon="@Icons.Material.Filled.Factory" />
+                            </MudItem>
 
                 <MudItem xs="12" md="3">
                     <DatePicker @bind-Date="_purchaseDate"
@@ -93,83 +186,240 @@
                                      AdornmentText="R$"
                                      Culture="@System.Globalization.CultureInfo.CurrentCulture" />
                 </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudTextField @bind-Value="_model.Model"
+                                              Label="Modelo"
+                                              Variant="Variant.Outlined"
+                                              Placeholder="Ex: Latitude 5490"
+                                              Adornment="Adornment.Start"
+                                              AdornmentIcon="@Icons.Material.Filled.DevicesOther" />
+                            </MudItem>
 
-                <MudItem xs="12" md="4">
-                    <MudTextField @bind-Value="_model.InvoiceNumber"
-                                  Label="Nota Fiscal"
-                                  Variant="Variant.Outlined" />
-                </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudSelect @bind-Value="_model.Status"
+                                           Label="Status"
+                                           Variant="Variant.Outlined"
+                                           Adornment="Adornment.Start"
+                                           AdornmentIcon="@Icons.Material.Filled.Circle"
+                                           AdornmentColor="@GetStatusColor(_model.Status)">
+                                    <MudSelectItem Value="@AssetStatus.Available">
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                                            <MudText>Disponível</MudText>
+                                        </MudStack>
+                                    </MudSelectItem>
+                                    <MudSelectItem Value="@AssetStatus.InUse">
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                            <MudIcon Icon="@Icons.Material.Filled.Person" Color="Color.Info" Size="Size.Small" />
+                                            <MudText>Em Uso</MudText>
+                                        </MudStack>
+                                    </MudSelectItem>
+                                    <MudSelectItem Value="@AssetStatus.Maintenance">
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                            <MudIcon Icon="@Icons.Material.Filled.Build" Color="Color.Warning" Size="Size.Small" />
+                                            <MudText>Manutenção</MudText>
+                                        </MudStack>
+                                    </MudSelectItem>
+                                    <MudSelectItem Value="@AssetStatus.Retired">
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                            <MudIcon Icon="@Icons.Material.Filled.Archive" Color="Color.Secondary" Size="Size.Small" />
+                                            <MudText>Aposentado</MudText>
+                                        </MudStack>
+                                    </MudSelectItem>
+                                    <MudSelectItem Value="@AssetStatus.Lost">
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                            <MudIcon Icon="@Icons.Material.Filled.SearchOff" Color="Color.Error" Size="Size.Small" />
+                                            <MudText>Perdido</MudText>
+                                        </MudStack>
+                                    </MudSelectItem>
+                                    <MudSelectItem Value="@AssetStatus.Sold">
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                            <MudIcon Icon="@Icons.Material.Filled.Sell" Color="Color.Tertiary" Size="Size.Small" />
+                                            <MudText>Vendido</MudText>
+                                        </MudStack>
+                                    </MudSelectItem>
+                                </MudSelect>
+                            </MudItem>
 
-                <MudItem xs="12" md="4">
-                    <MudSelect @bind-Value="_model.Status"
-                               Label="Status"
-                               Variant="Variant.Outlined">
-                        <MudSelectItem Value="@AssetStatus.Available">Disponível</MudSelectItem>
-                        <MudSelectItem Value="@AssetStatus.InUse">Em Uso</MudSelectItem>
-                        <MudSelectItem Value="@AssetStatus.Maintenance">Manutenção</MudSelectItem>
-                        <MudSelectItem Value="@AssetStatus.Retired">Aposentado</MudSelectItem>
-                        <MudSelectItem Value="@AssetStatus.Lost">Perdido</MudSelectItem>
-                        <MudSelectItem Value="@AssetStatus.Sold">Vendido</MudSelectItem>
-                    </MudSelect>
-                </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudSelect @bind-Value="_model.Condition"
+                                           Label="Condição"
+                                           Variant="Variant.Outlined"
+                                           Adornment="Adornment.Start"
+                                           AdornmentIcon="@Icons.Material.Filled.StarRate">
+                                    <MudSelectItem Value="@AssetCondition.Excellent">
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                            <MudRating ReadOnly="true" SelectedValue="5" Size="Size.Small" />
+                                            <MudText>Excelente</MudText>
+                                        </MudStack>
+                                    </MudSelectItem>
+                                    <MudSelectItem Value="@AssetCondition.Good">
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                            <MudRating ReadOnly="true" SelectedValue="4" Size="Size.Small" />
+                                            <MudText>Bom</MudText>
+                                        </MudStack>
+                                    </MudSelectItem>
+                                    <MudSelectItem Value="@AssetCondition.Fair">
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                            <MudRating ReadOnly="true" SelectedValue="3" Size="Size.Small" />
+                                            <MudText>Regular</MudText>
+                                        </MudStack>
+                                    </MudSelectItem>
+                                    <MudSelectItem Value="@AssetCondition.Poor">
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                            <MudRating ReadOnly="true" SelectedValue="2" Size="Size.Small" />
+                                            <MudText>Ruim</MudText>
+                                        </MudStack>
+                                    </MudSelectItem>
+                                    <MudSelectItem Value="@AssetCondition.Damaged">
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                            <MudRating ReadOnly="true" SelectedValue="1" Size="Size.Small" />
+                                            <MudText>Danificado</MudText>
+                                        </MudStack>
+                                    </MudSelectItem>
+                                </MudSelect>
+                            </MudItem>
 
-                <MudItem xs="12" md="4">
-                    <MudSelect @bind-Value="_model.Condition"
-                               Label="Condição"
-                               Variant="Variant.Outlined">
-                        <MudSelectItem Value="@AssetCondition.Excellent">Excelente</MudSelectItem>
-                        <MudSelectItem Value="@AssetCondition.Good">Bom</MudSelectItem>
-                        <MudSelectItem Value="@AssetCondition.Fair">Regular</MudSelectItem>
-                        <MudSelectItem Value="@AssetCondition.Poor">Ruim</MudSelectItem>
-                        <MudSelectItem Value="@AssetCondition.Damaged">Danificado</MudSelectItem>
-                    </MudSelect>
-                </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudNumericField @bind-Value="_model.ExpectedLifespanMonths"
+                                                 Label="Vida Útil Esperada"
+                                                 Variant="Variant.Outlined"
+                                                 Adornment="Adornment.Start"
+                                                 AdornmentIcon="@Icons.Material.Filled.AccessTime"
+                                                 HelperText="Em meses" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudTabPanel>
+
+                    @* Tab 3: Acquisition/Financial *@
+                    <MudTabPanel Text="Aquisição" Icon="@Icons.Material.Filled.ShoppingCart">
+                        <MudGrid Spacing="3">
+                            <MudItem xs="12" sm="6">
+                                <MudDatePicker @bind-Date="_purchaseDate"
+                                               Label="Data de Compra"
+                                               Variant="Variant.Outlined"
+                                               DateFormat="dd/MM/yyyy"
+                                               Adornment="Adornment.Start"
+                                               AdornmentIcon="@Icons.Material.Filled.CalendarMonth" />
+                            </MudItem>
 
                 <MudItem xs="12" md="4">
                     <DatePicker @bind-Date="_warrantyExpiryDate"
                                    Label="Garantia até" />
                 </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudNumericField @bind-Value="_model.PurchaseValue"
+                                                 Label="Valor de Compra"
+                                                 Variant="Variant.Outlined"
+                                                 Adornment="Adornment.Start"
+                                                 AdornmentIcon="@Icons.Material.Filled.AttachMoney"
+                                                 Format="N2"
+                                                 Culture="@System.Globalization.CultureInfo.CurrentCulture"
+                                                 HelperText="Valor pago na aquisição" />
+                            </MudItem>
 
-                <MudItem xs="12" md="4">
-                    <MudNumericField @bind-Value="_model.ExpectedLifespanMonths"
-                                     Label="Vida Útil (meses)"
-                                     Variant="Variant.Outlined" />
-                </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudTextField @bind-Value="_model.InvoiceNumber"
+                                              Label="Nota Fiscal"
+                                              Variant="Variant.Outlined"
+                                              Placeholder="Número da NF"
+                                              Adornment="Adornment.Start"
+                                              AdornmentIcon="@Icons.Material.Filled.Receipt" />
+                            </MudItem>
 
-                <MudItem xs="12">
-                    <MudTextField @bind-Value="_model.Description"
-                                  Label="Descrição"
-                                  Lines="3"
-                                  Variant="Variant.Outlined" />
-                </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudDatePicker @bind-Date="_warrantyExpiryDate"
+                                               Label="Garantia até"
+                                               Variant="Variant.Outlined"
+                                               DateFormat="dd/MM/yyyy"
+                                               Adornment="Adornment.Start"
+                                               AdornmentIcon="@Icons.Material.Filled.Security"
+                                               HelperText="Data de expiração da garantia" />
+                            </MudItem>
 
-                <MudItem xs="12">
-                    <MudTextField @bind-Value="_model.Notes"
-                                  Label="Observações"
-                                  Lines="3"
-                                  Variant="Variant.Outlined" />
-                </MudItem>
-
-                <MudItem xs="12" Class="mt-4">
-                    <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2">
-                        <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="Cancel">Cancelar</MudButton>
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="_saving">
-                            @if (_saving)
+                            @if (_warrantyExpiryDate.HasValue)
                             {
-                                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                                <MudItem xs="12">
+                                    @if (_warrantyExpiryDate.Value > DateTime.Today)
+                                    {
+                                        var daysRemaining = (_warrantyExpiryDate.Value - DateTime.Today).Days;
+                                        <MudAlert Severity="@(daysRemaining <= 30 ? Severity.Warning : Severity.Info)" Variant="Variant.Text" Dense="true">
+                                            <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Class="mr-1" />
+                                            @if (daysRemaining <= 30)
+                                            {
+                                                <text>Garantia expira em @daysRemaining dias!</text>
+                                            }
+                                            else
+                                            {
+                                                <text>Garantia válida por mais @daysRemaining dias.</text>
+                                            }
+                                        </MudAlert>
+                                    }
+                                    else
+                                    {
+                                        <MudAlert Severity="Severity.Error" Variant="Variant.Text" Dense="true">
+                                            <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Class="mr-1" />
+                                            Garantia expirada.
+                                        </MudAlert>
+                                    }
+                                </MudItem>
                             }
-                            else
-                            {
-                                <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-1" />
-                                <text>@(IsEditMode ? "Salvar alterações" : "Cadastrar")</text>
-                            }
-                        </MudButton>
-                    </MudStack>
-                </MudItem>
-            </MudGrid>
-        </MudForm>
+                        </MudGrid>
+                    </MudTabPanel>
+
+                    @* Tab 4: Notes/Description *@
+                    <MudTabPanel Text="Observações" Icon="@Icons.Material.Filled.Notes">
+                        <MudGrid Spacing="3">
+                            <MudItem xs="12">
+                                <MudTextField @bind-Value="_model.Description"
+                                              Label="Descrição"
+                                              Lines="4"
+                                              Variant="Variant.Outlined"
+                                              Placeholder="Descrição detalhada do ativo..."
+                                              Adornment="Adornment.Start"
+                                              AdornmentIcon="@Icons.Material.Filled.Description"
+                                              HelperText="Especificações técnicas, configurações, etc." />
+                            </MudItem>
+
+                            <MudItem xs="12">
+                                <MudTextField @bind-Value="_model.Notes"
+                                              Label="Notas Internas"
+                                              Lines="4"
+                                              Variant="Variant.Outlined"
+                                              Placeholder="Observações adicionais..."
+                                              Adornment="Adornment.Start"
+                                              AdornmentIcon="@Icons.Material.Filled.StickyNote2"
+                                              HelperText="Anotações internas sobre o ativo" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudTabPanel>
+                </MudTabs>
+            </MudForm>
         }
     </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" 
+                   Variant="Variant.Text"
+                   StartIcon="@Icons.Material.Filled.Close"
+                   Disabled="_saving">
+            Cancelar
+        </MudButton>
+        <MudButton Color="Color.Primary" 
+                   Variant="Variant.Filled" 
+                   OnClick="Save" 
+                   Disabled="_saving || _loading"
+                   StartIcon="@(_saving ? null : Icons.Material.Filled.Save)">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <text>Salvando...</text>
+            }
+            else
+            {
+                <text>@(IsEditMode ? "Salvar Alterações" : "Cadastrar Ativo")</text>
+            }
+        </MudButton>
+    </DialogActions>
 </MudDialog>
 
 @code {
@@ -271,11 +521,75 @@
         }
     }
 
+    private Color GetStatusColor(AssetStatus status) => status switch
+    {
+        AssetStatus.Available => Color.Success,
+        AssetStatus.InUse => Color.Info,
+        AssetStatus.Maintenance => Color.Warning,
+        AssetStatus.Retired => Color.Secondary,
+        AssetStatus.Lost => Color.Error,
+        AssetStatus.Sold => Color.Tertiary,
+        _ => Color.Default
+    };
+
+    private void OpenQuickCategoryPopover()
+    {
+        _newCategoryName = "";
+        _newCategoryIcon = Icons.Material.Filled.Category;
+        _showCategoryPopover = true;
+    }
+
+    private void CloseCategoryPopover()
+    {
+        _showCategoryPopover = false;
+    }
+
+    private async Task CreateQuickCategory()
+    {
+        if (string.IsNullOrWhiteSpace(_newCategoryName))
+        {
+            Snackbar.Add("Nome da categoria é obrigatório", Severity.Warning);
+            return;
+        }
+
+        _creatingCategory = true;
+        
+        try
+        {
+            var newCategory = new CreateAssetCategoryDto
+            {
+                Name = _newCategoryName,
+                Icon = _newCategoryIcon
+            };
+
+            var created = await ApiService.PostAsync<AssetCategoryDto>("/api/assets/categories", newCategory);
+            
+            if (created != null)
+            {
+                await LoadCategories();
+                _model.CategoryId = created.Id;
+                Snackbar.Add($"Categoria '{created.Name}' criada com sucesso!", Severity.Success);
+            }
+            
+            CloseCategoryPopover();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao criar categoria");
+            Snackbar.Add($"Erro ao criar categoria: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _creatingCategory = false;
+        }
+    }
+
     private async Task Save()
     {
         await _form!.Validate();
         if (!_form.IsValid)
         {
+            Snackbar.Add("Preencha todos os campos obrigatórios", Severity.Warning);
             return;
         }
 
@@ -315,12 +629,12 @@
                 };
 
                 result = await ApiService.PutAsync<AssetDto>($"/api/assets/{Id}", updateDto) ?? new AssetDto();
-                Snackbar.Add("Ativo atualizado com sucesso", Severity.Success);
+                Snackbar.Add("Ativo atualizado com sucesso!", Severity.Success);
             }
             else
             {
                 result = await ApiService.PostAsync<AssetDto>("/api/assets", _model) ?? new AssetDto();
-                Snackbar.Add("Ativo cadastrado com sucesso", Severity.Success);
+                Snackbar.Add("Ativo cadastrado com sucesso!", Severity.Success);
             }
 
             MudDialog.Close(DialogResult.Ok(result));

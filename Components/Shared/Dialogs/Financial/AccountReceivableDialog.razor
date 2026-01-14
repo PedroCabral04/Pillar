@@ -2,18 +2,25 @@
 @using erp.DTOs.Sales
 @using erp.Models.Financial
 @using erp.Components.Shared
+@using erp.Services
+@using MudBlazor
+@using Size = MudBlazor.Size
+@using Color = MudBlazor.Color
+
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
 
 <MudDialog>
     <TitleContent>
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.CallReceived" Color="MudBlazor.Color.Success" Size="MudBlazor.Size.Large" />
-            <MudText Typo="Typo.h6">Conta a Receber</MudText>
+            <MudIcon Icon="@Icons.Material.Filled.CallReceived" Color="Color.Success" Size="Size.Large" />
+            <MudText Typo="Typo.h6">@GetDialogTitle()</MudText>
         </MudStack>
     </TitleContent>
     <DialogContent>
         <MudForm @ref="form" @bind-IsValid="@success" Class="pa-2">
-            <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-3">
-                <MudIcon Icon="@Icons.Material.Filled.Person" Size="MudBlazor.Size.Small" Class="mr-1" />
+            <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" Class="mr-1" />
                 Dados do Cliente
             </MudText>
             <MudGrid Spacing="3">
@@ -24,6 +31,7 @@
                                Required="true" 
                                RequiredError="Cliente é obrigatório" 
                                Variant="Variant.Outlined"
+                               Disabled="@IsReadOnly"
                                Adornment="Adornment.Start"
                                AdornmentIcon="@Icons.Material.Filled.Person"
                                AnchorOrigin="Origin.BottomCenter">
@@ -37,6 +45,7 @@
                     <MudTextField @bind-Value="Model.InvoiceNumber" 
                                   Label="Número da Nota" 
                                   Variant="Variant.Outlined"
+                                  ReadOnly="@IsReadOnly"
                                   Adornment="Adornment.Start"
                                   AdornmentIcon="@Icons.Material.Filled.Receipt"
                                   HelperText="Número da nota fiscal (opcional)"/>
@@ -45,8 +54,8 @@
 
             <MudDivider Class="my-4" />
 
-            <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-3">
-                <MudIcon Icon="@Icons.Material.Filled.CalendarMonth" Size="MudBlazor.Size.Small" Class="mr-1" />
+            <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.CalendarMonth" Size="Size.Small" Class="mr-1" />
                 Datas
             </MudText>
             <MudGrid Spacing="3">
@@ -70,8 +79,8 @@
 
             <MudDivider Class="my-4" />
 
-            <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-3">
-                <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Size="MudBlazor.Size.Small" Class="mr-1" />
+            <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Size="Size.Small" Class="mr-1" />
                 Valores
             </MudText>
             <MudGrid Spacing="3">
@@ -83,6 +92,7 @@
                                      RequiredError="Valor é obrigatório" 
                                      Min="0.01M" 
                                      Variant="Variant.Outlined"
+                                     ReadOnly="@IsReadOnly"
                                      Adornment="Adornment.Start"
                                      AdornmentIcon="@Icons.Material.Filled.AttachMoney"/>
                 </MudItem>
@@ -92,6 +102,7 @@
                                      Format="C2" 
                                      Min="0" 
                                      Variant="Variant.Outlined"
+                                     ReadOnly="@IsReadOnly"
                                      Adornment="Adornment.Start"
                                      AdornmentIcon="@Icons.Material.Filled.Discount"/>
                 </MudItem>
@@ -101,6 +112,7 @@
                                      Format="C2" 
                                      Min="0" 
                                      Variant="Variant.Outlined"
+                                     ReadOnly="@IsReadOnly"
                                      Adornment="Adornment.Start"
                                      AdornmentIcon="@Icons.Material.Filled.TrendingUp"/>
                 </MudItem>
@@ -110,6 +122,7 @@
                                      Format="C2" 
                                      Min="0" 
                                      Variant="Variant.Outlined"
+                                     ReadOnly="@IsReadOnly"
                                      Adornment="Adornment.Start"
                                      AdornmentIcon="@Icons.Material.Filled.Warning"/>
                 </MudItem>
@@ -117,8 +130,8 @@
 
             <MudDivider Class="my-4" />
 
-            <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-3">
-                <MudIcon Icon="@Icons.Material.Filled.Payment" Size="MudBlazor.Size.Small" Class="mr-1" />
+            <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Payment" Size="Size.Small" Class="mr-1" />
                 Pagamento
             </MudText>
             <MudGrid Spacing="3">
@@ -127,13 +140,16 @@
                                Label="Método de Pagamento" 
                                @bind-Value="Model.PaymentMethod" 
                                Variant="Variant.Outlined"
+                               Disabled="@IsReadOnly"
                                Adornment="Adornment.Start"
                                AdornmentIcon="@Icons.Material.Filled.Payment"
                                AnchorOrigin="Origin.BottomCenter">
-                        @foreach (PaymentMethod method in Enum.GetValues(typeof(PaymentMethod)))
-                        {
-                            <MudSelectItem Value="@method">@method.ToString()</MudSelectItem>
-                        }
+                        <MudSelectItem Value="@PaymentMethod.Cash">Dinheiro</MudSelectItem>
+                        <MudSelectItem Value="@PaymentMethod.BankSlip">Boleto Bancário</MudSelectItem>
+                        <MudSelectItem Value="@PaymentMethod.Pix">Pix</MudSelectItem>
+                        <MudSelectItem Value="@PaymentMethod.CreditCard">Cartão de Crédito</MudSelectItem>
+                        <MudSelectItem Value="@PaymentMethod.DebitCard">Cartão de Débito</MudSelectItem>
+                        <MudSelectItem Value="@PaymentMethod.BankTransfer">Transferência Bancária</MudSelectItem>
                     </MudSelect>
                 </MudItem>
                 
@@ -143,6 +159,7 @@
                         <MudTextField @bind-Value="Model.BankSlipNumber" 
                                       Label="Código de Barras" 
                                       Variant="Variant.Outlined"
+                                      ReadOnly="@IsReadOnly"
                                       Adornment="Adornment.Start"
                                       AdornmentIcon="@Icons.Material.Filled.QrCode"/>
                     </MudItem>
@@ -153,6 +170,7 @@
                         <MudTextField @bind-Value="Model.PixKey" 
                                       Label="Chave Pix" 
                                       Variant="Variant.Outlined"
+                                      ReadOnly="@IsReadOnly"
                                       Adornment="Adornment.Start"
                                       AdornmentIcon="@Icons.Material.Filled.Pix"/>
                     </MudItem>
@@ -161,16 +179,17 @@
 
             <MudDivider Class="my-4" />
 
-            <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-3">
-                <MudIcon Icon="@Icons.Material.Filled.Category" Size="MudBlazor.Size.Small" Class="mr-1" />
+            <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Category" Size="Size.Small" Class="mr-1" />
                 Classificação
             </MudText>
             <MudGrid Spacing="3">
-                <MudItem xs="12" sm="6">
+                <MudItem xs="12" sm="@(IsReadOnly ? 6 : 5)">
                     <MudSelect T="int?" 
                                Label="Categoria" 
                                @bind-Value="Model.CategoryId" 
                                Variant="Variant.Outlined"
+                               Disabled="@IsReadOnly"
                                Adornment="Adornment.Start"
                                AdornmentIcon="@Icons.Material.Filled.Category"
                                Clearable="true"
@@ -182,11 +201,63 @@
                         }
                     </MudSelect>
                 </MudItem>
-                <MudItem xs="12" sm="6">
+                @if (!IsReadOnly)
+                {
+                    <MudItem xs="12" sm="1">
+                        <MudTooltip Text="Adicionar nova categoria">
+                            <MudIconButton Icon="@Icons.Material.Filled.Add" 
+                                           Color="Color.Primary" 
+                                           Variant="Variant.Outlined"
+                                           Size="Size.Large"
+                                           Style="height: 56px; width: 56px;"
+                                           OnClick="OpenCategoryPopover" />
+                        </MudTooltip>
+                        <MudPopover Open="@_showCategoryPopover" Fixed="true" Class="pa-4" 
+                                    AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight"
+                                    Style="min-width: 320px; z-index: 2000;">
+                            <MudStack Spacing="2">
+                                <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">
+                                    <MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Small" Class="mr-1" />
+                                    Nova Categoria
+                                </MudText>
+                                <MudTextField @bind-Value="_newCategoryName" 
+                                              Label="Nome" 
+                                              Variant="Variant.Outlined"
+                                              Margin="Margin.Dense"
+                                              Placeholder="Ex: Vendas, Serviços" />
+                                <MudTextField @bind-Value="_newCategoryCode" 
+                                              Label="Código" 
+                                              Variant="Variant.Outlined"
+                                              Margin="Margin.Dense"
+                                              Placeholder="Ex: VEN, SER" />
+                                <MudSelect T="CategoryType" @bind-Value="_newCategoryType"
+                                           Label="Tipo"
+                                           Variant="Variant.Outlined"
+                                           Margin="Margin.Dense">
+                                    <MudSelectItem Value="@CategoryType.Revenue">Receita</MudSelectItem>
+                                    <MudSelectItem Value="@CategoryType.Expense">Despesa</MudSelectItem>
+                                </MudSelect>
+                                <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="1">
+                                    <MudButton Size="Size.Small" OnClick="CloseCategoryPopover">Cancelar</MudButton>
+                                    <MudButton Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled"
+                                               OnClick="CreateCategory" Disabled="_creatingCategory">
+                                        @if (_creatingCategory)
+                                        {
+                                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
+                                        }
+                                        Criar
+                                    </MudButton>
+                                </MudStack>
+                            </MudStack>
+                        </MudPopover>
+                    </MudItem>
+                }
+                <MudItem xs="12" sm="@(IsReadOnly ? 6 : 5)">
                     <MudSelect T="int?" 
                                Label="Centro de Custo" 
                                @bind-Value="Model.CostCenterId" 
                                Variant="Variant.Outlined"
+                               Disabled="@IsReadOnly"
                                Adornment="Adornment.Start"
                                AdornmentIcon="@Icons.Material.Filled.AccountBalance"
                                Clearable="true"
@@ -198,12 +269,56 @@
                         }
                     </MudSelect>
                 </MudItem>
+                @if (!IsReadOnly)
+                {
+                    <MudItem xs="12" sm="1">
+                        <MudTooltip Text="Adicionar novo centro de custo">
+                            <MudIconButton Icon="@Icons.Material.Filled.Add" 
+                                           Color="Color.Primary" 
+                                           Variant="Variant.Outlined"
+                                           Size="Size.Large"
+                                           Style="height: 56px; width: 56px;"
+                                           OnClick="OpenCostCenterPopover" />
+                        </MudTooltip>
+                        <MudPopover Open="@_showCostCenterPopover" Fixed="true" Class="pa-4" 
+                                    AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight"
+                                    Style="min-width: 320px; z-index: 2000;">
+                            <MudStack Spacing="2">
+                                <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">
+                                    <MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Small" Class="mr-1" />
+                                    Novo Centro de Custo
+                                </MudText>
+                                <MudTextField @bind-Value="_newCostCenterName" 
+                                              Label="Nome" 
+                                              Variant="Variant.Outlined"
+                                              Margin="Margin.Dense"
+                                              Placeholder="Ex: Administrativo, Comercial" />
+                                <MudTextField @bind-Value="_newCostCenterCode" 
+                                              Label="Código" 
+                                              Variant="Variant.Outlined"
+                                              Margin="Margin.Dense"
+                                              Placeholder="Ex: ADM, COM" />
+                                <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="1">
+                                    <MudButton Size="Size.Small" OnClick="CloseCostCenterPopover">Cancelar</MudButton>
+                                    <MudButton Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled"
+                                               OnClick="CreateCostCenter" Disabled="_creatingCostCenter">
+                                        @if (_creatingCostCenter)
+                                        {
+                                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
+                                        }
+                                        Criar
+                                    </MudButton>
+                                </MudStack>
+                            </MudStack>
+                        </MudPopover>
+                    </MudItem>
+                }
             </MudGrid>
 
             <MudDivider Class="my-4" />
 
-            <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-3">
-                <MudIcon Icon="@Icons.Material.Filled.Notes" Size="MudBlazor.Size.Small" Class="mr-1" />
+            <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Notes" Size="Size.Small" Class="mr-1" />
                 Observações
             </MudText>
             <MudGrid Spacing="3">
@@ -212,6 +327,7 @@
                                   Label="Observações" 
                                   Lines="3" 
                                   Variant="Variant.Outlined"
+                                  ReadOnly="@IsReadOnly"
                                   HelperText="Anotações adicionais sobre esta conta"/>
                 </MudItem>
             </MudGrid>
@@ -222,44 +338,131 @@
                    Variant="Variant.Text" 
                    Disabled="@_saving"
                    StartIcon="@Icons.Material.Filled.Close">
-            Cancelar
+            @(IsReadOnly ? "Fechar" : "Cancelar")
         </MudButton>
-        <MudButton Color="MudBlazor.Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@_saving">
-            @if (_saving)
-            {
-                <MudProgressCircular Size="MudBlazor.Size.Small" Indeterminate="true" Class="mr-2" />
-                <text>Salvando...</text>
-            }
-            else
-            {
-                <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-1"/>
-                <text>Salvar</text>
-            }
-        </MudButton>
+        @if (!IsReadOnly)
+        {
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@_saving">
+                @if (_saving)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <text>Salvando...</text>
+                }
+                else
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-1"/>
+                    <text>Salvar</text>
+                }
+            </MudButton>
+        }
     </DialogActions>
 </MudDialog>
 
 @code {
-    [CascadingParameter] IMudDialogInstance MudDialog { get; set; }
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
     [Parameter] public CreateAccountReceivableDto Model { get; set; } = new();
+    [Parameter] public int? AccountId { get; set; }
+    [Parameter] public bool IsEdit { get; set; }
+    [Parameter] public bool IsReadOnly { get; set; }
     [Parameter] public List<CustomerDto> Customers { get; set; } = new();
     [Parameter] public List<FinancialCategoryDto> Categories { get; set; } = new();
     [Parameter] public List<CostCenterDto> CostCenters { get; set; } = new();
 
-    private MudForm form;
+    private MudForm? form;
     private bool success;
     private bool _saving = false;
 
-    protected override void OnInitialized()
+    // Category popover
+    private bool _showCategoryPopover = false;
+    private string _newCategoryName = "";
+    private string _newCategoryCode = "";
+    private CategoryType _newCategoryType = CategoryType.Revenue;
+    private bool _creatingCategory = false;
+
+    // Cost Center popover
+    private bool _showCostCenterPopover = false;
+    private string _newCostCenterName = "";
+    private string _newCostCenterCode = "";
+    private bool _creatingCostCenter = false;
+
+    protected override async Task OnInitializedAsync()
     {
         if (Model.IssueDate == default) Model.IssueDate = DateTime.Today;
         if (Model.DueDate == default) Model.DueDate = DateTime.Today.AddDays(30);
+
+        // Always load categories and cost centers to ensure they're available
+        await LoadCategories();
+        await LoadCostCenters();
+
+        // If editing or viewing details, load the account data
+        if ((IsEdit || IsReadOnly) && AccountId.HasValue)
+        {
+            await LoadAccountData();
+        }
+        
+        StateHasChanged();
+    }
+
+    private async Task LoadAccountData()
+    {
+        try
+        {
+            var account = await ApiService.GetAsync<AccountReceivableDto>($"api/accounts-receivable/{AccountId}");
+            if (account != null)
+            {
+                Model.CustomerId = account.CustomerId;
+                Model.InvoiceNumber = account.InvoiceNumber;
+                Model.OriginalAmount = account.OriginalAmount;
+                Model.DiscountAmount = account.DiscountAmount;
+                Model.InterestAmount = account.InterestAmount;
+                Model.FineAmount = account.FineAmount;
+                Model.IssueDate = account.IssueDate;
+                Model.DueDate = account.DueDate;
+                Model.PaymentMethod = account.PaymentMethod;
+                Model.BankSlipNumber = account.BankSlipNumber;
+                Model.PixKey = account.PixKey;
+                Model.CategoryId = account.CategoryId;
+                Model.CostCenterId = account.CostCenterId;
+                Model.Notes = account.Notes;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar conta: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadCategories()
+    {
+        try
+        {
+            Categories = await ApiService.GetAsync<List<FinancialCategoryDto>>("api/FinancialCategories") ?? new();
+        }
+        catch { }
+    }
+
+    private async Task LoadCostCenters()
+    {
+        try
+        {
+            CostCenters = await ApiService.GetAsync<List<CostCenterDto>>("api/CostCenters") ?? new();
+        }
+        catch { }
+    }
+
+    private string GetDialogTitle()
+    {
+        if (IsReadOnly) return "Detalhes da Conta a Receber";
+        if (IsEdit) return "Editar Conta a Receber";
+        return "Nova Conta a Receber";
     }
 
     private void Cancel() => MudDialog.Cancel();
 
     private async Task Submit()
     {
+        if (form == null) return;
+        
         await form.Validate();
         if (success)
         {
@@ -269,6 +472,126 @@
             await Task.Delay(100);
             
             MudDialog.Close(DialogResult.Ok(Model));
+        }
+    }
+
+    // Category Popover Methods
+    private void OpenCategoryPopover()
+    {
+        _showCategoryPopover = true;
+        _newCategoryName = "";
+        _newCategoryCode = "";
+        _newCategoryType = CategoryType.Revenue;
+    }
+
+    private void CloseCategoryPopover()
+    {
+        _showCategoryPopover = false;
+    }
+
+    private async Task CreateCategory()
+    {
+        if (string.IsNullOrWhiteSpace(_newCategoryName))
+        {
+            Snackbar.Add("Informe o nome da categoria", Severity.Warning);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_newCategoryCode))
+        {
+            // Generate code from name if not provided
+            _newCategoryCode = _newCategoryName.Length > 3 
+                ? _newCategoryName.Substring(0, 3).ToUpper() 
+                : _newCategoryName.ToUpper();
+        }
+
+        _creatingCategory = true;
+        try
+        {
+            var dto = new CreateFinancialCategoryDto
+            {
+                Name = _newCategoryName,
+                Code = _newCategoryCode,
+                Type = _newCategoryType,
+                IsActive = true
+            };
+
+            var created = await ApiService.PostAsync<FinancialCategoryDto>("api/FinancialCategories", dto);
+            if (created != null)
+            {
+                Categories.Add(created);
+                await InvokeAsync(StateHasChanged);
+                Model.CategoryId = created.Id;
+                Snackbar.Add("Categoria criada com sucesso!", Severity.Success);
+                CloseCategoryPopover();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao criar categoria: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _creatingCategory = false;
+        }
+    }
+
+    // Cost Center Popover Methods
+    private void OpenCostCenterPopover()
+    {
+        _showCostCenterPopover = true;
+        _newCostCenterName = "";
+        _newCostCenterCode = "";
+    }
+
+    private void CloseCostCenterPopover()
+    {
+        _showCostCenterPopover = false;
+    }
+
+    private async Task CreateCostCenter()
+    {
+        if (string.IsNullOrWhiteSpace(_newCostCenterName))
+        {
+            Snackbar.Add("Informe o nome do centro de custo", Severity.Warning);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_newCostCenterCode))
+        {
+            // Generate code from name if not provided
+            _newCostCenterCode = _newCostCenterName.Length > 3 
+                ? _newCostCenterName.Substring(0, 3).ToUpper() 
+                : _newCostCenterName.ToUpper();
+        }
+
+        _creatingCostCenter = true;
+        try
+        {
+            var dto = new CreateCostCenterDto
+            {
+                Name = _newCostCenterName,
+                Code = _newCostCenterCode,
+                IsActive = true
+            };
+
+            var created = await ApiService.PostAsync<CostCenterDto>("api/CostCenters", dto);
+            if (created != null)
+            {
+                CostCenters.Add(created);
+                await InvokeAsync(StateHasChanged);
+                Model.CostCenterId = created.Id;
+                Snackbar.Add("Centro de custo criado com sucesso!", Severity.Success);
+                CloseCostCenterPopover();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao criar centro de custo: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _creatingCostCenter = false;
         }
     }
 }

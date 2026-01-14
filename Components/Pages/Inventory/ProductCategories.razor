@@ -1,16 +1,18 @@
 @page "/inventory/categories"
 @using erp.DTOs.Inventory
 @using erp.Services
+@using erp.Services.Authorization
 @using erp.Components.Shared.Dialogs.Inventory
 @using MudBlazor
 @using Size = MudBlazor.Size
 @using Color = MudBlazor.Color
-@attribute [Authorize]
+@attribute [Authorize(Policy = ModulePolicies.Inventory)]
 
 @inject IApiService ApiService
 @inject ILogger<ProductCategories> Logger
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject ITablePreferenceService TablePreferences
 
 <PageTitle>Categorias de Produtos - Pillar ERP</PageTitle>
 
@@ -31,7 +33,7 @@
     }
 
     <MudTable T="ProductCategoryDto" ServerData="ServerReload" 
-            Dense="false" Hover="true" Elevation="2" @ref="_table" Striped="true" Loading="@_loading">
+            Dense="false" Hover="true" Elevation="2" @ref="_table" Striped="true" Loading="@_loading" RowsPerPage="@_defaultPageSize">
         <ToolBarContent>
             <MudText Typo="Typo.h5">Categorias Cadastradas</MudText>
             <MudSpacer/>
@@ -40,6 +42,19 @@
                             Variant="Variant.Outlined" Margin="Margin.Dense"
                             Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
                             Clearable="true" Style="min-width: 250px;"/>
+                <MudSelect T="int?" 
+                        Value="_parentCategoryFilter" 
+                        ValueChanged="OnParentCategoryFilterChanged"
+                        Label="Categoria Pai" 
+                        Variant="Variant.Outlined" 
+                        Margin="Margin.Dense"
+                        Clearable="true"
+                        Style="min-width: 200px;">
+                    @foreach (var category in _parentCategories)
+                    {
+                        <MudSelectItem T="int?" Value="@category.Id">@category.Name</MudSelectItem>
+                    }
+                </MudSelect>
                 <MudSelect T="string" 
                         Value="_statusFilter" 
                         ValueChanged="OnStatusFilterChanged"
@@ -130,7 +145,44 @@
     private string? _loadError;
     private string? _searchString;
     private string? _statusFilter;
+    private int? _parentCategoryFilter;
+    private List<ProductCategoryDto> _parentCategories = new();
     private bool _loading = false;
+    
+    // Table preferences
+    private string? _currentSortLabel;
+    private bool _sortDescending;
+    private int _defaultPageSize = 25;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _defaultPageSize = TablePreferences.GetPageSize();
+        var defaultSort = TablePreferences.GetDefaultSort("Categorias");
+        if (defaultSort.HasValue)
+        {
+            _currentSortLabel = defaultSort.Value.field;
+            _sortDescending = defaultSort.Value.descending;
+        }
+        
+        await LoadParentCategories();
+    }
+
+    private async Task LoadParentCategories()
+    {
+        try
+        {
+            // Carrega todas as categorias para o filtro (usando um tamanho de página grande)
+            var response = await ApiService.GetAsync<PaginatedCategoriesResponse>("/api/products/categories?pageSize=1000");
+            if (response != null)
+            {
+                _parentCategories = response.Items.OrderBy(c => c.Name).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar categorias para filtro");
+        }
+    }
 
     private async Task<TableData<ProductCategoryDto>> ServerReload(TableState state, CancellationToken ct)
     {
@@ -140,11 +192,35 @@
             var page = state.Page + 1;
             var pageSize = state.PageSize;
 
+            // Handle sorting - use preference as fallback when no sort is selected
+            string? sortBy = null;
+            bool sortDescending = false;
+            
+            if (string.IsNullOrEmpty(state.SortLabel))
+            {
+                if (!string.IsNullOrEmpty(_currentSortLabel))
+                {
+                    sortBy = _currentSortLabel;
+                    sortDescending = _sortDescending;
+                }
+            }
+            else
+            {
+                sortBy = state.SortLabel;
+                sortDescending = state.SortDirection == SortDirection.Descending;
+            }
+
             var queryParams = new List<string>
             {
                 $"page={page}",
                 $"pageSize={pageSize}"
             };
+
+            if (!string.IsNullOrEmpty(sortBy))
+            {
+                queryParams.Add($"sortBy={sortBy}");
+                queryParams.Add($"sortDescending={sortDescending}");
+            }
 
             if (!string.IsNullOrWhiteSpace(_searchString))
             {
@@ -154,6 +230,11 @@
             if (!string.IsNullOrWhiteSpace(_statusFilter))
             {
                 queryParams.Add($"status={Uri.EscapeDataString(_statusFilter)}");
+            }
+
+            if (_parentCategoryFilter.HasValue)
+            {
+                queryParams.Add($"parentCategoryId={_parentCategoryFilter}");
             }
 
             var query = string.Join("&", queryParams);
@@ -192,6 +273,12 @@
     private void OnStatusFilterChanged(string? value)
     {
         _statusFilter = value;
+        _table?.ReloadServerData();
+    }
+
+    private void OnParentCategoryFilterChanged(int? value)
+    {
+        _parentCategoryFilter = value;
         _table?.ReloadServerData();
     }
 

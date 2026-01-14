@@ -21,6 +21,9 @@ namespace erp.DTOs.Preferences
         public bool ReduceMotion { get; set; } = false;
         public string FontSize { get; set; } = "base"; // small|base|large
         public string NavigationType { get; set; } = "sidebar"; // sidebar|topbar
+        public string PrimaryColor { get; set; } = "#2563EB"; // Custom primary color
+        public bool SidebarPersistent { get; set; } = true; // Sidebar fixed vs. hover
+        public bool KeyboardShortcutsEnabled { get; set; } = true; // Enable/disable keyboard shortcuts
         // Sidebar UX state
         public List<string> PinnedRoutes { get; set; } = new();
         public Dictionary<string, bool> GroupExpanded { get; set; } = new();
@@ -55,6 +58,7 @@ namespace erp.DTOs.Preferences
         public bool Sounds { get; set; } = false;
         public int Volume { get; set; } = 70; // 0-100
         public string Digest { get; set; } = "immediate"; // immediate|daily|weekly
+        public string SoundFile { get; set; } = "notification.mp3"; // Sound file to play
     }
 
     public class SecurityPreferences

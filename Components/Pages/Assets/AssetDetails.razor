@@ -127,7 +127,7 @@ else if (_asset != null)
                         </MudGrid>
                     </MudPaper>
 
-                    @if (!string.IsNullOrEmpty(_asset.CurrentAssignedToUserName))
+                    @* @if (!string.IsNullOrEmpty(_asset.CurrentAssignedToUserName))
                     {
                         <MudPaper Elevation="2" Class="pa-4 mt-4">
                             <MudText Typo="Typo.h6" Class="mb-4">
@@ -147,20 +147,20 @@ else if (_asset != null)
                                 </MudItem>
                             </MudGrid>
                         </MudPaper>
-                    }
+                    }*@
                 </MudItem>
 
-                <!-- QR Code -->
+                @*<!-- QR Code -->
                 <MudItem xs="12" md="4">
                     <QRCodeDisplayComponent AssetId="@Id"
                                             AssetCode="@_asset.AssetCode"
                                             AssetName="@_asset.Name"
                                             Size="256"/>
-                </MudItem>
+                </MudItem>*@
             </MudGrid>
         </MudTabPanel>
 
-        <!-- Documents Tab -->
+        @*<!-- Documents Tab -->
         <MudTabPanel Text="Documentos" Icon="@Icons.Material.Filled.Description">
             <div class="mt-4">
                 <DocumentListComponent AssetId="@Id" 
@@ -241,7 +241,7 @@ else if (_asset != null)
                     </MudText>
                 </MudPaper>
             </div>
-        </MudTabPanel>
+        </MudTabPanel> *@
 
     </MudTabs>
 }

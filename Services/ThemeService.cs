@@ -138,9 +138,9 @@ public class ThemeService
 
     public async Task SetDarkModeAsync(bool value)
     {
-        if (IsDarkMode != value)
+        if (_isDarkMode != value)
         {
-            IsDarkMode = value;
+            _isDarkMode = value;
             _preferenceService.CurrentPreferences.Ui.DarkMode = value;
             await _preferenceService.SaveAsync();
             UpdateTheme();
@@ -159,6 +159,14 @@ public class ThemeService
 
     public void UpdateTheme()
     {
+        // Apply Custom Primary Color first (before high contrast might override)
+        var customColor = _preferenceService.CurrentPreferences.Ui.PrimaryColor;
+        if (!string.IsNullOrEmpty(customColor) && customColor != "#2563EB")
+        {
+            Theme.PaletteLight.Primary = customColor;
+            Theme.PaletteDark.Primary = customColor;
+        }
+
         // Apply High Contrast
         if (_preferenceService.CurrentPreferences.Ui.HighContrast)
         {

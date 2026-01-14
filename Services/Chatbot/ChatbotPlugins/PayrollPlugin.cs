@@ -35,21 +35,29 @@ public class PayrollPlugin
 
             if (!periods.Any())
             {
-                var filterText = year.HasValue ? $" para o ano {year}" : "";
-                filterText += statusFilter.HasValue ? $" com status '{GetStatusText(statusFilter.Value)}'" : "";
-                return $"📋 Não há períodos de folha de pagamento cadastrados{filterText}.";
+                var filterText = year.HasValue ? $" de {year}" : "";
+                return $"📋 Não há períodos de folha{filterText}.";
             }
 
-            var periodList = periods.Take(20).Select(p =>
-                $"- **{GetMonthName(p.ReferenceMonth)}/{p.ReferenceYear}** (ID: {p.Id}) - Status: {GetStatusText(p.Status)} - Funcionários: {p.Results.Count}"
+            var list = periods.Take(12).Select(p =>
+                $"| {p.Id} | {GetMonthName(p.ReferenceMonth)}/{p.ReferenceYear} | {GetStatusText(p.Status)} | {p.Results.Count} |"
             );
 
             var yearText = year.HasValue ? $" de {year}" : "";
-            return $"📋 **Períodos de Folha de Pagamento{yearText} ({periods.Count} total):**\n{string.Join("\n", periodList)}";
+            var remaining = periods.Count - 12;
+            var moreText = remaining > 0 ? $"\n\n*...e mais {remaining} períodos.*" : "";
+
+            return $"""
+                📋 **Períodos de Folha{yearText}** ({periods.Count} total)
+                
+                | ID | Referência | Status | Funcs |
+                |----|------------|--------|-------|
+                {string.Join("\n", list)}{moreText}
+                """;
         }
         catch (Exception ex)
         {
-            return $"❌ Erro ao listar períodos de folha: {ex.Message}";
+            return $"❌ Erro ao listar períodos: {ex.Message}";
         }
     }
 
@@ -63,36 +71,30 @@ public class PayrollPlugin
 
             if (period == null)
             {
-                return $"🔍 Período de folha com ID {periodId} não encontrado.";
+                return $"🔍 Período de folha **#{periodId}** não encontrado.";
             }
 
             var totalBruto = period.Results.Sum(r => r.GrossAmount);
             var totalLiquido = period.Results.Sum(r => r.NetAmount);
             var totalDescontos = period.Results.Sum(r => r.TotalDeductions);
-            var totalProventos = period.Results.Sum(r => r.TotalEarnings);
 
-            var statusInfo = period.Status switch
-            {
-                PayrollPeriodStatus.Approved => $" - Aprovado em: {period.ApprovedAt:dd/MM/yyyy}",
-                PayrollPeriodStatus.Paid => $" - Pago em: {period.PaidAt:dd/MM/yyyy}",
-                _ => ""
-            };
-
-            return $"📋 **Detalhes do Período de Folha:**\n\n" +
-                   $"**ID:** {period.Id}\n" +
-                   $"**Referência:** {GetMonthName(period.ReferenceMonth)}/{period.ReferenceYear}\n" +
-                   $"**Status:** {GetStatusText(period.Status)}{statusInfo}\n" +
-                   $"**Total de Funcionários:** {period.Results.Count}\n\n" +
-                   $"**💰 Resumo Financeiro:**\n" +
-                   $"  • Total Bruto: R$ {totalBruto:N2}\n" +
-                   $"  • Total Descontos: R$ {totalDescontos:N2}\n" +
-                   $"  • Total Proventos: R$ {totalProventos:N2}\n" +
-                   $"  • **Total Líquido: R$ {totalLiquido:N2}**\n\n" +
-                   $"**Observações:** {period.Notes ?? "Nenhuma"}";
+            return $"""
+                📋 **Folha de {GetMonthName(period.ReferenceMonth)}/{period.ReferenceYear}**
+                
+                | Métrica | Valor |
+                |---------|-------|
+                | **Status** | {GetStatusText(period.Status)} |
+                | **Funcionários** | {period.Results.Count} |
+                | **Total Bruto** | R$ {totalBruto:N2} |
+                | **Descontos** | R$ {totalDescontos:N2} |
+                | **Total Líquido** | R$ {totalLiquido:N2} |
+                
+                {(period.Notes != null ? $"> **Obs:** {period.Notes}" : "")}
+                """;
         }
         catch (Exception ex)
         {
-            return $"❌ Erro ao buscar detalhes do período: {ex.Message}";
+            return $"❌ Erro ao buscar detalhes: {ex.Message}";
         }
     }
 
@@ -104,40 +106,42 @@ public class PayrollPlugin
             var currentMonth = DateTime.UtcNow.Month;
             var currentYear = DateTime.UtcNow.Year;
 
-            // Busca períodos do ano atual
             var periods = await _payrollService.GetPeriodsAsync(currentYear, null);
             
-            // Tenta encontrar o período atual ou o mais recente
             var period = periods.FirstOrDefault(p => p.ReferenceMonth == currentMonth && p.ReferenceYear == currentYear)
                       ?? periods.FirstOrDefault();
 
             if (period == null)
             {
-                return $"📋 Não há períodos de folha de pagamento cadastrados para {currentYear}.";
+                return $"📋 Não há períodos de folha em {currentYear}.";
             }
 
             var totalBruto = period.Results.Sum(r => r.GrossAmount);
             var totalLiquido = period.Results.Sum(r => r.NetAmount);
             var totalDescontos = period.Results.Sum(r => r.TotalDeductions);
 
-            return $"📋 **Resumo da Folha - {GetMonthName(period.ReferenceMonth)}/{period.ReferenceYear}:**\n\n" +
-                   $"**Status:** {GetStatusText(period.Status)}\n" +
-                   $"**Funcionários:** {period.Results.Count}\n\n" +
-                   $"**💰 Totais:**\n" +
-                   $"  • Bruto: R$ {totalBruto:N2}\n" +
-                   $"  • Descontos: R$ {totalDescontos:N2}\n" +
-                   $"  • **Líquido: R$ {totalLiquido:N2}**";
+            return $"""
+                📋 **Folha Atual — {GetMonthName(period.ReferenceMonth)}/{period.ReferenceYear}**
+                
+                | Métrica | Valor |
+                |---------|-------|
+                | **Status** | {GetStatusText(period.Status)} |
+                | **Funcionários** | {period.Results.Count} |
+                | **Bruto** | R$ {totalBruto:N2} |
+                | **Descontos** | R$ {totalDescontos:N2} |
+                | **Líquido** | R$ {totalLiquido:N2} |
+                """;
         }
         catch (Exception ex)
         {
-            return $"❌ Erro ao buscar resumo da folha: {ex.Message}";
+            return $"❌ Erro ao buscar resumo: {ex.Message}";
         }
     }
 
     [KernelFunction, Description("Lista os funcionários e seus valores em um período específico de folha")]
     public async Task<string> ListPayrollEmployees(
         [Description("ID do período de folha de pagamento")] int periodId,
-        [Description("Número máximo de funcionários a exibir")] int maxResults = 15)
+        [Description("Número máximo de funcionários a exibir")] int maxResults = 10)
     {
         try
         {
@@ -145,28 +149,35 @@ public class PayrollPlugin
 
             if (period == null)
             {
-                return $"🔍 Período de folha com ID {periodId} não encontrado.";
+                return $"🔍 Período de folha **#{periodId}** não encontrado.";
             }
 
             if (!period.Results.Any())
             {
-                return $"📋 O período {GetMonthName(period.ReferenceMonth)}/{period.ReferenceYear} não possui resultados calculados.";
+                return $"📋 O período não possui resultados calculados.";
             }
 
-            var employeeList = period.Results
+            var list = period.Results
                 .OrderByDescending(r => r.NetAmount)
                 .Take(maxResults)
                 .Select(r =>
-                    $"- **{(string.IsNullOrEmpty(r.EmployeeNameSnapshot) ? $"Funcionário #{r.EmployeeId}" : r.EmployeeNameSnapshot)}** - Bruto: R$ {r.GrossAmount:N2} → Líquido: R$ {r.NetAmount:N2}"
+                    $"| {r.EmployeeNameSnapshot ?? $"#{r.EmployeeId}"} | R$ {r.GrossAmount:N2} | R$ {r.NetAmount:N2} |"
                 );
 
-            return $"👥 **Funcionários na Folha de {GetMonthName(period.ReferenceMonth)}/{period.ReferenceYear}:**\n" +
-                   $"(Exibindo {Math.Min(maxResults, period.Results.Count)} de {period.Results.Count})\n\n" +
-                   string.Join("\n", employeeList);
+            var remaining = period.Results.Count - maxResults;
+            var moreText = remaining > 0 ? $"\n\n*...e mais {remaining} funcionários.*" : "";
+
+            return $"""
+                👥 **Folha de {GetMonthName(period.ReferenceMonth)}/{period.ReferenceYear}** ({period.Results.Count} funcs)
+                
+                | Funcionário | Bruto | Líquido |
+                |-------------|-------|----------|
+                {string.Join("\n", list)}{moreText}
+                """;
         }
         catch (Exception ex)
         {
-            return $"❌ Erro ao listar funcionários da folha: {ex.Message}";
+            return $"❌ Erro ao listar funcionários: {ex.Message}";
         }
     }
 
@@ -181,31 +192,27 @@ public class PayrollPlugin
 
             if (!periods.Any())
             {
-                return $"📊 Não há dados de folha de pagamento para o ano {targetYear}.";
+                return $"📊 Não há dados de folha para {targetYear}.";
             }
 
             var totalBrutoAnual = periods.Sum(p => p.Results.Sum(r => r.GrossAmount));
             var totalLiquidoAnual = periods.Sum(p => p.Results.Sum(r => r.NetAmount));
             var totalDescontosAnual = periods.Sum(p => p.Results.Sum(r => r.TotalDeductions));
             var mediaFuncionarios = periods.Any() ? periods.Average(p => p.Results.Count) : 0;
-
-            var periodosCalculados = periods.Count(p => p.Status >= PayrollPeriodStatus.Calculated);
-            var periodosAprovados = periods.Count(p => p.Status >= PayrollPeriodStatus.Approved);
             var periodosPagos = periods.Count(p => p.Status == PayrollPeriodStatus.Paid);
 
-            return $"📊 **Estatísticas de Folha de Pagamento - {targetYear}:**\n\n" +
-                   $"**Períodos:**\n" +
-                   $"  • Total: {periods.Count}\n" +
-                   $"  • Calculados: {periodosCalculados}\n" +
-                   $"  • Aprovados: {periodosAprovados}\n" +
-                   $"  • Pagos: {periodosPagos}\n\n" +
-                   $"**💰 Totais Anuais:**\n" +
-                   $"  • Bruto: R$ {totalBrutoAnual:N2}\n" +
-                   $"  • Descontos: R$ {totalDescontosAnual:N2}\n" +
-                   $"  • **Líquido: R$ {totalLiquidoAnual:N2}**\n\n" +
-                   $"**📈 Médias:**\n" +
-                   $"  • Funcionários/mês: {mediaFuncionarios:F1}\n" +
-                   $"  • Folha mensal média: R$ {(periods.Count > 0 ? totalLiquidoAnual / periods.Count : 0):N2}";
+            return $"""
+                📊 **Estatísticas de Folha — {targetYear}**
+                
+                | Métrica | Valor |
+                |---------|-------|
+                | **Períodos** | {periods.Count} ({periodosPagos} pagos) |
+                | **Total Bruto** | R$ {totalBrutoAnual:N2} |
+                | **Total Descontos** | R$ {totalDescontosAnual:N2} |
+                | **Total Líquido** | R$ {totalLiquidoAnual:N2} |
+                | **Média Funcs/Mês** | {mediaFuncionarios:F0} |
+                | **Folha Mensal Média** | R$ {(periods.Count > 0 ? totalLiquidoAnual / periods.Count : 0):N2} |
+                """;
         }
         catch (Exception ex)
         {
@@ -232,26 +239,44 @@ public class PayrollPlugin
             var calculated = pendingPeriods.Where(p => p.Status == PayrollPeriodStatus.Calculated).ToList();
             var approved = pendingPeriods.Where(p => p.Status == PayrollPeriodStatus.Approved).ToList();
 
-            var result = $"⏳ **Períodos Pendentes de {currentYear}:**\n\n";
+            var result = $"⏳ **Períodos Pendentes de {currentYear}**\n\n";
 
             if (draft.Any())
             {
-                result += $"**📝 Aguardando cálculo ({draft.Count}):**\n";
-                result += string.Join("\n", draft.Select(p => $"  - {GetMonthName(p.ReferenceMonth)}/{p.ReferenceYear} (ID: {p.Id})"));
-                result += "\n\n";
+                var items = draft.Select(p => $"| {p.Id} | {GetMonthName(p.ReferenceMonth)}/{p.ReferenceYear} |");
+                result += $"""
+                    📝 **Aguardando Cálculo** ({draft.Count})
+                    
+                    | ID | Referência |
+                    |----|------------|
+                    {string.Join("\n", items)}
+                    
+                    """;
             }
 
             if (calculated.Any())
             {
-                result += $"**✅ Aguardando aprovação ({calculated.Count}):**\n";
-                result += string.Join("\n", calculated.Select(p => $"  - {GetMonthName(p.ReferenceMonth)}/{p.ReferenceYear} (ID: {p.Id})"));
-                result += "\n\n";
+                var items = calculated.Select(p => $"| {p.Id} | {GetMonthName(p.ReferenceMonth)}/{p.ReferenceYear} |");
+                result += $"""
+                    ✅ **Aguardando Aprovação** ({calculated.Count})
+                    
+                    | ID | Referência |
+                    |----|------------|
+                    {string.Join("\n", items)}
+                    
+                    """;
             }
 
             if (approved.Any())
             {
-                result += $"**💳 Aguardando pagamento ({approved.Count}):**\n";
-                result += string.Join("\n", approved.Select(p => $"  - {GetMonthName(p.ReferenceMonth)}/{p.ReferenceYear} (ID: {p.Id})"));
+                var items = approved.Select(p => $"| {p.Id} | {GetMonthName(p.ReferenceMonth)}/{p.ReferenceYear} |");
+                result += $"""
+                    💳 **Aguardando Pagamento** ({approved.Count})
+                    
+                    | ID | Referência |
+                    |----|------------|
+                    {string.Join("\n", items)}
+                    """;
             }
 
             return result.TrimEnd();

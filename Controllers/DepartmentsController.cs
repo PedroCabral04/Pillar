@@ -20,6 +20,10 @@ public class DepartmentsController : ControllerBase
         _context = context;
     }
     
+    /// <summary>
+    /// Recupera todos os departamentos, incluindo departamento pai, informações do gestor e contagem de funcionários.
+    /// </summary>
+    /// <returns>200 OK com uma coleção de <see cref="DepartmentDto"/>.</returns>
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<DepartmentDto>>> GetAllDepartments()
@@ -49,6 +53,11 @@ public class DepartmentsController : ControllerBase
         return Ok(dtos);
     }
     
+    /// <summary>
+    /// Recupera um único departamento pelo seu identificador, incluindo departamento pai, gestor e funcionários relacionados.
+    /// </summary>
+    /// <param name="id">O identificador do departamento.</param>
+    /// <returns>200 OK com <see cref="DepartmentDto"/>, ou 404 Not Found se o departamento não existir.</returns>
     [HttpGet("{id}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -83,6 +92,11 @@ public class DepartmentsController : ControllerBase
         return Ok(dto);
     }
     
+    /// <summary>
+    /// Cria um novo departamento.
+    /// </summary>
+    /// <param name="createDto">Dados do departamento usados para criar o registro.</param>
+    /// <returns>201 Created com o <see cref="DepartmentDto"/> criado, ou 400 Bad Request em caso de entrada inválida.</returns>
     [HttpPost]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -119,6 +133,12 @@ public class DepartmentsController : ControllerBase
         return CreatedAtAction(nameof(GetDepartmentById), new { id = dto.Id }, dto);
     }
     
+    /// <summary>
+    /// Atualiza um departamento existente com os valores fornecidos.
+    /// </summary>
+    /// <param name="id">O identificador do departamento a ser atualizado.</param>
+    /// <param name="updateDto">O payload de atualização.</param>
+    /// <returns>204 No Content em sucesso, ou 404 Not Found se o departamento não existir.</returns>
     [HttpPut("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -141,6 +161,11 @@ public class DepartmentsController : ControllerBase
         return NoContent();
     }
     
+    /// <summary>
+    /// Exclui um departamento se ele não tiver funcionários ou subdepartamentos.
+    /// </summary>
+    /// <param name="id">O identificador do departamento a ser excluído.</param>
+    /// <returns>204 No Content em sucesso, 400 Bad Request se existirem restrições de exclusão, ou 404 Not Found se não existir.</returns>
     [HttpDelete("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

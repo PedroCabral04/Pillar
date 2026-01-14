@@ -21,7 +21,8 @@ public interface IAccountPayableDao
         int? categoryId = null,
         int? costCenterId = null,
         string? sortBy = null,
-        bool sortDescending = false);
+        bool sortDescending = false,
+        string? searchText = null);
     Task<List<AccountPayable>> GetOverdueAsync();
     Task<List<AccountPayable>> GetDueSoonAsync(int days = 7);
     Task<List<AccountPayable>> GetPendingApprovalAsync();
@@ -45,6 +46,7 @@ public class AccountPayableDao : IAccountPayableDao
     public async Task<AccountPayable?> GetByIdAsync(int id)
     {
         return await _context.AccountsPayable
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .FirstOrDefaultAsync(a => a.Id == id);
     }
@@ -52,6 +54,7 @@ public class AccountPayableDao : IAccountPayableDao
     public async Task<AccountPayable?> GetByIdWithRelationsAsync(int id)
     {
         return await _context.AccountsPayable
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Include(a => a.Supplier)
             .Include(a => a.Category)
@@ -66,6 +69,7 @@ public class AccountPayableDao : IAccountPayableDao
     public async Task<List<AccountPayable>> GetAllAsync()
     {
         return await _context.AccountsPayable
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Include(a => a.Supplier)
             .OrderByDescending(a => a.CreatedAt)
@@ -84,9 +88,11 @@ public class AccountPayableDao : IAccountPayableDao
         int? categoryId = null,
         int? costCenterId = null,
         string? sortBy = null,
-        bool sortDescending = false)
+        bool sortDescending = false,
+        string? searchText = null)
     {
         var query = _context.AccountsPayable
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Include(a => a.Supplier)
             .Include(a => a.Category)
@@ -99,6 +105,8 @@ public class AccountPayableDao : IAccountPayableDao
 
         if (status.HasValue)
             query = query.Where(a => a.Status == status.Value);
+        else
+            query = query.Where(a => a.Status != AccountStatus.Cancelled);
 
         if (requiresApproval.HasValue)
             query = query.Where(a => a.RequiresApproval == requiresApproval.Value);
@@ -117,6 +125,16 @@ public class AccountPayableDao : IAccountPayableDao
 
         if (costCenterId.HasValue)
             query = query.Where(a => a.CostCenterId == costCenterId.Value);
+
+        // Apply text search
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            var search = searchText.ToLower();
+            query = query.Where(a => 
+                (a.InvoiceNumber != null && a.InvoiceNumber.ToLower().Contains(search)) ||
+                (a.Supplier != null && a.Supplier.Name.ToLower().Contains(search)) ||
+                (a.Notes != null && a.Notes.ToLower().Contains(search)));
+        }
 
         var totalCount = await query.CountAsync();
 
@@ -141,6 +159,7 @@ public class AccountPayableDao : IAccountPayableDao
     public async Task<List<AccountPayable>> GetOverdueAsync()
     {
         return await _context.AccountsPayable
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Include(a => a.Supplier)
             .Where(a => a.DueDate < DateTime.UtcNow && a.Status == AccountStatus.Pending)
@@ -152,6 +171,7 @@ public class AccountPayableDao : IAccountPayableDao
     {
         var targetDate = DateTime.UtcNow.AddDays(days);
         return await _context.AccountsPayable
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Include(a => a.Supplier)
             .Where(a => a.DueDate >= DateTime.UtcNow && a.DueDate <= targetDate && a.Status == AccountStatus.Pending)
@@ -162,6 +182,7 @@ public class AccountPayableDao : IAccountPayableDao
     public async Task<List<AccountPayable>> GetPendingApprovalAsync()
     {
         return await _context.AccountsPayable
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Include(a => a.Supplier)
             .Where(a => a.RequiresApproval && a.ApprovalDate == null)
@@ -172,6 +193,7 @@ public class AccountPayableDao : IAccountPayableDao
     public async Task<decimal> GetTotalByStatusAsync(AccountStatus status)
     {
         return await _context.AccountsPayable
+            .IgnoreQueryFilters()
             .Where(a => a.Status == status)
             .SumAsync(a => a.OriginalAmount - a.DiscountAmount + a.InterestAmount + a.FineAmount);
     }
@@ -179,6 +201,7 @@ public class AccountPayableDao : IAccountPayableDao
     public async Task<decimal> GetTotalBySupplierAsync(int supplierId)
     {
         return await _context.AccountsPayable
+            .IgnoreQueryFilters()
             .Where(a => a.SupplierId == supplierId && a.Status != AccountStatus.Paid)
             .SumAsync(a => a.OriginalAmount - a.DiscountAmount + a.InterestAmount + a.FineAmount - a.PaidAmount);
     }
@@ -186,6 +209,7 @@ public class AccountPayableDao : IAccountPayableDao
     public async Task<List<AccountPayable>> GetInstallmentsAsync(int parentAccountId)
     {
         return await _context.AccountsPayable
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(a => a.ParentAccountId == parentAccountId)
             .OrderBy(a => a.InstallmentNumber)

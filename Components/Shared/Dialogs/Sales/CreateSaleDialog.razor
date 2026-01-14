@@ -278,13 +278,13 @@
     
     private async Task<IEnumerable<CustomerDto>> SearchCustomers(string value, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(value))
-            return Array.Empty<CustomerDto>();
-        
         try
         {
-            var response = await ApiService.GetAsync<PaginatedCustomersResponse>(
-                $"/api/sales/customers?search={Uri.EscapeDataString(value)}&pageSize=10");
+            var url = string.IsNullOrWhiteSpace(value)
+                ? "/api/sales/customers?pageSize=10"
+                : $"/api/sales/customers?search={Uri.EscapeDataString(value)}&pageSize=10";
+
+            var response = await ApiService.GetAsync<PaginatedCustomersResponse>(url);
             return response?.Items ?? new List<CustomerDto>();
         }
         catch (Exception ex)
@@ -296,13 +296,13 @@
     
     private async Task<IEnumerable<ProductDto>> SearchProducts(string value, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(value))
-            return Array.Empty<ProductDto>();
-        
         try
         {
-            var response = await ApiService.GetAsync<PaginatedProductsResponse>(
-                $"/api/products?search={Uri.EscapeDataString(value)}&pageSize=20&status=Ativo");
+            var url = string.IsNullOrWhiteSpace(value)
+                ? "/api/products?pageSize=20&status=Ativo"
+                : $"/api/products?search={Uri.EscapeDataString(value)}&pageSize=20&status=Ativo";
+
+            var response = await ApiService.GetAsync<PaginatedProductsResponse>(url);
             return response?.Items ?? new List<ProductDto>();
         }
         catch (Exception ex)

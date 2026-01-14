@@ -69,13 +69,13 @@
             <MudNavLink Href="inventory/products" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Category">Produtos</MudNavLink>
             <MudNavLink Href="inventory/categories" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FolderOpen">Categorias</MudNavLink>
             <MudNavLink Href="inventory/movements" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.SwapHoriz">Movimentações</MudNavLink>
-            <MudNavLink Href="inventory/counts" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Checklist">Contagens</MudNavLink>
+            @*<MudNavLink Href="inventory/counts" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Checklist">Contagens</MudNavLink> *@
         </MudNavGroup>
         
         <MudNavGroup Title="Financeiro" Icon="@Icons.Material.Filled.AccountBalance" Expanded="false" Class="my-1" HideExpandIcon="false">
             <MudNavLink Href="financial/dashboard" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
-            <MudNavLink Href="financial/receivables" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CallReceived">Contas a Receber</MudNavLink>
-            <MudNavLink Href="financial/payables" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CallMade">Contas a Pagar</MudNavLink>
+            <MudNavLink Href="financial/accounts-receivable" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CallReceived">Contas a Receber</MudNavLink>
+            <MudNavLink Href="financial/accounts-payable" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CallMade">Contas a Pagar</MudNavLink>
             <MudNavLink Href="financial/suppliers" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.LocalShipping">Fornecedores</MudNavLink>
             <MudNavLink Href="financial/categories" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Category">Categorias</MudNavLink>
             <MudNavLink Href="financial/costcenters" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AccountBalanceWallet">Centros de Custo</MudNavLink>
@@ -98,7 +98,10 @@
     
     @if (IsOpen)
     {
-        <MudNavLink Href="assets" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Devices" Class="my-1">Ativos</MudNavLink>
+        <MudNavGroup Title="Ativos" Icon="@Icons.Material.Filled.Devices" Expanded="false" Class="my-1" HideExpandIcon="false">
+            <MudNavLink Href="assets" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Inventory2">Gerenciar Ativos</MudNavLink>
+            <MudNavLink Href="assets/categories" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Category">Categorias</MudNavLink>
+        </MudNavGroup>
     }
     else
     {
@@ -109,7 +112,7 @@
     
     @if (IsOpen)
     {
-        <MudNavLink Href="reports" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Assessment" Class="my-1">Relatórios</MudNavLink>
+        @*<MudNavLink Href="reports" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Assessment" Class="my-1">Relatórios</MudNavLink>*@
     }
     else
     {
@@ -130,7 +133,8 @@
                     <MudNavLink Href="admin/departments" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.BusinessCenter">Departamentos</MudNavLink>
                     <MudNavLink Href="admin/positions" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.WorkOutline">Cargos</MudNavLink>
                     <MudNavLink Href="admin/widget-roles" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Widgets">Widgets / Papéis</MudNavLink>
-                    <MudNavLink Href="time-tracking/payroll" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AccessTime">Apontamento</MudNavLink>
+                    <MudNavLink Href="time-tracking/entries" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AccessTime">Apontamento</MudNavLink>
+                    @* <MudNavLink Href="time-tracking/payroll" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AccessTime">Apontamento (Antigo)</MudNavLink> *@
                     <MudNavLink Href="audit" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.History">Auditoria</MudNavLink>
                     <MudNavLink Href="data-access-report" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Shield">Acessos LGPD</MudNavLink>
                 </MudNavGroup>
@@ -144,7 +148,7 @@
                     <MudNavLink Href="admin/tenants" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CorporateFare" Class="my-1" />
                 </MudTooltip>
                 <MudNavLink Href="admin/widget-roles" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Widgets" Class="my-1" />
-                <MudNavLink Href="time-tracking/payroll" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AccessTime" Class="my-1" />
+                <MudNavLink Href="time-tracking/entries" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AccessTime" Class="my-1" />
             }
         </Authorized>
     </AuthorizeView>

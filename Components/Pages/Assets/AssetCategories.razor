@@ -1,0 +1,258 @@
+@page "/assets/categories"
+@using erp.DTOs.Assets
+@using erp.Services
+@using erp.Services.Authorization
+@using erp.Components.Shared.Dialogs.Assets
+@using MudBlazor
+@using Size = MudBlazor.Size
+@using Color = MudBlazor.Color
+@attribute [Authorize(Policy = ModulePolicies.Assets)]
+
+@inject IApiService ApiService
+@inject ILogger<AssetCategories> Logger
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Categorias de Ativos - Pillar ERP</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Category" Size="Size.Large" Color="Color.Primary" />
+            <MudText Typo="Typo.h4">Categorias de Ativos</MudText>
+        </MudStack>
+        <MudButton Color="Color.Primary" 
+                Variant="Variant.Filled" 
+                StartIcon="@Icons.Material.Filled.Add"
+                OnClick="OpenCreateDialog">
+            Nova Categoria
+        </MudButton>
+    </MudStack>
+
+    @if (_loadError != null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@_loadError</MudAlert>
+    }
+
+    <MudPaper Elevation="2">
+        <MudTable T="AssetCategoryDto" Items="_categories" 
+                Dense="false" Hover="true" Striped="true" Loading="@_loading"
+                Filter="FilterFunc">
+            <ToolBarContent>
+                <MudText Typo="Typo.h6">Categorias Cadastradas</MudText>
+                <MudSpacer/>
+                <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                    <MudTextField T="string" @bind-Value="_searchString" 
+                                Placeholder="Buscar categoria..." 
+                                Variant="Variant.Outlined" Margin="Margin.Dense"
+                                Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
+                                Clearable="true" Style="min-width: 250px;" Immediate="true"/>
+                    <MudSelect T="string" 
+                            @bind-Value="_statusFilter"
+                            Label="Status" 
+                            Variant="Variant.Outlined" 
+                            Margin="Margin.Dense"
+                            Clearable="true"
+                            Style="min-width: 120px;">
+                        <MudSelectItem T="string" Value="@("Ativo")">Ativo</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("Inativo")">Inativo</MudSelectItem>
+                    </MudSelect>
+                </MudStack>
+            </ToolBarContent>
+            <HeaderContent>
+                <MudTh>Ícone</MudTh>
+                <MudTh>Nome</MudTh>
+                <MudTh>Descrição</MudTh>
+                <MudTh Style="text-align: center">Status</MudTh>
+                <MudTh>Data Criação</MudTh>
+                <MudTh Style="text-align: center">Ações</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Ícone">
+                    <MudIcon Icon="@(context.Icon ?? Icons.Material.Filled.Category)" 
+                             Color="Color.Primary" Size="Size.Medium" />
+                </MudTd>
+                <MudTd DataLabel="Nome">
+                    <MudText Typo="Typo.body2" Style="font-weight: 600;">@context.Name</MudText>
+                </MudTd>
+                <MudTd DataLabel="Descrição">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        @(string.IsNullOrEmpty(context.Description) ? "-" : context.Description)
+                    </MudText>
+                </MudTd>
+                <MudTd DataLabel="Status" Style="text-align: center">
+                    <MudChip T="string" Size="Size.Small" Color="@(context.IsActive ? Color.Success : Color.Default)">
+                        @(context.IsActive ? "Ativo" : "Inativo")
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Data">
+                    <MudText Typo="Typo.caption">@context.CreatedAt.ToString("dd/MM/yyyy")</MudText>
+                </MudTd>
+                <MudTd DataLabel="Ações" Style="text-align: center">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                                Size="Size.Small"
+                                OnClick="@(() => OpenEditDialog(context))"
+                                Title="Editar"/>
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                Size="Size.Small" 
+                                Color="Color.Error"
+                                OnClick="@(() => DeleteCategory(context))"
+                                Title="Excluir"/>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudStack AlignItems="AlignItems.Center" Spacing="2" Class="py-8">
+                    <MudIcon Icon="@Icons.Material.Filled.FolderOff" Size="Size.Large" Color="Color.Secondary" />
+                    <MudText Typo="Typo.body1" Color="Color.Secondary">Nenhuma categoria encontrada</MudText>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                               OnClick="OpenCreateDialog">
+                        Criar primeira categoria
+                    </MudButton>
+                </MudStack>
+            </NoRecordsContent>
+            <LoadingContent>
+                <MudText>Carregando...</MudText>
+            </LoadingContent>
+            <PagerContent>
+                <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+            </PagerContent>
+        </MudTable>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private List<AssetCategoryDto> _categories = new();
+    private string? _loadError;
+    private string? _searchString;
+    private string? _statusFilter;
+    private bool _loading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCategories();
+    }
+
+    private async Task LoadCategories()
+    {
+        _loading = true;
+        _loadError = null;
+        
+        try
+        {
+            _categories = await ApiService.GetAsync<List<AssetCategoryDto>>("/api/assets/categories") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar categorias de ativos");
+            _loadError = "Erro ao carregar categorias. Tente novamente.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private bool FilterFunc(AssetCategoryDto category)
+    {
+        // Status filter
+        if (!string.IsNullOrEmpty(_statusFilter))
+        {
+            var isActive = _statusFilter == "Ativo";
+            if (category.IsActive != isActive)
+                return false;
+        }
+        
+        // Search filter
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+            
+        if (category.Name.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+            
+        if (!string.IsNullOrEmpty(category.Description) && 
+            category.Description.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+            
+        return false;
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var options = new DialogOptions 
+        { 
+            CloseButton = true, 
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true 
+        };
+        
+        var dialog = await DialogService.ShowAsync<AssetCategoryDialog>("Nova Categoria", options);
+        var result = await dialog.Result;
+        
+        if (result is { Canceled: false })
+        {
+            await LoadCategories();
+        }
+    }
+
+    private async Task OpenEditDialog(AssetCategoryDto category)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Category", category }
+        };
+        
+        var options = new DialogOptions 
+        { 
+            CloseButton = true, 
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true 
+        };
+        
+        var dialog = await DialogService.ShowAsync<AssetCategoryDialog>("Editar Categoria", parameters, options);
+        var result = await dialog.Result;
+        
+        if (result is { Canceled: false })
+        {
+            await LoadCategories();
+        }
+    }
+
+    private async Task DeleteCategory(AssetCategoryDto category)
+    {
+        var parameters = new DialogParameters
+        {
+            { "ContentText", $"Tem certeza que deseja excluir a categoria \"{category.Name}\"?" },
+            { "ButtonText", "Excluir" },
+            { "Color", Color.Error }
+        };
+        
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<erp.Components.Shared.Dialogs.ConfirmDialog>("Confirmar Exclusão", parameters, options);
+        var result = await dialog.Result;
+        
+        if (result is { Canceled: false })
+        {
+            try
+            {
+                await ApiService.DeleteAsync($"/api/assets/categories/{category.Id}");
+                Snackbar.Add("Categoria excluída com sucesso!", Severity.Success);
+                await LoadCategories();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Erro ao excluir categoria {CategoryId}", category.Id);
+                
+                // Check if it's the "has assets" error
+                if (ex.Message.Contains("ativos associados", StringComparison.OrdinalIgnoreCase) ||
+                    ex.Message.Contains("possui ativos", StringComparison.OrdinalIgnoreCase))
+                {
+                    Snackbar.Add("Não é possível excluir esta categoria pois existem ativos vinculados a ela.", Severity.Warning);
+                }
+                else
+                {
+                    Snackbar.Add($"Erro ao excluir categoria: {ex.Message}", Severity.Error);
+                }
+            }
+        }
+    }
+}

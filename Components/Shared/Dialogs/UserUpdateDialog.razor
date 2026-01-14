@@ -519,8 +519,11 @@
         return roleName.ToLower() switch
         {
             "administrador" => Icons.Material.Filled.AdminPanelSettings,
-            "gerente" => Icons.Material.Filled.ManageAccounts,
-            "vendedor" => Icons.Material.Filled.StoreMallDirectory,
+            "gerente" => Icons.Material.Filled.SupervisorAccount,
+            "vendedor" => Icons.Material.Filled.PointOfSale,
+            "estoque" => Icons.Material.Filled.Inventory,
+            "rh" => Icons.Material.Filled.Badge,
+            "financeiro" => Icons.Material.Filled.AccountBalance,
             _ => Icons.Material.Filled.Person
         };
     }
@@ -532,7 +535,10 @@
             "administrador" => "Acesso total ao sistema",
             "gerente" => "Gerenciar equipes e relatórios",
             "vendedor" => "Registro de vendas e atendimento",
-            _ => "Usuário comum"
+            "estoque" => "Controle de estoque e produtos",
+            "rh" => "Recursos Humanos e folha",
+            "financeiro" => "Gestão financeira",
+            _ => "Usuário do sistema"
         };
     }
 }

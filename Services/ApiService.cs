@@ -20,6 +20,9 @@ public interface IApiService
     Task<HttpResponseMessage> PatchAsync(string endpoint, object? data, CancellationToken cancellationToken = default);
     Task<T?> PatchAsync<T>(string endpoint, object data, CancellationToken cancellationToken = default);
     
+    // File upload
+    Task<HttpResponseMessage> PostMultipartAsync(string endpoint, MultipartFormDataContent content, CancellationToken cancellationToken = default);
+    
     event EventHandler<bool>? LoadingStateChanged;
     event EventHandler<string>? ErrorOccurred;
     bool IsLoading { get; }
@@ -252,7 +255,8 @@ public class ApiService : IApiService
         
         // If not successful, throw exception with error details
         var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-        throw new HttpRequestException($"Request failed with status {response.StatusCode}: {errorContent}");
+        var errorMessage = ExtractErrorMessage(errorContent);
+        throw new HttpRequestException(errorMessage ?? $"Request failed with status {response.StatusCode}: {errorContent}");
     }
 
     public async Task<T?> PutAsync<T>(string endpoint, object data, CancellationToken cancellationToken = default)
@@ -270,7 +274,8 @@ public class ApiService : IApiService
         
         // If not successful, throw exception with error details
         var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-        throw new HttpRequestException($"Request failed with status {response.StatusCode}: {errorContent}");
+        var errorMessage = ExtractErrorMessage(errorContent);
+        throw new HttpRequestException(errorMessage ?? $"Request failed with status {response.StatusCode}: {errorContent}");
     }
 
     public async Task<HttpResponseMessage> PostAsync(string endpoint, object? data, CancellationToken cancellationToken = default)
@@ -322,7 +327,30 @@ public class ApiService : IApiService
         }
 
         var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-        throw new HttpRequestException($"Request failed with status {response.StatusCode}: {errorContent}");
+        var errorMessage = ExtractErrorMessage(errorContent);
+        throw new HttpRequestException(errorMessage ?? $"Request failed with status {response.StatusCode}: {errorContent}");
+    }
+
+    public async Task<HttpResponseMessage> PostMultipartAsync(string endpoint, MultipartFormDataContent content, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            BeginLoading();
+
+            var request = CreateRequestWithCookies(HttpMethod.Post, endpoint);
+            request.Content = content;
+            
+            return await _httpClient.SendAsync(request, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            HandleError(ex, endpoint, "POST (multipart)");
+            throw;
+        }
+        finally
+        {
+            EndLoading();
+        }
     }
 
     /// <summary>
@@ -391,6 +419,84 @@ public class ApiService : IApiService
         }
 
         throw lastException ?? new Exception($"Falha ao executar requisição para {endpoint} após {maxRetries} tentativas");
+    }
+
+    private string? ExtractErrorMessage(string content)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(content);
+            var root = doc.RootElement;
+
+            // 1. Try to find "errors" object (Validation problems)
+            if (root.TryGetProperty("errors", out var errors) && errors.ValueKind == JsonValueKind.Object)
+            {
+                var sb = new StringBuilder();
+                foreach (var property in errors.EnumerateObject())
+                {
+                    if (property.Value.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var error in property.Value.EnumerateArray())
+                        {
+                            sb.AppendLine(error.GetString());
+                        }
+                    }
+                    else
+                    {
+                        sb.AppendLine(property.Value.GetString());
+                    }
+                }
+                
+                if (sb.Length > 0)
+                    return sb.ToString().TrimEnd();
+            }
+
+            // 2. Try to find "detail" (ProblemDetails standard)
+            if (root.TryGetProperty("detail", out var detail) && detail.ValueKind == JsonValueKind.String)
+            {
+                return detail.GetString();
+            }
+
+            // 3. Try to find "title" (ProblemDetails standard)
+            if (root.TryGetProperty("title", out var title) && title.ValueKind == JsonValueKind.String)
+            {
+                return title.GetString();
+            }
+
+            // 4. Try to find "message" (Custom format)
+            if (root.TryGetProperty("message", out var msg) && msg.ValueKind == JsonValueKind.String)
+            {
+                return msg.GetString();
+            }
+            
+            // 5. Fallback for simple dictionary of errors (Legacy ModelState)
+            // If the root is an object and values are arrays of strings, treat as validation errors
+            if (root.ValueKind == JsonValueKind.Object)
+            {
+                var sb = new StringBuilder();
+                var isValidation = false;
+                
+                foreach (var property in root.EnumerateObject())
+                {
+                    if (property.Value.ValueKind == JsonValueKind.Array)
+                    {
+                        isValidation = true;
+                        foreach (var error in property.Value.EnumerateArray())
+                        {
+                            sb.AppendLine(error.GetString());
+                        }
+                    }
+                }
+                
+                if (isValidation && sb.Length > 0)
+                    return sb.ToString().TrimEnd();
+            }
+        }
+        catch
+        {
+            // Ignore parsing errors
+        }
+        return null;
     }
 
     /// <summary>

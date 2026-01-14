@@ -16,7 +16,8 @@
                 <MudText Typo="Typo.h6">@CurrentStep.Title</MudText>
                 <MudIconButton Icon="@Icons.Material.Filled.Close" 
                               Size="MudBlazor.Size.Small" 
-                              OnClick="@SkipTour" />
+                              OnClick="@SkipTour" 
+                              Disabled="@_isProcessing" />
             </div>
             
             <div class="onboarding-popup-body">
@@ -38,7 +39,8 @@
                 {
                     <MudButton Variant="Variant.Text" 
                               Color="MudBlazor.Color.Default" 
-                              OnClick="@SkipTour">
+                              OnClick="@SkipTour"
+                              Disabled="@_isProcessing">
                         Pular Tour
                     </MudButton>
                 }
@@ -50,7 +52,8 @@
                     <MudButton Variant="Variant.Outlined" 
                               Color="MudBlazor.Color.Primary" 
                               OnClick="@PreviousStep"
-                              Class="mr-2">
+                              Class="mr-2"
+                              Disabled="@_isProcessing">
                         Anterior
                     </MudButton>
                 }
@@ -59,7 +62,8 @@
                 {
                     <MudButton Variant="Variant.Filled" 
                               Color="MudBlazor.Color.Primary" 
-                              OnClick="@NextStep">
+                              OnClick="@NextStep"
+                              Disabled="@_isProcessing">
                         Próximo
                     </MudButton>
                 }
@@ -67,7 +71,8 @@
                 {
                     <MudButton Variant="Variant.Filled" 
                               Color="MudBlazor.Color.Success" 
-                              OnClick="@CompleteTour">
+                              OnClick="@CompleteTour"
+                              Disabled="@_isProcessing">
                         Concluir
                     </MudButton>
                 }
@@ -89,6 +94,7 @@
     private int CurrentStepIndex { get; set; }
     private string? UserId { get; set; }
     private string[]? UserRoles { get; set; }
+    private bool _isProcessing = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -127,22 +133,32 @@
 
     private async Task NextStep()
     {
+        if (_isProcessing) return;
         if (CurrentTour == null || CurrentStepIndex >= CurrentTour.Steps.Count - 1) return;
 
-        CurrentStepIndex++;
-        CurrentStep = CurrentTour.Steps[CurrentStepIndex];
-        
-        if (!string.IsNullOrEmpty(UserId) && CurrentTour != null)
+        try
         {
-            await OnboardingService.CompleteStepAsync(UserId, CurrentTour.Id, CurrentStepIndex - 1);
+            _isProcessing = true;
+            CurrentStepIndex++;
+            CurrentStep = CurrentTour.Steps[CurrentStepIndex];
+            
+            if (!string.IsNullOrEmpty(UserId) && CurrentTour != null)
+            {
+                await OnboardingService.CompleteStepAsync(UserId, CurrentTour.Id, CurrentStepIndex - 1);
+            }
+            
+            StateHasChanged();
+            await ScrollToTarget();
         }
-        
-        StateHasChanged();
-        await ScrollToTarget();
+        finally
+        {
+            _isProcessing = false;
+        }
     }
 
     private async Task PreviousStep()
     {
+        if (_isProcessing) return;
         if (CurrentTour == null || CurrentStepIndex <= 0) return;
 
         CurrentStepIndex--;
@@ -153,28 +169,46 @@
 
     private async Task CompleteTour()
     {
+        if (_isProcessing) return;
         if (CurrentTour == null || CurrentStep == null || string.IsNullOrEmpty(UserId)) return;
 
-        await OnboardingService.CompleteTourAsync(UserId, CurrentTour.Id);
-        await OnTourCompleted.InvokeAsync(CurrentTour.Id);
-        
-        IsActive = false;
-        CurrentTour = null;
-        CurrentStep = null;
-        StateHasChanged();
+        try
+        {
+            _isProcessing = true;
+            await OnboardingService.CompleteTourAsync(UserId, CurrentTour.Id);
+            await OnTourCompleted.InvokeAsync(CurrentTour.Id);
+            
+            IsActive = false;
+            CurrentTour = null;
+            CurrentStep = null;
+            StateHasChanged();
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
     }
 
     private async Task SkipTour()
     {
+        if (_isProcessing) return;
         if (CurrentTour == null || string.IsNullOrEmpty(UserId)) return;
 
-        await OnboardingService.SkipTourAsync(UserId, CurrentTour.Id);
-        await OnTourSkipped.InvokeAsync(CurrentTour.Id);
-        
-        IsActive = false;
-        CurrentTour = null;
-        CurrentStep = null;
-        StateHasChanged();
+        try
+        {
+            _isProcessing = true;
+            await OnboardingService.SkipTourAsync(UserId, CurrentTour.Id);
+            await OnTourSkipped.InvokeAsync(CurrentTour.Id);
+            
+            IsActive = false;
+            CurrentTour = null;
+            CurrentStep = null;
+            StateHasChanged();
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
     }
 
     private void OnOverlayClick()

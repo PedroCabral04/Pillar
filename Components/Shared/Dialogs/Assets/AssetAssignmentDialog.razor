@@ -1,0 +1,231 @@
+@using erp.DTOs.Assets
+@using erp.DTOs.User
+@using erp.Services
+@using erp.Models
+@using MudBlazor
+@using Size = MudBlazor.Size
+@using Color = MudBlazor.Color
+
+@inject IApiService ApiService
+@inject ILogger<AssetAssignmentDialog> Logger
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Color="Color.Primary" Size="Size.Large" />
+            <MudText Typo="Typo.h6">Atribuir Ativo</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        @if (_loading)
+        {
+            <MudStack AlignItems="AlignItems.Center" Class="py-4">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Carregando...</MudText>
+            </MudStack>
+        }
+        else
+        {
+            <MudForm @ref="_form" Model="_model" Class="pa-2">
+                <MudStack Spacing="3">
+                    @if (Asset != null)
+                    {
+                        <MudAlert Severity="Severity.Info" Variant="Variant.Text" Dense="true">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                <MudIcon Icon="@Icons.Material.Filled.Inventory2" Size="Size.Small" />
+                                <MudText Typo="Typo.body2">
+                                    <strong>@Asset.AssetCode</strong> - @Asset.Name
+                                </MudText>
+                            </MudStack>
+                        </MudAlert>
+                    }
+
+                    <MudSelect T="int" @bind-Value="_model.AssignedToUserId"
+                               Label="Atribuir para"
+                               Required="true"
+                               RequiredError="Selecione um usuário"
+                               Variant="Variant.Outlined"
+                               Adornment="Adornment.Start"
+                               AdornmentIcon="@Icons.Material.Filled.Person"
+                               HelperText="Selecione o usuário que receberá o ativo"
+                               ToStringFunc="@(id => _users.FirstOrDefault(u => u.Id == id)?.FullName ?? "Selecione um usuário")">
+                        @if (!_users.Any())
+                        {
+                            <MudSelectItem T="int" Value="0" Disabled="true">
+                                <MudText Color="Color.Secondary">Nenhum usuário encontrado</MudText>
+                            </MudSelectItem>
+                        }
+                        @foreach (var user in _users.Where(u => u.IsActive))
+                        {
+                            <MudSelectItem T="int" Value="@user.Id">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                    <MudAvatar Size="Size.Small" Color="Color.Primary">
+                                        @(user.FullName?.Substring(0, 1).ToUpper() ?? "U")
+                                    </MudAvatar>
+                                    <MudStack Spacing="0">
+                                        <MudText Typo="Typo.body2">@(user.FullName ?? user.Username)</MudText>
+                                        @if (!string.IsNullOrEmpty(user.DepartmentName))
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@user.DepartmentName</MudText>
+                                        }
+                                    </MudStack>
+                                </MudStack>
+                            </MudSelectItem>
+                        }
+                    </MudSelect>
+
+                    <MudDatePicker @bind-Date="_assignedDate"
+                                   Label="Data de Atribuição"
+                                   Variant="Variant.Outlined"
+                                   DateFormat="dd/MM/yyyy"
+                                   Adornment="Adornment.Start"
+                                   AdornmentIcon="@Icons.Material.Filled.CalendarMonth"
+                                   HelperText="Data em que o ativo foi entregue" />
+
+                    <MudSelect T="AssetCondition" @bind-Value="_model.ConditionOnAssignment"
+                               Label="Condição na Entrega"
+                               Variant="Variant.Outlined"
+                               Adornment="Adornment.Start"
+                               AdornmentIcon="@Icons.Material.Filled.StarRate"
+                               HelperText="Estado do ativo no momento da entrega">
+                        <MudSelectItem T="AssetCondition" Value="@AssetCondition.Excellent">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudRating ReadOnly="true" SelectedValue="5" Size="Size.Small" />
+                                <MudText>Excelente</MudText>
+                            </MudStack>
+                        </MudSelectItem>
+                        <MudSelectItem T="AssetCondition" Value="@AssetCondition.Good">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudRating ReadOnly="true" SelectedValue="4" Size="Size.Small" />
+                                <MudText>Bom</MudText>
+                            </MudStack>
+                        </MudSelectItem>
+                        <MudSelectItem T="AssetCondition" Value="@AssetCondition.Fair">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudRating ReadOnly="true" SelectedValue="3" Size="Size.Small" />
+                                <MudText>Regular</MudText>
+                            </MudStack>
+                        </MudSelectItem>
+                        <MudSelectItem T="AssetCondition" Value="@AssetCondition.Poor">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudRating ReadOnly="true" SelectedValue="2" Size="Size.Small" />
+                                <MudText>Ruim</MudText>
+                            </MudStack>
+                        </MudSelectItem>
+                        <MudSelectItem T="AssetCondition" Value="@AssetCondition.Damaged">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudRating ReadOnly="true" SelectedValue="1" Size="Size.Small" />
+                                <MudText>Danificado</MudText>
+                            </MudStack>
+                        </MudSelectItem>
+                    </MudSelect>
+
+                    <MudTextField @bind-Value="_model.AssignmentNotes"
+                                  Label="Observações"
+                                  Variant="Variant.Outlined"
+                                  Lines="3"
+                                  Placeholder="Observações sobre a atribuição..."
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Notes"
+                                  HelperText="Notas opcionais sobre a entrega do ativo" />
+                </MudStack>
+            </MudForm>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Close" Disabled="_saving">
+            Cancelar
+        </MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save" 
+                   Disabled="_saving || _loading" StartIcon="@(_saving ? null : Icons.Material.Filled.PersonAdd)">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <text>Atribuindo...</text>
+            }
+            else
+            {
+                <text>Atribuir Ativo</text>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public AssetDto? Asset { get; set; }
+
+    private MudForm? _form;
+    private CreateAssetAssignmentDto _model = new();
+    private List<UserDto> _users = new();
+    private DateTime? _assignedDate = DateTime.Today;
+    private bool _loading = true;
+    private bool _saving = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Asset != null)
+        {
+            _model.AssetId = Asset.Id;
+            _model.ConditionOnAssignment = Asset.Condition;
+        }
+
+        await LoadUsers();
+        _loading = false;
+    }
+
+    private async Task LoadUsers()
+    {
+        try
+        {
+            _users = await ApiService.GetAsync<List<UserDto>>("/api/user") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar usuários");
+            Snackbar.Add("Erro ao carregar lista de usuários", Severity.Error);
+        }
+    }
+
+    private async Task Save()
+    {
+        await _form!.Validate();
+        if (!_form.IsValid)
+        {
+            return;
+        }
+
+        if (_model.AssignedToUserId == 0)
+        {
+            Snackbar.Add("Selecione um usuário", Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+
+        try
+        {
+            _model.AssignedDate = _assignedDate?.ToUniversalTime() ?? DateTime.UtcNow;
+
+            var result = await ApiService.PostAsync<AssetAssignmentDto>("/api/assets/assignments", _model);
+            
+            if (result != null)
+            {
+                Snackbar.Add($"Ativo atribuído para {result.AssignedToUserName} com sucesso!", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(result));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao atribuir ativo");
+            Snackbar.Add($"Erro ao atribuir ativo: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

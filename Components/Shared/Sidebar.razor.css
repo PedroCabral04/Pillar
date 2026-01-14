@@ -7,7 +7,9 @@
     display: flex;
     flex-direction: column;
     height: 100%;
-    overflow: hidden;
+    /* Allow vertical scrolling but hide horizontal overflow (removes x scrollbar) */
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .sidebar-nav-menu {
@@ -274,16 +276,25 @@
 }
 
 /* ========================================
-   Reduced Motion
-   ======================================== */
-
-@media (prefers-reduced-motion: reduce) {
-    .pillar-sidebar *,
-    .nav-item,
-    .nav-subitem,
-    .mini-nav-item,
-    .full-wrapper {
-        transition: none !important;
-        transform: none !important;
-    }
+   Hide scrollbar when sidebar is collapsed
+   ========================================
+   Keep scrolling functional while hiding visual scrollbar.
+*/
+.full-wrapper.closing .pillar-sidebar,
+.mini-root .pillar-sidebar {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE 10+ */
 }
+
+.full-wrapper.closing .pillar-sidebar::-webkit-scrollbar,
+.mini-root .pillar-sidebar::-webkit-scrollbar {
+    display: none; /* Chrome, Edge, Safari */
+    width: 0;
+    height: 0;
+}
+
+/* ========================================
+   Reduced Motion
+   Note: System preference is NOT automatically applied.
+   The app controls this via MainLayout.razor preference.
+   ======================================== */

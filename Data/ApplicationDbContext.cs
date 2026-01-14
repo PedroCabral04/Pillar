@@ -1,6 +1,7 @@
 using erp.Models;
 using erp.Models.Identity;
 using erp.Models.Audit;
+using erp.Models.Chatbot;
 using erp.Models.TimeTracking;
 using erp.Models.Financial;
 using erp.Models.Payroll;
@@ -99,6 +100,14 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<UserDashboardLayout> UserDashboardLayouts { get; set; } = null!;
     public DbSet<WidgetRoleConfiguration> WidgetRoleConfigurations { get; set; } = null!;
     
+    // Chatbot Conversations
+    public DbSet<ChatConversation> ChatConversations { get; set; } = null!;
+    public DbSet<ChatMessage> ChatMessages { get; set; } = null!;
+    
+    // Module Permissions
+    public DbSet<ModulePermission> ModulePermissions { get; set; } = null!;
+    public DbSet<RoleModulePermission> RoleModulePermissions { get; set; } = null!;
+    
     // Serviços injetados para auditoria
     private readonly IHttpContextAccessor? _httpContextAccessor;
     private readonly erp.Services.Tenancy.ITenantContextAccessor? _tenantContextAccessor;
@@ -126,6 +135,15 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     {
         _httpContextAccessor = httpContextAccessor;
         _tenantContextAccessor = tenantContextAccessor;
+    }
+
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        configurationBuilder.Properties<DateTime>()
+            .HaveConversion<DateTimeToUtcConverter>();
+
+        configurationBuilder.Properties<DateTime?>()
+            .HaveConversion<NullableDateTimeToUtcConverter>();
     }
 
     protected override void OnConfiguring(DbContextOptionsBuilder options)
@@ -981,6 +999,12 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         
         // Dashboard model configuration
         ConfigureDashboardModels(modelBuilder);
+        
+        // Chatbot model configuration
+        ConfigureChatbotModels(modelBuilder);
+        
+        // Module permissions configuration
+        ConfigureModulePermissionModels(modelBuilder);
 
         // Apply Global Query Filters for Multi-Tenancy
         // These filters ensure queries only return data for the current tenant.
@@ -1758,7 +1782,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             c.HasKey(x => x.Id);
             c.Property(x => x.Name).HasMaxLength(100).IsRequired();
             c.Property(x => x.Description).HasMaxLength(500);
-            c.Property(x => x.Icon).HasMaxLength(50);
+            c.Property(x => x.Icon).HasMaxLength(500); // MudBlazor icons are SVG paths, need more space
+            c.Property(x => x.CreatedAt).HasConversion(
+                v => v.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : v.ToUniversalTime(),
+                v => v);
             
             c.HasIndex(x => x.Name);
             c.HasIndex(x => x.IsActive);
@@ -1780,6 +1807,18 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             a.Property(x => x.Notes).HasMaxLength(2000);
             a.Property(x => x.ImageUrl).HasMaxLength(500);
             a.Property(x => x.PurchaseValue).HasPrecision(18, 2);
+            a.Property(x => x.PurchaseDate).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
+            a.Property(x => x.WarrantyExpiryDate).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
+            a.Property(x => x.CreatedAt).HasConversion(
+                v => v.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : v.ToUniversalTime(),
+                v => v);
+            a.Property(x => x.UpdatedAt).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
             
             a.HasIndex(x => x.AssetCode).IsUnique();
             a.HasIndex(x => x.SerialNumber);
@@ -1801,6 +1840,18 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             aa.HasKey(x => x.Id);
             aa.Property(x => x.AssignmentNotes).HasMaxLength(1000);
             aa.Property(x => x.ReturnNotes).HasMaxLength(1000);
+            aa.Property(x => x.AssignedDate).HasConversion(
+                v => v.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : v.ToUniversalTime(),
+                v => v);
+            aa.Property(x => x.ReturnedDate).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
+            aa.Property(x => x.CreatedAt).HasConversion(
+                v => v.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : v.ToUniversalTime(),
+                v => v);
+            aa.Property(x => x.UpdatedAt).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
             
             aa.HasIndex(x => x.AssetId);
             aa.HasIndex(x => x.AssignedToUserId);
@@ -1840,6 +1891,24 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             am.Property(x => x.InvoiceNumber).HasMaxLength(50);
             am.Property(x => x.Notes).HasMaxLength(2000);
             am.Property(x => x.Cost).HasPrecision(18, 2);
+            am.Property(x => x.ScheduledDate).HasConversion(
+                v => v.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : v.ToUniversalTime(),
+                v => v);
+            am.Property(x => x.StartedDate).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
+            am.Property(x => x.CompletedDate).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
+            am.Property(x => x.NextMaintenanceDate).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
+            am.Property(x => x.CreatedAt).HasConversion(
+                v => v.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : v.ToUniversalTime(),
+                v => v);
+            am.Property(x => x.UpdatedAt).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
             
             am.HasIndex(x => x.AssetId);
             am.HasIndex(x => x.Type);
@@ -1875,6 +1944,18 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             ad.Property(x => x.ContentType).HasMaxLength(200).IsRequired();
             ad.Property(x => x.Description).HasMaxLength(1000);
             ad.Property(x => x.DocumentNumber).HasMaxLength(100);
+            ad.Property(x => x.DocumentDate).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
+            ad.Property(x => x.ExpiryDate).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
+            ad.Property(x => x.CreatedAt).HasConversion(
+                v => v.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : v.ToUniversalTime(),
+                v => v);
+            ad.Property(x => x.UpdatedAt).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
             
             ad.HasIndex(x => x.AssetId);
             ad.HasIndex(x => x.Type);
@@ -1902,6 +1983,21 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             at.Property(x => x.ToLocation).HasMaxLength(200).IsRequired();
             at.Property(x => x.Reason).HasMaxLength(1000);
             at.Property(x => x.Notes).HasMaxLength(2000);
+            at.Property(x => x.TransferDate).HasConversion(
+                v => v.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : v.ToUniversalTime(),
+                v => v);
+            at.Property(x => x.ApprovedDate).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
+            at.Property(x => x.CompletedDate).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
+            at.Property(x => x.CreatedAt).HasConversion(
+                v => v.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : v.ToUniversalTime(),
+                v => v);
+            at.Property(x => x.UpdatedAt).HasConversion(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                v => v);
             
             at.HasIndex(x => x.AssetId);
             at.HasIndex(x => x.FromDepartmentId);
@@ -1990,11 +2086,13 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             a.HasIndex(x => new { x.TenantId, x.EntityName, x.Timestamp })
                 .HasDatabaseName("idx_audit_tenant_entity_timeline");
             
-            // Query filter para multi-tenancy (allows system logs with TenantId == 0)
+            // Query filter para multi-tenancy
             a.HasQueryFilter(log => 
-                !ShouldApplyTenantFilter || 
-                log.TenantId == 0 || // System logs (no tenant)
-                log.TenantId == CurrentTenantId);
+                _tenantContextAccessor == null || 
+                _tenantContextAccessor.Current == null || 
+                !_tenantContextAccessor.Current.TenantId.HasValue || 
+                log.TenantId == 0 || // Logs sem tenant (sistema)
+                log.TenantId == _tenantContextAccessor.Current.TenantId.GetValueOrDefault());
         });
     }
 
@@ -2157,10 +2255,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         {
             e.ToTable("PayrollEntries");
             e.HasKey(x => x.Id);
-            e.Property(x => x.Faltas).HasColumnType("decimal(5,2)");
-            e.Property(x => x.Abonos).HasColumnType("decimal(5,2)");
-            e.Property(x => x.HorasExtras).HasColumnType("decimal(5,2)");
-            e.Property(x => x.Atrasos).HasColumnType("decimal(5,2)");
+            e.Property(x => x.Faltas).HasColumnType("decimal(18,2)");
+            e.Property(x => x.Abonos).HasColumnType("decimal(18,2)");
+            e.Property(x => x.HorasExtras).HasColumnType("decimal(18,2)");
+            e.Property(x => x.Atrasos).HasColumnType("decimal(18,2)");
             e.Property(x => x.Observacoes).HasMaxLength(1000);
             e.Property(x => x.CreatedAt).IsRequired();
 
@@ -2224,55 +2322,122 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .OnDelete(DeleteBehavior.SetNull);
         });
     }
-
-    /// <summary>
-    /// Configures global query filters for all tenant-scoped entities.
-    /// Filters ensure queries only return data for the current tenant when a tenant context exists.
-    /// When no tenant context is available (tests, admin operations, anonymous endpoints), all data is accessible.
-    /// </summary>
-    private void ConfigureTenantQueryFilters(ModelBuilder modelBuilder)
+    
+    private void ConfigureModulePermissionModels(ModelBuilder modelBuilder)
     {
-        // Inventory
-        modelBuilder.Entity<Models.Inventory.Product>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
-        modelBuilder.Entity<Models.Inventory.StockMovement>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
-        modelBuilder.Entity<Models.Inventory.Warehouse>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
-        modelBuilder.Entity<Models.Inventory.StockCount>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
-        modelBuilder.Entity<Models.Inventory.StockCountItem>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
-
-        // Sales
-        modelBuilder.Entity<Models.Sales.Customer>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
-        modelBuilder.Entity<Models.Sales.Sale>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
-        modelBuilder.Entity<Models.Sales.SaleItem>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
-
-        // Service Orders
-        modelBuilder.Entity<Models.ServiceOrders.ServiceOrder>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
-        modelBuilder.Entity<Models.ServiceOrders.ServiceOrderItem>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
-
-        // Financial
-        modelBuilder.Entity<Supplier>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
-        modelBuilder.Entity<AccountReceivable>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
-        modelBuilder.Entity<AccountPayable>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
-        modelBuilder.Entity<FinancialCategory>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
-        modelBuilder.Entity<CostCenter>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
-
-        // Assets
-        modelBuilder.Entity<Asset>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
-        modelBuilder.Entity<AssetAssignment>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
-        modelBuilder.Entity<AssetCategory>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
-        modelBuilder.Entity<AssetMaintenance>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
-        modelBuilder.Entity<AssetTransfer>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
-        modelBuilder.Entity<AssetDocument>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
-
-        // Kanban
-        modelBuilder.Entity<Models.Kanban.KanbanBoard>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
-        modelBuilder.Entity<Models.Kanban.KanbanColumn>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
-        modelBuilder.Entity<Models.Kanban.KanbanCard>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
-        modelBuilder.Entity<Models.Kanban.KanbanLabel>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
-        modelBuilder.Entity<Models.Kanban.KanbanComment>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
-        modelBuilder.Entity<Models.Kanban.KanbanCardHistory>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
-
-        // HR
-        modelBuilder.Entity<Department>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
-        modelBuilder.Entity<Position>().HasQueryFilter(e => !ShouldApplyTenantFilter || e.TenantId == CurrentTenantId);
+        // ModulePermission
+        modelBuilder.Entity<ModulePermission>(mp =>
+        {
+            mp.ToTable("ModulePermissions");
+            mp.HasKey(x => x.Id);
+            
+            mp.Property(x => x.ModuleKey).HasMaxLength(50).IsRequired();
+            mp.Property(x => x.DisplayName).HasMaxLength(100).IsRequired();
+            mp.Property(x => x.Description).HasMaxLength(500);
+            mp.Property(x => x.Icon).HasMaxLength(100);
+            mp.Property(x => x.DisplayOrder).HasDefaultValue(0);
+            mp.Property(x => x.IsActive).HasDefaultValue(true);
+            
+            mp.HasIndex(x => x.ModuleKey).IsUnique();
+            mp.HasIndex(x => x.DisplayOrder);
+        });
+        
+        // RoleModulePermission (junction table)
+        modelBuilder.Entity<RoleModulePermission>(rmp =>
+        {
+            rmp.ToTable("RoleModulePermissions");
+            rmp.HasKey(x => x.Id);
+            
+            rmp.HasIndex(x => new { x.RoleId, x.ModulePermissionId }).IsUnique();
+            
+            rmp.HasOne(x => x.Role)
+                .WithMany(r => r.ModulePermissions)
+                .HasForeignKey(x => x.RoleId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            rmp.HasOne(x => x.ModulePermission)
+                .WithMany(mp => mp.RolePermissions)
+                .HasForeignKey(x => x.ModulePermissionId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            rmp.HasOne(x => x.GrantedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.GrantedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+        
+        // ApplicationRole additional configuration
+        modelBuilder.Entity<ApplicationRole>(role =>
+        {
+            role.Property(x => x.Description).HasMaxLength(500);
+            role.Property(x => x.Icon).HasMaxLength(100);
+        });
+    }
+    
+    private void ConfigureChatbotModels(ModelBuilder modelBuilder)
+    {
+        // ChatConversation
+        modelBuilder.Entity<ChatConversation>(c =>
+        {
+            c.ToTable("ChatConversations");
+            c.HasKey(x => x.Id);
+            
+            c.Property(x => x.Title).HasMaxLength(200).IsRequired();
+            c.Property(x => x.CreatedAt).IsRequired();
+            
+            c.HasIndex(x => x.UserId);
+            c.HasIndex(x => x.TenantId);
+            c.HasIndex(x => new { x.UserId, x.CreatedAt });
+            c.HasIndex(x => new { x.UserId, x.IsArchived });
+            
+            c.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            // Query filter for multi-tenancy
+            c.HasQueryFilter(conv => 
+                _tenantContextAccessor == null || 
+                _tenantContextAccessor.Current == null || 
+                !_tenantContextAccessor.Current.TenantId.HasValue || 
+                conv.TenantId == _tenantContextAccessor.Current.TenantId.GetValueOrDefault());
+        });
+        
+        // ChatMessage
+        modelBuilder.Entity<ChatMessage>(m =>
+        {
+            m.ToTable("ChatMessages");
+            m.HasKey(x => x.Id);
+            
+            m.Property(x => x.Role).HasMaxLength(20).IsRequired();
+            m.Property(x => x.Content).IsRequired();
+            m.Property(x => x.Timestamp).IsRequired();
+            m.Property(x => x.Order).IsRequired();
+            
+            m.HasIndex(x => x.ConversationId);
+            m.HasIndex(x => new { x.ConversationId, x.Order });
+            
+            m.HasOne(x => x.Conversation)
+                .WithMany(x => x.Messages)
+                .HasForeignKey(x => x.ConversationId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
     }
 }
+
+public class DateTimeToUtcConverter : ValueConverter<DateTime, DateTime>
+{
+    public DateTimeToUtcConverter() : base(
+        v => v.ToUniversalTime(),
+        v => DateTime.SpecifyKind(v, DateTimeKind.Utc))
+    { }
+}
+
+public class NullableDateTimeToUtcConverter : ValueConverter<DateTime?, DateTime?>
+{
+    public NullableDateTimeToUtcConverter() : base(
+        v => v.HasValue ? v.Value.ToUniversalTime() : v,
+        v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v)
+    { }
+}
+

@@ -12,16 +12,19 @@ public class ChatbotService : IChatbotService
     private readonly Kernel _kernel;
     private readonly ILogger<ChatbotService> _logger;
     private readonly IConfiguration _configuration;
+    private readonly IChatbotCacheService _cacheService;
     private readonly string _aiProvider;
     private readonly bool _aiConfigured;
 
     public ChatbotService(
         ILogger<ChatbotService> logger,
         IConfiguration configuration,
-        IServiceProvider serviceProvider)
+        IServiceProvider serviceProvider,
+        IChatbotCacheService cacheService)
     {
         _logger = logger;
         _configuration = configuration;
+        _cacheService = cacheService;
 
         // Criar o Kernel do Semantic Kernel
         var builder = Kernel.CreateBuilder();
@@ -158,10 +161,9 @@ public class ChatbotService : IChatbotService
             new SystemPlugin(), 
             "SystemPlugin");
         
-        // Novos plugins
-        builder.Plugins.AddFromObject(
-            ActivatorUtilities.CreateInstance<AssetsPlugin>(serviceProvider), 
-            "AssetsPlugin");
+        // builder.Plugins.AddFromObject(
+        //     ActivatorUtilities.CreateInstance<AssetsPlugin>(serviceProvider), 
+        //     "AssetsPlugin");
         
         builder.Plugins.AddFromObject(
             ActivatorUtilities.CreateInstance<CustomersPlugin>(serviceProvider), 
@@ -184,6 +186,20 @@ public class ChatbotService : IChatbotService
     {
         try
         {
+            // Verificar cache primeiro
+            if (_cacheService.IsEnabled)
+            {
+                var contextHash = _cacheService.GenerateContextHash(conversationHistory);
+                var cachedResponse = _cacheService.GetCachedResponse(message, contextHash);
+                
+                if (cachedResponse != null)
+                {
+                    _logger.LogDebug("Resposta obtida do cache para: {MessagePreview}...", 
+                        message.Length > 30 ? message[..30] : message);
+                    return cachedResponse;
+                }
+            }
+
             // Se não tem IA configurada, usar modo fallback
             if (!_aiConfigured)
             {
@@ -194,12 +210,30 @@ public class ChatbotService : IChatbotService
             var chatHistory = new ChatHistory();
             
             // System prompt
-            chatHistory.AddSystemMessage(@"Você é um assistente virtual do Pillar ERP, um sistema de gestão empresarial.
-                Você tem acesso a funções para gerenciar produtos, vendas, finanças e recursos humanos.
-                Seja prestativo, profissional e objetivo nas respostas.
-                Quando o usuário pedir para cadastrar algo ou realizar uma ação, use as funções disponíveis.
-                Sempre confirme o sucesso ou falha das operações realizadas.
-                Responda em português brasileiro de forma clara e amigável.");
+            chatHistory.AddSystemMessage("""
+                Você é o assistente virtual do Pillar ERP, um sistema de gestão empresarial brasileiro.
+                
+                **Suas capacidades:**
+                - Gerenciar produtos, vendas, clientes e fornecedores
+                - Consultar informações financeiras (contas a pagar/receber)
+                - Gerenciar ativos da empresa e manutenções
+                - Consultar folha de pagamento e recursos humanos
+                
+                **Regras de formatação:**
+                - Use Markdown para formatar suas respostas (negrito, tabelas, listas)
+                - Seja conciso e objetivo - evite textos longos desnecessários
+                - Use tabelas Markdown para apresentar dados tabulares
+                - Use emojis com moderação para indicar status (✅ ❌ ⚠️ 📊)
+                - Destaque valores monetários e nomes importantes em **negrito**
+                - Quando listar muitos itens, limite a 10 e indique quantos restam
+                
+                **Comportamento:**
+                - Responda sempre em português brasileiro
+                - Seja profissional mas amigável
+                - Quando o usuário pedir uma ação, use as funções disponíveis
+                - Confirme sucesso ou falha das operações realizadas
+                - Se não encontrar dados, informe de forma clara
+                """);
 
             // Adicionar histórico anterior se existir
             if (conversationHistory != null)
@@ -246,14 +280,23 @@ public class ChatbotService : IChatbotService
                 _kernel);
 
             // Gerar sugestões de ações
-            var suggestions = GenerateSuggestions(message);
+            // var suggestions = GenerateSuggestions(message);
 
-            return new ChatResponseDto
+            var response = new ChatResponseDto
             {
                 Response = result.Content ?? "Desculpe, não consegui processar sua mensagem.",
                 Success = true,
-                SuggestedActions = suggestions
+                // SuggestedActions = suggestions
             };
+
+            // Armazenar no cache para futuras requisições
+            if (_cacheService.IsEnabled)
+            {
+                var contextHash = _cacheService.GenerateContextHash(conversationHistory);
+                _cacheService.SetCachedResponse(message, response, contextHash);
+            }
+
+            return response;
         }
         catch (Exception ex)
         {

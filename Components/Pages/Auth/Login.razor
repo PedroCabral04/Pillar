@@ -9,6 +9,9 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject IJSRuntime JS
 @inject ITenantBrandingProvider BrandingProvider
+@inject PreferenceService PreferenceService
+@inject ThemeService ThemeService
+@implements IAsyncDisposable
 @code {
     [Parameter] [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
 }
@@ -18,8 +21,8 @@
 <MudGrid Spacing="0" Style="height: 100vh; overflow: hidden;">
     <!-- Left Side: Branding / Image -->
     <MudItem xs="12" md="6" lg="7" Class="d-none d-md-flex flex-column justify-center align-center relative" 
-             Style="@($"background-color: {_branding.PrimaryColor}; color: white; position: relative;")">
-        
+             Style="@($"background-color: white ; color: white; position: relative;")">
+@*         
         @if (!string.IsNullOrEmpty(_branding.LoginBackgroundUrl))
         {
              <div style="@($"position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: url('{_branding.LoginBackgroundUrl}'); background-size: cover; background-position: center; opacity: 0.4; mix-blend-mode: overlay;")"></div>
@@ -28,34 +31,26 @@
         {
              <!-- Abstract pattern overlay if no image -->
              <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%);"></div>
-        }
+        } *@
         
         <div class="d-flex flex-column align-center gap-4 pa-8 text-center" style="z-index: 2; max-width: 600px;">
-             @if (!string.IsNullOrEmpty(_branding.LogoUrl))
-             {
-                 <MudImage Src="@_branding.LogoUrl" Alt="@_branding.TenantName" Width="150" Class="mb-6" ObjectFit="ObjectFit.Contain" />
-             }
-             else
-             {
-                 <MudAvatar Size="MudBlazor.Size.Large" Color="MudBlazor.Color.Surface" Variant="Variant.Filled" Class="mb-6" Style="width: 80px; height: 80px;">
-                     <MudText Typo="Typo.h3" Color="MudBlazor.Color.Primary" Style="font-weight: 700;">@_branding.Initials</MudText>
-                 </MudAvatar>
-             }
+             <!-- Use tenant logo when available, otherwise fall back to local /logo.png -->
+             <MudImage Src="@(_branding.LogoUrl ?? "/logo.png")" Alt="@_branding.TenantName" Width="600" Class="mb-6" ObjectFit="ObjectFit.Contain" />
              
-             <MudText Typo="Typo.h2" Style="font-weight: 700; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">@_branding.TenantName</MudText>
-             <MudText Typo="Typo.h5" Style="opacity: 0.9; font-weight: 300;">Gerencie seu negócio com eficiência e inteligência.</MudText>
+             @* <MudText Typo="Typo.h2" Style="font-weight: 700; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">@_branding.TenantName</MudText> *@
+             @* <MudText Typo="Typo.h5" Style="opacity: 0.9; font-weight: 300;">Gerencie seu negócio com eficiência e inteligência.</MudText> *@
         </div>
     </MudItem>
 
     <!-- Right Side: Login Form -->
-    <MudItem xs="12" md="6" lg="5" Class="d-flex justify-center align-center pa-4" Style="background-color: var(--mud-palette-background);">
-        <MudPaper Elevation="0" Class="pa-8 w-100" Style="max-width: 480px; background: transparent;">
+    <MudItem xs="12" md="6" lg="5" Class="d-flex justify-center align-center" Style="background-color: var(--mud-palette-background);">
+        <MudPaper Elevation="0" Class="pa-8 w-100" Style="@MudPaperStyle">
             
-            <!-- Mobile Branding Header -->
-            <div class="d-md-none d-flex flex-column align-center mb-8">
-                 <MudAvatar Size="MudBlazor.Size.Large" Color="MudBlazor.Color.Primary" Class="mb-2">@_branding.Initials</MudAvatar>
-                 <MudText Typo="Typo.h5" Color="MudBlazor.Color.Primary" Style="font-weight: 600;">@_branding.TenantName</MudText>
-            </div>
+              <!-- Mobile Branding Header -->
+              <div class="d-md-none d-flex flex-column align-center mb-8">
+                  <MudImage Src="@(_branding.LogoUrl ?? "/logo.png")" Width="80" Class="mb-2" ObjectFit="ObjectFit.Contain" />
+                  @* <MudText Typo="Typo.h5" Color="MudBlazor.Color.Primary" Style="font-weight: 600;">@_branding.TenantName</MudText> *@
+              </div>
 
             <div class="mb-10">
                 <MudText Typo="Typo.h4" Style="font-weight: 700;" Class="mb-2">Bem-vindo!</MudText>
@@ -124,9 +119,15 @@
     private TenantBrandingTheme _branding = TenantBrandingTheme.Default;
     private string ErrorDisplayStyle => string.IsNullOrEmpty(error) ? "display:none;" : "display:block;";
 
+    private string PrimaryColor => (ThemeService?.IsDarkMode == true ? ThemeService.Theme.PaletteDark.Primary : ThemeService.Theme.PaletteLight.Primary).ToString();
+    private string SecondaryColor => (ThemeService?.IsDarkMode == true ? ThemeService.Theme.PaletteDark.Secondary : ThemeService.Theme.PaletteLight.Secondary).ToString();
+    private string MudPaperStyle => $"max-width: 480px; background: transparent; --mud-palette-primary: {PrimaryColor}; --mud-palette-secondary: {SecondaryColor};";
+
     protected override async Task OnInitializedAsync()
     {
         _branding = BrandingProvider.GetCurrentBranding();
+        ThemeService.OnThemeChanged += ThemeChanged;
+
         var state = await AuthStateProvider.GetAuthenticationStateAsync();
         if (state.User.Identity?.IsAuthenticated == true)
         {
@@ -134,6 +135,58 @@
             Nav.NavigateTo(target!, replace: true);
         }
     }
+
+    private bool _themeInitialized;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_themeInitialized)
+            return;
+
+        try
+        {
+            var prefersDark = await JS.InvokeAsync<bool>("erpAuth.getSystemPrefersDark");
+            await ThemeService.SetDarkModeAsync(prefersDark);
+            _dotNetRef = DotNetObjectReference.Create(this);
+            _themeListener = await JS.InvokeAsync<IJSObjectReference>("erpAuth.registerThemeListener", _dotNetRef);
+            _themeInitialized = true;
+        }
+        catch (JSException jsEx)
+        {
+            Console.WriteLine($"JS interop not available yet: {jsEx.Message}");
+            // Will retry on next OnAfterRenderAsync
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to initialize system theme listener: {ex.Message}");
+        }
+    }
+
+    private void ThemeChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public async Task OnSystemThemeChanged(bool isDark)
+    {
+        await ThemeService.SetDarkModeAsync(isDark);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        ThemeService.OnThemeChanged -= ThemeChanged;
+        try { _dotNetRef?.Dispose(); } catch { }
+        if (_themeListener != null)
+        {
+            try { await _themeListener.InvokeVoidAsync("dispose"); } catch { }
+            try { await _themeListener.DisposeAsync(); } catch { }
+        }
+    }
+
+    private IJSObjectReference? _themeListener;
+    private DotNetObjectReference<Login>? _dotNetRef;
 
     private async Task HandleLoginAsync()
     {
@@ -177,7 +230,26 @@
                 }
                 
                 Console.WriteLine("Login sem 2FA - redirecionando para home");
-                var target = string.IsNullOrWhiteSpace(ReturnUrl) ? "/" : ReturnUrl;
+                // Get the preferred start page from user preferences
+                // Force loading from server to get the latest preferences after login
+                await PreferenceService.InitializeAsync(forceServerLoad: true);
+                var defaultPage = PreferenceService.CurrentPreferences.Dashboard.DefaultStartPage;
+                Console.WriteLine($"[LOGIN] DefaultStartPage from preferences: '{defaultPage}'");
+                var targetPage = defaultPage switch
+                {
+                    "Home" => "/",
+                    "Dashboard" => "/dashboard",
+                    "Kanban" => "/kanban",
+                    "Vendas" => "/sales",
+                    "Clientes" => "/sales/customers",
+                    "Produtos" => "/inventory/products",
+                    "Financeiro" => "/financial/dashboard",
+                    _ => "/"
+                };
+                Console.WriteLine($"[LOGIN] Target page resolved to: '{targetPage}'");
+                Console.WriteLine($"[LOGIN] ReturnUrl is: '{ReturnUrl}'");
+                var target = string.IsNullOrWhiteSpace(ReturnUrl) ? targetPage : ReturnUrl;
+                Console.WriteLine($"[LOGIN] Final navigation target: '{target}'");
                 Nav.NavigateTo(target!, forceLoad: true);
             }
             else

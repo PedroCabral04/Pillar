@@ -17,7 +17,7 @@
 <MudDialogProvider MaxWidth="MaxWidth.Medium" FullWidth="true" CloseOnEscapeKey="true" />
 <MudSnackbarProvider/>
 
-<div class="pa-4" style="@AuthBackgroundStyle">
+<div style="@AuthBackgroundStyle">
     @Body
 </div>
 
@@ -52,7 +52,6 @@
         get
         {
             var style = "min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;";
-            style += " padding:2rem;";
 
             if (!string.IsNullOrWhiteSpace(_branding.LoginBackgroundUrl))
             {

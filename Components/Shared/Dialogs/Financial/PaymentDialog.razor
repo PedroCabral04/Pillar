@@ -13,13 +13,14 @@
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Cancel" Variant="Variant.Outlined">Cancelar</MudButton>
-        <MudButton Color="MudBlazor.Color.Primary" OnClick="Submit">Confirmar</MudButton>
+        <MudButton Color="MudBlazor.Color.Primary" Variant="Variant.Filled" OnClick="Submit">Confirmar</MudButton>
     </DialogActions>
 </MudDialog>
 
 @code {
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
     [Parameter] public decimal PaidAmount { get; set; }
+    [Parameter] public decimal MaxAmount { get; set; } = decimal.MaxValue;
     [Parameter] public DateTime? PaymentDate { get; set; } = DateTime.Today;
     [Parameter] public string AmountLabel { get; set; } = "Valor Pago";
 
@@ -33,14 +34,20 @@
 
     private void Cancel() => MudDialog.Cancel();
 
-    private void Submit()
+    private async Task Submit()
     {
-        form.Validate();
+        await form.Validate();
         if (success)
         {
+            // Additional validation: amount cannot exceed max
+            if (PaidAmount > MaxAmount)
+            {
+                return;
+            }
+
             MudDialog.Close(DialogResult.Ok(new {
                 PaidAmount,
-                PaymentDate = PaymentDate ?? DateTime.Today,
+                PaymentDate = PaymentDate ?? DateTime.UtcNow.Date,
                 AdditionalDiscount,
                 AdditionalInterest,
                 AdditionalFine,

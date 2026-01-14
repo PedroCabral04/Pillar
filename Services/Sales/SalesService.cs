@@ -135,7 +135,7 @@ public class SalesService : ISalesService
 
         if (!string.IsNullOrWhiteSpace(status))
         {
-            query = query.Where(s => s.Status == status);
+            query = query.Where(s => s.Status.ToUpper() == status.ToUpper());
         }
 
         if (startDate.HasValue)
@@ -174,12 +174,12 @@ public class SalesService : ISalesService
             throw new KeyNotFoundException($"Venda com ID {id} não encontrada");
         }
 
-        if (sale.Status == "Finalizada")
+        if (sale.Status.ToUpper() == "FINALIZADA")
         {
             throw new InvalidOperationException("Não é possível editar uma venda finalizada");
         }
 
-        if (sale.Status == "Cancelada")
+        if (sale.Status.ToUpper() == "CANCELADA")
         {
             throw new InvalidOperationException("Não é possível editar uma venda cancelada");
         }
@@ -212,12 +212,12 @@ public class SalesService : ISalesService
                 return false;
             }
 
-            if (sale.Status == "Cancelada")
+            if (sale.Status.ToUpper() == "CANCELADA")
             {
                 throw new InvalidOperationException("Venda já está cancelada");
             }
 
-            var wasFinalized = sale.Status == "Finalizada";
+            var wasFinalized = sale.Status.ToUpper() == "FINALIZADA";
 
             // Se a venda estava finalizada, devolver o estoque
             if (wasFinalized)
@@ -301,12 +301,12 @@ public class SalesService : ISalesService
                 throw new KeyNotFoundException($"Venda com ID {id} não encontrada");
             }
 
-            if (sale.Status == "Finalizada")
+            if (sale.Status.ToUpper() == "FINALIZADA")
             {
                 throw new InvalidOperationException("Venda já está finalizada");
             }
 
-            if (sale.Status == "Cancelada")
+            if (sale.Status.ToUpper() == "CANCELADA")
             {
                 throw new InvalidOperationException("Não é possível finalizar uma venda cancelada");
             }
@@ -385,7 +385,7 @@ public class SalesService : ISalesService
     public async Task<decimal> GetTotalSalesAsync(DateTime startDate, DateTime endDate)
     {
         return await _context.Sales
-            .Where(s => s.Status == "Finalizada" && 
+            .Where(s => s.Status.ToUpper() == "FINALIZADA" && 
                        s.SaleDate >= startDate && 
                        s.SaleDate <= endDate)
             .SumAsync(s => s.NetAmount);
@@ -399,7 +399,7 @@ public class SalesService : ISalesService
         return await _context.SaleItems
             .Include(i => i.Sale)
             .Include(i => i.Product)
-            .Where(i => i.Sale.Status == "Finalizada" && 
+            .Where(i => i.Sale.Status.ToUpper() == "FINALIZADA" && 
                        i.Sale.SaleDate >= startDate && 
                        i.Sale.SaleDate <= endDate)
             .GroupBy(i => new { i.Product.Name })
@@ -412,7 +412,7 @@ public class SalesService : ISalesService
 
     private async Task<string> GenerateSaleNumberAsync()
     {
-        var today = DateTime.Today;
+        var today = DateTime.UtcNow.Date;
         var prefix = $"VEN{today:yyyyMMdd}";
         
         var lastSale = await _context.Sales
