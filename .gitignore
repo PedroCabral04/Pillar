@@ -44,3 +44,4 @@ app_data/
 *.userosscache
 *.sln.docstates
 Migrations
+nul
