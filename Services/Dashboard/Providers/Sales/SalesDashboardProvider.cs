@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using erp.Data;
 using erp.DTOs.Dashboard;
 using erp.DTOs.Reports;
+using erp.Services.Dashboard;
 using erp.Services.Reports;
 
 namespace erp.Services.Dashboard.Providers.Sales;
@@ -25,8 +26,8 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
         {
             ProviderKey = Key,
             WidgetKey = "sales-today",
-            Title = "Vendas de Hoje",
-            Description = "Resumo das vendas finalizadas hoje",
+            Title = "Resumo de Vendas",
+            Description = "Vendas finalizadas no período selecionado",
             ChartType = DashboardChartType.Bar,
             Icon = "mdi-cash-register",
             Unit = "R$",
@@ -93,13 +94,13 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
 
     private async Task<ChartDataResponse> GetSalesTodayAsync(DashboardQuery query, CancellationToken ct)
     {
-        var today = DateTime.UtcNow.Date;
-        var tomorrow = today.AddDays(1);
+        var startDate = query.From?.ToUniversalTime() ?? DateTime.UtcNow.Date;
+        var endDate = query.To?.ToUniversalTime().AddDays(1) ?? DateTime.UtcNow.Date.AddDays(1);
 
-        var todaySales = await _context.Sales
+        var sales = await _context.Sales
             .Where(s => s.Status == "Finalizada" &&
-                       s.SaleDate >= today &&
-                       s.SaleDate < tomorrow)
+                       s.SaleDate >= startDate &&
+                       s.SaleDate < endDate)
             .Select(s => new
             {
                 s.Id,
@@ -108,8 +109,12 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
             })
             .ToListAsync(ct);
 
-        var totalAmount = todaySales.Sum(s => s.NetAmount);
-        var salesCount = todaySales.Count;
+        var totalAmount = sales.Sum(s => s.NetAmount);
+        var salesCount = sales.Count;
+        
+        // Build dynamic title based on date range
+        var periodLabel = DashboardDateUtils.FormatPeriodLabel(query.From, query.To);
+        var dynamicTitle = GetDynamicSalesTitle(query.From, query.To);
 
         return new ChartDataResponse
         {
@@ -119,19 +124,52 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
                 new() { Name = "Valor", Data = new List<decimal> { totalAmount, salesCount } }
             },
             Subtitle = $"{salesCount} venda(s) | Total: {CurrencyFormatService.FormatStatic(totalAmount)}",
+            DynamicTitle = dynamicTitle,
+            DynamicDescription = $"Vendas finalizadas de {periodLabel}",
+            PeriodLabel = periodLabel,
             Meta = new Dictionary<string, object>
             {
                 { "TotalAmount", totalAmount },
                 { "SalesCount", salesCount },
-                { "Today", today.ToString("yyyy-MM-dd") }
+                { "StartDate", startDate.ToString("yyyy-MM-dd") },
+                { "EndDate", endDate.AddDays(-1).ToString("yyyy-MM-dd") }
             }
         };
     }
+    
+    private static string GetDynamicSalesTitle(DateTime? from, DateTime? to)
+    {
+        var today = DateTime.Today;
+        var start = from?.Date ?? today;
+        var end = to?.Date ?? today;
+        
+        // Same day
+        if (start == end)
+        {
+            if (start == today) return "Vendas de Hoje";
+            if (start == today.AddDays(-1)) return "Vendas de Ontem";
+            return $"Vendas de {start:dd/MM/yyyy}";
+        }
+        
+        // Common ranges using tolerance-based comparison
+        if (DashboardDateUtils.IsApproximateRange(from, to, 7)) return "Vendas dos Últimos 7 Dias";
+        if (DashboardDateUtils.IsApproximateRange(from, to, 30)) return "Vendas dos Últimos 30 Dias";
+        if (start == new DateTime(today.Year, today.Month, 1) && end == today) return "Vendas deste Mês";
+        
+        var lastMonth = today.AddMonths(-1);
+        var firstDayLastMonth = new DateTime(lastMonth.Year, lastMonth.Month, 1);
+        var lastDayLastMonth = firstDayLastMonth.AddMonths(1).AddDays(-1);
+        if (start == firstDayLastMonth && end == lastDayLastMonth) return "Vendas do Mês Anterior";
+        
+        return "Vendas do Período";
+    }
+    
 
     private async Task<ChartDataResponse> GetSalesByMonthAsync(DashboardQuery query, CancellationToken ct)
     {
         var startDate = query.From?.ToUniversalTime() ?? DateTime.UtcNow.AddMonths(-11).Date;
         var endDate = query.To?.ToUniversalTime() ?? DateTime.UtcNow.Date;
+        var periodLabel = DashboardDateUtils.FormatPeriodLabel(query.From, query.To);
 
         var salesByMonth = await _context.Sales
             .Where(s => s.Status == "Finalizada" && 
@@ -176,7 +214,9 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
             {
                 new() { Name = "Receita", Data = data }
             },
-            Subtitle = $"Total: {CurrencyFormatService.FormatStatic(data.Sum(d => d))}"
+            Subtitle = $"Total: {CurrencyFormatService.FormatStatic(data.Sum(d => d))}",
+            PeriodLabel = periodLabel,
+            DynamicDescription = $"Vendas agregadas por mês de {periodLabel}"
         };
     }
 
@@ -184,6 +224,7 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
     {
         var startDate = query.From ?? DateTime.UtcNow.AddMonths(-1).Date;
         var endDate = query.To ?? DateTime.UtcNow.Date;
+        var periodLabel = DashboardDateUtils.FormatPeriodLabel(query.From, query.To);
 
         var topProducts = await _context.SaleItems
             .Include(i => i.Sale)
@@ -207,7 +248,8 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
             {
                 Categories = new List<string> { "Sem dados" },
                 Series = new List<ChartSeriesDto> { new() { Name = "Quantidade", Data = new List<decimal> { 0 } } },
-                Subtitle = "Nenhuma venda no período"
+                Subtitle = "Nenhuma venda no período",
+                PeriodLabel = periodLabel
             };
         }
 
@@ -218,7 +260,9 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
             {
                 new() { Name = "Quantidade", Data = topProducts.Select(p => (decimal)p.Quantity).ToList() }
             },
-            Subtitle = $"Top {topProducts.Count} produtos"
+            Subtitle = $"Top {topProducts.Count} produtos",
+            PeriodLabel = periodLabel,
+            DynamicDescription = $"Produtos mais vendidos de {periodLabel}"
         };
     }
 
@@ -226,6 +270,7 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
     {
         var startDate = query.From ?? DateTime.UtcNow.AddMonths(-1).Date;
         var endDate = query.To ?? DateTime.UtcNow.Date;
+        var periodLabel = DashboardDateUtils.FormatPeriodLabel(query.From, query.To);
 
         var salesByStatus = await _context.Sales
             .Where(s => s.SaleDate >= startDate && s.SaleDate <= endDate)
@@ -243,7 +288,8 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
             {
                 Categories = new List<string> { "Sem dados" },
                 Series = new List<ChartSeriesDto> { new() { Name = "Vendas", Data = new List<decimal> { 0 } } },
-                Subtitle = "Nenhuma venda no período"
+                Subtitle = "Nenhuma venda no período",
+                PeriodLabel = periodLabel
             };
         }
 
@@ -254,12 +300,15 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
             {
                 new() { Name = "Vendas", Data = salesByStatus.Select(s => (decimal)s.Count).ToList() }
             },
-            Subtitle = $"Total: {salesByStatus.Sum(s => s.Count)} vendas"
+            Subtitle = $"Total: {salesByStatus.Sum(s => s.Count)} vendas",
+            PeriodLabel = periodLabel,
+            DynamicDescription = $"Vendas por status de {periodLabel}"
         };
     }
 
     private async Task<ChartDataResponse> GetSalesPeakHoursAsync(DashboardQuery query, CancellationToken ct)
     {
+        var periodLabel = DashboardDateUtils.FormatPeriodLabel(query.From, query.To);
         var filter = new SalesReportFilterDto
         {
             StartDate = query.From?.ToUniversalTime() ?? DateTime.UtcNow.AddMonths(-1),
@@ -275,7 +324,8 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
             {
                 Categories = new List<string> { "Sem dados" },
                 Series = new List<ChartSeriesDto> { new() { Name = "Vendas", Data = new List<decimal> { 0 } } },
-                Subtitle = "Nenhuma venda no período"
+                Subtitle = "Nenhuma venda no período",
+                PeriodLabel = periodLabel
             };
         }
 
@@ -315,7 +365,9 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
             {
                 new() { Name = "Vendas", Data = values }
             },
-            Subtitle = $"Pico: {peakHour} ({peakCount:N0} vendas) | Dia mais movimentado: {peakDay}"
+            Subtitle = $"Pico: {peakHour} ({peakCount:N0} vendas) | Dia mais movimentado: {peakDay}",
+            PeriodLabel = periodLabel,
+            DynamicDescription = $"Análise de horários de pico de {periodLabel}"
         };
     }
 }

@@ -19,52 +19,73 @@ public class FinancialDashboardService : IFinancialDashboardService
 
     public async Task<FinancialDashboardDto> GetDashboardDataAsync(DateTime? startDate = null, DateTime? endDate = null, decimal initialBalance = 0)
     {
-        var payables = await _payableDao.GetAllAsync();
-        var receivables = await _receivableDao.GetAllAsync();
-
-        // Filter by date if provided (using DueDate for general filtering if needed, but usually dashboard shows current state)
-        // For specific charts like cash flow, we might filter.
-        // For totals, we usually want everything relevant (e.g. pending, overdue).
+        var allPayables = await _payableDao.GetAllAsync();
+        var allReceivables = await _receivableDao.GetAllAsync();
+        
+        // Apply date filter if provided (using IssueDate for historical analysis)
+        var payables = allPayables.AsEnumerable();
+        var receivables = allReceivables.AsEnumerable();
+        
+        if (startDate.HasValue)
+        {
+            var filterStart = startDate.Value.ToUniversalTime().Date;
+            payables = payables.Where(x => x.IssueDate >= filterStart);
+            receivables = receivables.Where(x => x.IssueDate >= filterStart);
+        }
+        
+        if (endDate.HasValue)
+        {
+            var filterEnd = endDate.Value.ToUniversalTime().Date.AddDays(1);
+            payables = payables.Where(x => x.IssueDate < filterEnd);
+            receivables = receivables.Where(x => x.IssueDate < filterEnd);
+        }
+        
+        var payablesList = payables.ToList();
+        var receivablesList = receivables.ToList();
         
         var dto = new FinancialDashboardDto();
 
-        // Totals
-        dto.TotalPayable = payables.Sum(x => x.NetAmount);
-        dto.TotalPayableOverdue = payables.Where(x => x.Status == AccountStatus.Overdue).Sum(x => x.RemainingAmount);
-        dto.TotalPayablePaid = payables.Where(x => x.Status == AccountStatus.Paid).Sum(x => x.PaidAmount);
-        dto.TotalPayablePending = payables.Where(x => x.Status == AccountStatus.Pending).Sum(x => x.RemainingAmount);
+        // Totals (filtered by period)
+        dto.TotalPayable = payablesList.Sum(x => x.NetAmount);
+        dto.TotalPayableOverdue = payablesList.Where(x => x.Status == AccountStatus.Overdue).Sum(x => x.RemainingAmount);
+        dto.TotalPayablePaid = payablesList.Where(x => x.Status == AccountStatus.Paid).Sum(x => x.PaidAmount);
+        dto.TotalPayablePending = payablesList.Where(x => x.Status == AccountStatus.Pending).Sum(x => x.RemainingAmount);
 
-        dto.TotalReceivable = receivables.Sum(x => x.NetAmount);
-        dto.TotalReceivableOverdue = receivables.Where(x => x.Status == AccountStatus.Overdue).Sum(x => x.RemainingAmount);
-        dto.TotalReceivablePaid = receivables.Where(x => x.Status == AccountStatus.Paid).Sum(x => x.PaidAmount);
-        dto.TotalReceivablePending = receivables.Where(x => x.Status == AccountStatus.Pending).Sum(x => x.RemainingAmount);
+        dto.TotalReceivable = receivablesList.Sum(x => x.NetAmount);
+        dto.TotalReceivableOverdue = receivablesList.Where(x => x.Status == AccountStatus.Overdue).Sum(x => x.RemainingAmount);
+        dto.TotalReceivablePaid = receivablesList.Where(x => x.Status == AccountStatus.Paid).Sum(x => x.PaidAmount);
+        dto.TotalReceivablePending = receivablesList.Where(x => x.Status == AccountStatus.Pending).Sum(x => x.RemainingAmount);
 
         // Counts
-        dto.PayablesCount = payables.Count(x => x.Status != AccountStatus.Paid && x.Status != AccountStatus.Cancelled);
-        dto.PayablesOverdueCount = payables.Count(x => x.Status == AccountStatus.Overdue);
-        dto.ReceivablesCount = receivables.Count(x => x.Status != AccountStatus.Paid && x.Status != AccountStatus.Cancelled);
-        dto.ReceivablesOverdueCount = receivables.Count(x => x.Status == AccountStatus.Overdue);
+        dto.PayablesCount = payablesList.Count(x => x.Status != AccountStatus.Paid && x.Status != AccountStatus.Cancelled);
+        dto.PayablesOverdueCount = payablesList.Count(x => x.Status == AccountStatus.Overdue);
+        dto.ReceivablesCount = receivablesList.Count(x => x.Status != AccountStatus.Paid && x.Status != AccountStatus.Cancelled);
+        dto.ReceivablesOverdueCount = receivablesList.Count(x => x.Status == AccountStatus.Overdue);
 
-        // Cash Flow Projection (Next 30 days) with cumulative balance
-        var today = DateTime.UtcNow.Date;
-        var next30Days = today.AddDays(30);
+        // Cash Flow Projection - Use date range if provided, otherwise next 30 days
+        var projectionStart = startDate?.ToUniversalTime().Date ?? DateTime.UtcNow.Date;
+        var projectionEnd = endDate?.ToUniversalTime().Date ?? projectionStart.AddDays(30);
+        var projectionDays = (int)(projectionEnd - projectionStart).TotalDays;
+        if (projectionDays <= 0) projectionDays = 30;
+        if (projectionDays > 365) projectionDays = 365; // Cap at 1 year for performance
         
-        var flowPayables = payables
-            .Where(x => x.DueDate >= today && x.DueDate <= next30Days && x.Status != AccountStatus.Paid && x.Status != AccountStatus.Cancelled)
+        // For projection, we need all unpaid accounts with DueDate in the range
+        var flowPayables = allPayables
+            .Where(x => x.DueDate >= projectionStart && x.DueDate <= projectionEnd && x.Status != AccountStatus.Paid && x.Status != AccountStatus.Cancelled)
             .GroupBy(x => x.DueDate.Date)
             .ToDictionary(g => g.Key, g => g.Sum(x => x.RemainingAmount));
 
-        var flowReceivables = receivables
-            .Where(x => x.DueDate >= today && x.DueDate <= next30Days && x.Status != AccountStatus.Paid && x.Status != AccountStatus.Cancelled)
+        var flowReceivables = allReceivables
+            .Where(x => x.DueDate >= projectionStart && x.DueDate <= projectionEnd && x.Status != AccountStatus.Paid && x.Status != AccountStatus.Cancelled)
             .GroupBy(x => x.DueDate.Date)
             .ToDictionary(g => g.Key, g => g.Sum(x => x.RemainingAmount));
 
         // Calculate cumulative balance starting from initial balance
         decimal cumulativeBalance = initialBalance;
         
-        for (int i = 0; i <= 30; i++)
+        for (int i = 0; i <= projectionDays; i++)
         {
-            var date = today.AddDays(i);
+            var date = projectionStart.AddDays(i);
             var revenue = flowReceivables.ContainsKey(date) ? flowReceivables[date] : 0;
             var expense = flowPayables.ContainsKey(date) ? flowPayables[date] : 0;
             
@@ -94,12 +115,12 @@ public class FinancialDashboardService : IFinancialDashboardService
             }
         }
 
-        // Aging List
-        dto.PayablesAgingList = CalculateAgingList(payables.Where(x => x.Status != AccountStatus.Paid && x.Status != AccountStatus.Cancelled));
-        dto.ReceivablesAgingList = CalculateAgingList(receivables.Where(x => x.Status != AccountStatus.Paid && x.Status != AccountStatus.Cancelled));
+        // Aging List (uses all accounts, not date-filtered, as aging is about current overdue status)
+        dto.PayablesAgingList = CalculateAgingList(allPayables.Where(x => x.Status != AccountStatus.Paid && x.Status != AccountStatus.Cancelled));
+        dto.ReceivablesAgingList = CalculateAgingList(allReceivables.Where(x => x.Status != AccountStatus.Paid && x.Status != AccountStatus.Cancelled));
 
-        // Top Suppliers
-        dto.TopSuppliers = payables
+        // Top Suppliers (filtered by period)
+        dto.TopSuppliers = payablesList
             .Where(x => x.Supplier != null)
             .GroupBy(x => x.SupplierId)
             .Select(g => new TopCustomerSupplierDto
@@ -113,8 +134,8 @@ public class FinancialDashboardService : IFinancialDashboardService
             .Take(5)
             .ToList();
 
-        // Top Customers
-        dto.TopCustomers = receivables
+        // Top Customers (filtered by period)
+        dto.TopCustomers = receivablesList
             .Where(x => x.Customer != null)
             .GroupBy(x => x.CustomerId)
             .Select(g => new TopCustomerSupplierDto

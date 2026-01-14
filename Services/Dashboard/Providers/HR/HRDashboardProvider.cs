@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using erp.Data;
 using erp.DTOs.Dashboard;
 using erp.Models.Identity;
+using erp.Services.Financial;
 
 namespace erp.Services.Dashboard.Providers.HR;
 
@@ -23,7 +24,7 @@ public class HRDashboardProvider : IDashboardWidgetProvider
             ProviderKey = Key,
             WidgetKey = "employees-count",
             Title = "Contagem de Funcionários",
-            Description = "Funcionários ativos por status",
+            Description = "Funcionários atuais por status de emprego",
             ChartType = DashboardChartType.Donut,
             Icon = "mdi-account-group",
             Unit = "funcionários",
@@ -34,7 +35,7 @@ public class HRDashboardProvider : IDashboardWidgetProvider
             ProviderKey = Key,
             WidgetKey = "department-headcount",
             Title = "Funcionários por Departamento",
-            Description = "Distribuição de funcionários por departamento",
+            Description = "Distribuição atual de funcionários por departamento",
             ChartType = DashboardChartType.Bar,
             Icon = "mdi-domain",
             Unit = "funcionários",
@@ -44,8 +45,8 @@ public class HRDashboardProvider : IDashboardWidgetProvider
         {
             ProviderKey = Key,
             WidgetKey = "recent-hires",
-            Title = "Contratações Recentes",
-            Description = "Funcionários contratados nos últimos 12 meses",
+            Title = "Contratações",
+            Description = "Funcionários contratados no período selecionado",
             ChartType = DashboardChartType.Line,
             Icon = "mdi-account-plus",
             Unit = "contratações",
@@ -56,7 +57,7 @@ public class HRDashboardProvider : IDashboardWidgetProvider
             ProviderKey = Key,
             WidgetKey = "payroll-summary",
             Title = "Resumo da Folha",
-            Description = "Valores totais do último período de folha",
+            Description = "Valores totais do último período de folha processado",
             ChartType = DashboardChartType.Bar,
             Icon = "mdi-cash-multiple",
             Unit = "R$",
@@ -67,7 +68,7 @@ public class HRDashboardProvider : IDashboardWidgetProvider
             ProviderKey = Key,
             WidgetKey = "positions-overview",
             Title = "Cargos na Empresa",
-            Description = "Distribuição de funcionários por cargo",
+            Description = "Distribuição atual de funcionários por cargo",
             ChartType = DashboardChartType.Pie,
             Icon = "mdi-briefcase",
             Unit = "funcionários",
@@ -87,6 +88,8 @@ public class HRDashboardProvider : IDashboardWidgetProvider
             _ => throw new KeyNotFoundException($"Widget '{widgetKey}' not found in provider '{Key}'.")
         };
     }
+    
+
 
     private async Task<ChartDataResponse> GetEmployeesCountAsync(DashboardQuery query, CancellationToken ct)
     {
@@ -106,7 +109,8 @@ public class HRDashboardProvider : IDashboardWidgetProvider
             {
                 Categories = new List<string> { "Sem dados" },
                 Series = new List<ChartSeriesDto> { new() { Name = "Funcionários", Data = new List<decimal> { 0 } } },
-                Subtitle = "Nenhum funcionário cadastrado"
+                Subtitle = "Nenhum funcionário cadastrado",
+                IsCurrentStateWidget = true
             };
         }
 
@@ -121,7 +125,9 @@ public class HRDashboardProvider : IDashboardWidgetProvider
             {
                 new() { Name = "Funcionários", Data = data }
             },
-            Subtitle = $"Total: {total} funcionários"
+            Subtitle = $"Total: {total} funcionários",
+            IsCurrentStateWidget = true,
+            DynamicDescription = "Snapshot atual da distribuição de funcionários por status"
         };
     }
 
@@ -146,9 +152,12 @@ public class HRDashboardProvider : IDashboardWidgetProvider
             {
                 Categories = new List<string> { "Sem dados" },
                 Series = new List<ChartSeriesDto> { new() { Name = "Funcionários", Data = new List<decimal> { 0 } } },
-                Subtitle = "Nenhum departamento com funcionários"
+                Subtitle = "Nenhum departamento com funcionários",
+                IsCurrentStateWidget = true
             };
         }
+        
+        var total = headcount.Sum(h => h.Count);
 
         return new ChartDataResponse
         {
@@ -157,14 +166,17 @@ public class HRDashboardProvider : IDashboardWidgetProvider
             {
                 new() { Name = "Funcionários", Data = headcount.Select(h => (decimal)h.Count).ToList() }
             },
-            Subtitle = $"Top {headcount.Count} departamentos"
+            Subtitle = $"Top {headcount.Count} departamentos | Total: {total} funcionários ativos",
+            IsCurrentStateWidget = true,
+            DynamicDescription = "Distribuição atual de funcionários ativos por departamento"
         };
     }
 
     private async Task<ChartDataResponse> GetRecentHiresAsync(DashboardQuery query, CancellationToken ct)
     {
-        var startDate = (query.From ?? DateTime.Now.AddMonths(-11).Date).ToUniversalTime();
+        var startDate = (query.From ?? DateTime.Now.AddMonths(-12).Date).ToUniversalTime();
         var endDate = (query.To ?? DateTime.Now.Date).ToUniversalTime();
+        var periodLabel = DashboardDateUtils.FormatPeriodLabel(query.From, query.To);
 
         var hires = await _context.Set<ApplicationUser>()
             .Where(u => u.HireDate != null && u.HireDate >= startDate && u.HireDate <= endDate)
@@ -199,6 +211,8 @@ public class HRDashboardProvider : IDashboardWidgetProvider
             var key = $"{monthNum}/{year}";
             return (decimal)hiresDict.GetValueOrDefault(key, 0);
         }).ToList();
+        
+        var totalHires = (int)data.Sum();
 
         return new ChartDataResponse
         {
@@ -207,8 +221,28 @@ public class HRDashboardProvider : IDashboardWidgetProvider
             {
                 new() { Name = "Contratações", Data = data }
             },
-            Subtitle = $"Total: {data.Sum()} contratações no período"
+            Subtitle = $"Total: {totalHires} contratações no período",
+            PeriodLabel = periodLabel,
+            DynamicTitle = GetDynamicHiresTitle(query.From, query.To),
+            DynamicDescription = $"Funcionários contratados de {periodLabel}"
         };
+    }
+    
+    private static string GetDynamicHiresTitle(DateTime? from, DateTime? to)
+    {
+        var today = DateTime.Today;
+        var start = from?.Date ?? today.AddMonths(-12);
+        var end = to?.Date ?? today;
+        
+        // Check common ranges using tolerance-based comparison
+        if (DashboardDateUtils.IsApproximateMonthRange(from, to, 12) || (from == null && to == null))
+            return "Contratações dos Últimos 12 Meses";
+        if (DashboardDateUtils.IsApproximateMonthRange(from, to, 6)) 
+            return "Contratações dos Últimos 6 Meses";
+        if (start == new DateTime(today.Year, 1, 1) && end == today) 
+            return "Contratações deste Ano";
+        
+        return "Contratações do Período";
     }
 
     private async Task<ChartDataResponse> GetPayrollSummaryAsync(DashboardQuery query, CancellationToken ct)
@@ -224,9 +258,12 @@ public class HRDashboardProvider : IDashboardWidgetProvider
             {
                 Categories = new List<string> { "Sem dados" },
                 Series = new List<ChartSeriesDto> { new() { Name = "Valor", Data = new List<decimal> { 0 } } },
-                Subtitle = "Nenhuma folha processada"
+                Subtitle = "Nenhuma folha processada",
+                IsCurrentStateWidget = true
             };
         }
+        
+        var totalCost = latestPeriod.TotalEmployerCost;
 
         return new ChartDataResponse
         {
@@ -246,7 +283,9 @@ public class HRDashboardProvider : IDashboardWidgetProvider
                     } 
                 }
             },
-            Subtitle = $"Competência: {latestPeriod.ReferenceMonth:00}/{latestPeriod.ReferenceYear}"
+            Subtitle = $"Competência: {latestPeriod.ReferenceMonth:00}/{latestPeriod.ReferenceYear} | Custo total: {CurrencyFormatService.FormatStatic(totalCost)}",
+            IsCurrentStateWidget = true,
+            DynamicDescription = $"Resumo da folha de {latestPeriod.ReferenceMonth:00}/{latestPeriod.ReferenceYear}"
         };
     }
 
@@ -271,9 +310,12 @@ public class HRDashboardProvider : IDashboardWidgetProvider
             {
                 Categories = new List<string> { "Sem dados" },
                 Series = new List<ChartSeriesDto> { new() { Name = "Funcionários", Data = new List<decimal> { 0 } } },
-                Subtitle = "Nenhum cargo com funcionários"
+                Subtitle = "Nenhum cargo com funcionários",
+                IsCurrentStateWidget = true
             };
         }
+        
+        var total = positions.Sum(p => p.Count);
 
         return new ChartDataResponse
         {
@@ -282,7 +324,9 @@ public class HRDashboardProvider : IDashboardWidgetProvider
             {
                 new() { Name = "Funcionários", Data = positions.Select(p => (decimal)p.Count).ToList() }
             },
-            Subtitle = $"Top {positions.Count} cargos"
+            Subtitle = $"Top {positions.Count} cargos | Total: {total} funcionários",
+            IsCurrentStateWidget = true,
+            DynamicDescription = "Distribuição atual de funcionários ativos por cargo"
         };
     }
 }

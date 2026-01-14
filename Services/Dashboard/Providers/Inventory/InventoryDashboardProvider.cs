@@ -26,55 +26,55 @@ public class InventoryDashboardProvider : IDashboardWidgetProvider
             ProviderKey = Key,
             WidgetKey = "stock-levels",
             Title = "Níveis de Estoque",
-            Description = "Distribuição de produtos por nível de estoque",
+            Description = "Distribuição atual de produtos por nível de estoque",
             ChartType = DashboardChartType.Pie,
             Icon = "mdi-package-variant",
-            Unit = "produtos"
-            , RequiredRoles = new[] { "Estoque", "Administrador" }
+            Unit = "produtos",
+            RequiredRoles = new[] { "Estoque", "Administrador" }
         },
         new DashboardWidgetDefinition
         {
             ProviderKey = Key,
             WidgetKey = "low-stock-alert",
             Title = "Alertas de Estoque Baixo",
-            Description = "Produtos com estoque abaixo do mínimo",
+            Description = "Produtos com estoque atual abaixo do mínimo",
             ChartType = DashboardChartType.Bar,
             Icon = "mdi-alert",
-            Unit = "unidades"
-            , RequiredRoles = new[] { "Estoque", "Compras", "Administrador" }
+            Unit = "unidades",
+            RequiredRoles = new[] { "Estoque", "Compras", "Administrador" }
         },
         new DashboardWidgetDefinition
         {
             ProviderKey = Key,
             WidgetKey = "stock-movements",
             Title = "Movimentações de Estoque",
-            Description = "Entradas e saídas por mês",
+            Description = "Entradas e saídas no período selecionado",
             ChartType = DashboardChartType.Line,
             Icon = "mdi-swap-horizontal",
-            Unit = "movimentações"
-            , RequiredRoles = new[] { "Estoque", "Administrador" }
+            Unit = "movimentações",
+            RequiredRoles = new[] { "Estoque", "Administrador" }
         },
         new DashboardWidgetDefinition
         {
             ProviderKey = Key,
             WidgetKey = "top-value-products",
             Title = "Produtos de Maior Valor",
-            Description = "Top 10 produtos por valor em estoque",
+            Description = "Top 10 produtos por valor atual em estoque",
             ChartType = DashboardChartType.Bar,
             Icon = "mdi-currency-usd",
-            Unit = "R$"
-            , RequiredRoles = new[] { "Estoque", "Financeiro", "Administrador" }
+            Unit = "R$",
+            RequiredRoles = new[] { "Estoque", "Financeiro", "Administrador" }
         },
         new DashboardWidgetDefinition
         {
             ProviderKey = Key,
             WidgetKey = "abc-curve",
             Title = "Curva ABC (Pareto)",
-            Description = "Classificação de produtos por contribuição de receita",
+            Description = "Classificação de produtos por contribuição de receita no período",
             ChartType = DashboardChartType.Donut,
             Icon = "mdi-chart-arc",
-            Unit = "R$"
-            , RequiredRoles = new[] { "Estoque", "Financeiro", "Gerente", "Administrador" }
+            Unit = "R$",
+            RequiredRoles = new[] { "Estoque", "Financeiro", "Gerente", "Administrador" }
         }
     };
 
@@ -90,6 +90,7 @@ public class InventoryDashboardProvider : IDashboardWidgetProvider
             _ => throw new KeyNotFoundException($"Widget '{widgetKey}' not found in provider '{Key}'.")
         };
     }
+    
 
     private async Task<ChartDataResponse> GetStockLevelsAsync(DashboardQuery query, CancellationToken ct)
     {
@@ -107,9 +108,11 @@ public class InventoryDashboardProvider : IDashboardWidgetProvider
             Categories = new List<string> { "Sem Estoque", "Estoque Baixo", "Estoque Normal", "Excesso" },
             Series = new List<ChartSeriesDto>
             {
-                new() { Name = "Produtos", Data = new List<decimal> { (decimal)noStock, (decimal)lowStock, (decimal)normalStock, (decimal)overStock } }
+                new() { Name = "Produtos", Data = new List<decimal> { noStock, lowStock, normalStock, overStock } }
             },
-            Subtitle = $"Total: {products.Count} produtos"
+            Subtitle = $"Total: {products.Count} produtos ativos",
+            IsCurrentStateWidget = true,
+            DynamicDescription = "Snapshot atual da distribuição de estoque"
         };
     }
 
@@ -124,6 +127,18 @@ public class InventoryDashboardProvider : IDashboardWidgetProvider
             .Select(p => new { p.Name, p.CurrentStock, p.MinimumStock })
             .ToListAsync(ct);
 
+        // Guard clause: return early if no low-stock products
+        if (lowStockProducts.Count == 0)
+        {
+            return new ChartDataResponse
+            {
+                Categories = new List<string> { "Nenhum alerta" },
+                Series = new List<ChartSeriesDto> { new() { Name = "Estoque", Data = new List<decimal> { 0 } } },
+                Subtitle = "Todos os produtos estão com estoque adequado",
+                IsCurrentStateWidget = true
+            };
+        }
+
         var categories = lowStockProducts.Select(p => p.Name).ToList();
         var currentStock = lowStockProducts.Select(p => (decimal)p.CurrentStock).ToList();
         var minimumStock = lowStockProducts.Select(p => (decimal)p.MinimumStock).ToList();
@@ -136,7 +151,9 @@ public class InventoryDashboardProvider : IDashboardWidgetProvider
                 new() { Name = "Estoque Atual", Data = currentStock },
                 new() { Name = "Estoque Mínimo", Data = minimumStock }
             },
-            Subtitle = $"{lowStockProducts.Count} produtos com estoque baixo"
+            Subtitle = $"{lowStockProducts.Count} produtos com estoque baixo",
+            IsCurrentStateWidget = true,
+            DynamicDescription = "Produtos atualmente com estoque abaixo do mínimo"
         };
     }
 
@@ -144,6 +161,7 @@ public class InventoryDashboardProvider : IDashboardWidgetProvider
     {
         var startDate = query.From?.ToUniversalTime() ?? DateTime.UtcNow.AddMonths(-11).Date;
         var endDate = query.To?.ToUniversalTime() ?? DateTime.UtcNow.Date;
+        var periodLabel = DashboardDateUtils.FormatPeriodLabel(query.From, query.To);
 
         var movements = await _context.StockMovements
             .Where(m => m.MovementDate >= startDate && m.MovementDate <= endDate)
@@ -192,6 +210,9 @@ public class InventoryDashboardProvider : IDashboardWidgetProvider
             var key = $"{monthNum}/{year}";
             return exits.GetValueOrDefault(key, 0);
         }).ToList();
+        
+        var totalEntries = entriesData.Sum();
+        var totalExits = exitsData.Sum();
 
         return new ChartDataResponse
         {
@@ -201,7 +222,9 @@ public class InventoryDashboardProvider : IDashboardWidgetProvider
                 new() { Name = "Entradas", Data = entriesData },
                 new() { Name = "Saídas", Data = exitsData }
             },
-            Subtitle = "Últimos 12 meses"
+            Subtitle = $"Entradas: {totalEntries:N0} | Saídas: {totalExits:N0}",
+            PeriodLabel = periodLabel,
+            DynamicDescription = $"Movimentações de estoque de {periodLabel}"
         };
     }
 
@@ -217,6 +240,19 @@ public class InventoryDashboardProvider : IDashboardWidgetProvider
                 Value = p.CurrentStock * p.CostPrice
             })
             .ToListAsync(ct);
+        
+        if (!topProducts.Any())
+        {
+            return new ChartDataResponse
+            {
+                Categories = new List<string> { "Sem dados" },
+                Series = new List<ChartSeriesDto> { new() { Name = "Valor", Data = new List<decimal> { 0 } } },
+                Subtitle = "Nenhum produto com estoque",
+                IsCurrentStateWidget = true
+            };
+        }
+        
+        var totalValue = topProducts.Sum(p => p.Value);
 
         return new ChartDataResponse
         {
@@ -225,12 +261,15 @@ public class InventoryDashboardProvider : IDashboardWidgetProvider
             {
                 new() { Name = "Valor em Estoque", Data = topProducts.Select(p => p.Value).ToList() }
             },
-            Subtitle = "Top 10 produtos"
+            Subtitle = $"Top {topProducts.Count} produtos | Total: {CurrencyFormatService.FormatStatic(totalValue)}",
+            IsCurrentStateWidget = true,
+            DynamicDescription = "Produtos com maior valor atual em estoque"
         };
     }
 
     private async Task<ChartDataResponse> GetABCCurveAsync(DashboardQuery query, CancellationToken ct)
     {
+        var periodLabel = DashboardDateUtils.FormatPeriodLabel(query.From, query.To);
         var filter = new InventoryReportFilterDto
         {
             StartDate = query.From?.ToUniversalTime() ?? DateTime.UtcNow.AddMonths(-6),
@@ -246,7 +285,8 @@ public class InventoryDashboardProvider : IDashboardWidgetProvider
             {
                 Categories = new List<string> { "Sem dados" },
                 Series = new List<ChartSeriesDto> { new() { Name = "Receita", Data = new List<decimal> { 0 } } },
-                Subtitle = "Nenhum dado de vendas no período"
+                Subtitle = "Nenhum dado de vendas no período",
+                PeriodLabel = periodLabel
             };
         }
 
@@ -267,7 +307,9 @@ public class InventoryDashboardProvider : IDashboardWidgetProvider
                     summary.ClassCRevenue 
                 } }
             },
-            Subtitle = $"Total: {CurrencyFormatService.FormatStatic(summary.TotalRevenue)} | A: {summary.ClassAPercentage:N1}% | B: {summary.ClassBPercentage:N1}% | C: {summary.ClassCPercentage:N1}%"
+            Subtitle = $"Total: {CurrencyFormatService.FormatStatic(summary.TotalRevenue)} | A: {summary.ClassAPercentage:N1}% | B: {summary.ClassBPercentage:N1}% | C: {summary.ClassCPercentage:N1}%",
+            PeriodLabel = periodLabel,
+            DynamicDescription = $"Análise Curva ABC baseada em vendas de {periodLabel}"
         };
     }
 }

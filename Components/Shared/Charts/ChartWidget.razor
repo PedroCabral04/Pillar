@@ -9,10 +9,26 @@
         <div class="d-flex align-center justify-space-between flex-wrap gap-2">
             <div class="d-flex align-center gap-3">
                 <div>
-                    <MudText Typo="Typo.subtitle1" Class="chart-title">@Definition.Title</MudText>
-                    @if (!string.IsNullOrWhiteSpace(Definition.Description))
+                    <div class="d-flex align-center gap-2">
+                        <MudText Typo="Typo.subtitle1" Class="chart-title">@DisplayTitle</MudText>
+                        @if (Data?.IsCurrentStateWidget == true)
+                        {
+                            <MudTooltip Text="Este widget mostra o estado atual e não é afetado pelo filtro de período">
+                                <MudChip T="string" Text="Atual" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Info" Variant="Variant.Outlined" 
+                                         Class="current-state-chip" />
+                            </MudTooltip>
+                        }
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(DisplayDescription))
                     {
-                        <MudText Typo="Typo.caption" Class="chart-description">@Definition.Description</MudText>
+                        <MudText Typo="Typo.caption" Class="chart-description">@DisplayDescription</MudText>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(Data?.PeriodLabel) && Data?.IsCurrentStateWidget != true)
+                    {
+                        <MudText Typo="Typo.caption" Class="chart-period-label">
+                            <MudIcon Icon="@Icons.Material.Outlined.DateRange" Size="MudBlazor.Size.Small" Class="mr-1" Style="vertical-align: middle; font-size: 14px;" />
+                            @Data.PeriodLabel
+                        </MudText>
                     }
                 </div>
             </div>
@@ -176,6 +192,20 @@
         margin-top: 2px;
     }
     
+    .chart-period-label {
+        color: var(--mud-palette-primary);
+        font-size: 0.7rem;
+        margin-top: 4px;
+        display: flex;
+        align-items: center;
+    }
+    
+    .current-state-chip {
+        height: 20px !important;
+        font-size: 0.65rem !important;
+        padding: 0 6px !important;
+    }
+    
     .chart-subtitle {
         color: var(--mud-palette-text-secondary);
         background: rgba(var(--mud-palette-primary-rgb), 0.06);
@@ -337,6 +367,10 @@
     };
     
     private bool IsPieOrDonut => Definition.ChartType is DashboardChartType.Pie or DashboardChartType.Donut;
+    
+    // Use dynamic title/description from Data if available, otherwise fall back to Definition
+    private string DisplayTitle => Data?.DynamicTitle ?? Definition.Title;
+    private string DisplayDescription => Data?.DynamicDescription ?? Definition.Description ?? string.Empty;
     
     private ApexChartOptions<DataPoint> _barOptions = null!;
     private ApexChartOptions<DataPoint> _lineOptions = null!;

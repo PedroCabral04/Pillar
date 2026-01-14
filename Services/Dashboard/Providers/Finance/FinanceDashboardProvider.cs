@@ -21,7 +21,7 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
             ProviderKey = Key,
             WidgetKey = "cashflow",
             Title = "Fluxo de Caixa",
-            Description = "Projeção de entradas vs saídas próximos 30 dias",
+            Description = "Projeção de entradas vs saídas no período",
             ChartType = DashboardChartType.Area,
             Icon = "mdi-cash",
             Unit = "R$",
@@ -32,7 +32,7 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
             ProviderKey = Key,
             WidgetKey = "accounts-payable-summary",
             Title = "Resumo Contas a Pagar",
-            Description = "Total pendente, vencido e pago",
+            Description = "Total pendente, vencido e pago no período",
             ChartType = DashboardChartType.Donut,
             Icon = "mdi-arrow-down-bold-circle",
             Unit = "R$",
@@ -43,7 +43,7 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
             ProviderKey = Key,
             WidgetKey = "accounts-receivable-summary",
             Title = "Resumo Contas a Receber",
-            Description = "Total pendente, vencido e recebido",
+            Description = "Total pendente, vencido e recebido no período",
             ChartType = DashboardChartType.Donut,
             Icon = "mdi-arrow-up-bold-circle",
             Unit = "R$",
@@ -54,7 +54,7 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
             ProviderKey = Key,
             WidgetKey = "aging-analysis",
             Title = "Análise de Aging",
-            Description = "Distribuição de contas vencidas por período",
+            Description = "Distribuição de contas vencidas por período (estado atual)",
             ChartType = DashboardChartType.Bar,
             Icon = "mdi-calendar-alert",
             Unit = "R$",
@@ -65,7 +65,7 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
             ProviderKey = Key,
             WidgetKey = "top-suppliers",
             Title = "Top Fornecedores",
-            Description = "Fornecedores com maior volume de compras",
+            Description = "Fornecedores com maior volume de compras no período",
             ChartType = DashboardChartType.Bar,
             Icon = "mdi-truck",
             Unit = "R$",
@@ -76,7 +76,7 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
             ProviderKey = Key,
             WidgetKey = "top-customers",
             Title = "Top Clientes",
-            Description = "Clientes com maior volume de vendas",
+            Description = "Clientes com maior volume de vendas no período",
             ChartType = DashboardChartType.Bar,
             Icon = "mdi-account-group",
             Unit = "R$",
@@ -87,7 +87,7 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
             ProviderKey = Key,
             WidgetKey = "cashflow-alerts",
             Title = "Alertas Fluxo de Caixa",
-            Description = "Dias projetados com saldo negativo",
+            Description = "Dias projetados com saldo negativo no período",
             ChartType = DashboardChartType.Bar,
             Icon = "mdi-alert-circle",
             Unit = "R$",
@@ -109,28 +109,27 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
             _ => throw new KeyNotFoundException($"Widget '{widgetKey}' not found in provider '{Key}'.")
         };
     }
+    
 
     private async Task<ChartDataResponse> GetCashflowAsync(DashboardQuery query, CancellationToken ct)
     {
-        var dashboardData = await _financialService.GetDashboardDataAsync();
+        var periodLabel = DashboardDateUtils.FormatPeriodLabel(query.From, query.To);
+        var dashboardData = await _financialService.GetDashboardDataAsync(query.From, query.To);
         
-        // Get next 30 days projection
         var categories = dashboardData.CashFlowProjection
-            .Take(30)
             .Select(x => x.Date.ToString("dd/MM"))
             .ToList();
             
         var revenues = dashboardData.CashFlowProjection
-            .Take(30)
             .Select(x => x.Revenue)
             .ToList();
             
         var expenses = dashboardData.CashFlowProjection
-            .Take(30)
             .Select(x => x.Expense)
             .ToList();
 
         var netTotal = revenues.Sum() - expenses.Sum();
+        var daysCount = dashboardData.CashFlowProjection.Count;
         
         return new ChartDataResponse
         {
@@ -140,13 +139,16 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
                 new() { Name = "Entradas", Data = revenues },
                 new() { Name = "Saídas", Data = expenses }
             },
-            Subtitle = $"Saldo projetado: {CurrencyFormatService.FormatStatic(netTotal)}"
+            Subtitle = $"Saldo projetado: {CurrencyFormatService.FormatStatic(netTotal)}",
+            PeriodLabel = periodLabel,
+            DynamicDescription = $"Projeção de fluxo de caixa para {daysCount} dias"
         };
     }
 
     private async Task<ChartDataResponse> GetAccountsPayableSummaryAsync(DashboardQuery query, CancellationToken ct)
     {
-        var dashboardData = await _financialService.GetDashboardDataAsync();
+        var periodLabel = DashboardDateUtils.FormatPeriodLabel(query.From, query.To);
+        var dashboardData = await _financialService.GetDashboardDataAsync(query.From, query.To);
         
         return new ChartDataResponse
         {
@@ -164,13 +166,16 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
                     } 
                 }
             },
-            Subtitle = $"Total: {CurrencyFormatService.FormatStatic(dashboardData.TotalPayable)} | {dashboardData.PayablesCount} contas abertas"
+            Subtitle = $"Total: {CurrencyFormatService.FormatStatic(dashboardData.TotalPayable)} | {dashboardData.PayablesCount} contas abertas",
+            PeriodLabel = periodLabel,
+            DynamicDescription = $"Contas a pagar emitidas de {periodLabel}"
         };
     }
 
     private async Task<ChartDataResponse> GetAccountsReceivableSummaryAsync(DashboardQuery query, CancellationToken ct)
     {
-        var dashboardData = await _financialService.GetDashboardDataAsync();
+        var periodLabel = DashboardDateUtils.FormatPeriodLabel(query.From, query.To);
+        var dashboardData = await _financialService.GetDashboardDataAsync(query.From, query.To);
         
         return new ChartDataResponse
         {
@@ -188,12 +193,15 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
                     } 
                 }
             },
-            Subtitle = $"Total: {CurrencyFormatService.FormatStatic(dashboardData.TotalReceivable)} | {dashboardData.ReceivablesCount} contas abertas"
+            Subtitle = $"Total: {CurrencyFormatService.FormatStatic(dashboardData.TotalReceivable)} | {dashboardData.ReceivablesCount} contas abertas",
+            PeriodLabel = periodLabel,
+            DynamicDescription = $"Contas a receber emitidas de {periodLabel}"
         };
     }
 
     private async Task<ChartDataResponse> GetAgingAnalysisAsync(DashboardQuery query, CancellationToken ct)
     {
+        // Aging analysis always uses current state (not filtered by period)
         var dashboardData = await _financialService.GetDashboardDataAsync();
         
         var payableAging = dashboardData.PayablesAgingList;
@@ -213,13 +221,16 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
                 new() { Name = "A Pagar Vencido", Data = payableData },
                 new() { Name = "A Receber Vencido", Data = receivableData }
             },
-            Subtitle = $"Total vencido: {CurrencyFormatService.FormatStatic(totalOverdue)}"
+            Subtitle = $"Total vencido: {CurrencyFormatService.FormatStatic(totalOverdue)}",
+            IsCurrentStateWidget = true,
+            DynamicDescription = "Análise de envelhecimento das contas vencidas (estado atual)"
         };
     }
 
     private async Task<ChartDataResponse> GetTopSuppliersAsync(DashboardQuery query, CancellationToken ct)
     {
-        var dashboardData = await _financialService.GetDashboardDataAsync();
+        var periodLabel = DashboardDateUtils.FormatPeriodLabel(query.From, query.To);
+        var dashboardData = await _financialService.GetDashboardDataAsync(query.From, query.To);
         
         if (!dashboardData.TopSuppliers.Any())
         {
@@ -227,7 +238,8 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
             {
                 Categories = new List<string> { "Sem dados" },
                 Series = new List<ChartSeriesDto> { new() { Name = "Valor", Data = new List<decimal> { 0 } } },
-                Subtitle = "Nenhum fornecedor encontrado"
+                Subtitle = "Nenhum fornecedor no período",
+                PeriodLabel = periodLabel
             };
         }
         
@@ -238,13 +250,16 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
             {
                 new() { Name = "Total Compras", Data = dashboardData.TopSuppliers.Select(x => x.TotalAmount).ToList() }
             },
-            Subtitle = $"Top {dashboardData.TopSuppliers.Count} fornecedores"
+            Subtitle = $"Top {dashboardData.TopSuppliers.Count} fornecedores",
+            PeriodLabel = periodLabel,
+            DynamicDescription = $"Principais fornecedores de {periodLabel}"
         };
     }
 
     private async Task<ChartDataResponse> GetTopCustomersAsync(DashboardQuery query, CancellationToken ct)
     {
-        var dashboardData = await _financialService.GetDashboardDataAsync();
+        var periodLabel = DashboardDateUtils.FormatPeriodLabel(query.From, query.To);
+        var dashboardData = await _financialService.GetDashboardDataAsync(query.From, query.To);
         
         if (!dashboardData.TopCustomers.Any())
         {
@@ -252,7 +267,8 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
             {
                 Categories = new List<string> { "Sem dados" },
                 Series = new List<ChartSeriesDto> { new() { Name = "Valor", Data = new List<decimal> { 0 } } },
-                Subtitle = "Nenhum cliente encontrado"
+                Subtitle = "Nenhum cliente no período",
+                PeriodLabel = periodLabel
             };
         }
         
@@ -263,13 +279,16 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
             {
                 new() { Name = "Total Vendas", Data = dashboardData.TopCustomers.Select(x => x.TotalAmount).ToList() }
             },
-            Subtitle = $"Top {dashboardData.TopCustomers.Count} clientes"
+            Subtitle = $"Top {dashboardData.TopCustomers.Count} clientes",
+            PeriodLabel = periodLabel,
+            DynamicDescription = $"Principais clientes de {periodLabel}"
         };
     }
 
     private async Task<ChartDataResponse> GetCashflowAlertsAsync(DashboardQuery query, CancellationToken ct)
     {
-        var dashboardData = await _financialService.GetDashboardDataAsync();
+        var periodLabel = DashboardDateUtils.FormatPeriodLabel(query.From, query.To);
+        var dashboardData = await _financialService.GetDashboardDataAsync(query.From, query.To);
         var alerts = dashboardData.CashFlowAlerts;
 
         if (!alerts.Any())
@@ -278,7 +297,8 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
             {
                 Categories = new List<string> { "Sem alertas" },
                 Series = new List<ChartSeriesDto> { new() { Name = "Saldo", Data = new List<decimal> { 0 } } },
-                Subtitle = "✅ Nenhum dia com saldo negativo projetado"
+                Subtitle = "Nenhum dia com saldo negativo projetado",
+                PeriodLabel = periodLabel
             };
         }
 
@@ -291,8 +311,8 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
         var warningCount = alerts.Count(a => a.Severity == "Warning");
         
         var severityText = criticalCount > 0 
-            ? $"⚠️ {criticalCount} crítico(s), {warningCount} alerta(s)"
-            : $"⚠️ {warningCount} alerta(s)";
+            ? $"{criticalCount} crítico(s), {warningCount} alerta(s)"
+            : $"{warningCount} alerta(s)";
 
         return new ChartDataResponse
         {
@@ -301,7 +321,9 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
             {
                 new() { Name = "Déficit Projetado", Data = balances }
             },
-            Subtitle = $"{alerts.Count} dia(s) com saldo negativo | {severityText}"
+            Subtitle = $"{alerts.Count} dia(s) com saldo negativo | {severityText}",
+            PeriodLabel = periodLabel,
+            DynamicDescription = $"Alertas de fluxo de caixa para {periodLabel}"
         };
     }
 }
