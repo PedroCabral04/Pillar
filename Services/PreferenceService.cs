@@ -160,11 +160,8 @@ namespace erp.Services
                     throw;
                 }
             }
-            
-            if (lastException != null)
-                throw lastException;
-                
-            OnPreferenceChanged?.Invoke();
+
+            throw lastException ?? new Exception("Failed to save preferences after multiple retries");
         }
     }
 }

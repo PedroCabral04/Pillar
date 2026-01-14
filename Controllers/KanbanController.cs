@@ -38,6 +38,14 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         return u;
     }
 
+    private int GetRequiredTenantId()
+    {
+        var tenantId = tenantContextAccessor.Current?.TenantId;
+        if (tenantId is null)
+            throw new InvalidOperationException("Tenant context is required for this operation");
+        return tenantId.Value;
+    }
+
     // ===== Boards (Multiple) =====
 
     /// <summary>
@@ -176,7 +184,7 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         var board = await db.KanbanBoards.FirstOrDefaultAsync(b => b.OwnerId == myId);
         if (board is null)
         {
-            var tenantId = await GetTenantId();
+            var tenantId = GetRequiredTenantId();
 
             board = new KanbanBoard { OwnerId = myId, Name = "Meu quadro", TenantId = tenantId };
             db.KanbanBoards.Add(board);
@@ -362,7 +370,7 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         if (column is null) return NotFound("Coluna não encontrada");
         if (column.Board.OwnerId != user.Id) return Forbid();
 
-        var tenantId = await GetTenantId();
+        var tenantId = GetRequiredTenantId();
         var maxPos = await db.KanbanCards.Where(t => t.ColumnId == column.Id).MaxAsync(t => (int?)t.Position) ?? -1;
         var card = new KanbanCard
         {
@@ -373,7 +381,8 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
             DueDate = ToUtc(req.DueDate),
             Priority = req.Priority,
             AssignedUserId = req.AssignedUserId,
-            Color = req.Color
+            Color = req.Color,
+            TenantId = tenantId
         };
         db.KanbanCards.Add(card);
         await db.SaveChangesAsync();

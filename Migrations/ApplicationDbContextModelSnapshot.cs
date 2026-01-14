@@ -2068,8 +2068,6 @@ namespace erp.Migrations
                     b.Property<decimal>("CostPrice")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -2133,8 +2131,6 @@ namespace erp.Migrations
                     b.Property<decimal>("SalePrice")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
 
                     b.Property<string>("Sku")
                         .IsRequired()
@@ -2172,8 +2168,6 @@ namespace erp.Migrations
                         .HasColumnType("numeric");
 
                     b.Property<decimal?>("WholesalePrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
@@ -4631,13 +4625,10 @@ namespace erp.Migrations
             modelBuilder.Entity("erp.Models.Kanban.KanbanBoard", b =>
                 {
                     b.HasOne("erp.Models.Identity.ApplicationUser", "Owner")
-                    b.HasOne("erp.Models.Identity.ApplicationUser", "Owner")
                         .WithMany()
                         .HasForeignKey("OwnerId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Owner");
 
                     b.Navigation("Owner");
                 });

@@ -7,6 +7,7 @@ using erp.Models.Financial;
 using erp.Models.Payroll;
 using erp.Models.Tenancy;
 using erp.Models.Dashboard;
+using erp.Services.Tenancy;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
@@ -2422,6 +2423,74 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .HasForeignKey(x => x.ConversationId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
+    }
+
+    private void ConfigureTenantQueryFilters(ModelBuilder modelBuilder)
+    {
+        // Apply global query filters to all entities implementing IMustHaveTenant
+        // This ensures multi-tenant data isolation at the query level
+        // Filter logic:
+        // - No filter when tenant context is not available (tests, admin operations, anonymous endpoints)
+        // - Filter to current tenant when tenant context is available
+        
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            if (!typeof(IMustHaveTenant).IsAssignableFrom(entityType.ClrType))
+                continue;
+            
+            // Skip entities that already have a query filter configured (e.g., AuditLog, ChatConversation)
+            if (entityType.GetQueryFilter() != null)
+                continue;
+            
+            var parameter = System.Linq.Expressions.Expression.Parameter(entityType.ClrType, "e");
+            var tenantIdProperty = System.Linq.Expressions.Expression.Property(parameter, nameof(IMustHaveTenant.TenantId));
+            
+            // Build the filter expression:
+            // e => _tenantContextAccessor == null || 
+            //      _tenantContextAccessor.Current == null || 
+            //      !_tenantContextAccessor.Current.TenantId.HasValue || 
+            //      e.TenantId == _tenantContextAccessor.Current.TenantId.GetValueOrDefault()
+            
+            var accessorField = System.Linq.Expressions.Expression.Constant(this);
+            var accessorProperty = System.Linq.Expressions.Expression.Field(accessorField, "_tenantContextAccessor");
+            
+            // _tenantContextAccessor == null
+            var accessorNull = System.Linq.Expressions.Expression.Equal(
+                accessorProperty, 
+                System.Linq.Expressions.Expression.Constant(null, typeof(ITenantContextAccessor)));
+            
+            // _tenantContextAccessor.Current
+            var currentProperty = System.Linq.Expressions.Expression.Property(accessorProperty, "Current");
+            
+            // _tenantContextAccessor.Current == null
+            var currentNull = System.Linq.Expressions.Expression.Equal(
+                currentProperty, 
+                System.Linq.Expressions.Expression.Constant(null, typeof(TenantContext)));
+            
+            // _tenantContextAccessor.Current.TenantId
+            var currentTenantIdProperty = System.Linq.Expressions.Expression.Property(currentProperty, "TenantId");
+            
+            // !_tenantContextAccessor.Current.TenantId.HasValue
+            var hasValueProperty = System.Linq.Expressions.Expression.Property(currentTenantIdProperty, "HasValue");
+            var noTenantId = System.Linq.Expressions.Expression.Not(hasValueProperty);
+            
+            // _tenantContextAccessor.Current.TenantId.GetValueOrDefault()
+            var getValueOrDefaultMethod = typeof(int?).GetMethod("GetValueOrDefault", Type.EmptyTypes)!;
+            var currentTenantValue = System.Linq.Expressions.Expression.Call(currentTenantIdProperty, getValueOrDefaultMethod);
+            
+            // e.TenantId == _tenantContextAccessor.Current.TenantId.GetValueOrDefault()
+            var tenantMatch = System.Linq.Expressions.Expression.Equal(tenantIdProperty, currentTenantValue);
+            
+            // Combine: accessorNull || currentNull || noTenantId || tenantMatch
+            var filterExpression = System.Linq.Expressions.Expression.OrElse(
+                System.Linq.Expressions.Expression.OrElse(
+                    System.Linq.Expressions.Expression.OrElse(accessorNull, currentNull),
+                    noTenantId),
+                tenantMatch);
+            
+            var lambda = System.Linq.Expressions.Expression.Lambda(filterExpression, parameter);
+            entityType.SetQueryFilter(lambda);
+        }
     }
 }
 

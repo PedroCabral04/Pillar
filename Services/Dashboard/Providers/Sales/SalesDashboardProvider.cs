@@ -84,7 +84,6 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
         return widgetKey switch
         {
             "sales-today" => GetSalesTodayAsync(query, ct),
-            "sales-today" => GetSalesTodayAsync(query, ct),
             "sales-by-month" => GetSalesByMonthAsync(query, ct),
             "top-products" => GetTopProductsAsync(query, ct),
             "sales-by-status" => GetSalesByStatusAsync(query, ct),
