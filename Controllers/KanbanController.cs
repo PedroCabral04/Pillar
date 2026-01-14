@@ -1,9 +1,12 @@
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using erp.Data;
 using erp.DTOs.Kanban;
+using erp.Models;
 using erp.Models.Identity;
 using erp.Models.Kanban;
+using erp.Services.Tenancy;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -14,12 +17,39 @@ namespace erp.Controllers;
 [ApiController]
 [Route("api/kanban")]
 [Authorize]
-public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUser> users) : ControllerBase
+public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUser> users, ITenantContextAccessor tenantContextAccessor) : ControllerBase
 {
     // PostgreSQL requires DateTime with Kind=Utc for timestamp with time zone columns
-    private static DateTime? ToUtc(DateTime? dt) => dt.HasValue 
-        ? DateTime.SpecifyKind(dt.Value, DateTimeKind.Utc) 
+    private static DateTime? ToUtc(DateTime? dt) => dt.HasValue
+        ? DateTime.SpecifyKind(dt.Value, DateTimeKind.Utc)
         : null;
+
+    private async Task<int> GetTenantId()
+    {
+        // Try tenant context accessor first
+        var tenantId = tenantContextAccessor.Current?.TenantId;
+        if (tenantId.HasValue)
+        {
+            return tenantId.Value;
+        }
+
+        // Try user claim
+        var claimValue = User?.FindFirstValue(TenantClaimTypes.TenantId);
+        if (int.TryParse(claimValue, out var parsed))
+        {
+            return parsed;
+        }
+
+        // Fall back to user's TenantId from database
+        var user = await users.GetUserAsync(User);
+        if (user?.TenantId.HasValue == true)
+        {
+            return user.TenantId.Value;
+        }
+
+        throw new InvalidOperationException(
+            "Cannot determine tenant context. Ensure the request has a valid tenant context (subdomain, X-Tenant header, or user claim).");
+    }
 
     private async Task<int> GetMyUserIdAsync()
     {
@@ -54,16 +84,17 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
     public async Task<ActionResult<KanbanBoardDto>> CreateBoard([FromBody] CreateBoardRequest req)
     {
         var myId = await GetMyUserIdAsync();
-        
-        var board = new KanbanBoard { OwnerId = myId, Name = req.Name };
+        var tenantId = await GetTenantId();
+
+        var board = new KanbanBoard { OwnerId = myId, Name = req.Name, TenantId = tenantId };
         db.KanbanBoards.Add(board);
         await db.SaveChangesAsync();
 
         // Default columns
         db.KanbanColumns.AddRange(
-            new KanbanColumn { BoardId = board.Id, Title = "A Fazer", Position = 0 },
-            new KanbanColumn { BoardId = board.Id, Title = "Fazendo", Position = 1 },
-            new KanbanColumn { BoardId = board.Id, Title = "Feito", Position = 2 }
+            new KanbanColumn { BoardId = board.Id, Title = "A Fazer", Position = 0, TenantId = tenantId },
+            new KanbanColumn { BoardId = board.Id, Title = "Fazendo", Position = 1, TenantId = tenantId },
+            new KanbanColumn { BoardId = board.Id, Title = "Feito", Position = 2, TenantId = tenantId }
         );
 
         await db.SaveChangesAsync();
@@ -161,23 +192,25 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         var board = await db.KanbanBoards.FirstOrDefaultAsync(b => b.OwnerId == myId);
         if (board is null)
         {
-            board = new KanbanBoard { OwnerId = myId, Name = "Meu quadro" };
+            var tenantId = await GetTenantId();
+
+            board = new KanbanBoard { OwnerId = myId, Name = "Meu quadro", TenantId = tenantId };
             db.KanbanBoards.Add(board);
             await db.SaveChangesAsync();
 
             // Default columns
             db.KanbanColumns.AddRange(
-                new KanbanColumn { BoardId = board.Id, Title = "A Fazer", Position = 0 },
-                new KanbanColumn { BoardId = board.Id, Title = "Fazendo", Position = 1 },
-                new KanbanColumn { BoardId = board.Id, Title = "Feito", Position = 2 }
+                new KanbanColumn { BoardId = board.Id, Title = "A Fazer", Position = 0, TenantId = tenantId },
+                new KanbanColumn { BoardId = board.Id, Title = "Fazendo", Position = 1, TenantId = tenantId },
+                new KanbanColumn { BoardId = board.Id, Title = "Feito", Position = 2, TenantId = tenantId }
             );
 
             // Default labels
             db.KanbanLabels.AddRange(
-                new KanbanLabel { BoardId = board.Id, Name = "Bug", Color = "#EF4444" },
-                new KanbanLabel { BoardId = board.Id, Name = "Feature", Color = "#22C55E" },
-                new KanbanLabel { BoardId = board.Id, Name = "Melhoria", Color = "#3B82F6" },
-                new KanbanLabel { BoardId = board.Id, Name = "Urgente", Color = "#F59E0B" }
+                new KanbanLabel { BoardId = board.Id, Name = "Bug", Color = "#EF4444", TenantId = tenantId },
+                new KanbanLabel { BoardId = board.Id, Name = "Feature", Color = "#22C55E", TenantId = tenantId },
+                new KanbanLabel { BoardId = board.Id, Name = "Melhoria", Color = "#3B82F6", TenantId = tenantId },
+                new KanbanLabel { BoardId = board.Id, Name = "Urgente", Color = "#F59E0B", TenantId = tenantId }
             );
 
             await db.SaveChangesAsync();
@@ -323,6 +356,7 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         if (column is null) return NotFound("Coluna não encontrada");
         if (column.Board.OwnerId != user.Id) return Forbid();
 
+        var tenantId = await GetTenantId();
         var maxPos = await db.KanbanCards.Where(t => t.ColumnId == column.Id).MaxAsync(t => (int?)t.Position) ?? -1;
         var card = new KanbanCard
         {
@@ -333,7 +367,8 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
             DueDate = ToUtc(req.DueDate),
             Priority = req.Priority,
             AssignedUserId = req.AssignedUserId,
-            Color = req.Color
+            Color = req.Color,
+            TenantId = tenantId
         };
         db.KanbanCards.Add(card);
         await db.SaveChangesAsync();
@@ -359,7 +394,8 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
             CardId = card.Id,
             UserId = user.Id,
             Action = KanbanHistoryAction.Created,
-            Description = "criou o card"
+            Description = "criou o card",
+            TenantId = tenantId
         });
         await db.SaveChangesAsync();
 
@@ -452,7 +488,8 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
                 CardId = card.Id,
                 UserId = user.Id,
                 Action = KanbanHistoryAction.Updated,
-                Description = string.Join("; ", changes)
+                Description = string.Join("; ", changes),
+                TenantId = card.TenantId
             });
         }
 
@@ -493,7 +530,8 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
             CardId = card.Id,
             UserId = user.Id,
             Action = req.IsArchived ? KanbanHistoryAction.Archived : KanbanHistoryAction.Restored,
-            Description = req.IsArchived ? "arquivou o card" : "restaurou o card"
+            Description = req.IsArchived ? "arquivou o card" : "restaurou o card",
+            TenantId = card.TenantId
         });
 
         await db.SaveChangesAsync();
@@ -530,7 +568,8 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
                 Action = KanbanHistoryAction.Moved,
                 Description = $"moveu de '{fromColumn.Title}' para '{targetColumn.Title}'",
                 OldValue = fromColumn.Title,
-                NewValue = targetColumn.Title
+                NewValue = targetColumn.Title,
+                TenantId = card.TenantId
             });
         }
 
@@ -575,7 +614,8 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         {
             CardId = cardId,
             AuthorId = user.Id,
-            Content = req.Content
+            Content = req.Content,
+            TenantId = card.TenantId
         };
         db.KanbanComments.Add(comment);
 
@@ -584,7 +624,8 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
             CardId = cardId,
             UserId = user.Id,
             Action = KanbanHistoryAction.CommentAdded,
-            Description = "adicionou um comentário"
+            Description = "adicionou um comentário",
+            TenantId = card.TenantId
         });
 
         await db.SaveChangesAsync();
@@ -615,7 +656,8 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
             CardId = cardId,
             UserId = user.Id,
             Action = KanbanHistoryAction.CommentEdited,
-            Description = "editou um comentário"
+            Description = "editou um comentário",
+            TenantId = comment.TenantId
         });
 
         await db.SaveChangesAsync();
@@ -640,7 +682,8 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
             CardId = cardId,
             UserId = user.Id,
             Action = KanbanHistoryAction.CommentDeleted,
-            Description = "removeu um comentário"
+            Description = "removeu um comentário",
+            TenantId = comment.TenantId
         });
 
         await db.SaveChangesAsync();
@@ -710,7 +753,7 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
     public async Task<ActionResult<KanbanLabelDto>> CreateLabel([FromBody] CreateLabelRequest req)
     {
         var myId = await GetMyUserIdAsync();
-        
+
         KanbanBoard? board;
         if (req.BoardId.HasValue)
         {
@@ -720,14 +763,15 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         {
             board = await db.KanbanBoards.FirstOrDefaultAsync(b => b.OwnerId == myId);
         }
-        
+
         if (board is null) return NotFound("Crie o quadro primeiro");
 
         var label = new KanbanLabel
         {
             BoardId = board.Id,
             Name = req.Name,
-            Color = req.Color
+            Color = req.Color,
+            TenantId = board.TenantId
         };
         db.KanbanLabels.Add(label);
         await db.SaveChangesAsync();
@@ -787,7 +831,7 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
         var board = await db.KanbanBoards.FirstOrDefaultAsync(b => b.OwnerId == myId);
         if (board is null) return NotFound("Crie o quadro primeiro");
         var max = await db.KanbanColumns.Where(c => c.BoardId == board.Id).MaxAsync(c => (int?)c.Position) ?? -1;
-        var col = new KanbanColumn { BoardId = board.Id, Title = req.Title, Position = max + 1 };
+        var col = new KanbanColumn { BoardId = board.Id, Title = req.Title, Position = max + 1, TenantId = board.TenantId };
         db.KanbanColumns.Add(col);
         await db.SaveChangesAsync();
         return Created($"/api/kanban/columns/{col.Id}", new KanbanColumnDto(col.Id, col.Title, col.Position));

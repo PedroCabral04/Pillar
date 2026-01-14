@@ -199,6 +199,7 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddMemoryCache(); // Required for rate limiting in ApiKeyMiddleware
 builder.Services.Configure<DemoSeedOptions>(builder.Configuration.GetSection("DemoSeed"));
 builder.Services.Configure<SecurityOptions>(builder.Configuration.GetSection("Security"));
 builder.Services.AddScoped<DemoDataSeeder>();
