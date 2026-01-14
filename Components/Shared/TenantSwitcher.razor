@@ -1,0 +1,128 @@
+@using erp.DTOs.Tenancy
+@using erp.Services
+@using erp.Services.Tenancy
+@using MudBlazor
+@inject IApiService ApiService
+@inject ITenantContextAccessor TenantContextAccessor
+@inject ITenantBrandingProvider BrandingProvider
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+@if (_tenants.Count > 1)
+{
+    <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" Dense="true">
+        <ActivatorContent>
+            <MudChip T="string" Icon="@Icons.Material.Filled.Business" Color="MudBlazor.Color.Surface" Size="MudBlazor.Size.Small">
+                @(_currentTenant?.Name ?? "Tenant")
+                <MudIcon Icon="@Icons.Material.Filled.ArrowDropDown" Size="MudBlazor.Size.Small" Class="ml-1" />
+            </MudChip>
+        </ActivatorContent>
+        <ChildContent>
+            <MudText Typo="Typo.caption" Class="px-4 py-2 mud-text-secondary">Trocar tenant</MudText>
+            <MudDivider />
+            @foreach (var tenant in _tenants)
+            {
+                var isSelected = tenant.Id == _currentTenant?.Id;
+                <MudMenuItem OnClick="() => SwitchToTenant(tenant)" Disabled="@isSelected">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        @if (!string.IsNullOrWhiteSpace(tenant.Branding?.LogoUrl))
+                        {
+                            <MudImage Src="@tenant.Branding.LogoUrl" Height="20" Width="20" ObjectFit="ObjectFit.Contain" Class="rounded" />
+                        }
+                        else
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.Business" Size="MudBlazor.Size.Small" />
+                        }
+                        <MudText>@tenant.Name</MudText>
+                        @if (isSelected)
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.Check" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Success" />
+                        }
+                    </MudStack>
+                </MudMenuItem>
+            }
+        </ChildContent>
+    </MudMenu>
+}
+else if (_tenants.Count == 1)
+{
+    <MudChip T="string" Icon="@Icons.Material.Filled.Business" Color="MudBlazor.Color.Surface" Size="MudBlazor.Size.Small">
+        @_tenants[0].Name
+    </MudChip>
+}
+
+@code {
+    private List<TenantDto> _tenants = new();
+    private TenantDto? _currentTenant;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTenantsAsync();
+    }
+
+    private async Task LoadTenantsAsync()
+    {
+        try
+        {
+            var tenants = await ApiService.GetAsync<List<TenantDto>>("api/tenants/my-tenants");
+            _tenants = tenants ?? new();
+            
+            // Identifica o tenant atual
+            var currentTenantId = TenantContextAccessor.Current.TenantId;
+            _currentTenant = _tenants.FirstOrDefault(t => t.Id == currentTenantId);
+        }
+        catch (Exception ex)
+        {
+            // Silently fail - user might not have multiple tenants
+            _tenants = new();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void SwitchToTenant(TenantDto tenant)
+    {
+        if (tenant.Id == _currentTenant?.Id)
+        {
+            return;
+        }
+
+        // Redireciona para a home com o header X-Tenant ou via subdomain
+        // Por simplicidade, usamos query param que o middleware pode ler
+        // Alternativa: usar subdomain (tenant.Slug.pillar.local)
+        
+        // Opção 1: Usar localStorage para persistir a escolha do tenant
+        // Opção 2: Redirecionar para subdomain
+        // Opção 3: Usar cookie
+        
+        // Por agora, vamos usar a abordagem de subdomain se disponível,
+        // caso contrário mostramos uma mensagem
+        
+        var currentUri = new Uri(NavigationManager.Uri);
+        var host = currentUri.Host;
+        
+        // Tenta construir URL com subdomain
+        if (host.Contains('.'))
+        {
+            // Remove o subdomain atual e adiciona o novo
+            var parts = host.Split('.');
+            if (parts.Length >= 2)
+            {
+                // Assume formato: tenant.domain.tld ou tenant.domain.local
+                parts[0] = tenant.Slug;
+                var newHost = string.Join('.', parts);
+                var newUrl = $"{currentUri.Scheme}://{newHost}:{currentUri.Port}/";
+                NavigationManager.NavigateTo(newUrl, forceLoad: true);
+                return;
+            }
+        }
+        
+        // Fallback: se não puder usar subdomain, mostra mensagem
+        Snackbar.Add($"Para trocar para {tenant.Name}, acesse: {tenant.Slug}.pillar.local", Severity.Info);
+        _currentTenant = tenant;
+        BrandingProvider.NotifyBrandingChanged();
+    }
+}

@@ -176,8 +176,28 @@ public class TenantService : ITenantService
             return;
         }
 
-        _db.Tenants.Remove(tenant);
+        // Soft delete: marca como arquivado em vez de remover
+        tenant.Status = TenantStatus.Archived;
+        tenant.DeletedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(cancellationToken);
+        
+        _logger.LogInformation("Tenant {TenantName} (ID: {TenantId}) arquivado", tenant.Name, id);
+    }
+
+    public async Task<IEnumerable<TenantDto>> GetUserTenantsAsync(int userId, CancellationToken cancellationToken = default)
+    {
+        // Busca tenants onde o usuário tem membership ativa
+        var tenants = await _db.TenantMemberships
+            .AsNoTracking()
+            .Where(m => m.UserId == userId && m.RevokedAt == null)
+            .Include(m => m.Tenant)
+                .ThenInclude(t => t!.Branding)
+            .Where(m => m.Tenant != null && m.Tenant.Status == TenantStatus.Active)
+            .Select(m => m.Tenant!)
+            .OrderBy(t => t.Name)
+            .ToListAsync(cancellationToken);
+
+        return _mapper.TenantsToTenantDtos(tenants);
     }
 
     public async Task<bool> SlugExistsAsync(string slug, int? ignoreTenantId = null, CancellationToken cancellationToken = default)
@@ -188,7 +208,9 @@ public class TenantService : ITenantService
         }
 
         var normalizedSlug = slug.ToLowerInvariant();
-        return await _db.Tenants.AnyAsync(t => t.Slug == normalizedSlug && (!ignoreTenantId.HasValue || t.Id != ignoreTenantId), cancellationToken);
+        return await _db.Tenants.AnyAsync(t => t.Slug == normalizedSlug 
+            && t.Status != TenantStatus.Archived
+            && (!ignoreTenantId.HasValue || t.Id != ignoreTenantId), cancellationToken);
     }
 
     public async Task ProvisionDatabaseAsync(int id, CancellationToken cancellationToken = default)
@@ -229,6 +251,7 @@ public class TenantService : ITenantService
             .AnyAsync(
                 t => t.DatabaseName != null
                      && t.DatabaseName.ToLower() == normalizedDatabaseName
+                     && t.Status != TenantStatus.Archived
                      && (!ignoreTenantId.HasValue || t.Id != ignoreTenantId),
                 cancellationToken);
 

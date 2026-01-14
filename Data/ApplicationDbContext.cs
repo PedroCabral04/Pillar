@@ -1047,7 +1047,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             tenant.Property(x => x.Notes).HasMaxLength(2000);
             tenant.Property(x => x.ConfigurationJson).HasColumnType("jsonb");
 
-            tenant.HasIndex(x => x.Slug).IsUnique();
+            tenant.HasIndex(x => x.Slug)
+                .IsUnique()
+                .HasFilter("\"Status\" != 4"); // 4 = TenantStatus.Archived
             tenant.HasIndex(x => x.Status);
             tenant.HasIndex(x => x.DocumentNumber);
             tenant.HasIndex(x => x.DatabaseName)

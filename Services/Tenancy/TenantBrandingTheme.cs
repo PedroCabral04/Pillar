@@ -21,6 +21,26 @@ public record class TenantBrandingTheme
     public string? FaviconUrl { get; init; } = "/favicon.ico";
     public string? LoginBackgroundUrl { get; init; }
     public string? CustomCss { get; init; }
+    
+    /// <summary>
+    /// Timestamp usado para cache busting das imagens.
+    /// </summary>
+    public DateTime? UpdatedAt { get; init; }
+
+    /// <summary>
+    /// Logo URL com cache busting parameter para forcar reload apos atualizacao.
+    /// </summary>
+    public string LogoUrlWithCacheBust => AppendCacheBust(LogoUrl) ?? "/logo.png";
+
+    /// <summary>
+    /// Favicon URL com cache busting parameter para forcar reload apos atualizacao.
+    /// </summary>
+    public string FaviconUrlWithCacheBust => AppendCacheBust(FaviconUrl) ?? "/favicon.ico";
+
+    /// <summary>
+    /// Login background URL com cache busting parameter.
+    /// </summary>
+    public string? LoginBackgroundUrlWithCacheBust => AppendCacheBust(LoginBackgroundUrl);
 
     public string Initials
     {
@@ -38,5 +58,17 @@ public record class TenantBrandingTheme
 
             return string.Concat(parts);
         }
+    }
+
+    private string? AppendCacheBust(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return null;
+
+        if (!UpdatedAt.HasValue)
+            return url;
+
+        var separator = url.Contains('?') ? '&' : '?';
+        return $"{url}{separator}v={UpdatedAt.Value.Ticks}";
     }
 }

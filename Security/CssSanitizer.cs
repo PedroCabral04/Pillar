@@ -124,37 +124,95 @@ public static partial class CssSanitizer
     }
 
     /// <summary>
+    /// Allowed CSS functions that are safe to use.
+    /// </summary>
+    private static readonly string[] AllowedFunctions =
+    [
+        "rgb(", "rgba(", "hsl(", "hsla(",
+        "var(",        // CSS custom properties (only --variables, not arbitrary content)
+        "calc(",       // CSS calculations
+        "min(", "max(", "clamp(",
+        "linear-gradient(", "radial-gradient(",
+        "translateX(", "translateY(", "translate(",
+        "rotate(", "scale(", "skew(",
+    ];
+
+    /// <summary>
     /// Validates that a CSS value doesn't contain dangerous content.
     /// </summary>
     private static bool IsValueSafe(string value)
     {
-        // Reject values that look like URLs or contain dangerous functions
         var lowerValue = value.ToLowerInvariant();
 
-        // Check for URL-like patterns
-        if (ForbiddenPatterns.Any(p => lowerValue.Contains(p)))
-            return false;
+        // 1. Check for non-function forbidden patterns (scripts, expressions, etc.)
+        // Function-like patterns (ending with '(') are skipped here because they are
+        // checked more accurately in the whitelisted functions step below.
+        foreach (var pattern in ForbiddenPatterns)
+        {
+            if (!pattern.EndsWith('(') && lowerValue.Contains(pattern))
+                return false;
+        }
 
-        // Reject calc() with potentially dangerous content (basic check)
-        if (lowerValue.Contains("calc("))
-            return false;
+        // 2. Check for function calls - only allow whitelisted functions
+        if (lowerValue.Contains('('))
+        {
+            var functions = ExtractFunctions(lowerValue);
+            if (functions.Count == 0 && lowerValue.Contains('('))
+            {
+                // Has parentheses but no valid function name matches - could be an obfuscation attempt
+                return false;
+            }
 
-        // Reject var() with potentially malicious custom properties
+            foreach (var func in functions)
+            {
+                if (!AllowedFunctions.Any(allowed => func.StartsWith(allowed)))
+                {
+                    return false;
+                }
+            }
+        }
+
+        // 3. Validate var() usage - all var() calls must follow the proper format
         if (lowerValue.Contains("var("))
+        {
+            var varMatches = VarPropertyRegex().Matches(lowerValue);
+            var varCalls = ExtractFunctions(lowerValue).Count(f => f == "var(");
+            
+            if (varMatches.Count != varCalls)
+                return false; // Some var() calls don't match the allowed --property format
+        }
+
+        // 4. Specific rejections for safe-looking but dangerous patterns
+        if (lowerValue.Contains("attr(")) // Can be used to inject attributes
             return false;
 
-        // Reject attr() which can be used to inject attributes
-        if (lowerValue.Contains("attr("))
+        if (value.Contains('\\')) // Escape character bypass
             return false;
 
-        // Reject any backslashes (can be used for character encoding bypass)
-        if (value.Contains('\\'))
-            return false;
-
-        // Reject HTML-like content
-        if (value.Contains('<') || value.Contains('>'))
+        if (value.Contains('<') || value.Contains('>')) // HTML injection
             return false;
 
         return true;
     }
+
+    /// <summary>
+    /// Extracts all function calls from a CSS value.
+    /// </summary>
+    private static List<string> ExtractFunctions(string value)
+    {
+        var functions = new List<string>();
+        var regex = FunctionRegex();
+        var matches = regex.Matches(value);
+        foreach (Match match in matches)
+        {
+            functions.Add(match.Value);
+        }
+        return functions;
+    }
+
+    [GeneratedRegex(@"[a-z\-]+\(", RegexOptions.IgnoreCase)]
+    private static partial Regex FunctionRegex();
+
+    [GeneratedRegex(@"var\(\s*--[a-z0-9\-_]+\s*\)", RegexOptions.IgnoreCase)]
+    private static partial Regex VarPropertyRegex();
 }

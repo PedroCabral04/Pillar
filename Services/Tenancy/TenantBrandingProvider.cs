@@ -37,6 +37,7 @@ public class TenantBrandingProvider : ITenantBrandingProvider
             FaviconUrl = NormalizeUrl(branding?.FaviconUrl) ?? TenantBrandingTheme.Default.FaviconUrl,
             LoginBackgroundUrl = NormalizeUrl(branding?.LoginBackgroundUrl),
             CustomCss = branding?.CustomCss,
+            UpdatedAt = branding?.UpdatedAt ?? branding?.CreatedAt,
         };
     }
 

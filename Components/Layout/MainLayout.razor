@@ -1,4 +1,4 @@
-﻿@using MudBlazor
+@using MudBlazor
 @using erp.Services
 @using erp.Services.Browser
 @using erp.Services.Tenancy
@@ -64,7 +64,7 @@
                                aria-label="@(_isSidebarLocked ? "Recolher menu lateral" : "Expandir menu lateral")" />
                 
                 <div class="d-flex align-center">
-                    <MudImage Src='@(_branding.LogoUrl ?? "/logo.png")' 
+                    <MudImage Src='@(_branding.LogoUrlWithCacheBust)' 
                               Alt="@_branding.TenantName"
                               Height="32"
                               ObjectFit="ObjectFit.Contain"
@@ -73,6 +73,13 @@
                 </div>
 
                 <MudSpacer />
+                
+                @* Tenant Switcher para usuários com acesso a múltiplos tenants *@
+                <AuthorizeView>
+                    <Authorized>
+                        <erp.Components.Shared.TenantSwitcher />
+                    </Authorized>
+                </AuthorizeView>
                 
                 @* <MudHidden Breakpoint="Breakpoint.SmAndDown">
                     <MudTextField @bind-Value="@_searchString" Placeholder="Pesquisar..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="MudBlazor.Size.Medium" Class="mt-0 mx-4" Variant="Variant.Outlined" Margin="Margin.Dense" Style="background-color: var(--mud-palette-background); border-radius: 8px; width: 300px;" />

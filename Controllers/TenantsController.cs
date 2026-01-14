@@ -76,6 +76,27 @@ public class TenantsController : ControllerBase
     }
 
     /// <summary>
+    /// Recupera os tenants que o usuário atual tem acesso via TenantMemberships.
+    /// Endpoint para permitir tenant switching.
+    /// </summary>
+    /// <param name="cancellationToken">Token para cancelamento da operação.</param>
+    /// <returns>Lista de <see cref="TenantDto"/> que o usuário pode acessar.</returns>
+    [HttpGet("my-tenants")]
+    [AllowAnonymous] // Permite acesso sem ser admin, mas requer autenticação
+    [Authorize] // Requer autenticação
+    public async Task<ActionResult<IEnumerable<TenantDto>>> GetMyTenantsAsync(CancellationToken cancellationToken)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == 0)
+        {
+            return Unauthorized();
+        }
+
+        var tenants = await _tenantService.GetUserTenantsAsync(userId, cancellationToken);
+        return Ok(tenants);
+    }
+
+    /// <summary>
     /// Recupera informações de conexão (ex.: connection string) do tenant.
     /// </summary>
     /// <param name="id">Identificador do tenant.</param>
