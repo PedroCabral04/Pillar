@@ -107,28 +107,45 @@ public class KanbanController(ApplicationDbContext db, UserManager<ApplicationUs
             return BadRequest("Você precisa manter pelo menos um quadro.");
         }
 
-        // Delete all related data
-        var columns = await db.KanbanColumns.Where(c => c.BoardId == id).ToListAsync();
-        var columnIds = columns.Select(c => c.Id).ToList();
-        
-        var cards = await db.KanbanCards.Where(c => columnIds.Contains(c.ColumnId)).ToListAsync();
-        var cardIds = cards.Select(c => c.Id).ToList();
+        // Get column IDs for cascading delete (need this for cards)
+        var columnIds = await db.KanbanColumns
+            .Where(c => c.BoardId == id)
+            .Select(c => c.Id)
+            .ToListAsync();
 
-        // Delete card-related data
-        var cardLabels = await db.KanbanCardLabels.Where(cl => cardIds.Contains(cl.CardId)).ToListAsync();
-        var comments = await db.KanbanComments.Where(c => cardIds.Contains(c.CardId)).ToListAsync();
-        var history = await db.KanbanCardHistories.Where(h => cardIds.Contains(h.CardId)).ToListAsync();
+        if (columnIds.Any())
+        {
+            var cardIds = await db.KanbanCards
+                .Where(c => columnIds.Contains(c.ColumnId))
+                .Select(c => c.Id)
+                .ToListAsync();
 
-        db.KanbanCardLabels.RemoveRange(cardLabels);
-        db.KanbanComments.RemoveRange(comments);
-        db.KanbanCardHistories.RemoveRange(history);
-        db.KanbanCards.RemoveRange(cards);
-        
-        // Delete labels and columns
+            // Delete card-related data through change tracker for audit logging
+            if (cardIds.Any())
+            {
+                var cardLabels = await db.KanbanCardLabels.Where(cl => cardIds.Contains(cl.CardId)).ToListAsync();
+                db.KanbanCardLabels.RemoveRange(cardLabels);
+                
+                var comments = await db.KanbanComments.Where(c => cardIds.Contains(c.CardId)).ToListAsync();
+                db.KanbanComments.RemoveRange(comments);
+                
+                var histories = await db.KanbanCardHistories.Where(h => cardIds.Contains(h.CardId)).ToListAsync();
+                db.KanbanCardHistories.RemoveRange(histories);
+                
+                var cards = await db.KanbanCards.Where(c => cardIds.Contains(c.Id)).ToListAsync();
+                db.KanbanCards.RemoveRange(cards);
+                
+                await db.SaveChangesAsync();
+            }
+
+            // Delete columns through change tracker
+            var columns = await db.KanbanColumns.Where(c => c.BoardId == id).ToListAsync();
+            db.KanbanColumns.RemoveRange(columns);
+        }
+
+        // Delete labels through change tracker
         var labels = await db.KanbanLabels.Where(l => l.BoardId == id).ToListAsync();
         db.KanbanLabels.RemoveRange(labels);
-        db.KanbanColumns.RemoveRange(columns);
-
         db.KanbanBoards.Remove(board);
         await db.SaveChangesAsync();
 

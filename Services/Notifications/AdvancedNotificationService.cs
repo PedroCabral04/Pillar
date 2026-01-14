@@ -2,6 +2,18 @@ using erp.DTOs.Notifications;
 
 namespace erp.Services.Notifications;
 
+/// <summary>
+/// Advanced notification service for persistent notifications with full lifecycle management.
+/// </summary>
+/// <remarks>
+/// This service provides a comprehensive notification system with:
+/// - Persistent storage (in-memory for now, can be extended to database)
+/// - Read/unread tracking and preferences
+/// - Filtering, pagination, and expiration
+/// - Real-time events for notification center UI
+///
+/// For simple transient toast notifications, use <see cref="Services.INotificationService"/> instead.
+/// </remarks>
 public interface IAdvancedNotificationService
 {
     // Notification CRUD

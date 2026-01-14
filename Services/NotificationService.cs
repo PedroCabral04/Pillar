@@ -2,6 +2,14 @@ using MudBlazor;
 
 namespace erp.Services;
 
+/// <summary>
+/// Simple UI notification service for transient toast/snackbar messages.
+/// </summary>
+/// <remarks>
+/// This service provides quick, ephemeral notifications that appear and disappear automatically.
+/// For persistent notifications with read/unread status, preferences, and history,
+/// use <see cref="Notifications.IAdvancedNotificationService"/> instead.
+/// </remarks>
 public interface INotificationService
 {
     void ShowSuccess(string message);
@@ -10,6 +18,9 @@ public interface INotificationService
     void ShowInfo(string message);
 }
 
+/// <summary>
+/// Implementation of transient UI notifications using MudBlazor Snackbar.
+/// </summary>
 public class NotificationService : INotificationService
 {
     private readonly ISnackbar _snackbar;

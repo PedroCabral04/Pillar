@@ -1,4 +1,5 @@
 @using erp.Services.Tenancy
+@using erp.Security
 @using MudBlazor
 @using MudBlazor.Utilities
 @using Microsoft.AspNetCore.Components
@@ -21,7 +22,11 @@
     </style>
     @if (!string.IsNullOrWhiteSpace(Branding.CustomCss))
     {
-        <style id="tenant-branding-custom-css">@((MarkupString)Branding.CustomCss!)</style>
+        var sanitizedCss = CssSanitizer.Sanitize(Branding.CustomCss);
+        if (!string.IsNullOrWhiteSpace(sanitizedCss))
+        {
+            <style id="tenant-branding-custom-css">@((MarkupString)sanitizedCss)</style>
+        }
     }
 </HeadContent>
 

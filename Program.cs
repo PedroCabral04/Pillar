@@ -200,6 +200,7 @@ builder.Services.AddSwaggerGen(options =>
 });
 builder.Services.AddHttpContextAccessor();
 builder.Services.Configure<DemoSeedOptions>(builder.Configuration.GetSection("DemoSeed"));
+builder.Services.Configure<SecurityOptions>(builder.Configuration.GetSection("Security"));
 builder.Services.AddScoped<DemoDataSeeder>();
 builder.Services.AddScoped(sp => {
     var navigationManager = sp.GetRequiredService<NavigationManager>();
@@ -433,6 +434,10 @@ var forwardedOptions = new ForwardedHeadersOptions
 forwardedOptions.KnownNetworks.Clear();
 forwardedOptions.KnownProxies.Clear();
 app.UseForwardedHeaders(forwardedOptions);
+
+// Global exception handling - must be early to catch exceptions from all middleware
+app.UseMiddleware<GlobalExceptionMiddleware>();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -748,13 +753,23 @@ using (var scope = app.Services.CreateScope())
         var admin = await userManager.FindByEmailAsync(adminEmail);
         if (admin is null)
         {
+            // Get default admin password from configuration (not hardcoded)
+            var securityOptions = scope.ServiceProvider.GetRequiredService<IOptions<SecurityOptions>>();
+            var defaultPassword = securityOptions.Value.DefaultAdminPassword;
+
+            if (string.IsNullOrWhiteSpace(defaultPassword))
+            {
+                throw new InvalidOperationException(
+                    "Default admin password not configured. Please set Security:DefaultAdminPassword in appsettings.json or use environment variables.");
+            }
+
             admin = new ApplicationUser
             {
                 UserName = "admin",
                 Email = adminEmail,
                 EmailConfirmed = true
             };
-            var created = await userManager.CreateAsync(admin, "Admin@123!");
+            var created = await userManager.CreateAsync(admin, defaultPassword);
             if (created.Succeeded)
             {
                 await userManager.AddToRoleAsync(admin, "Administrador");

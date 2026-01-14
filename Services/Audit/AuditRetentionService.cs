@@ -45,12 +45,17 @@ public class AuditRetentionService : IAuditRetentionService
             return;
         }
 
-        // TODO: Mover para tabela AuditLogsArchive ou exportar para S3/Azure Blob
-        // Por enquanto, apenas marca como processado
-        
+        // NOTE: Archiving not yet implemented.
+        // Current implementation only identifies logs to archive.
+        // Future implementation should:
+        // - Copy logs to AuditLogsArchive table
+        // - Or export to cold storage (S3/Azure Blob)
+        // - Mark original logs as archived
+
+        // For now, we just log the count
         _logger.LogInformation(
-            "Arquivados {Count} logs anteriores a {Date}", 
-            logsToArchive.Count, 
+            "Identificados {Count} logs para arquivar anteriores a {Date}. Implementação de arquivamento pendente.",
+            logsToArchive.Count,
             cutoffDate);
     }
 

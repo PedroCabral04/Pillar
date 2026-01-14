@@ -5,6 +5,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace erp.Models;
 
+/// <summary>
+/// Role model for user authorization.
+/// </summary>
+/// <remarks>
+/// OBSOLETE: Use <see cref="Models.Identity.ApplicationRole"/> instead.
+/// This legacy Role model is kept for backwards compatibility only.
+/// New code should use ApplicationRole from Models.Identity which is integrated with ASP.NET Core Identity.
+/// </remarks>
+[Obsolete("Use ApplicationRole from Models.Identity instead. This legacy model will be removed in future versions.")]
 public class Role {
 
     [Key]

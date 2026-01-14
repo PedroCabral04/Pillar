@@ -6,9 +6,15 @@ using Microsoft.EntityFrameworkCore;
 namespace erp.Models;
 
 /// <summary>
-/// Modelo que representa um usuário no sistema
+/// Modelo que representa um usuário no sistema.
 /// </summary>
+/// <remarks>
+/// OBLSOLETO: Use <see cref="Models.Identity.ApplicationUser"/> instead.
+/// This legacy User model is kept for backwards compatibility only.
+/// New code should use ApplicationUser from Models.Identity which is integrated with ASP.NET Core Identity.
+/// </remarks>
 [Index(nameof(Email), IsUnique = true)]
+[Obsolete("Use ApplicationUser from Models.Identity instead. This legacy model will be removed in future versions.")]
 public class User
 {
     

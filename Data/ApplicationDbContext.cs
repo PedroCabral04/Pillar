@@ -15,9 +15,18 @@ using System.Text.Json;
 
 namespace erp.Data;
 
+/// <summary>
+/// Main Entity Framework database context for the Pillar ERP application.
+/// </summary>
+/// <remarks>
+/// DbSet properties are initialized by EF Core infrastructure, hence the null-forgiving operator (!).
+/// The null! suppression is correct here - EF Core guarantees these properties will never be null at runtime.
+/// </remarks>
 public class ApplicationDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, int>
 {
-    // Mantemos os DbSets existentes se ainda forem usados em outras partes (tabelas próprias do app)
+    // Legacy User/Role/UserRole DbSets - kept for backwards compatibility only.
+    // These duplicate the Identity entities (ApplicationUser, ApplicationRole) and should not be used in new code.
+    // TODO: Migrate consumers to use ApplicationUser/ApplicationRole and remove these DbSets.
     public new DbSet<User> Users { get; set; } = null!;
     public new DbSet<Role> Roles { get; set; } = null!;
     public new DbSet<UserRole> UserRoles { get; set; } = null!;
@@ -124,7 +133,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         // Only configure here if no provider was configured via DI (AddDbContext)
         if (!options.IsConfigured)
         {
-            options.UseNpgsql("Host=localhost;Database=erp;Username=postgres;Password=123");
+            throw new InvalidOperationException(
+                "Database connection string not configured. " +
+                "Please set 'DbContextSettings:ConnectionString' in appsettings.json " +
+                "or use the 'ConnectionStrings__DefaultConnection' environment variable.");
         }
     }
 
