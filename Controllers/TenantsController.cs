@@ -1,5 +1,6 @@
 using erp.DTOs.Tenancy;
 using erp.Services.Tenancy;
+using erp.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -20,11 +21,16 @@ public class TenantsController : ControllerBase
 {
     private readonly ITenantService _tenantService;
     private readonly ITenantBrandingService _brandingService;
+    private readonly IFileValidationService _fileValidationService;
 
-    public TenantsController(ITenantService tenantService, ITenantBrandingService brandingService)
+    public TenantsController(
+        ITenantService tenantService, 
+        ITenantBrandingService brandingService,
+        IFileValidationService fileValidationService)
     {
         _tenantService = tenantService;
         _brandingService = brandingService;
+        _fileValidationService = fileValidationService;
     }
 
     /// <summary>
@@ -224,6 +230,13 @@ public class TenantsController : ControllerBase
         if (file is null || file.Length == 0)
         {
             return BadRequest(new BrandingUploadResult(false, null, "Nenhum arquivo enviado.", false, 0, 0));
+        }
+
+        // Validação de segurança do arquivo (tipo, magic bytes, tamanho)
+        var validationResult = await _fileValidationService.ValidateFileAsync(file, cancellationToken);
+        if (!validationResult.IsValid)
+        {
+            return BadRequest(new BrandingUploadResult(false, null, validationResult.ErrorMessage, false, 0, 0));
         }
 
         await using var stream = file.OpenReadStream();

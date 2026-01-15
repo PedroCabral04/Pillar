@@ -81,6 +81,55 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddScoped<IAuthorizationHandler, ModuleAccessHandler>();
 builder.Services.AddMemoryCache();
 
+// CORS Configuration - Security: Restrict cross-origin requests
+var allowedOrigins = builder.Configuration["Security:CorsAllowedOrigins"];
+if (!string.IsNullOrEmpty(allowedOrigins))
+{
+    builder.Services.AddCors(options =>
+    {
+        options.AddDefaultPolicy(policy =>
+        {
+            var origins = allowedOrigins.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (origins.Contains("*"))
+            {
+                // WARNING: AllowAll origins is not secure for production
+                policy.AllowAnyOrigin()
+                      .AllowAnyMethod()
+                      .AllowAnyHeader();
+            }
+            else
+            {
+                policy.WithOrigins(origins)
+                      .WithMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
+                      .WithHeaders("Content-Type", "Authorization", "X-CSRF-TOKEN")
+                      .AllowCredentials();
+            }
+        });
+    });
+}
+else
+{
+    // Default policy for development - allow same origin only
+    builder.Services.AddCors(options =>
+    {
+        options.AddDefaultPolicy(policy =>
+        {
+            if (builder.Environment.IsDevelopment())
+            {
+                policy.AllowAnyOrigin()
+                      .AllowAnyMethod()
+                      .AllowAnyHeader();
+            }
+            else
+            {
+                // Production: same origin only by default
+                policy.WithMethods("GET", "POST", "PUT", "DELETE", "PATCH")
+                      .WithHeaders("Content-Type", "Authorization", "X-CSRF-TOKEN");
+            }
+        });
+    });
+}
+
 // Data Protection keys persistence (optional, via env DATAPROTECTION__KEYS_DIRECTORY)
 var dataProtectionKeysDir = Environment.GetEnvironmentVariable("DATAPROTECTION__KEYS_DIRECTORY");
 if (!string.IsNullOrWhiteSpace(dataProtectionKeysDir))
@@ -118,17 +167,35 @@ builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
         options.LoginPath = "/login";
         options.LogoutPath = "/api/auth/logout";
         options.Cookie.Name = "erp.auth";
-        options.ExpireTimeSpan = TimeSpan.FromDays(7);
-        options.SlidingExpiration = true;
+
+        // SECURITY: Configuração de expiração de cookie (configurável via appsettings)
+        var sessionHours = builder.Configuration.GetValue<int>("Security:SessionExpirationHours", 8);
+        options.ExpireTimeSpan = TimeSpan.FromHours(sessionHours);
+        options.SlidingExpiration = builder.Configuration.GetValue<bool>("Security:SlidingExpiration", true);
+
     // Harden cookie
-    options.Cookie.HttpOnly = true;
-    options.Cookie.SameSite = SameSiteMode.Lax; // prevents CSRF on cross-site navigations, still works for same-site
-        // Use SameAsRequest to support TLS termination at the proxy (Coolify/nginx)
-        // and avoid antiforgery exceptions when the incoming connection to Kestrel is HTTP
-        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+    options.Cookie.HttpOnly = true; // Previne acesso via JavaScript (anti-XSS)
+
+        // SECURITY: SameSite configuration
+        // Lax é necessário para Blazor Server funcionar com navegadores modernos
+        // Strict pode ser usado para endpoints de API sensíveis se necessário
+        var sameSiteMode = builder.Configuration.GetValue<string>("Security:SameSiteMode", "Lax");
+        options.Cookie.SameSite = Enum.Parse<SameSiteMode>(sameSiteMode);
+
+        // SECURITY: SecurePolicy - Always em produção quando HTTPS está habilitado
+        if (builder.Environment.IsProduction())
+        {
+            options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        }
+        else
+        {
+            // Desenvolvimento: SameAsRequest para suportar TLS termination
+            options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        }
+
     options.Cookie.Path = "/";
     options.Cookie.IsEssential = true; // ensure cookie not blocked by consent if used
-    
+
     // Configure API-specific events to return JSON instead of redirecting
     options.Events.OnRedirectToLogin = context =>
     {
@@ -280,12 +347,29 @@ builder.Services.AddAntiforgery(o =>
 });
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
+// SECURITY: Valida que connection string está configurada em produção
+if (builder.Environment.IsProduction() && string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException(
+        "Database connection string not configured. Please set DbContextSettings__ConnectionString environment variable.");
+}
+
 builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =>
 {
     var resolver = serviceProvider.GetRequiredService<erp.Services.Tenancy.ITenantConnectionResolver>();
     var effectiveConnection = resolver.GetCurrentConnectionString();
+    var finalConnection = effectiveConnection ?? connectionString;
+
+    // SECURITY: Verifica se a connection string padrão foi deixada
+    if (finalConnection != null && finalConnection.Contains("Password=123"))
+    {
+        throw new InvalidOperationException(
+            "Default database password detected. Please change the password in the connection string.");
+    }
+
     options.UseNpgsql(
-        effectiveConnection ?? connectionString ?? "Host=localhost;Database=erp;Username=postgres;Password=123",
+        finalConnection ?? "Host=localhost;Database=erp;Username=postgres",
         npgsql => npgsql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)
     );
 });
@@ -294,8 +378,17 @@ builder.Services.AddDbContextFactory<ApplicationDbContext>((serviceProvider, opt
 {
     var resolver = serviceProvider.GetRequiredService<erp.Services.Tenancy.ITenantConnectionResolver>();
     var effectiveConnection = resolver.GetCurrentConnectionString();
+    var finalConnection = effectiveConnection ?? connectionString;
+
+    // SECURITY: Verifica se a connection string padrão foi deixada
+    if (finalConnection != null && finalConnection.Contains("Password=123"))
+    {
+        throw new InvalidOperationException(
+            "Default database password detected. Please change the password in the connection string.");
+    }
+
     options.UseNpgsql(
-        effectiveConnection ?? connectionString ?? "Host=localhost;Database=erp;Username=postgres;Password=123",
+        finalConnection ?? "Host=localhost;Database=erp;Username=postgres",
         npgsql => npgsql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)
     );
 }, ServiceLifetime.Scoped);
@@ -398,6 +491,7 @@ builder.Services.AddScoped<erp.DAOs.Assets.IAssetDao, erp.DAOs.Assets.AssetDao>(
 builder.Services.AddScoped<erp.Services.Assets.IAssetService, erp.Services.Assets.AssetService>();
 builder.Services.AddScoped<erp.Services.Assets.IQRCodeService, erp.Services.Assets.QRCodeService>();
 builder.Services.AddScoped<erp.Services.Assets.IFileStorageService, erp.Services.Assets.LocalFileStorageService>();
+builder.Services.AddScoped<erp.Security.IFileValidationService, erp.Security.FileValidationService>();
 builder.Services.AddScoped<erp.Mappings.AssetMapper>();
 
 // Time tracking services
@@ -494,7 +588,13 @@ else
 
 app.UseHttpsRedirection(); // Redireciona HTTP para HTTPS
 
+// Security Headers - Protege contra XSS, clickjacking, MIME sniffing
+app.UseSecurityHeaders();
+
 app.UseStaticFiles(); // Permite servir arquivos estáticos como CSS, JS, imagens
+
+// CORS - Deve vir antes de Authentication/Authorization
+app.UseCors();
 
 // Enforce secure cookie behaviors globally
 app.UseCookiePolicy(new CookiePolicyOptions
@@ -563,8 +663,10 @@ using (var scope = app.Services.CreateScope())
         var dbBootstrap = bootstrapCfg || string.Equals(bootstrapEnv, "true", StringComparison.OrdinalIgnoreCase);
 
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        
+
         // --- HOTFIX: Increase PayrollEntry precision ---
+        // SECURITY NOTE: ExecuteSqlRaw é usado aqui porque não há equivalente no EF Core para ALTER TABLE.
+        // Este código não aceita input de usuário - é SQL hardcoded executado apenas na inicialização.
         try
         {
             await db.Database.ExecuteSqlRawAsync(@"
@@ -579,9 +681,11 @@ using (var scope = app.Services.CreateScope())
         {
             Console.WriteLine($"[Hotfix] Error increasing precision (might be already applied): {ex.Message}");
         }
-        
+
         // --- AUTO-FIX: Baseline migrations if missing (Self-Healing for Coolify) ---
-        try 
+        // SECURITY NOTE: SqlQueryRaw/ExecuteSqlRawAsync são usados para consultar/metadados do PostgreSQL.
+        // Estas queries não aceitam input de usuário - são SQL hardcoded para verificar estrutura do DB.
+        try
         {
             // Check if AspNetUsers exists (implies DB was created with EnsureCreated)
             var userTableExists = await db.Database.SqlQueryRaw<int>(

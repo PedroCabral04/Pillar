@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 
 using erp.DTOs.Role;
+using erp.Validation;
 
 namespace erp.DTOs.User;
 
@@ -25,7 +26,10 @@ public class CreateUserDto
     
     // Informações Pessoais
     public string? FullName { get; set; }
+
+    [Cpf(ErrorMessage = "CPF inválido.")]
     public string? Cpf { get; set; }
+
     public string? Rg { get; set; }
     public DateTime? DateOfBirth { get; set; }
     public string? Gender { get; set; }
