@@ -74,6 +74,9 @@ public class Product : IAuditable, IMustHaveTenant
     // Movimentações
     public virtual ICollection<StockMovement> StockMovements { get; set; } = new List<StockMovement>();
     
+    // Concurrency control for stock updates
+    public uint Version { get; set; }
+
     // Metadata
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }

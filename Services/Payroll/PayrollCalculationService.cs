@@ -92,10 +92,10 @@ public class PayrollCalculationService : IPayrollCalculationService
             var preTaxDeductions = DecimalRound(faltasAmount + atrasosAmount);
             var grossAmount = DecimalRound(Math.Max(earningsTotal - preTaxDeductions, 0));
 
-            var inssAmount = CalculateProgressiveTax(grossAmount, inssBrackets);
+            var inssAmount = CalculateProgressiveTax(grossAmount, inssBrackets, isSimpleDeduction: false);
             var dependents = 0; // NOTE: Dependent count not yet implemented - requires adding DependentCount field to ApplicationUser
             var irrfBase = Math.Max(grossAmount - inssAmount - (dependents * DependentDeduction), 0);
-            var irrfAmount = CalculateProgressiveTax(irrfBase, irrfBrackets);
+            var irrfAmount = CalculateProgressiveTax(irrfBase, irrfBrackets, isSimpleDeduction: true);
 
             var totalDeductions = DecimalRound(preTaxDeductions + inssAmount + irrfAmount);
             var netAmount = DecimalRound(Math.Max(earningsTotal - totalDeductions, 0));
@@ -255,45 +255,45 @@ public class PayrollCalculationService : IPayrollCalculationService
         };
     }
 
-    private static decimal CalculateProgressiveTax(decimal baseAmount, IReadOnlyList<PayrollTaxBracket> brackets)
+    private static decimal CalculateProgressiveTax(decimal baseAmount, IReadOnlyList<PayrollTaxBracket> brackets, bool isSimpleDeduction = false)
     {
         if (baseAmount <= 0 || brackets.Count == 0)
         {
             return 0m;
         }
 
-        decimal total = 0m;
-        PayrollTaxBracket? appliedBracket = null;
-
-        foreach (var bracket in brackets)
+        if (isSimpleDeduction)
         {
-            if (baseAmount <= bracket.RangeStart)
-            {
-                break;
-            }
+            // Lógica IRRF: Base Total * Alíquota da Faixa - Parcela a Deduzir
+            var appliedBracket = brackets
+                .OrderByDescending(b => b.RangeStart)
+                .FirstOrDefault(b => baseAmount >= b.RangeStart);
 
-            var upperLimit = bracket.RangeEnd ?? decimal.MaxValue;
-            var taxablePortion = Math.Min(baseAmount, upperLimit) - bracket.RangeStart;
-            if (taxablePortion <= 0)
-            {
-                continue;
-            }
+            if (appliedBracket == null) return 0m;
 
-            total += taxablePortion * bracket.Rate;
-
-            if (baseAmount <= upperLimit)
-            {
-                appliedBracket = bracket;
-                break;
-            }
+            var tax = (baseAmount * appliedBracket.Rate) - appliedBracket.Deduction;
+            return DecimalRound(Math.Max(tax, 0));
         }
-
-        if (appliedBracket?.Deduction > 0)
+        else
         {
-            total -= appliedBracket.Deduction;
-        }
+            // Lógica INSS: Soma progressiva das fatias
+            decimal total = 0m;
+            foreach (var bracket in brackets)
+            {
+                if (baseAmount <= bracket.RangeStart) break;
 
-        return DecimalRound(Math.Max(total, 0));
+                var upperLimit = bracket.RangeEnd ?? decimal.MaxValue;
+                var taxablePortion = Math.Min(baseAmount, upperLimit) - bracket.RangeStart;
+                
+                if (taxablePortion > 0)
+                {
+                    total += taxablePortion * bracket.Rate;
+                }
+
+                if (baseAmount <= upperLimit) break;
+            }
+            return DecimalRound(Math.Max(total, 0));
+        }
     }
 
     private static decimal DecimalRound(decimal value) => decimal.Round(value, 2, MidpointRounding.AwayFromZero);

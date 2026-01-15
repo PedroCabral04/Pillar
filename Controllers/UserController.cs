@@ -27,17 +27,32 @@ namespace erp.Controllers
         private readonly RoleManager<ApplicationRole> _roles;
         private readonly ApplicationDbContext _context;
         private readonly ITenantContextAccessor _tenantContextAccessor;
+        private readonly ILogger<UsersController> _logger;
 
         public UsersController(
             UserManager<ApplicationUser> users,
             RoleManager<ApplicationRole> roles,
             ApplicationDbContext context,
-            ITenantContextAccessor tenantContextAccessor)
+            ITenantContextAccessor tenantContextAccessor,
+            ILogger<UsersController> logger)
         {
             _users = users;
             _roles = roles;
             _context = context;
             _tenantContextAccessor = tenantContextAccessor;
+            _logger = logger;
+        }
+
+        private string GenerateSecureRandomPassword()
+        {
+            const string chars = "ABCDEFGHJKLMNOPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz0123456789!@#$%^&*?_-";
+            var random = new Random();
+            var password = new char[12];
+            for (int i = 0; i < password.Length; i++)
+            {
+                password[i] = chars[random.Next(chars.Length)];
+            }
+            return new string(password);
         }
 
         private int? GetScopedTenantId()
@@ -316,10 +331,19 @@ namespace erp.Controllers
                 CreatedAt = DateTime.UtcNow
             };
 
-            var password = string.IsNullOrWhiteSpace(createUserDto.Password) ? "User@123!" : createUserDto.Password!;
+            var password = string.IsNullOrWhiteSpace(createUserDto.Password) 
+                ? GenerateSecureRandomPassword() 
+                : createUserDto.Password!;
+                
             var result = await _users.CreateAsync(user, password);
             if (!result.Succeeded)
                 return BadRequest(string.Join("; ", result.Errors.Select(e => e.Description)));
+
+            // Se gerou senha aleatória, loga (em produção deveria enviar por email)
+            if (string.IsNullOrWhiteSpace(createUserDto.Password))
+            {
+                _logger.LogInformation("Senha temporária gerada para {Email}: {Password}", user.Email, password);
+            }
 
             // Atribuir roles por Id => precisamos dos nomes
             var allRoles = ApplyTenantScope(_roles.Roles).ToList();

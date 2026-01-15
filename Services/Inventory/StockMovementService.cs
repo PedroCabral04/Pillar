@@ -19,50 +19,66 @@ public class StockMovementService : IStockMovementService
 
     public async Task<StockMovementDto> CreateMovementAsync(CreateStockMovementDto dto, int userId)
     {
-        var product = await _context.Products.FindAsync(dto.ProductId);
-        if (product == null)
-        {
-            throw new InvalidOperationException("Produto não encontrado");
-        }
+        const int maxRetries = 3;
+        int retryCount = 0;
 
-        // Validar estoque para saídas
-        if (dto.Type == (int)MovementType.Out && !product.AllowNegativeStock)
+        while (true)
         {
-            if (product.CurrentStock < dto.Quantity)
+            try
             {
-                throw new InvalidOperationException(
-                    $"Estoque insuficiente. Disponível: {product.CurrentStock}, Solicitado: {dto.Quantity}");
+                var product = await _context.Products.FindAsync(dto.ProductId);
+                if (product == null)
+                {
+                    throw new InvalidOperationException("Produto não encontrado");
+                }
+
+                // Validar estoque para saídas
+                if (dto.Type == (int)MovementType.Out && !product.AllowNegativeStock)
+                {
+                    if (product.CurrentStock < dto.Quantity)
+                    {
+                        throw new InvalidOperationException(
+                            $"Estoque insuficiente. Disponível: {product.CurrentStock}, Solicitado: {dto.Quantity}");
+                    }
+                }
+
+                var movement = _mapper.CreateMovementDtoToMovement(dto);
+                movement.CreatedByUserId = userId;
+                movement.PreviousStock = product.CurrentStock;
+                movement.TotalCost = dto.Quantity * dto.UnitCost;
+
+                // Atualizar estoque do produto
+                switch ((MovementType)dto.Type)
+                {
+                    case MovementType.In:
+                        product.CurrentStock += dto.Quantity;
+                        break;
+                    case MovementType.Out:
+                        product.CurrentStock -= dto.Quantity;
+                        break;
+                    case MovementType.Transfer:
+                        // Para transferências entre armazéns, a lógica de estoque total não muda
+                        // mas deveríamos rastrear o estoque por armazém se houvesse essa tabela.
+                        break;
+                }
+
+                movement.CurrentStock = product.CurrentStock;
+                product.UpdatedAt = DateTime.UtcNow;
+
+                _context.StockMovements.Add(movement);
+                await _context.SaveChangesAsync();
+
+                return await GetMovementByIdAsync(movement.Id)
+                    ?? throw new InvalidOperationException("Erro ao criar movimentação");
+            }
+            catch (DbUpdateConcurrencyException) when (retryCount < maxRetries)
+            {
+                retryCount++;
+                // Recarrega o produto para pegar os valores atualizados na próxima tentativa
+                _context.ChangeTracker.Clear();
+                await Task.Delay(new Random().Next(50, 200));
             }
         }
-
-        var movement = _mapper.CreateMovementDtoToMovement(dto);
-        movement.CreatedByUserId = userId;
-        movement.PreviousStock = product.CurrentStock;
-        movement.TotalCost = dto.Quantity * dto.UnitCost;
-
-        // Atualizar estoque do produto
-        switch ((MovementType)dto.Type)
-        {
-            case MovementType.In:
-                product.CurrentStock += dto.Quantity;
-                break;
-            case MovementType.Out:
-                product.CurrentStock -= dto.Quantity;
-                break;
-            case MovementType.Transfer:
-                // Para transferências, a lógica seria mais complexa
-                // Por enquanto, não altera o estoque total
-                break;
-        }
-
-        movement.CurrentStock = product.CurrentStock;
-        product.UpdatedAt = DateTime.UtcNow;
-
-        _context.StockMovements.Add(movement);
-        await _context.SaveChangesAsync();
-
-        return await GetMovementByIdAsync(movement.Id)
-            ?? throw new InvalidOperationException("Erro ao criar movimentação");
     }
 
     public async Task<StockMovementDto> CreateEntryAsync(

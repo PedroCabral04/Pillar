@@ -394,8 +394,6 @@ builder.Services.AddDbContextFactory<ApplicationDbContext>((serviceProvider, opt
 }, ServiceLifetime.Scoped);
 
 // Registra DAOs e Serviços
-builder.Services.AddScoped<IUserDao, UserDao>();
-builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<PreferenceService>();
 builder.Services.AddScoped<CurrencyFormatService>();
 builder.Services.AddScoped<ThemeService>();
@@ -541,7 +539,6 @@ builder.Services.AddScoped<erp.Services.Reports.IPdfExportService, erp.Services.
 builder.Services.AddScoped<erp.Services.Reports.IExcelExportService, erp.Services.Reports.ExcelExportService>();
 
 // ------- REGISTRO DO MAPPERLY -------
-builder.Services.AddScoped<UserMapper, UserMapper>();
 builder.Services.AddScoped<ProductMapper, ProductMapper>();
 builder.Services.AddScoped<StockMovementMapper, StockMovementMapper>();
 builder.Services.AddScoped<StockCountMapper, StockCountMapper>();
@@ -663,24 +660,6 @@ using (var scope = app.Services.CreateScope())
         var dbBootstrap = bootstrapCfg || string.Equals(bootstrapEnv, "true", StringComparison.OrdinalIgnoreCase);
 
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-        // --- HOTFIX: Increase PayrollEntry precision ---
-        // SECURITY NOTE: ExecuteSqlRaw é usado aqui porque não há equivalente no EF Core para ALTER TABLE.
-        // Este código não aceita input de usuário - é SQL hardcoded executado apenas na inicialização.
-        try
-        {
-            await db.Database.ExecuteSqlRawAsync(@"
-                ALTER TABLE ""PayrollEntries"" ALTER COLUMN ""HorasExtras"" TYPE numeric(18,2);
-                ALTER TABLE ""PayrollEntries"" ALTER COLUMN ""Faltas"" TYPE numeric(18,2);
-                ALTER TABLE ""PayrollEntries"" ALTER COLUMN ""Atrasos"" TYPE numeric(18,2);
-                ALTER TABLE ""PayrollEntries"" ALTER COLUMN ""Abonos"" TYPE numeric(18,2);
-            ");
-            Console.WriteLine("[Hotfix] PayrollEntry precision increased.");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Hotfix] Error increasing precision (might be already applied): {ex.Message}");
-        }
 
         // --- AUTO-FIX: Baseline migrations if missing (Self-Healing for Coolify) ---
         // SECURITY NOTE: SqlQueryRaw/ExecuteSqlRawAsync são usados para consultar/metadados do PostgreSQL.

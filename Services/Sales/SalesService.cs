@@ -33,63 +33,122 @@ public class SalesService : ISalesService
             throw new InvalidOperationException("A venda deve conter pelo menos um item");
         }
 
-        // Generate sale number
-        var saleNumber = await GenerateSaleNumberAsync();
+        const int maxRetries = 3;
+        int retryCount = 0;
 
-        var sale = new Sale
+        while (true)
         {
-            SaleNumber = saleNumber,
-            CustomerId = dto.CustomerId,
-            UserId = userId,
-            SaleDate = dto.SaleDate,
-            DiscountAmount = dto.DiscountAmount,
-            Status = dto.Status,
-            PaymentMethod = dto.PaymentMethod,
-            Notes = dto.Notes,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        decimal totalAmount = 0;
-
-        foreach (var itemDto in dto.Items)
-        {
-            var product = await _context.Products.FindAsync(itemDto.ProductId);
-            if (product == null)
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
             {
-                throw new InvalidOperationException($"Produto com ID {itemDto.ProductId} não encontrado");
+                // Generate sale number
+                var saleNumber = await GenerateSaleNumberAsync();
+
+                var sale = new Sale
+                {
+                    SaleNumber = saleNumber,
+                    CustomerId = dto.CustomerId,
+                    UserId = userId,
+                    SaleDate = dto.SaleDate,
+                    DiscountAmount = dto.DiscountAmount,
+                    Status = dto.Status,
+                    PaymentMethod = dto.PaymentMethod,
+                    Notes = dto.Notes,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                decimal totalAmount = 0;
+
+                foreach (var itemDto in dto.Items)
+                {
+                    var product = await _context.Products.FindAsync(itemDto.ProductId);
+                    if (product == null)
+                    {
+                        throw new InvalidOperationException($"Produto com ID {itemDto.ProductId} não encontrado");
+                    }
+
+                    // Se a venda estiver sendo criada já como FINALIZADA, damos baixa no estoque
+                    if (sale.Status.ToUpper() == "FINALIZADA")
+                    {
+                        if (product.CurrentStock < itemDto.Quantity && !product.AllowNegativeStock)
+                        {
+                            throw new InvalidOperationException(
+                                $"Estoque insuficiente para o produto '{product.Name}' (SKU: {product.Sku}). " +
+                                $"Disponível: {product.CurrentStock}, Solicitado: {itemDto.Quantity}");
+                        }
+                        
+                        var previousStock = product.CurrentStock;
+                        product.CurrentStock -= itemDto.Quantity;
+                        product.UpdatedAt = DateTime.UtcNow;
+
+                        // Criar movimentação de estoque
+                        var stockMovement = new Models.Inventory.StockMovement
+                        {
+                            ProductId = itemDto.ProductId,
+                            Type = Models.Inventory.MovementType.Out,
+                            Reason = Models.Inventory.MovementReason.Sale,
+                            Quantity = itemDto.Quantity,
+                            PreviousStock = previousStock,
+                            CurrentStock = product.CurrentStock,
+                            UnitCost = product.CostPrice,
+                            TotalCost = product.CostPrice * itemDto.Quantity,
+                            Notes = $"Baixa automática de estoque - Venda {saleNumber}",
+                            MovementDate = DateTime.UtcNow,
+                            CreatedByUserId = userId
+                        };
+                        _context.StockMovements.Add(stockMovement);
+                    }
+
+                    var itemTotal = (itemDto.Quantity * itemDto.UnitPrice) - itemDto.Discount;
+                    totalAmount += itemTotal;
+
+                    var item = new SaleItem
+                    {
+                        ProductId = itemDto.ProductId,
+                        Quantity = itemDto.Quantity,
+                        UnitPrice = itemDto.UnitPrice,
+                        CostPrice = product.CostPrice,
+                        Discount = itemDto.Discount,
+                        Total = itemTotal
+                    };
+
+                    sale.Items.Add(item);
+                }
+
+                sale.TotalAmount = totalAmount;
+                sale.NetAmount = totalAmount - sale.DiscountAmount;
+
+                _context.Sales.Add(sale);
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                // Calcular comissões se finalizada
+                if (_commissionService != null && sale.Status.ToUpper() == "FINALIZADA")
+                {
+                    try { await _commissionService.CalculateCommissionsForSaleAsync(sale.Id); }
+                    catch (Exception ex) { _logger.LogError(ex, "Erro ao calcular comissões para venda {SaleId}", sale.Id); }
+                }
+
+                return await GetByIdAsync(sale.Id) ?? throw new InvalidOperationException("Erro ao recuperar venda criada");
             }
-
-            // Validar estoque disponível
-            if (product.CurrentStock < itemDto.Quantity && !product.AllowNegativeStock)
+            catch (DbUpdateException ex) when (retryCount < maxRetries && (ex.InnerException?.Message.Contains("duplicate key") == true || ex is DbUpdateConcurrencyException))
             {
-                throw new InvalidOperationException(
-                    $"Estoque insuficiente para o produto '{product.Name}' (SKU: {product.Sku}). " +
-                    $"Disponível: {product.CurrentStock}, Solicitado: {itemDto.Quantity}");
+                await transaction.RollbackAsync();
+                retryCount++;
+                _logger.LogWarning("Concorrência ou duplicidade detectada ao criar venda. Tentativa {RetryCount} de {MaxRetries}", retryCount, maxRetries);
+                
+                // Limpar o contexto para evitar problemas com entidades rastreadas
+                _context.ChangeTracker.Clear();
+                
+                // Pequeno delay aleatório para evitar colisões sucessivas
+                await Task.Delay(new Random().Next(50, 200));
             }
-
-            var itemTotal = (itemDto.Quantity * itemDto.UnitPrice) - itemDto.Discount;
-            totalAmount += itemTotal;
-
-            var item = new SaleItem
+            catch (Exception)
             {
-                ProductId = itemDto.ProductId,
-                Quantity = itemDto.Quantity,
-                UnitPrice = itemDto.UnitPrice,
-                CostPrice = product.CostPrice, // Capture cost price at sale time for commission calculation
-                Discount = itemDto.Discount,
-                Total = itemTotal
-            };
-
-            sale.Items.Add(item);
+                await transaction.RollbackAsync();
+                throw;
+            }
         }
-
-        sale.TotalAmount = totalAmount;
-        sale.NetAmount = totalAmount - sale.DiscountAmount;
-
-        _context.Sales.Add(sale);
-        await _context.SaveChangesAsync();
-
-        return await GetByIdAsync(sale.Id) ?? throw new InvalidOperationException("Erro ao recuperar venda criada");
     }
 
     public async Task<SaleDto?> GetByIdAsync(int id)

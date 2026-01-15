@@ -26,12 +26,8 @@ namespace erp.Data;
 /// </remarks>
 public class ApplicationDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, int>
 {
-    // Legacy User/Role/UserRole DbSets - kept for backwards compatibility only.
-    // These duplicate the Identity entities (ApplicationUser, ApplicationRole) and should not be used in new code.
-    // TODO: Migrate consumers to use ApplicationUser/ApplicationRole and remove these DbSets.
-    public new DbSet<User> Users { get; set; } = null!;
-    public new DbSet<Role> Roles { get; set; } = null!;
-    public new DbSet<UserRole> UserRoles { get; set; } = null!;
+    // IdentityDbContext already provides Users, Roles, and UserRole management.
+    // Legacy models are being removed to ensure consistency.
 
     // Kanban
     public DbSet<Models.Kanban.KanbanBoard> KanbanBoards { get; set; } = null!;
@@ -297,15 +293,15 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     {
         var entries = ChangeTracker
             .Entries()
-            .Where(e => e.Entity is User &&
+            .Where(e => e.Entity is ApplicationUser &&
                         e.State is EntityState.Added or EntityState.Modified);
 
         foreach (var entityEntry in entries )
         {
-            var userEntity = (User)entityEntry.Entity;
+            var userEntity = (ApplicationUser)entityEntry.Entity;
             if (entityEntry.State == EntityState.Modified)
             {
-                userEntity.LastUpdatedAt = DateTime.UtcNow;
+                userEntity.UpdatedAt = DateTime.UtcNow;
             }
             
             if (entityEntry.State == EntityState.Added)
@@ -830,23 +826,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             }
         }
 
-    // As entidades de Identity usam tabelas padrão: AspNetUsers, AspNetRoles, etc.
-    // As entidades do app usam suas próprias tabelas: Users, Roles, UserRoles.
-        modelBuilder.Entity<UserRole>(entity =>
-        {
-            entity.HasKey(ur => new { ur.UserId, ur.RoleId });
-
-            entity.HasOne(ur => ur.User)
-                .WithMany(u => u.UserRoles)
-                .HasForeignKey(ur => ur.UserId)
-                .IsRequired();
-
-            entity.HasOne(ur => ur.Role)
-                .WithMany(r => r.UserRoles)
-                .HasForeignKey(ur => ur.RoleId)
-                .IsRequired();
-    });
-
+        // Application specific configurations follow below.
+        
         // Kanban model configuration
         modelBuilder.Entity<Models.Kanban.KanbanBoard>(b =>
         {
@@ -993,7 +974,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             .IsUnique();
 
         // Payroll model configuration
-        // ConfigurePayrollModels(modelBuilder); // TODO: Implement this method
+        ConfigurePayrollModels(modelBuilder); 
 
         // Time tracking / payroll configuration
         ConfigureTimeTrackingModels(modelBuilder);
@@ -1116,6 +1097,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             p.Property(x => x.SalePrice).HasPrecision(18, 2);
             p.Property(x => x.WholesalePrice).HasPrecision(18, 2);
             p.Property(x => x.CommissionPercent).HasPrecision(5, 2);
+
+            // Concurrency Token (PostgreSQL xmin)
+            p.Property(x => x.Version).IsRowVersion();
             
             // Indexes
             p.HasIndex(x => x.Sku).IsUnique();
