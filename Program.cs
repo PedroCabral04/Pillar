@@ -526,6 +526,33 @@ builder.Services.AddScoped<erp.Services.Tenancy.ITenantConnectionResolver, erp.S
 builder.Services.AddScoped<erp.Services.Tenancy.ITenantBrandingProvider, erp.Services.Tenancy.TenantBrandingProvider>();
 builder.Services.Configure<erp.Services.Tenancy.TenantDatabaseOptions>(builder.Configuration.GetSection("MultiTenancy:Database"));
 
+// Administration services
+builder.Services.AddScoped<erp.Services.Administration.IDepartmentService, erp.Services.Administration.DepartmentService>();
+builder.Services.AddScoped<erp.DAOs.Administration.IDepartmentDao, erp.DAOs.Administration.DepartmentDao>();
+builder.Services.AddScoped<erp.Services.Administration.IPositionService, erp.Services.Administration.PositionService>();
+builder.Services.AddScoped<erp.DAOs.Administration.IPositionDao, erp.DAOs.Administration.PositionDao>();
+
+// Kanban services
+builder.Services.AddScoped<erp.Services.Kanban.IKanbanService, erp.Services.Kanban.KanbanService>();
+builder.Services.AddScoped<erp.DAOs.Kanban.IKanbanDao, erp.DAOs.Kanban.KanbanDao>();
+
+// Inventory DAOs
+builder.Services.AddScoped<erp.DAOs.Inventory.IProductDao, erp.DAOs.Inventory.ProductDao>();
+builder.Services.AddScoped<erp.DAOs.Inventory.IProductCategoryDao, erp.DAOs.Inventory.ProductCategoryDao>();
+builder.Services.AddScoped<erp.DAOs.Inventory.IStockMovementDao, erp.DAOs.Inventory.StockMovementDao>();
+builder.Services.AddScoped<erp.DAOs.Inventory.IWarehouseDao, erp.DAOs.Inventory.WarehouseDao>();
+
+// Sales DAOs
+builder.Services.AddScoped<erp.DAOs.Sales.ICustomerDao, erp.DAOs.Sales.CustomerDao>();
+builder.Services.AddScoped<erp.DAOs.Sales.ISaleDao, erp.DAOs.Sales.SaleDao>();
+
+// Payroll DAOs
+builder.Services.AddScoped<erp.DAOs.Payroll.IPayrollPeriodDao, erp.DAOs.Payroll.PayrollPeriodDao>();
+builder.Services.AddScoped<erp.DAOs.Payroll.IPayrollEntryDao, erp.DAOs.Payroll.PayrollEntryDao>();
+
+// Service Orders DAOs
+builder.Services.AddScoped<erp.DAOs.ServiceOrders.IServiceOrderDao, erp.DAOs.ServiceOrders.ServiceOrderDao>();
+
 // Email services
 builder.Services.Configure<erp.Services.Email.EmailSettings>(builder.Configuration.GetSection("Email"));
 builder.Services.AddScoped<erp.Services.Email.IEmailService, erp.Services.Email.EmailService>();

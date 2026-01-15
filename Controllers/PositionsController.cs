@@ -1,9 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using erp.DTOs.User;
+using erp.Services.Administration;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.EntityFrameworkCore;
-using erp.Data;
-using erp.Models.Identity;
 using erp.Models.Audit;
 
 namespace erp.Controllers;
@@ -11,19 +9,15 @@ namespace erp.Controllers;
 [ApiController]
 [Route("api/positions")]
 [Authorize]
-/// <summary>
-/// Controller que expõe operações CRUD para cargos (positions).
-/// Permite listar, recuperar por id, criar, atualizar e excluir cargos.
-/// </summary>
 public class PositionsController : ControllerBase
 {
-    private readonly ApplicationDbContext _context;
-    
-    public PositionsController(ApplicationDbContext context)
+    private readonly IPositionService _positionService;
+
+    public PositionsController(IPositionService positionService)
     {
-        _context = context;
+        _positionService = positionService;
     }
-    
+
     /// <summary>
     /// Retorna a lista completa de cargos com informações relevantes.
     /// </summary>
@@ -32,32 +26,10 @@ public class PositionsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<PositionDto>>> GetAllPositions()
     {
-        var positions = await _context.Positions
-            .AsNoTracking()
-            .Include(p => p.DefaultDepartment)
-            .Include(p => p.Employees)
-            .ToListAsync();
-            
-        var dtos = positions.Select(p => new PositionDto
-        {
-            Id = p.Id,
-            Title = p.Title,
-            Description = p.Description,
-            Code = p.Code,
-            Level = p.Level,
-            MinSalary = p.MinSalary,
-            MaxSalary = p.MaxSalary,
-            DefaultDepartmentId = p.DefaultDepartmentId,
-            DefaultDepartmentName = p.DefaultDepartment?.Name,
-            Requirements = p.Requirements,
-            Responsibilities = p.Responsibilities,
-            IsActive = p.IsActive,
-            EmployeeCount = p.Employees.Count
-        }).ToList();
-        
-        return Ok(dtos);
+        var positions = await _positionService.GetAllAsync();
+        return Ok(positions);
     }
-    
+
     /// <summary>
     /// Recupera um cargo por seu identificador.
     /// </summary>
@@ -69,35 +41,14 @@ public class PositionsController : ControllerBase
     [AuditRead("Position", DataSensitivity.High, Description = "Visualização de cargo e faixas salariais")]
     public async Task<ActionResult<PositionDto>> GetPositionById(int id)
     {
-        var position = await _context.Positions
-            .AsNoTracking()
-            .Include(p => p.DefaultDepartment)
-            .Include(p => p.Employees)
-            .FirstOrDefaultAsync(p => p.Id == id);
-            
+        var position = await _positionService.GetByIdAsync(id);
+
         if (position == null)
             return NotFound($"Cargo com ID {id} não encontrado.");
-            
-        var dto = new PositionDto
-        {
-            Id = position.Id,
-            Title = position.Title,
-            Description = position.Description,
-            Code = position.Code,
-            Level = position.Level,
-            MinSalary = position.MinSalary,
-            MaxSalary = position.MaxSalary,
-            DefaultDepartmentId = position.DefaultDepartmentId,
-            DefaultDepartmentName = position.DefaultDepartment?.Name,
-            Requirements = position.Requirements,
-            Responsibilities = position.Responsibilities,
-            IsActive = position.IsActive,
-            EmployeeCount = position.Employees.Count
-        };
-        
-        return Ok(dto);
+
+        return Ok(position);
     }
-    
+
     /// <summary>
     /// Cria um novo cargo no sistema.
     /// </summary>
@@ -108,43 +59,10 @@ public class PositionsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<PositionDto>> CreatePosition([FromBody] CreatePositionDto createDto)
     {
-        var position = new Position
-        {
-            Title = createDto.Title,
-            Description = createDto.Description,
-            Code = createDto.Code,
-            Level = createDto.Level,
-            MinSalary = createDto.MinSalary,
-            MaxSalary = createDto.MaxSalary,
-            DefaultDepartmentId = createDto.DefaultDepartmentId,
-            Requirements = createDto.Requirements,
-            Responsibilities = createDto.Responsibilities,
-            IsActive = true,
-            CreatedAt = DateTime.UtcNow
-        };
-        
-        _context.Positions.Add(position);
-        await _context.SaveChangesAsync();
-        
-        var dto = new PositionDto
-        {
-            Id = position.Id,
-            Title = position.Title,
-            Description = position.Description,
-            Code = position.Code,
-            Level = position.Level,
-            MinSalary = position.MinSalary,
-            MaxSalary = position.MaxSalary,
-            DefaultDepartmentId = position.DefaultDepartmentId,
-            Requirements = position.Requirements,
-            Responsibilities = position.Responsibilities,
-            IsActive = position.IsActive,
-            EmployeeCount = 0
-        };
-        
-        return CreatedAtAction(nameof(GetPositionById), new { id = dto.Id }, dto);
+        var position = await _positionService.CreateAsync(createDto);
+        return CreatedAtAction(nameof(GetPositionById), new { id = position.Id }, position);
     }
-    
+
     /// <summary>
     /// Atualiza um cargo existente.
     /// </summary>
@@ -156,26 +74,10 @@ public class PositionsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdatePosition(int id, [FromBody] UpdatePositionDto updateDto)
     {
-        var position = await _context.Positions.FindAsync(id);
-        if (position == null)
-            return NotFound($"Cargo com ID {id} não encontrado.");
-            
-        position.Title = updateDto.Title;
-        position.Description = updateDto.Description;
-        position.Code = updateDto.Code;
-        position.Level = updateDto.Level;
-        position.MinSalary = updateDto.MinSalary;
-        position.MaxSalary = updateDto.MaxSalary;
-        position.DefaultDepartmentId = updateDto.DefaultDepartmentId;
-        position.Requirements = updateDto.Requirements;
-        position.Responsibilities = updateDto.Responsibilities;
-        position.IsActive = updateDto.IsActive;
-        position.UpdatedAt = DateTime.UtcNow;
-        
-        await _context.SaveChangesAsync();
+        await _positionService.UpdateAsync(id, updateDto);
         return NoContent();
     }
-    
+
     /// <summary>
     /// Remove um cargo do sistema se não houver funcionários atribuídos.
     /// </summary>
@@ -187,18 +89,7 @@ public class PositionsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> DeletePosition(int id)
     {
-        var position = await _context.Positions
-            .Include(p => p.Employees)
-            .FirstOrDefaultAsync(p => p.Id == id);
-            
-        if (position == null)
-            return NotFound($"Cargo com ID {id} não encontrado.");
-            
-        if (position.Employees.Any())
-            return BadRequest("Não é possível excluir um cargo com funcionários. Reatribua os funcionários primeiro.");
-        
-        _context.Positions.Remove(position);
-        await _context.SaveChangesAsync();
+        await _positionService.DeleteAsync(id);
         return NoContent();
     }
 }
