@@ -9,7 +9,7 @@ namespace erp.Services.Payroll;
 
 public interface IPayrollCalculationService
 {
-    Task<PayrollPeriod> CalculateAsync(int payrollPeriodId, int requestedById, CancellationToken cancellationToken = default);
+    Task<PayrollPeriod> CalculateAsync(int payrollPeriodId, int requestedById, PayrollCalculationMode mode = PayrollCalculationMode.Full, CancellationToken cancellationToken = default);
 }
 
 public class PayrollCalculationService : IPayrollCalculationService
@@ -27,7 +27,7 @@ public class PayrollCalculationService : IPayrollCalculationService
         _logger = logger;
     }
 
-    public async Task<PayrollPeriod> CalculateAsync(int payrollPeriodId, int requestedById, CancellationToken cancellationToken = default)
+    public async Task<PayrollPeriod> CalculateAsync(int payrollPeriodId, int requestedById, PayrollCalculationMode mode = PayrollCalculationMode.Full, CancellationToken cancellationToken = default)
     {
         var period = await _context.PayrollPeriods
             .Include(p => p.Entries)
@@ -92,10 +92,16 @@ public class PayrollCalculationService : IPayrollCalculationService
             var preTaxDeductions = DecimalRound(faltasAmount + atrasosAmount);
             var grossAmount = DecimalRound(Math.Max(earningsTotal - preTaxDeductions, 0));
 
-            var inssAmount = CalculateProgressiveTax(grossAmount, inssBrackets, isSimpleDeduction: false);
+            decimal inssAmount = 0;
+            decimal irrfAmount = 0;
             var dependents = employee.DependentCount;
-            var irrfBase = Math.Max(grossAmount - inssAmount - (dependents * DependentDeduction), 0);
-            var irrfAmount = CalculateProgressiveTax(irrfBase, irrfBrackets, isSimpleDeduction: true);
+
+            if (mode == PayrollCalculationMode.Full)
+            {
+                inssAmount = CalculateProgressiveTax(grossAmount, inssBrackets, isSimpleDeduction: false);
+                var irrfBase = Math.Max(grossAmount - inssAmount - (dependents * DependentDeduction), 0);
+                irrfAmount = CalculateProgressiveTax(irrfBase, irrfBrackets, isSimpleDeduction: true);
+            }
 
             var totalDeductions = DecimalRound(preTaxDeductions + inssAmount + irrfAmount);
             var netAmount = DecimalRound(Math.Max(earningsTotal - totalDeductions, 0));
