@@ -56,8 +56,9 @@ public class ChatbotController : ControllerBase
             }
 
             var response = await _chatbotService.ProcessMessageAsync(
-                request.Message, 
-                request.ConversationHistory);
+                request.Message,
+                request.ConversationHistory,
+                GetCurrentUserId());
 
             return Ok(response);
         }

@@ -12,10 +12,12 @@ namespace erp.Services.Chatbot.ChatbotPlugins;
 public class SuppliersPlugin
 {
     private readonly ISupplierService _supplierService;
+    private readonly IChatbotUserContext _userContext;
 
-    public SuppliersPlugin(ISupplierService supplierService)
+    public SuppliersPlugin(ISupplierService supplierService, IChatbotUserContext userContext)
     {
         _supplierService = supplierService;
+        _userContext = userContext;
     }
 
     [KernelFunction, Description("Busca fornecedores pelo nome ou CNPJ/CPF")]
@@ -278,7 +280,8 @@ public class SuppliersPlugin
                 IsActive = true
             };
 
-            var supplier = await _supplierService.CreateAsync(createDto, currentUserId: 1); // TODO: obter userId do contexto
+            var currentUserId = _userContext.CurrentUserId ?? 1;
+            var supplier = await _supplierService.CreateAsync(createDto, currentUserId: currentUserId);
 
             var addressParts = new List<string>();
             if (!string.IsNullOrEmpty(street)) addressParts.Add(street);
