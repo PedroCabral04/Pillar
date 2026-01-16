@@ -1022,8 +1022,6 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             tenant.Property(x => x.PrimaryContactName).HasMaxLength(200);
             tenant.Property(x => x.PrimaryContactEmail).HasMaxLength(200);
             tenant.Property(x => x.PrimaryContactPhone).HasMaxLength(20);
-            tenant.Property(x => x.DatabaseName).HasMaxLength(200);
-            tenant.Property(x => x.ConnectionString).HasMaxLength(500);
             tenant.Property(x => x.Region).HasMaxLength(200);
             tenant.Property(x => x.Notes).HasMaxLength(2000);
             tenant.Property(x => x.ConfigurationJson).HasColumnType("jsonb");
@@ -1033,9 +1031,6 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .HasFilter("\"Status\" != 4"); // 4 = TenantStatus.Archived
             tenant.HasIndex(x => x.Status);
             tenant.HasIndex(x => x.DocumentNumber);
-            tenant.HasIndex(x => x.DatabaseName)
-                .IsUnique()
-                .HasFilter("\"DatabaseName\" IS NOT NULL");
 
             tenant.HasOne(x => x.Branding)
                 .WithMany()

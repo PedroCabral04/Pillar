@@ -27,8 +27,6 @@
                     Slug = restoredState.Slug,
                     Name = restoredState.Name,
                     IsDemo = restoredState.IsDemo,
-                    ConnectionString = restoredState.ConnectionString,
-                    DatabaseName = restoredState.DatabaseName,
                     Branding = restoredState.Branding != null ? new TenantBranding
                     {
                         LogoUrl = restoredState.Branding.LogoUrl,
@@ -41,7 +39,7 @@
                         CustomCss = restoredState.Branding.CustomCss
                     } : null
                 };
-                
+
                 TenantContextAccessor.SetTenant(tenant);
                 BrandingProvider.NotifyBrandingChanged();
             }
@@ -67,9 +65,7 @@
                     current.Branding.EmailFooterHtml,
                     current.Branding.CustomCss
                 ) : null,
-                current.IsDemo,
-                current.ConnectionString,
-                current.DatabaseName
+                current.IsDemo
             );
 
             ApplicationState.PersistAsJson("TenantState", state);
@@ -84,12 +80,10 @@
     }
 
     private record TenantState(
-        int TenantId, 
-        string Slug, 
-        string Name, 
+        int TenantId,
+        string Slug,
+        string Name,
         TenantBrandingDto? Branding,
-        bool IsDemo,
-        string? ConnectionString,
-        string? DatabaseName
+        bool IsDemo
     );
 }

@@ -5,7 +5,8 @@
       "Bash(dotnet ef migrations add:*)",
       "Bash(dotnet tool restore:*)",
       "Bash(dotnet build:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(del:*)"
     ]
   }
 }

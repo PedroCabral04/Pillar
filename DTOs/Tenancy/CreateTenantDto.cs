@@ -32,12 +32,4 @@ public class CreateTenantDto
     public bool IsDemo { get; set; }
 
     public TenantBrandingDto? Branding { get; set; }
-
-    [MaxLength(200)]
-    public string? DatabaseName { get; set; }
-
-    [MaxLength(500)]
-    public string? ConnectionString { get; set; }
-
-    public bool ProvisionDatabase { get; set; }
 }

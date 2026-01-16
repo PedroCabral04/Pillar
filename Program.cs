@@ -367,16 +367,12 @@ if (builder.Environment.IsProduction() && string.IsNullOrWhiteSpace(connectionSt
 
 builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =>
 {
-    var resolver = serviceProvider.GetRequiredService<erp.Services.Tenancy.ITenantConnectionResolver>();
-    var effectiveConnection = resolver.GetCurrentConnectionString();
-    var finalConnection = effectiveConnection ?? connectionString;
-
     // SECURITY: Verifica se a connection string padrão foi deixada
-    if (finalConnection != null)
+    if (connectionString != null)
     {
         // Check for common/default passwords patterns
         var passwordMatch = System.Text.RegularExpressions.Regex.Match(
-            finalConnection,
+            connectionString,
             @"Password=(?:123|password|Password123|admin|root|postgres|test|demo)",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
@@ -386,23 +382,19 @@ builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =
     }
 
     options.UseNpgsql(
-        finalConnection ?? "Host=localhost;Database=erp;Username=postgres",
+        connectionString ?? "Host=localhost;Database=erp;Username=postgres",
         npgsql => npgsql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)
     );
 });
 
 builder.Services.AddDbContextFactory<ApplicationDbContext>((serviceProvider, options) =>
 {
-    var resolver = serviceProvider.GetRequiredService<erp.Services.Tenancy.ITenantConnectionResolver>();
-    var effectiveConnection = resolver.GetCurrentConnectionString();
-    var finalConnection = effectiveConnection ?? connectionString;
-
     // SECURITY: Verifica se a connection string padrão foi deixada
-    if (finalConnection != null)
+    if (connectionString != null)
     {
         // Check for common/default passwords patterns
         var passwordMatch = System.Text.RegularExpressions.Regex.Match(
-            finalConnection,
+            connectionString,
             @"Password=(?:123|password|Password123|admin|root|postgres|test|demo)",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
@@ -412,7 +404,7 @@ builder.Services.AddDbContextFactory<ApplicationDbContext>((serviceProvider, opt
     }
 
     options.UseNpgsql(
-        finalConnection ?? "Host=localhost;Database=erp;Username=postgres",
+        connectionString ?? "Host=localhost;Database=erp;Username=postgres",
         npgsql => npgsql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)
     );
 }, ServiceLifetime.Scoped);
@@ -544,11 +536,7 @@ builder.Services.AddScoped<erp.Services.Tenancy.ITenantService, erp.Services.Ten
 builder.Services.AddScoped<erp.Services.Tenancy.ITenantBrandingService, erp.Services.Tenancy.TenantBrandingService>();
 builder.Services.AddScoped<erp.Services.Tenancy.ITenantContextAccessor, erp.Services.Tenancy.TenantContextAccessor>();
 builder.Services.AddScoped<erp.Services.Tenancy.ITenantResolver, erp.Services.Tenancy.DefaultTenantResolver>();
-builder.Services.AddScoped<erp.Services.Tenancy.ITenantDbContextFactory, erp.Services.Tenancy.TenantDbContextFactory>();
-builder.Services.AddScoped<erp.Services.Tenancy.ITenantProvisioningService, erp.Services.Tenancy.TenantProvisioningService>();
-builder.Services.AddScoped<erp.Services.Tenancy.ITenantConnectionResolver, erp.Services.Tenancy.TenantConnectionResolver>();
 builder.Services.AddScoped<erp.Services.Tenancy.ITenantBrandingProvider, erp.Services.Tenancy.TenantBrandingProvider>();
-builder.Services.Configure<erp.Services.Tenancy.TenantDatabaseOptions>(builder.Configuration.GetSection("MultiTenancy:Database"));
 
 // Administration services
 builder.Services.AddScoped<erp.Services.Administration.IDepartmentService, erp.Services.Administration.DepartmentService>();

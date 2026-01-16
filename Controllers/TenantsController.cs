@@ -14,7 +14,7 @@ namespace erp.Controllers;
 /// <summary>
 /// Controller responsável por gerenciar tenants (locatários) do sistema.
 /// Exponha endpoints de listagem, consulta por id/slug, criação, atualização,
-/// exclusão, provisionamento da base e operações de branding (logo/favicon).
+/// exclusão e operações de branding (logo/favicon).
 /// Requer autorização com a role "Administrador".
 /// </summary>
 public class TenantsController : ControllerBase
@@ -103,24 +103,6 @@ public class TenantsController : ControllerBase
     }
 
     /// <summary>
-    /// Recupera informações de conexão (ex.: connection string) do tenant.
-    /// </summary>
-    /// <param name="id">Identificador do tenant.</param>
-    /// <param name="cancellationToken">Token para cancelamento da operação.</param>
-    /// <returns>Objeto <see cref="TenantConnectionInfoDto"/> ou 404 se não encontrado.</returns>
-    [HttpGet("{id:int}/connection-info")]
-    public async Task<ActionResult<TenantConnectionInfoDto>> GetConnectionInfoAsync(int id, CancellationToken cancellationToken)
-    {
-        var info = await _tenantService.GetConnectionInfoAsync(id, cancellationToken);
-        if (info is null)
-        {
-            return NotFound();
-        }
-
-        return Ok(info);
-    }
-
-    /// <summary>
     /// Verifica se um slug já existe para outro tenant.
     /// </summary>
     /// <param name="slug">Slug a ser verificado.</param>
@@ -189,26 +171,6 @@ public class TenantsController : ControllerBase
     {
         await _tenantService.DeleteAsync(id, cancellationToken);
         return NoContent();
-    }
-
-    /// <summary>
-    /// Executa o provisionamento da base de dados para o tenant (criação/migração de schema).
-    /// </summary>
-    /// <param name="id">Identificador do tenant a ser provisionado.</param>
-    /// <param name="cancellationToken">Token para cancelamento da operação.</param>
-    /// <returns>HTTP 204 se bem-sucedido ou 404 se o tenant não existir.</returns>
-    [HttpPost("{id:int}/provision")]
-    public async Task<IActionResult> ProvisionAsync(int id, CancellationToken cancellationToken)
-    {
-        try
-        {
-            await _tenantService.ProvisionDatabaseAsync(id, cancellationToken);
-            return NoContent();
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
     }
 
     /// <summary>

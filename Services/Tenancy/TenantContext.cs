@@ -10,8 +10,6 @@ public class TenantContext
     public TenantStatus Status { get; private set; } = TenantStatus.Provisioning;
     public TenantBranding? Branding { get; private set; }
     public bool IsDemo { get; private set; }
-    public string? ConnectionString { get; private set; }
-    public string? DatabaseName { get; private set; }
     public bool IsResolved => TenantId.HasValue;
 
     internal void ApplyTenant(Tenant tenant)
@@ -22,8 +20,6 @@ public class TenantContext
         Status = tenant.Status;
         Branding = tenant.Branding;
         IsDemo = tenant.IsDemo;
-        ConnectionString = tenant.ConnectionString;
-        DatabaseName = tenant.DatabaseName;
     }
 
     internal void Reset()
@@ -34,7 +30,5 @@ public class TenantContext
         Branding = null;
         IsDemo = false;
         Status = TenantStatus.Provisioning;
-        ConnectionString = null;
-        DatabaseName = null;
     }
 }

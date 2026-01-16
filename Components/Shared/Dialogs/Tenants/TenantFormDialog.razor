@@ -308,8 +308,6 @@
             _model.PrimaryContactPhone = Tenant.PrimaryContactPhone;
             _model.Region = Tenant.Region;
             _model.IsDemo = Tenant.IsDemo;
-            _model.DatabaseName = Tenant.DatabaseName;
-            _model.ConnectionString = Tenant.ConnectionString;
             _model.Status = Tenant.Status;
             _model.Notes = Tenant.Notes;
             if (Tenant.Branding is not null)
@@ -323,7 +321,6 @@
         }
         else
         {
-            _model.ProvisionDatabase = true;
             // Default colors
             _primaryColor = new MudColor("#2563EB");
             _secondaryColor = new MudColor("#64748B");
@@ -494,10 +491,7 @@
                     IsDemo = _model.IsDemo,
                     Status = _model.Status,
                     Notes = _model.Notes,
-                    Branding = _model.Branding.ToDto(),
-                    DatabaseName = _model.DatabaseName,
-                    ConnectionString = _model.ConnectionString,
-                    ProvisionDatabase = _model.ProvisionDatabase
+                    Branding = _model.Branding.ToDto()
                 };
 
                 var updated = await ApiService.PutAsync<TenantDto>($"api/tenants/{Tenant.Id}", updateDto);
@@ -523,10 +517,7 @@
                     PrimaryContactPhone = _model.PrimaryContactPhone,
                     Region = _model.Region,
                     IsDemo = _model.IsDemo,
-                    Branding = _model.Branding.ToDto(),
-                    DatabaseName = _model.DatabaseName,
-                    ConnectionString = _model.ConnectionString,
-                    ProvisionDatabase = _model.ProvisionDatabase
+                    Branding = _model.Branding.ToDto()
                 };
 
                 var created = await ApiService.PostAsync<TenantDto>("api/tenants", createDto);
@@ -665,14 +656,6 @@
         public bool IsDemo { get; set; }
         public TenantStatus Status { get; set; } = TenantStatus.Provisioning;
         public string? Notes { get; set; }
-
-        [MaxLength(200)]
-        public string? DatabaseName { get; set; }
-
-        [MaxLength(500)]
-        public string? ConnectionString { get; set; }
-
-        public bool ProvisionDatabase { get; set; }
 
         public TenantBrandingModel Branding { get; set; } = new();
     }

@@ -13,8 +13,6 @@ public record TenantDto(
     string? PrimaryContactPhone,
     string? Region,
     bool IsDemo,
-    string? DatabaseName,
-    string? ConnectionString,
     DateTime CreatedAt,
     DateTime? ActivatedAt,
     DateTime? SuspendedAt,
