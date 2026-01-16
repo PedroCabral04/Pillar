@@ -83,6 +83,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     
     // Audit
     public DbSet<AuditLog> AuditLogs { get; set; } = null!;
+    public DbSet<AuditLogArchive> AuditLogArchives { get; set; } = null!;
     public DbSet<PayrollPeriod> PayrollPeriods { get; set; } = null!;
     public DbSet<PayrollEntry> PayrollEntries { get; set; } = null!;
     public DbSet<PayrollResult> PayrollResults { get; set; } = null!;

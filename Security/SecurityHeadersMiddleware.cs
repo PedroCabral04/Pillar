@@ -76,8 +76,8 @@ public class SecurityHeadersMiddleware
             "form-action 'self'",                           // Restringe form submissions
             "frame-ancestors 'none'",                       // Previne clickjacking
             "img-src 'self' data: https: blob:",            // Imagens
-            "font-src 'self' data:",                        // Fontes
-            "style-src 'self' 'unsafe-inline'",             // CSS (unsafe-inline necessário para Blazor)
+            "font-src 'self' data: https://fonts.gstatic.com",  // Fontes
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", // CSS (unsafe-inline necessário para Blazor)
             "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // JS (necessário para Blazor Server)
             "connect-src 'self' wss: ws:",                  // SignalR/websockets
             "object-src 'none'",                            // Bloqueia plugins

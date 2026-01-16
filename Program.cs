@@ -378,6 +378,15 @@ builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =
 
         if (passwordMatch.Success)
         {
+            // SECURITY: Block weak passwords in production
+            if (builder.Environment.IsProduction())
+            {
+                throw new InvalidOperationException(
+                    "Weak database password detected. The connection string contains a common/default password. " +
+                    "Please use a strong, unique password for your database.");
+            }
+            // Log warning in development - would need ILogger here but not available at this stage
+            // The warning will be visible in the exception above if run in production
         }
     }
 
@@ -400,6 +409,13 @@ builder.Services.AddDbContextFactory<ApplicationDbContext>((serviceProvider, opt
 
         if (passwordMatch.Success)
         {
+            // SECURITY: Block weak passwords in production
+            if (builder.Environment.IsProduction())
+            {
+                throw new InvalidOperationException(
+                    "Weak database password detected. The connection string contains a common/default password. " +
+                    "Please use a strong, unique password for your database.");
+            }
         }
     }
 
@@ -518,6 +534,7 @@ builder.Services.AddScoped<erp.Services.Payroll.IPayrollService, erp.Services.Pa
 
 // Audit services
 builder.Services.AddScoped<erp.Services.Audit.IAuditService, erp.Services.Audit.AuditService>();
+builder.Services.AddScoped<erp.Services.Audit.IAuditRetentionService, erp.Services.Audit.AuditRetentionService>();
 
 // Authorization / Permission services
 builder.Services.AddScoped<IPermissionService, PermissionService>();
@@ -527,6 +544,7 @@ builder.Services.AddSingleton<erp.Services.Chatbot.IChatbotCacheService, erp.Ser
 builder.Services.AddScoped<erp.Services.Chatbot.IChatbotService, erp.Services.Chatbot.ChatbotService>();
 builder.Services.AddScoped<erp.Services.Chatbot.IChatConversationService, erp.Services.Chatbot.ChatConversationService>();
 builder.Services.AddScoped<erp.DAOs.Chatbot.IChatConversationDao, erp.DAOs.Chatbot.ChatConversationDao>();
+builder.Services.AddScoped<erp.Services.Chatbot.IChatbotUserContext, erp.Services.Chatbot.ChatbotUserContext>();
 
 // Browser Service (Mobile/Responsive)
 builder.Services.AddScoped<erp.Services.Browser.IBrowserService, erp.Services.Browser.BrowserService>();

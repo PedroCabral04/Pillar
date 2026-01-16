@@ -12,6 +12,7 @@ using erp.Data;
 using erp.Models.Audit;
 using erp.Services.Tenancy;
 using System.Security.Claims;
+using System.Security.Cryptography;
 
 namespace erp.Controllers
 {
@@ -43,16 +44,59 @@ namespace erp.Controllers
             _logger = logger;
         }
 
-        private string GenerateSecureRandomPassword()
+        /// <summary>
+        /// Generates a cryptographically secure random password.
+        /// Uses RandomNumberGenerator instead of Random for better security.
+        /// </summary>
+        private static string GenerateSecureRandomPassword()
         {
-            const string chars = "ABCDEFGHJKLMNOPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz0123456789!@#$%^&*?_-";
-            var random = new Random();
-            var password = new char[12];
-            for (int i = 0; i < password.Length; i++)
+            const string lowercase = "abcdefghijkmnopqrstuvwxyz";
+            const string uppercase = "ABCDEFGHJKLMNOPQRSTUVWXYZ";
+            const string digits = "0123456789";
+            const string special = "!@#$%^&*?_-";
+
+            var passwordChars = new char[16];
+
+            // Ensure at least one of each required character type
+            using var rng = RandomNumberGenerator.Create();
+            passwordChars[0] = GetRandomChar(lowercase, rng);
+            passwordChars[1] = GetRandomChar(uppercase, rng);
+            passwordChars[2] = GetRandomChar(digits, rng);
+            passwordChars[3] = GetRandomChar(special, rng);
+
+            // Fill the rest with random characters from all pools
+            const string allChars = lowercase + uppercase + digits + special;
+            for (int i = 4; i < passwordChars.Length; i++)
             {
-                password[i] = chars[random.Next(chars.Length)];
+                passwordChars[i] = GetRandomChar(allChars, rng);
             }
-            return new string(password);
+
+            // Shuffle the password to avoid predictable pattern
+            Shuffle(passwordChars, rng);
+
+            return new string(passwordChars);
+        }
+
+        private static char GetRandomChar(string charSet, RandomNumberGenerator rng)
+        {
+            var buffer = new byte[4];
+            rng.GetBytes(buffer);
+            var randomValue = BitConverter.ToUInt32(buffer, 0);
+            return charSet[(int)(randomValue % (uint)charSet.Length)];
+        }
+
+        private static void Shuffle(char[] array, RandomNumberGenerator rng)
+        {
+            int n = array.Length;
+            var buffer = new byte[4];
+
+            for (int i = n - 1; i > 0; i--)
+            {
+                rng.GetBytes(buffer);
+                var randomValue = BitConverter.ToUInt32(buffer, 0);
+                int j = (int)(randomValue % (uint)(i + 1));
+                (array[i], array[j]) = (array[j], array[i]);
+            }
         }
 
         private int? GetScopedTenantId()
@@ -112,19 +156,29 @@ namespace erp.Controllers
                 .Include(u => u.Department)
                 .Include(u => u.Position)
                 .ToListAsync();
-                
+
+            // Batch load all roles to avoid N+1 query problem
+            var userIds = allUsers.Select(u => u.Id).ToList();
+            var userRoles = await _context.UserRoles
+                .Where(ur => userIds.Contains(ur.UserId))
+                .Join(_context.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => new { ur.UserId, RoleName = r.Name! })
+                .ToListAsync();
+
+            var rolesByUser = userRoles.GroupBy(x => x.UserId)
+                .ToDictionary(g => g.Key, g => g.Select(x => x.RoleName).ToList());
+
             var userDtos = new List<UserDto>(allUsers.Count);
             foreach (var u in allUsers)
             {
-                var roles = await _users.GetRolesAsync(u);
+                var roles = rolesByUser.GetValueOrDefault(u.Id, new List<string>());
                 userDtos.Add(new UserDto
                 {
                     Id = u.Id,
                     Username = u.UserName ?? string.Empty,
                     Email = u.Email ?? string.Empty,
                     Phone = u.PhoneNumber ?? string.Empty,
-                    RoleNames = roles.ToList(),
-                    RoleAbbreviations = roles.ToList(),
+                    RoleNames = roles,
+                    RoleAbbreviations = roles,
                     IsActive = u.IsActive,
                     FullName = u.FullName,
                     Cpf = u.Cpf,

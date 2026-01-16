@@ -13,6 +13,7 @@ public class ChatbotService : IChatbotService
     private readonly ILogger<ChatbotService> _logger;
     private readonly IConfiguration _configuration;
     private readonly IChatbotCacheService _cacheService;
+    private readonly IChatbotUserContext _userContext;
     private readonly string _aiProvider;
     private readonly bool _aiConfigured;
 
@@ -20,11 +21,13 @@ public class ChatbotService : IChatbotService
         ILogger<ChatbotService> logger,
         IConfiguration configuration,
         IServiceProvider serviceProvider,
-        IChatbotCacheService cacheService)
+        IChatbotCacheService cacheService,
+        IChatbotUserContext userContext)
     {
         _logger = logger;
         _configuration = configuration;
         _cacheService = cacheService;
+        _userContext = userContext;
 
         // Criar o Kernel do Semantic Kernel
         var builder = Kernel.CreateBuilder();
@@ -181,11 +184,17 @@ public class ChatbotService : IChatbotService
     }
 
     public async Task<ChatResponseDto> ProcessMessageAsync(
-        string message, 
-        List<ChatMessageDto>? conversationHistory = null)
+        string message,
+        List<ChatMessageDto>? conversationHistory = null,
+        int? userId = null)
     {
         try
         {
+            // Set user context for this request if userId is provided
+            if (userId.HasValue)
+            {
+                _userContext.SetCurrentUser(userId.Value);
+            }
             // Verificar cache primeiro
             if (_cacheService.IsEnabled)
             {
@@ -307,6 +316,11 @@ public class ChatbotService : IChatbotService
                 Success = false,
                 Error = ex.Message
             };
+        }
+        finally
+        {
+            // Always clear user context after processing
+            _userContext.Clear();
         }
     }
 

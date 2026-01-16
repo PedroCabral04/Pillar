@@ -4,5 +4,5 @@ namespace erp.Services.Chatbot;
 
 public interface IChatbotService
 {
-    Task<ChatResponseDto> ProcessMessageAsync(string message, List<ChatMessageDto>? conversationHistory = null);
+    Task<ChatResponseDto> ProcessMessageAsync(string message, List<ChatMessageDto>? conversationHistory = null, int? userId = null);
 }

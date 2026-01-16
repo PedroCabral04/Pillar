@@ -144,7 +144,13 @@ public class ApplicationUser : IdentityUser<int>, erp.Models.Audit.IAuditable
     
     [MaxLength(200)]
     public string? EducationLevel { get; set; }
-    
+
+    /// <summary>
+    /// Número de dependentes para fins de cálculo de IRRF na folha de pagamento.
+    /// Cada dependente permite uma dedução de R$ 189,59 no cálculo do IRRF.
+    /// </summary>
+    public int DependentCount { get; set; } = 0;
+
     public string? Certifications { get; set; } // JSON array de certificações
     
     // Observações e Metadados
