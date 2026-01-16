@@ -16,18 +16,23 @@ RUN dotnet publish "erp.csproj" -c Release -o /app/publish --no-restore
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
 WORKDIR /app
 
-# Optional: set timezone to UTC explicitly (app already uses UTC)
+# Build-time arguments (optional)
+ARG ASPNETCORE_ENVIRONMENT=Production
+ARG DB_BOOTSTRAP=false
+
+# Environment variables (overridable by Coolify at runtime)
 ENV TZ=Etc/UTC \
     ASPNETCORE_URLS=http://+:8080 \
-    ASPNETCORE_ENVIRONMENT=Production \
-    DB_BOOTSTRAP=dropcreate
+    ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT} \
+    DB_BOOTSTRAP=${DB_BOOTSTRAP} \
+    DATAPROTECTION__KEYS_DIRECTORY=/keys
 
 EXPOSE 8080
 
 # Copy published output
 COPY --from=build /app/publish .
 
-# Default health probe (Coolify can use /health)
-# HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+# Health probe (Coolify uses this for container health monitoring)
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
 ENTRYPOINT ["dotnet", "erp.dll"]

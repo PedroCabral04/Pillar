@@ -19,7 +19,9 @@ public class TenantConnectionResolver : ITenantConnectionResolver
         _tenantContextAccessor = tenantContextAccessor;
         _configuration = configuration;
         _logger = logger;
-        _defaultConnectionString = configuration.GetConnectionString("DefaultConnection") ?? "";
+        _defaultConnectionString = configuration.GetConnectionString("DefaultConnection") 
+                                   ?? configuration["DbContextSettings:ConnectionString"] 
+                                   ?? "";
         _templateConnectionString = configuration["MultiTenancy:Database:TemplateConnectionString"] ?? "";
 
         // SECURITY: Log warning se usando credenciais padrão em desenvolvimento

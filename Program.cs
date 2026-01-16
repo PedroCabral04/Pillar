@@ -355,13 +355,14 @@ builder.Services.AddAntiforgery(o =>
     // HeaderName can be customized if you post forms via JS: o.HeaderName = "X-CSRF-TOKEN";
 });
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
+                    ?? builder.Configuration["DbContextSettings:ConnectionString"];
 
 // SECURITY: Valida que connection string está configurada em produção
 if (builder.Environment.IsProduction() && string.IsNullOrWhiteSpace(connectionString))
 {
     throw new InvalidOperationException(
-        "Database connection string not configured. Please set DbContextSettings__ConnectionString environment variable.");
+        "Database connection string not configured. Please set ConnectionStrings__DefaultConnection or DbContextSettings__ConnectionString environment variable.");
 }
 
 builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =>
