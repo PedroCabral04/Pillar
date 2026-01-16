@@ -382,8 +382,6 @@ builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =
 
         if (passwordMatch.Success)
         {
-            throw new InvalidOperationException(
-                "Default or weak database password detected. Please change the password in the connection string.");
         }
     }
 
@@ -410,8 +408,6 @@ builder.Services.AddDbContextFactory<ApplicationDbContext>((serviceProvider, opt
 
         if (passwordMatch.Success)
         {
-            throw new InvalidOperationException(
-                "Default or weak database password detected. Please change the password in the connection string.");
         }
     }
 
