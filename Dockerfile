@@ -21,7 +21,7 @@ ARG ASPNETCORE_ENVIRONMENT=Production
 ARG DB_BOOTSTRAP=false
 
 # Environment variables (overridable by Coolify at runtime)
-ENV TZ=Etc/UTC \
+ENV TZ=America/Sao_Paulo \
     ASPNETCORE_URLS=http://+:8080 \
     ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT} \
     DB_BOOTSTRAP=${DB_BOOTSTRAP} \
@@ -33,6 +33,5 @@ EXPOSE 8080
 COPY --from=build /app/publish .
 
 # Health probe (Coolify uses this for container health monitoring)
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
 ENTRYPOINT ["dotnet", "erp.dll"]
