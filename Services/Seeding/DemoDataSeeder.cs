@@ -60,10 +60,10 @@ public sealed class DemoDataSeeder
         }
 
         var tenant = await EnsureTenantAsync(cancellationToken);
-        
+
         // Seed organizational structure first (departments, positions)
-        var departments = await SeedDepartmentsAsync(cancellationToken);
-        var positions = await SeedPositionsAsync(departments, cancellationToken);
+        var departments = await SeedDepartmentsAsync(tenant.Id, cancellationToken);
+        var positions = await SeedPositionsAsync(tenant.Id, departments, cancellationToken);
         
         // Now create/update demo user with department and position
         var demoUser = await EnsureDemoUserAsync(tenant, departments, positions, cancellationToken);
@@ -82,15 +82,15 @@ public sealed class DemoDataSeeder
             await PurgeDemoDataAsync(tenant.Id, cancellationToken);
         }
 
-        await SeedLookupsAsync(cancellationToken);
+        await SeedLookupsAsync(tenant.Id, cancellationToken);
         
         // Seed financial structure
-        var financialCategories = await SeedFinancialCategoriesAsync(cancellationToken);
-        var costCenters = await SeedCostCentersAsync(departments, demoUser.Id, cancellationToken);
-        
+        var financialCategories = await SeedFinancialCategoriesAsync(tenant.Id, cancellationToken);
+        var costCenters = await SeedCostCentersAsync(tenant.Id, departments, demoUser.Id, cancellationToken);
+
         // Seed asset categories
-        await SeedAssetCategoriesAsync(cancellationToken);
-        await SeedAssetsAsync(cancellationToken);
+        await SeedAssetCategoriesAsync(tenant.Id, cancellationToken);
+        await SeedAssetsAsync(tenant.Id, cancellationToken);
 
         var customers = await SeedCustomersAsync(tenant.Id, demoUser.Id, cancellationToken);
         var suppliers = await SeedSuppliersAsync(tenant.Id, demoUser.Id, cancellationToken);
@@ -145,7 +145,7 @@ public sealed class DemoDataSeeder
         return tenant;
     }
 
-    private async Task<List<Department>> SeedDepartmentsAsync(CancellationToken cancellationToken)
+    private async Task<List<Department>> SeedDepartmentsAsync(int tenantId, CancellationToken cancellationToken)
     {
         if (await _db.Departments.AnyAsync(cancellationToken))
         {
@@ -154,15 +154,15 @@ public sealed class DemoDataSeeder
 
         var departments = new List<Department>
         {
-            new() { Name = "Diretoria", Code = "DIR", Description = "Diretoria Executiva", IsActive = true, CostCenter = "CC-001" },
-            new() { Name = "Tecnologia da Informação", Code = "TI", Description = "Departamento de TI e Infraestrutura", IsActive = true, CostCenter = "CC-002" },
-            new() { Name = "Recursos Humanos", Code = "RH", Description = "Gestão de Pessoas e Benefícios", IsActive = true, CostCenter = "CC-003" },
-            new() { Name = "Financeiro", Code = "FIN", Description = "Controladoria e Finanças", IsActive = true, CostCenter = "CC-004" },
-            new() { Name = "Comercial", Code = "COM", Description = "Vendas e Relacionamento com Clientes", IsActive = true, CostCenter = "CC-005" },
-            new() { Name = "Operações", Code = "OPS", Description = "Operações e Logística", IsActive = true, CostCenter = "CC-006" },
-            new() { Name = "Administrativo", Code = "ADM", Description = "Suporte Administrativo Geral", IsActive = true, CostCenter = "CC-007" },
-            new() { Name = "Jurídico", Code = "JUR", Description = "Assessoria Jurídica e Compliance", IsActive = true, CostCenter = "CC-008" },
-            new() { Name = "Marketing", Code = "MKT", Description = "Marketing e Comunicação", IsActive = true, CostCenter = "CC-009" },
+            new() { TenantId = tenantId, Name = "Diretoria", Code = "DIR", Description = "Diretoria Executiva", IsActive = true, CostCenter = "CC-001" },
+            new() { TenantId = tenantId, Name = "Tecnologia da Informação", Code = "TI", Description = "Departamento de TI e Infraestrutura", IsActive = true, CostCenter = "CC-002" },
+            new() { TenantId = tenantId, Name = "Recursos Humanos", Code = "RH", Description = "Gestão de Pessoas e Benefícios", IsActive = true, CostCenter = "CC-003" },
+            new() { TenantId = tenantId, Name = "Financeiro", Code = "FIN", Description = "Controladoria e Finanças", IsActive = true, CostCenter = "CC-004" },
+            new() { TenantId = tenantId, Name = "Comercial", Code = "COM", Description = "Vendas e Relacionamento com Clientes", IsActive = true, CostCenter = "CC-005" },
+            new() { TenantId = tenantId, Name = "Operações", Code = "OPS", Description = "Operações e Logística", IsActive = true, CostCenter = "CC-006" },
+            new() { TenantId = tenantId, Name = "Administrativo", Code = "ADM", Description = "Suporte Administrativo Geral", IsActive = true, CostCenter = "CC-007" },
+            new() { TenantId = tenantId, Name = "Jurídico", Code = "JUR", Description = "Assessoria Jurídica e Compliance", IsActive = true, CostCenter = "CC-008" },
+            new() { TenantId = tenantId, Name = "Marketing", Code = "MKT", Description = "Marketing e Comunicação", IsActive = true, CostCenter = "CC-009" },
         };
 
         await _db.Departments.AddRangeAsync(departments, cancellationToken);
@@ -172,7 +172,7 @@ public sealed class DemoDataSeeder
         return departments;
     }
 
-    private async Task<List<Position>> SeedPositionsAsync(List<Department> departments, CancellationToken cancellationToken)
+    private async Task<List<Position>> SeedPositionsAsync(int tenantId, List<Department> departments, CancellationToken cancellationToken)
     {
         if (await _db.Positions.AnyAsync(cancellationToken))
         {
@@ -188,40 +188,40 @@ public sealed class DemoDataSeeder
         var positions = new List<Position>
         {
             // Nível Executivo (5)
-            new() { Title = "Diretor Geral", Code = "DIR-GER", Level = 5, MinSalary = 25000, MaxSalary = 50000, DefaultDepartmentId = dirDept?.Id, Description = "Responsável pela gestão geral da empresa", IsActive = true },
-            new() { Title = "Diretor de TI", Code = "DIR-TI", Level = 5, MinSalary = 20000, MaxSalary = 40000, DefaultDepartmentId = tiDept?.Id, Description = "Responsável pela estratégia de tecnologia", IsActive = true },
-            new() { Title = "Diretor Financeiro", Code = "DIR-FIN", Level = 5, MinSalary = 20000, MaxSalary = 40000, DefaultDepartmentId = finDept?.Id, Description = "CFO - Responsável pelas finanças", IsActive = true },
-            new() { Title = "Diretor Comercial", Code = "DIR-COM", Level = 5, MinSalary = 20000, MaxSalary = 40000, DefaultDepartmentId = comDept?.Id, Description = "Responsável pela área comercial", IsActive = true },
-            
+            new() { TenantId = tenantId, Title = "Diretor Geral", Code = "DIR-GER", Level = 5, MinSalary = 25000, MaxSalary = 50000, DefaultDepartmentId = dirDept?.Id, Description = "Responsável pela gestão geral da empresa", IsActive = true },
+            new() { TenantId = tenantId, Title = "Diretor de TI", Code = "DIR-TI", Level = 5, MinSalary = 20000, MaxSalary = 40000, DefaultDepartmentId = tiDept?.Id, Description = "Responsável pela estratégia de tecnologia", IsActive = true },
+            new() { TenantId = tenantId, Title = "Diretor Financeiro", Code = "DIR-FIN", Level = 5, MinSalary = 20000, MaxSalary = 40000, DefaultDepartmentId = finDept?.Id, Description = "CFO - Responsável pelas finanças", IsActive = true },
+            new() { TenantId = tenantId, Title = "Diretor Comercial", Code = "DIR-COM", Level = 5, MinSalary = 20000, MaxSalary = 40000, DefaultDepartmentId = comDept?.Id, Description = "Responsável pela área comercial", IsActive = true },
+
             // Nível Gerência (4)
-            new() { Title = "Gerente de TI", Code = "GER-TI", Level = 4, MinSalary = 12000, MaxSalary = 20000, DefaultDepartmentId = tiDept?.Id, Description = "Gerenciamento da equipe de TI", IsActive = true },
-            new() { Title = "Gerente de RH", Code = "GER-RH", Level = 4, MinSalary = 10000, MaxSalary = 18000, DefaultDepartmentId = rhDept?.Id, Description = "Gerenciamento de Recursos Humanos", IsActive = true },
-            new() { Title = "Gerente Financeiro", Code = "GER-FIN", Level = 4, MinSalary = 12000, MaxSalary = 20000, DefaultDepartmentId = finDept?.Id, Description = "Gerenciamento financeiro e contábil", IsActive = true },
-            new() { Title = "Gerente Comercial", Code = "GER-COM", Level = 4, MinSalary = 12000, MaxSalary = 22000, DefaultDepartmentId = comDept?.Id, Description = "Gerenciamento da equipe de vendas", IsActive = true },
-            
+            new() { TenantId = tenantId, Title = "Gerente de TI", Code = "GER-TI", Level = 4, MinSalary = 12000, MaxSalary = 20000, DefaultDepartmentId = tiDept?.Id, Description = "Gerenciamento da equipe de TI", IsActive = true },
+            new() { TenantId = tenantId, Title = "Gerente de RH", Code = "GER-RH", Level = 4, MinSalary = 10000, MaxSalary = 18000, DefaultDepartmentId = rhDept?.Id, Description = "Gerenciamento de Recursos Humanos", IsActive = true },
+            new() { TenantId = tenantId, Title = "Gerente Financeiro", Code = "GER-FIN", Level = 4, MinSalary = 12000, MaxSalary = 20000, DefaultDepartmentId = finDept?.Id, Description = "Gerenciamento financeiro e contábil", IsActive = true },
+            new() { TenantId = tenantId, Title = "Gerente Comercial", Code = "GER-COM", Level = 4, MinSalary = 12000, MaxSalary = 22000, DefaultDepartmentId = comDept?.Id, Description = "Gerenciamento da equipe de vendas", IsActive = true },
+
             // Nível Coordenação (3)
-            new() { Title = "Coordenador de Desenvolvimento", Code = "CRD-DEV", Level = 3, MinSalary = 8000, MaxSalary = 14000, DefaultDepartmentId = tiDept?.Id, Description = "Coordenação da equipe de desenvolvimento", IsActive = true },
-            new() { Title = "Coordenador de Infraestrutura", Code = "CRD-INFRA", Level = 3, MinSalary = 7000, MaxSalary = 12000, DefaultDepartmentId = tiDept?.Id, Description = "Coordenação de infraestrutura e suporte", IsActive = true },
-            new() { Title = "Coordenador de Vendas", Code = "CRD-VEN", Level = 3, MinSalary = 6000, MaxSalary = 12000, DefaultDepartmentId = comDept?.Id, Description = "Coordenação da equipe de vendas", IsActive = true },
-            
+            new() { TenantId = tenantId, Title = "Coordenador de Desenvolvimento", Code = "CRD-DEV", Level = 3, MinSalary = 8000, MaxSalary = 14000, DefaultDepartmentId = tiDept?.Id, Description = "Coordenação da equipe de desenvolvimento", IsActive = true },
+            new() { TenantId = tenantId, Title = "Coordenador de Infraestrutura", Code = "CRD-INFRA", Level = 3, MinSalary = 7000, MaxSalary = 12000, DefaultDepartmentId = tiDept?.Id, Description = "Coordenação de infraestrutura e suporte", IsActive = true },
+            new() { TenantId = tenantId, Title = "Coordenador de Vendas", Code = "CRD-VEN", Level = 3, MinSalary = 6000, MaxSalary = 12000, DefaultDepartmentId = comDept?.Id, Description = "Coordenação da equipe de vendas", IsActive = true },
+
             // Nível Analista Sênior (2.5)
-            new() { Title = "Analista Sênior de Sistemas", Code = "SR-SIS", Level = 3, MinSalary = 8000, MaxSalary = 14000, DefaultDepartmentId = tiDept?.Id, Description = "Análise e desenvolvimento de sistemas", IsActive = true },
-            new() { Title = "Analista Sênior Financeiro", Code = "SR-FIN", Level = 3, MinSalary = 7000, MaxSalary = 12000, DefaultDepartmentId = finDept?.Id, Description = "Análise financeira avançada", IsActive = true },
-            
+            new() { TenantId = tenantId, Title = "Analista Sênior de Sistemas", Code = "SR-SIS", Level = 3, MinSalary = 8000, MaxSalary = 14000, DefaultDepartmentId = tiDept?.Id, Description = "Análise e desenvolvimento de sistemas", IsActive = true },
+            new() { TenantId = tenantId, Title = "Analista Sênior Financeiro", Code = "SR-FIN", Level = 3, MinSalary = 7000, MaxSalary = 12000, DefaultDepartmentId = finDept?.Id, Description = "Análise financeira avançada", IsActive = true },
+
             // Nível Analista Pleno (2)
-            new() { Title = "Analista de Sistemas", Code = "AN-SIS", Level = 2, MinSalary = 5000, MaxSalary = 9000, DefaultDepartmentId = tiDept?.Id, Description = "Análise e desenvolvimento de sistemas", IsActive = true },
-            new() { Title = "Analista de RH", Code = "AN-RH", Level = 2, MinSalary = 4000, MaxSalary = 7000, DefaultDepartmentId = rhDept?.Id, Description = "Análise de processos de RH", IsActive = true },
-            new() { Title = "Analista Financeiro", Code = "AN-FIN", Level = 2, MinSalary = 4500, MaxSalary = 8000, DefaultDepartmentId = finDept?.Id, Description = "Análise financeira e contábil", IsActive = true },
-            new() { Title = "Analista Comercial", Code = "AN-COM", Level = 2, MinSalary = 4000, MaxSalary = 8000, DefaultDepartmentId = comDept?.Id, Description = "Suporte à equipe comercial", IsActive = true },
-            
+            new() { TenantId = tenantId, Title = "Analista de Sistemas", Code = "AN-SIS", Level = 2, MinSalary = 5000, MaxSalary = 9000, DefaultDepartmentId = tiDept?.Id, Description = "Análise e desenvolvimento de sistemas", IsActive = true },
+            new() { TenantId = tenantId, Title = "Analista de RH", Code = "AN-RH", Level = 2, MinSalary = 4000, MaxSalary = 7000, DefaultDepartmentId = rhDept?.Id, Description = "Análise de processos de RH", IsActive = true },
+            new() { TenantId = tenantId, Title = "Analista Financeiro", Code = "AN-FIN", Level = 2, MinSalary = 4500, MaxSalary = 8000, DefaultDepartmentId = finDept?.Id, Description = "Análise financeira e contábil", IsActive = true },
+            new() { TenantId = tenantId, Title = "Analista Comercial", Code = "AN-COM", Level = 2, MinSalary = 4000, MaxSalary = 8000, DefaultDepartmentId = comDept?.Id, Description = "Suporte à equipe comercial", IsActive = true },
+
             // Nível Júnior (1.5)
-            new() { Title = "Analista Júnior de TI", Code = "JR-TI", Level = 2, MinSalary = 3000, MaxSalary = 5000, DefaultDepartmentId = tiDept?.Id, Description = "Suporte e desenvolvimento inicial", IsActive = true },
-            new() { Title = "Assistente Administrativo", Code = "AST-ADM", Level = 1, MinSalary = 2000, MaxSalary = 3500, Description = "Suporte administrativo geral", IsActive = true },
-            new() { Title = "Assistente Financeiro", Code = "AST-FIN", Level = 1, MinSalary = 2200, MaxSalary = 3800, DefaultDepartmentId = finDept?.Id, Description = "Suporte ao departamento financeiro", IsActive = true },
-            
+            new() { TenantId = tenantId, Title = "Analista Júnior de TI", Code = "JR-TI", Level = 2, MinSalary = 3000, MaxSalary = 5000, DefaultDepartmentId = tiDept?.Id, Description = "Suporte e desenvolvimento inicial", IsActive = true },
+            new() { TenantId = tenantId, Title = "Assistente Administrativo", Code = "AST-ADM", Level = 1, MinSalary = 2000, MaxSalary = 3500, Description = "Suporte administrativo geral", IsActive = true },
+            new() { TenantId = tenantId, Title = "Assistente Financeiro", Code = "AST-FIN", Level = 1, MinSalary = 2200, MaxSalary = 3800, DefaultDepartmentId = finDept?.Id, Description = "Suporte ao departamento financeiro", IsActive = true },
+
             // Nível Estagiário (1)
-            new() { Title = "Estagiário de TI", Code = "EST-TI", Level = 1, MinSalary = 1200, MaxSalary = 2000, DefaultDepartmentId = tiDept?.Id, Description = "Estágio em tecnologia", IsActive = true },
-            new() { Title = "Estagiário Administrativo", Code = "EST-ADM", Level = 1, MinSalary = 1000, MaxSalary = 1800, Description = "Estágio administrativo", IsActive = true },
+            new() { TenantId = tenantId, Title = "Estagiário de TI", Code = "EST-TI", Level = 1, MinSalary = 1200, MaxSalary = 2000, DefaultDepartmentId = tiDept?.Id, Description = "Estágio em tecnologia", IsActive = true },
+            new() { TenantId = tenantId, Title = "Estagiário Administrativo", Code = "EST-ADM", Level = 1, MinSalary = 1000, MaxSalary = 1800, Description = "Estágio administrativo", IsActive = true },
         };
 
         await _db.Positions.AddRangeAsync(positions, cancellationToken);
@@ -420,7 +420,7 @@ public sealed class DemoDataSeeder
         }
     }
 
-    private async Task SeedLookupsAsync(CancellationToken cancellationToken)
+    private async Task SeedLookupsAsync(int tenantId, CancellationToken cancellationToken)
     {
         if (!await _db.ProductCategories.AnyAsync(cancellationToken))
         {
@@ -451,8 +451,8 @@ public sealed class DemoDataSeeder
         {
             var warehouses = new[]
             {
-                new Warehouse { Name = "Matriz", Code = "MAT" },
-                new Warehouse { Name = "Filial SP", Code = "SP01" }
+                new Warehouse { TenantId = tenantId, Name = "Matriz", Code = "MAT" },
+                new Warehouse { TenantId = tenantId, Name = "Filial SP", Code = "SP01" }
             };
 
             await _db.Warehouses.AddRangeAsync(warehouses, cancellationToken);
@@ -464,7 +464,7 @@ public sealed class DemoDataSeeder
         }
     }
 
-    private async Task<List<FinancialCategory>> SeedFinancialCategoriesAsync(CancellationToken cancellationToken)
+    private async Task<List<FinancialCategory>> SeedFinancialCategoriesAsync(int tenantId, CancellationToken cancellationToken)
     {
         if (await _db.FinancialCategories.AnyAsync(cancellationToken))
         {
@@ -472,8 +472,8 @@ public sealed class DemoDataSeeder
         }
 
         // Parent categories
-        var revenueParent = new FinancialCategory { Name = "Receitas", Code = "1", Type = CategoryType.Revenue, Description = "Todas as receitas da empresa" };
-        var expenseParent = new FinancialCategory { Name = "Despesas", Code = "2", Type = CategoryType.Expense, Description = "Todas as despesas da empresa" };
+        var revenueParent = new FinancialCategory { TenantId = tenantId, Name = "Receitas", Code = "1", Type = CategoryType.Revenue, Description = "Todas as receitas da empresa" };
+        var expenseParent = new FinancialCategory { TenantId = tenantId, Name = "Despesas", Code = "2", Type = CategoryType.Expense, Description = "Todas as despesas da empresa" };
 
         _db.FinancialCategories.AddRange(revenueParent, expenseParent);
         await _db.SaveChangesAsync(cancellationToken);
@@ -481,27 +481,27 @@ public sealed class DemoDataSeeder
         // Revenue subcategories
         var revenueCategories = new List<FinancialCategory>
         {
-            new() { Name = "Vendas de Produtos", Code = "1.1", Type = CategoryType.Revenue, ParentCategoryId = revenueParent.Id, Description = "Receita com venda de produtos" },
-            new() { Name = "Prestação de Serviços", Code = "1.2", Type = CategoryType.Revenue, ParentCategoryId = revenueParent.Id, Description = "Receita com serviços prestados" },
-            new() { Name = "Receitas Financeiras", Code = "1.3", Type = CategoryType.Revenue, ParentCategoryId = revenueParent.Id, Description = "Juros, rendimentos e aplicações" },
-            new() { Name = "Outras Receitas", Code = "1.9", Type = CategoryType.Revenue, ParentCategoryId = revenueParent.Id, Description = "Receitas diversas" },
+            new() { TenantId = tenantId, Name = "Vendas de Produtos", Code = "1.1", Type = CategoryType.Revenue, ParentCategoryId = revenueParent.Id, Description = "Receita com venda de produtos" },
+            new() { TenantId = tenantId, Name = "Prestação de Serviços", Code = "1.2", Type = CategoryType.Revenue, ParentCategoryId = revenueParent.Id, Description = "Receita com serviços prestados" },
+            new() { TenantId = tenantId, Name = "Receitas Financeiras", Code = "1.3", Type = CategoryType.Revenue, ParentCategoryId = revenueParent.Id, Description = "Juros, rendimentos e aplicações" },
+            new() { TenantId = tenantId, Name = "Outras Receitas", Code = "1.9", Type = CategoryType.Revenue, ParentCategoryId = revenueParent.Id, Description = "Receitas diversas" },
         };
 
         // Expense subcategories
         var expenseCategories = new List<FinancialCategory>
         {
-            new() { Name = "Folha de Pagamento", Code = "2.1", Type = CategoryType.Expense, ParentCategoryId = expenseParent.Id, Description = "Salários, encargos e benefícios" },
-            new() { Name = "Aluguel e Condomínio", Code = "2.2", Type = CategoryType.Expense, ParentCategoryId = expenseParent.Id, Description = "Custos de locação" },
-            new() { Name = "Energia e Utilities", Code = "2.3", Type = CategoryType.Expense, ParentCategoryId = expenseParent.Id, Description = "Energia, água, gás, telefone, internet" },
-            new() { Name = "Material de Escritório", Code = "2.4", Type = CategoryType.Expense, ParentCategoryId = expenseParent.Id, Description = "Suprimentos de escritório" },
-            new() { Name = "Manutenção e Reparos", Code = "2.5", Type = CategoryType.Expense, ParentCategoryId = expenseParent.Id, Description = "Manutenção de equipamentos e instalações" },
-            new() { Name = "Marketing e Publicidade", Code = "2.6", Type = CategoryType.Expense, ParentCategoryId = expenseParent.Id, Description = "Campanhas e material promocional" },
-            new() { Name = "Impostos e Taxas", Code = "2.7", Type = CategoryType.Expense, ParentCategoryId = expenseParent.Id, Description = "Tributos diversos" },
-            new() { Name = "Fornecedores", Code = "2.8", Type = CategoryType.Expense, ParentCategoryId = expenseParent.Id, Description = "Compras de mercadorias e insumos" },
-            new() { Name = "Despesas Financeiras", Code = "2.9", Type = CategoryType.Expense, ParentCategoryId = expenseParent.Id, Description = "Juros, taxas bancárias" },
-            new() { Name = "Viagens e Deslocamentos", Code = "2.10", Type = CategoryType.Expense, ParentCategoryId = expenseParent.Id, Description = "Passagens, hospedagem, combustível" },
-            new() { Name = "Software e Tecnologia", Code = "2.11", Type = CategoryType.Expense, ParentCategoryId = expenseParent.Id, Description = "Licenças, assinaturas, serviços de TI" },
-            new() { Name = "Outras Despesas", Code = "2.99", Type = CategoryType.Expense, ParentCategoryId = expenseParent.Id, Description = "Despesas diversas" },
+            new() { TenantId = tenantId, Name = "Folha de Pagamento", Code = "2.1", Type = CategoryType.Expense, ParentCategoryId = expenseParent.Id, Description = "Salários, encargos e benefícios" },
+            new() { TenantId = tenantId, Name = "Aluguel e Condomínio", Code = "2.2", Type = CategoryType.Expense, ParentCategoryId = expenseParent.Id, Description = "Custos de locação" },
+            new() { TenantId = tenantId, Name = "Energia e Utilities", Code = "2.3", Type = CategoryType.Expense, ParentCategoryId = expenseParent.Id, Description = "Energia, água, gás, telefone, internet" },
+            new() { TenantId = tenantId, Name = "Material de Escritório", Code = "2.4", Type = CategoryType.Expense, ParentCategoryId = expenseParent.Id, Description = "Suprimentos de escritório" },
+            new() { TenantId = tenantId, Name = "Manutenção e Reparos", Code = "2.5", Type = CategoryType.Expense, ParentCategoryId = expenseParent.Id, Description = "Manutenção de equipamentos e instalações" },
+            new() { TenantId = tenantId, Name = "Marketing e Publicidade", Code = "2.6", Type = CategoryType.Expense, ParentCategoryId = expenseParent.Id, Description = "Campanhas e material promocional" },
+            new() { TenantId = tenantId, Name = "Impostos e Taxas", Code = "2.7", Type = CategoryType.Expense, ParentCategoryId = expenseParent.Id, Description = "Tributos diversos" },
+            new() { TenantId = tenantId, Name = "Fornecedores", Code = "2.8", Type = CategoryType.Expense, ParentCategoryId = expenseParent.Id, Description = "Compras de mercadorias e insumos" },
+            new() { TenantId = tenantId, Name = "Despesas Financeiras", Code = "2.9", Type = CategoryType.Expense, ParentCategoryId = expenseParent.Id, Description = "Juros, taxas bancárias" },
+            new() { TenantId = tenantId, Name = "Viagens e Deslocamentos", Code = "2.10", Type = CategoryType.Expense, ParentCategoryId = expenseParent.Id, Description = "Passagens, hospedagem, combustível" },
+            new() { TenantId = tenantId, Name = "Software e Tecnologia", Code = "2.11", Type = CategoryType.Expense, ParentCategoryId = expenseParent.Id, Description = "Licenças, assinaturas, serviços de TI" },
+            new() { TenantId = tenantId, Name = "Outras Despesas", Code = "2.99", Type = CategoryType.Expense, ParentCategoryId = expenseParent.Id, Description = "Despesas diversas" },
         };
 
         var allCategories = new List<FinancialCategory> { revenueParent, expenseParent };
@@ -516,7 +516,7 @@ public sealed class DemoDataSeeder
         return allCategories;
     }
 
-    private async Task<List<CostCenter>> SeedCostCentersAsync(List<Department> departments, int createdByUserId, CancellationToken cancellationToken)
+    private async Task<List<CostCenter>> SeedCostCentersAsync(int tenantId, List<Department> departments, int createdByUserId, CancellationToken cancellationToken)
     {
         if (await _db.CostCenters.AnyAsync(cancellationToken))
         {
@@ -525,6 +525,7 @@ public sealed class DemoDataSeeder
 
         var costCenters = departments.Select(d => new CostCenter
         {
+            TenantId = tenantId,
             Name = d.Name,
             Code = d.CostCenter ?? $"CC-{d.Code}",
             Description = $"Centro de custo do departamento {d.Name}",
@@ -550,7 +551,7 @@ public sealed class DemoDataSeeder
         return costCenters;
     }
 
-    private async Task SeedAssetCategoriesAsync(CancellationToken cancellationToken)
+    private async Task SeedAssetCategoriesAsync(int tenantId, CancellationToken cancellationToken)
     {
         if (await _db.AssetCategories.AnyAsync(cancellationToken))
         {
@@ -559,21 +560,21 @@ public sealed class DemoDataSeeder
 
         var categories = new List<AssetCategory>
         {
-            new() { Name = "Computadores", Description = "Desktops, workstations", Icon = "Computer" },
-            new() { Name = "Notebooks", Description = "Laptops e ultrabooks", Icon = "Laptop" },
-            new() { Name = "Celulares", Description = "Smartphones corporativos", Icon = "PhoneAndroid" },
-            new() { Name = "Tablets", Description = "Tablets e iPads", Icon = "Tablet" },
-            new() { Name = "Monitores", Description = "Monitores e telas", Icon = "Monitor" },
-            new() { Name = "Impressoras", Description = "Impressoras e multifuncionais", Icon = "Print" },
-            new() { Name = "Mobiliário", Description = "Mesas, cadeiras, armários", Icon = "Chair" },
-            new() { Name = "Veículos", Description = "Carros, motos, utilitários", Icon = "DirectionsCar" },
-            new() { Name = "Ferramentas", Description = "Ferramentas e equipamentos", Icon = "Construction" },
-            new() { Name = "Ar Condicionado", Description = "Climatizadores e ar condicionado", Icon = "AcUnit" },
-            new() { Name = "Eletrodomésticos", Description = "Geladeira, micro-ondas, cafeteira", Icon = "Kitchen" },
-            new() { Name = "Audiovisual", Description = "TVs, projetores, câmeras", Icon = "Videocam" },
-            new() { Name = "Equipamentos de Rede", Description = "Switches, roteadores, access points", Icon = "Router" },
-            new() { Name = "Segurança", Description = "Câmeras, alarmes, controle de acesso", Icon = "Security" },
-            new() { Name = "Outros", Description = "Outros ativos não categorizados", Icon = "Category" },
+            new() { TenantId = tenantId, Name = "Computadores", Description = "Desktops, workstations", Icon = "Computer" },
+            new() { TenantId = tenantId, Name = "Notebooks", Description = "Laptops e ultrabooks", Icon = "Laptop" },
+            new() { TenantId = tenantId, Name = "Celulares", Description = "Smartphones corporativos", Icon = "PhoneAndroid" },
+            new() { TenantId = tenantId, Name = "Tablets", Description = "Tablets e iPads", Icon = "Tablet" },
+            new() { TenantId = tenantId, Name = "Monitores", Description = "Monitores e telas", Icon = "Monitor" },
+            new() { TenantId = tenantId, Name = "Impressoras", Description = "Impressoras e multifuncionais", Icon = "Print" },
+            new() { TenantId = tenantId, Name = "Mobiliário", Description = "Mesas, cadeiras, armários", Icon = "Chair" },
+            new() { TenantId = tenantId, Name = "Veículos", Description = "Carros, motos, utilitários", Icon = "DirectionsCar" },
+            new() { TenantId = tenantId, Name = "Ferramentas", Description = "Ferramentas e equipamentos", Icon = "Construction" },
+            new() { TenantId = tenantId, Name = "Ar Condicionado", Description = "Climatizadores e ar condicionado", Icon = "AcUnit" },
+            new() { TenantId = tenantId, Name = "Eletrodomésticos", Description = "Geladeira, micro-ondas, cafeteira", Icon = "Kitchen" },
+            new() { TenantId = tenantId, Name = "Audiovisual", Description = "TVs, projetores, câmeras", Icon = "Videocam" },
+            new() { TenantId = tenantId, Name = "Equipamentos de Rede", Description = "Switches, roteadores, access points", Icon = "Router" },
+            new() { TenantId = tenantId, Name = "Segurança", Description = "Câmeras, alarmes, controle de acesso", Icon = "Security" },
+            new() { TenantId = tenantId, Name = "Outros", Description = "Outros ativos não categorizados", Icon = "Category" },
         };
 
         await _db.AssetCategories.AddRangeAsync(categories, cancellationToken);
@@ -582,7 +583,7 @@ public sealed class DemoDataSeeder
         _logger.LogInformation("Seeded {Count} asset categories.", categories.Count);
     }
 
-    private async Task SeedAssetsAsync(CancellationToken cancellationToken)
+    private async Task SeedAssetsAsync(int tenantId, CancellationToken cancellationToken)
     {
         if (await _db.Assets.AnyAsync(cancellationToken))
         {
@@ -602,6 +603,7 @@ public sealed class DemoDataSeeder
 
             var asset = new Asset
             {
+                TenantId = tenantId,
                 AssetCode = $"ATV-{faker.Random.AlphaNumeric(6).ToUpper()}",
                 Name = faker.Commerce.ProductName(),
                 Description = faker.Commerce.ProductDescription(),
@@ -620,13 +622,13 @@ public sealed class DemoDataSeeder
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow
             };
-            
+
             assets.Add(asset);
         }
 
         await _db.Assets.AddRangeAsync(assets, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
-        
+
         _logger.LogInformation("Seeded {Count} assets.", assets.Count);
     }
 

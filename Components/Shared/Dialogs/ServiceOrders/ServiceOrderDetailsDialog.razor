@@ -156,7 +156,7 @@
     {
         try
         {
-            _order = await ApiService.GetAsync<ServiceOrderDto>($"/api/service-orders/{OrderId}");
+            _order = await ApiService.GetAsync<ServiceOrderDto>($"/api/ordens-servico/{OrderId}");
         }
         catch (Exception ex)
         {

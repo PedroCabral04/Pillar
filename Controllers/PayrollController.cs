@@ -10,7 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace erp.Controllers;
 
 [ApiController]
-[Route("api/payroll")]
+[Route("api/folha-pagamento")]
 [Authorize(Roles = "Administrador,Gerente,RH")]
 [ResponseCache(NoStore = true)]
 public class PayrollController : ControllerBase
@@ -100,10 +100,14 @@ public class PayrollController : ControllerBase
     /// Executa o cálculo da folha para o período especificado.
     /// </summary>
     /// <param name="id">Identificador do período.</param>
+    /// <param name="request">Dados do cálculo (modo simplificado ou completo).</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <returns>Detalhes do período após o cálculo.</returns>
     [HttpPost("periods/{id:int}/calculate")]
-    public async Task<ActionResult<PayrollPeriodDetailDto>> Calculate(int id, CancellationToken cancellationToken)
+    public async Task<ActionResult<PayrollPeriodDetailDto>> Calculate(
+        int id,
+        [FromBody] CalculatePayrollPeriodRequest request,
+        CancellationToken cancellationToken)
     {
         var userId = GetCurrentUserId();
         if (userId == null)
@@ -111,7 +115,8 @@ public class PayrollController : ControllerBase
             return Unauthorized();
         }
 
-        var period = await _payrollService.CalculatePeriodAsync(id, userId.Value, cancellationToken);
+        var mode = request?.Mode ?? PayrollCalculationMode.Full;
+        var period = await _payrollService.CalculatePeriodAsync(id, userId.Value, mode, cancellationToken);
         var dto = _mapper.ToDetailDto(period);
         EnrichPeriodDto(dto, period);
         return Ok(dto);

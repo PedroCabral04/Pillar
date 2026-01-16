@@ -7,7 +7,7 @@ using System.Security.Claims;
 namespace erp.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/assistente")]
 [Authorize]
 public class ChatbotController : ControllerBase
 {
@@ -56,8 +56,9 @@ public class ChatbotController : ControllerBase
             }
 
             var response = await _chatbotService.ProcessMessageAsync(
-                request.Message, 
-                request.ConversationHistory);
+                request.Message,
+                request.ConversationHistory,
+                GetCurrentUserId());
 
             return Ok(response);
         }

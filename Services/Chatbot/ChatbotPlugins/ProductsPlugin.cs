@@ -12,12 +12,14 @@ public class ProductsPlugin
 {
     private readonly IInventoryService _inventoryService;
     private readonly IChatbotCacheService _cacheService;
+    private readonly IChatbotUserContext _userContext;
     private const string PluginName = "ProductsPlugin";
 
-    public ProductsPlugin(IInventoryService inventoryService, IChatbotCacheService cacheService)
+    public ProductsPlugin(IInventoryService inventoryService, IChatbotCacheService cacheService, IChatbotUserContext userContext)
     {
         _inventoryService = inventoryService;
         _cacheService = cacheService;
+        _userContext = userContext;
     }
 
     [KernelFunction, Description("Lista todos os produtos cadastrados no sistema. Use página > 1 para ver mais produtos.")]
@@ -185,7 +187,9 @@ public class ProductsPlugin
                 CurrentStock = initialQuantity
             };
 
-            var createdProduct = await _inventoryService.CreateProductAsync(productDto, 1); // TODO: Obter userId do contexto
+            var currentUserId = _userContext.CurrentUserId
+                ?? throw new InvalidOperationException("User context not set. Chatbot operations require a valid user context for audit purposes.");
+            var createdProduct = await _inventoryService.CreateProductAsync(productDto, currentUserId);
 
             // Invalidar cache de listagem de produtos após criar novo
             _cacheService.InvalidatePluginCache(PluginName);

@@ -142,6 +142,22 @@
                        Value="@PreferenceService.CurrentPreferences.Ui.ReduceMotion"
                        ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Ui.ReduceMotion = v))" />
 
+            <MudDivider Class="my-2" />
+            <MudText Typo="Typo.subtitle2">Cor Primária</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">
+                Escolha a cor de destaque da interface
+            </MudText>
+            <MudStack Row="true" Spacing="2">
+                @foreach (var color in AvailableColors)
+                {
+                    var isSelected = PreferenceService.CurrentPreferences.Ui.PrimaryColor == color;
+                    <div @onclick="@(() => OnPrimaryColorChange(color))"
+                         style="@($"background-color: {color}; width: 40px; height: 40px; border-radius: 50%; border: 3px solid {(isSelected ? "var(--mud-palette-text-primary)" : "transparent")}; cursor: pointer; transition: transform 0.2s;")"
+                         class="hover-scale"
+                         title="@color" />
+                }
+            </MudStack>
+
             @* <MudSwitch T="bool" Color="MudBlazor.Color.Primary" Label="Atalhos de teclado habilitados"
                        Value="@PreferenceService.CurrentPreferences.Ui.KeyboardShortcutsEnabled"
                        ValueChanged="@(v => OnChange(async () => PreferenceService.CurrentPreferences.Ui.KeyboardShortcutsEnabled = v))" /> *@
@@ -588,6 +604,9 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // Garantir que as preferências estão carregadas
+        await PreferenceService.InitializeAsync();
+
         // Load user profile info
         try
         {

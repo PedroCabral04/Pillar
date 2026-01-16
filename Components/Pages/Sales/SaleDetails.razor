@@ -242,7 +242,7 @@ else if (_sale != null)
         _error = null;
         try
         {
-            _sale = await ApiService.GetAsync<SaleDto>($"/api/sales/{Id}");
+            _sale = await ApiService.GetAsync<SaleDto>($"/api/vendas/{Id}");
             if (_sale == null)
             {
                 _error = "Venda não encontrada";
@@ -434,7 +434,7 @@ else if (_sale != null)
 
         try
         {
-            var url = $"/api/sales/{Id}/export/pdf";
+            var url = $"/api/vendas/{Id}/export/pdf";
             await JSRuntime.InvokeVoidAsync("open", url, "_blank");
             Snackbar.Add("Exportando PDF...", Severity.Info);
         }
@@ -471,7 +471,7 @@ else if (_sale != null)
 
             try
             {
-                await ApiService.PostAsync<object>($"/api/sales/{Id}/finalize", null);
+                await ApiService.PostAsync<object>($"/api/vendas/{Id}/finalize", null);
                 Snackbar.Add("Venda finalizada com sucesso", Severity.Success);
                 await LoadSale();
             }
@@ -503,7 +503,7 @@ else if (_sale != null)
         {
             try
             {
-                await ApiService.PostAsync<object>($"/api/sales/{Id}/cancel", null);
+                await ApiService.PostAsync<object>($"/api/vendas/{Id}/cancel", null);
                 Snackbar.Add("Venda cancelada com sucesso", Severity.Success);
                 await LoadSale();
             }
@@ -533,7 +533,7 @@ else if (_sale != null)
         {
             try
             {
-                var product = await ApiService.GetAsync<ProductDto>($"/api/products/{item.ProductId}");
+                var product = await ApiService.GetAsync<ProductDto>($"/api/produtos/{item.ProductId}");
                 if (product == null)
                 {
                     insufficient.Add($"Produto {item.ProductName} (SKU: {item.ProductSku}) não encontrado");

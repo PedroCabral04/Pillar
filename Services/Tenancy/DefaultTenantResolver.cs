@@ -70,6 +70,14 @@ public class DefaultTenantResolver : ITenantResolver
                 .ThenInclude(t => t!.Branding)
             .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
 
+        // Verificar se o tenant do usuário está acessível
+        if (identityUser?.Tenant is not null && !IsTenantAccessible(identityUser.Tenant))
+        {
+            _logger.LogWarning("Usuário {UserId} pertence ao tenant '{Slug}' com status {Status} - acesso negado",
+                userId, identityUser.Tenant.Slug, identityUser.Tenant.Status);
+            return null;
+        }
+
         return identityUser?.Tenant;
     }
 
@@ -78,10 +86,29 @@ public class DefaultTenantResolver : ITenantResolver
         var normalized = slug.ToLowerInvariant();
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
 
-        return await db.Tenants
+        var tenant = await db.Tenants
             .AsNoTracking()
             .Include(t => t.Branding)
             .FirstOrDefaultAsync(t => t.Slug == normalized, cancellationToken);
+
+        // Verificar se o tenant está em um status que permite acesso
+        if (tenant is not null && !IsTenantAccessible(tenant))
+        {
+            _logger.LogWarning("Tenant '{Slug}' encontrado mas com status {Status} - acesso negado", 
+                slug, tenant.Status);
+            return null;
+        }
+
+        return tenant;
+    }
+
+    /// <summary>
+    /// Verifica se o tenant está em um status que permite acesso ao sistema.
+    /// Apenas tenants Active e Provisioning (para setup inicial) podem acessar.
+    /// </summary>
+    private static bool IsTenantAccessible(Tenant tenant)
+    {
+        return tenant.Status is TenantStatus.Active or TenantStatus.Provisioning;
     }
 
     private static string? ExtractSlugFromHeader(HttpContext context)

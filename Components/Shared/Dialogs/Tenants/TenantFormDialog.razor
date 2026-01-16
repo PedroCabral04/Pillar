@@ -112,13 +112,20 @@
                                 <MudStack Spacing="2">
                                     <MudText Typo="Typo.subtitle2">Logo</MudText>
                                     <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">
-                                        Recomendado: 200×60px. Máximo: 512×512px, 2MB. Formatos: PNG, JPG, SVG, WebP
+                                        Recomendado: 200x60px. Máximo: 512x512px, 2MB. Formatos: PNG, JPG, SVG, WebP
                                     </MudText>
-                                    @if (!string.IsNullOrWhiteSpace(_model.Branding.LogoUrl))
+                                    @{
+                                        var logoToShow = _previewLogoUrl ?? _model.Branding.LogoUrl;
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(logoToShow))
                                     {
                                         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                            <MudImage Src="@_model.Branding.LogoUrl" Alt="Logo" Height="40" ObjectFit="ObjectFit.Contain" Class="rounded border" />
-                                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="MudBlazor.Color.Error" Size="MudBlazor.Size.Small" OnClick="() => _model.Branding.LogoUrl = null" Title="Remover logo" />
+                                            <MudImage Src="@logoToShow" Alt="Logo" Height="40" ObjectFit="ObjectFit.Contain" Class="rounded border" />
+                                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="MudBlazor.Color.Error" Size="MudBlazor.Size.Small" OnClick="ClearLogoPreview" Title="Remover logo" />
+                                            @if (_pendingLogoFile is not null)
+                                            {
+                                                <MudChip T="string" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Info">Pendente</MudChip>
+                                            }
                                         </MudStack>
                                     }
                                     <MudFileUpload T="IBrowserFile" Accept=".png,.jpg,.jpeg,.svg,.webp" OnFilesChanged="OnLogoFileSelected" MaximumFileCount="1">
@@ -136,17 +143,24 @@
                                 </MudStack>
                             </MudItem>
                             @* Favicon Upload *@
-                            @* <MudItem xs="12" md="6">
+                            <MudItem xs="12" md="6">
                                 <MudStack Spacing="2">
                                     <MudText Typo="Typo.subtitle2">Favicon</MudText>
                                     <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">
-                                        Recomendado: 32×32px ou 64×64px. Máximo: 128×128px, 512KB. Formatos: PNG, ICO, SVG
+                                        Recomendado: 32x32px ou 64x64px. Máximo: 128x128px, 512KB. Formatos: PNG, ICO, SVG
                                     </MudText>
-                                    @if (!string.IsNullOrWhiteSpace(_model.Branding.FaviconUrl))
+                                    @{
+                                        var faviconToShow = _previewFaviconUrl ?? _model.Branding.FaviconUrl;
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(faviconToShow))
                                     {
                                         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                            <MudImage Src="@_model.Branding.FaviconUrl" Alt="Favicon" Height="32" Width="32" ObjectFit="ObjectFit.Contain" Class="rounded border" />
-                                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="MudBlazor.Color.Error" Size="MudBlazor.Size.Small" OnClick="() => _model.Branding.FaviconUrl = null" Title="Remover favicon" />
+                                            <MudImage Src="@faviconToShow" Alt="Favicon" Height="32" Width="32" ObjectFit="ObjectFit.Contain" Class="rounded border" />
+                                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="MudBlazor.Color.Error" Size="MudBlazor.Size.Small" OnClick="ClearFaviconPreview" Title="Remover favicon" />
+                                            @if (_pendingFaviconFile is not null)
+                                            {
+                                                <MudChip T="string" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Info">Pendente</MudChip>
+                                            }
                                         </MudStack>
                                     }
                                     <MudFileUpload T="IBrowserFile" Accept=".png,.ico,.svg" OnFilesChanged="OnFaviconFileSelected" MaximumFileCount="1">
@@ -163,6 +177,8 @@
                                     <MudTextField @bind-Value="_model.Branding.FaviconUrl" Label="ou informe URL" Variant="Variant.Outlined" Placeholder="https://..." />
                                 </MudStack>
                             </MudItem>
+                            
+                            @* Color Pickers *@
                             <MudItem xs="12" md="4">
                                 <MudStack Spacing="1">
                                     <MudText Typo="Typo.subtitle2">Cor primária</MudText>
@@ -203,7 +219,7 @@
                             </MudItem>
                             <MudItem xs="12" md="4">
                                 <MudStack Spacing="1">
-                                    <MudText Typo="Typo.subtitle2">Cor destaque</MudText>
+                                    <MudText Typo="Typo.subtitle2">Cor de destaque</MudText>
                                     <MudColorPicker Value="_accentColor"
                                                     Variant="Variant.Outlined"
                                                     ShowAlpha="false"
@@ -219,34 +235,24 @@
                                         </MudStack>
                                     }
                                 </MudStack>
-                            </MudItem> *@
-                            @* <MudItem xs="12" md="6">
-                                <MudTextField @bind-Value="_model.Branding.LoginBackgroundUrl" Label="Fundo da tela de login" Variant="Variant.Outlined" />
                             </MudItem>
-                            <MudItem xs="12">
-                                <MudTextField @bind-Value="_model.Branding.EmailFooterHtml" Label="Rodapé de email (HTML)" Variant="Variant.Outlined" Lines="3" />
-                            </MudItem>
-                            <MudItem xs="12">
-                                <MudTextField @bind-Value="_model.Branding.CustomCss" Label="CSS customizado" Variant="Variant.Outlined" Lines="3" />
-                            </MudItem> *@
-                        </MudGrid>
-                    </MudExpansionPanel>
-                    <MudExpansionPanel Text="Infraestrutura & Banco de Dados">
-                        <MudAlert Severity="Severity.Info" Dense="true">
-                            Caso não informe uma connection string, o template configurado em <code>appsettings.json</code> será usado.
-                        </MudAlert>
-                        <MudGrid GutterSize="GutterSize.Small" Class="mt-2">
+                            
+                            @* Additional Branding Fields *@
                             <MudItem xs="12" md="6">
-                                <MudTextField @bind-Value="_model.DatabaseName" Label="Nome do banco" Variant="Variant.Outlined" MaxLength="200" />
+                                <MudTextField @bind-Value="_model.Branding.LoginBackgroundUrl" Label="Fundo da tela de login (URL)" Variant="Variant.Outlined" Placeholder="https://..." />
                             </MudItem>
                             <MudItem xs="12" md="6">
-                                <MudTextField @bind-Value="_model.ConnectionString" Label="Connection string" Variant="Variant.Outlined" MaxLength="500" />
+                                <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary" Class="mt-4">
+                                    Imagem de fundo exibida na página de login. Recomendado: 1920x1080px.
+                                </MudText>
+                            </MudItem>
+                            <MudItem xs="12">
+                                <MudTextField @bind-Value="_model.Branding.EmailFooterHtml" Label="Rodapé de email (HTML)" Variant="Variant.Outlined" Lines="3" HelperText="HTML que será inserido no rodapé dos emails enviados pelo sistema" />
+                            </MudItem>
+                            <MudItem xs="12">
+                            <MudTextField @bind-Value="_model.Branding.CustomCss" Label="CSS customizado" Variant="Variant.Outlined" Lines="4" HelperText="CSS adicional para personalizar o visual. Propriedades permitidas: cores, fontes, bordas, sombras." />
                             </MudItem>
                         </MudGrid>
-                        <MudStack Direction="Row" AlignItems="AlignItems.Center" Spacing="1" Class="mt-3">
-                            <MudSwitch T="bool" @bind-Checked="_model.ProvisionDatabase" Color="MudBlazor.Color.Primary" />
-                            <MudText Typo="Typo.body2">Executar provisionamento (criar banco e rodar migrations) após salvar</MudText>
-                        </MudStack>
                     </MudExpansionPanel>
                 </MudExpansionPanels>
             </MudStack>
@@ -278,6 +284,12 @@
     // File upload state
     private bool _uploadingLogo;
     private bool _uploadingFavicon;
+    
+    // Pending file uploads for new tenants
+    private IBrowserFile? _pendingLogoFile;
+    private IBrowserFile? _pendingFaviconFile;
+    private string? _previewLogoUrl;
+    private string? _previewFaviconUrl;
 
     // Color picker state
     private MudColor? _primaryColor;
@@ -296,8 +308,6 @@
             _model.PrimaryContactPhone = Tenant.PrimaryContactPhone;
             _model.Region = Tenant.Region;
             _model.IsDemo = Tenant.IsDemo;
-            _model.DatabaseName = Tenant.DatabaseName;
-            _model.ConnectionString = Tenant.ConnectionString;
             _model.Status = Tenant.Status;
             _model.Notes = Tenant.Notes;
             if (Tenant.Branding is not null)
@@ -311,7 +321,6 @@
         }
         else
         {
-            _model.ProvisionDatabase = true;
             // Default colors
             _primaryColor = new MudColor("#2563EB");
             _secondaryColor = new MudColor("#64748B");
@@ -354,13 +363,56 @@
     private async Task OnLogoFileSelected(InputFileChangeEventArgs e)
     {
         if (e.FileCount == 0) return;
-        await UploadBrandingImage(e.File, "logo", url => _model.Branding.LogoUrl = url, v => _uploadingLogo = v);
+        
+        var file = e.File;
+        
+        // Para novos tenants, armazena o arquivo e cria preview
+        if (!IsEdit || Tenant is null)
+        {
+            _pendingLogoFile = file;
+            // Cria preview local usando Data URL
+            await CreateLocalPreview(file, url => _previewLogoUrl = url);
+            return;
+        }
+        
+        await UploadBrandingImage(file, "logo", url => _model.Branding.LogoUrl = url, v => _uploadingLogo = v);
     }
 
     private async Task OnFaviconFileSelected(InputFileChangeEventArgs e)
     {
         if (e.FileCount == 0) return;
-        await UploadBrandingImage(e.File, "favicon", url => _model.Branding.FaviconUrl = url, v => _uploadingFavicon = v);
+        
+        var file = e.File;
+        
+        // Para novos tenants, armazena o arquivo e cria preview
+        if (!IsEdit || Tenant is null)
+        {
+            _pendingFaviconFile = file;
+            // Cria preview local usando Data URL
+            await CreateLocalPreview(file, url => _previewFaviconUrl = url);
+            return;
+        }
+        
+        await UploadBrandingImage(file, "favicon", url => _model.Branding.FaviconUrl = url, v => _uploadingFavicon = v);
+    }
+
+    private async Task CreateLocalPreview(IBrowserFile file, Action<string> setPreviewUrl)
+    {
+        try
+        {
+            // Le o arquivo e converte para Data URL para preview local
+            var buffer = new byte[file.Size];
+            await using var stream = file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+            await stream.ReadExactlyAsync(buffer);
+            var base64 = Convert.ToBase64String(buffer);
+            var dataUrl = $"data:{file.ContentType};base64,{base64}";
+            setPreviewUrl(dataUrl);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao criar preview: {ex.Message}", Severity.Warning);
+        }
     }
 
     private async Task UploadBrandingImage(IBrowserFile file, string imageType, Action<string?> setUrl, Action<bool> setUploading)
@@ -439,10 +491,7 @@
                     IsDemo = _model.IsDemo,
                     Status = _model.Status,
                     Notes = _model.Notes,
-                    Branding = _model.Branding.ToDto(),
-                    DatabaseName = _model.DatabaseName,
-                    ConnectionString = _model.ConnectionString,
-                    ProvisionDatabase = _model.ProvisionDatabase
+                    Branding = _model.Branding.ToDto()
                 };
 
                 var updated = await ApiService.PutAsync<TenantDto>($"api/tenants/{Tenant.Id}", updateDto);
@@ -468,13 +517,17 @@
                     PrimaryContactPhone = _model.PrimaryContactPhone,
                     Region = _model.Region,
                     IsDemo = _model.IsDemo,
-                    Branding = _model.Branding.ToDto(),
-                    DatabaseName = _model.DatabaseName,
-                    ConnectionString = _model.ConnectionString,
-                    ProvisionDatabase = _model.ProvisionDatabase
+                    Branding = _model.Branding.ToDto()
                 };
 
                 var created = await ApiService.PostAsync<TenantDto>("api/tenants", createDto);
+                
+                // Upload pending images after creating the tenant
+                if (created is not null)
+                {
+                    await UploadPendingImagesAsync(created.Id);
+                }
+                
                 Snackbar.Add($"Tenant '{created?.Name ?? _model.Name}' criado", Severity.Success);
                 MudDialog.Close(DialogResult.Ok(created));
             }
@@ -488,6 +541,67 @@
         {
             _saving = false;
         }
+    }
+
+    private async Task UploadPendingImagesAsync(int tenantId)
+    {
+        // Upload pending logo
+        if (_pendingLogoFile is not null)
+        {
+            try
+            {
+                using var content = new MultipartFormDataContent();
+                var fileContent = new StreamContent(_pendingLogoFile.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024));
+                fileContent.Headers.ContentType = new MediaTypeHeaderValue(_pendingLogoFile.ContentType);
+                content.Add(fileContent, "file", _pendingLogoFile.Name);
+
+                var response = await ApiService.PostMultipartAsync($"api/tenants/{tenantId}/branding/logo", content);
+                if (response.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("Logo enviado com sucesso", Severity.Success);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao enviar logo: {ex.Message}", Severity.Warning);
+            }
+        }
+
+        // Upload pending favicon
+        if (_pendingFaviconFile is not null)
+        {
+            try
+            {
+                using var content = new MultipartFormDataContent();
+                var fileContent = new StreamContent(_pendingFaviconFile.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024));
+                fileContent.Headers.ContentType = new MediaTypeHeaderValue(_pendingFaviconFile.ContentType);
+                content.Add(fileContent, "file", _pendingFaviconFile.Name);
+
+                var response = await ApiService.PostMultipartAsync($"api/tenants/{tenantId}/branding/favicon", content);
+                if (response.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("Favicon enviado com sucesso", Severity.Success);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao enviar favicon: {ex.Message}", Severity.Warning);
+            }
+        }
+    }
+
+    private void ClearLogoPreview()
+    {
+        _pendingLogoFile = null;
+        _previewLogoUrl = null;
+        _model.Branding.LogoUrl = null;
+    }
+
+    private void ClearFaviconPreview()
+    {
+        _pendingFaviconFile = null;
+        _previewFaviconUrl = null;
+        _model.Branding.FaviconUrl = null;
     }
 
     private async Task SubmitForm()
@@ -542,14 +656,6 @@
         public bool IsDemo { get; set; }
         public TenantStatus Status { get; set; } = TenantStatus.Provisioning;
         public string? Notes { get; set; }
-
-        [MaxLength(200)]
-        public string? DatabaseName { get; set; }
-
-        [MaxLength(500)]
-        public string? ConnectionString { get; set; }
-
-        public bool ProvisionDatabase { get; set; }
 
         public TenantBrandingModel Branding { get; set; } = new();
     }

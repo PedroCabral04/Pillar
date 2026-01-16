@@ -13,7 +13,7 @@ namespace erp.Controllers;
 /// </summary>
 [Authorize]
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/ordens-servico")]
 public class ServiceOrdersController : ControllerBase
 {
     private readonly IServiceOrderService _serviceOrderService;

@@ -439,7 +439,7 @@
 
         try
         {
-            var response = await ApiService.GetAsync<PaginatedCategoryResponse>("/api/products/categories?pageSize=1000");
+            var response = await ApiService.GetAsync<PaginatedCategoryResponse>("/api/produtos/categories?pageSize=1000");
             _categories = response?.Items ?? new List<ProductCategoryDto>();
 
             if (Product.CategoryId > 0 && !_categories.Any(c => c.Id == Product.CategoryId))
@@ -552,7 +552,7 @@
         _saving = true;
         try
         {
-            var result = await ApiService.PutAsync<ProductDto>($"/api/products/{_updateProduct.Id}", _updateProduct);
+            var result = await ApiService.PutAsync<ProductDto>($"/api/produtos/{_updateProduct.Id}", _updateProduct);
 
             if (result != null)
             {

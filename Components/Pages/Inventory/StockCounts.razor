@@ -244,7 +244,7 @@
             }
 
             var query = string.Join("&", queryParams);
-            var response = await ApiService.GetAsync<PaginatedResponse<StockCountDto>>($"/api/inventory/counts?{query}");
+            var response = await ApiService.GetAsync<PaginatedResponse<StockCountDto>>($"/api/estoque/counts?{query}");
 
             if (response != null)
             {
@@ -322,7 +322,7 @@
                     ApplyAdjustments = true
                 };
                 
-                await ApiService.PostAsync<object>($"/api/inventory/counts/{count.Id}/approve", dto);
+                await ApiService.PostAsync<object>($"/api/estoque/counts/{count.Id}/approve", dto);
                 Snackbar.Add("Contagem aprovada com sucesso!", Severity.Success);
                 _table?.ReloadServerData();
             }
@@ -345,7 +345,7 @@
         {
             try
             {
-                await ApiService.DeleteAsync($"/api/inventory/counts/{count.Id}");
+                await ApiService.DeleteAsync($"/api/estoque/counts/{count.Id}");
                 Snackbar.Add("Contagem cancelada com sucesso!", Severity.Success);
                 _table?.ReloadServerData();
             }

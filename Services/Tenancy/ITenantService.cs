@@ -11,6 +11,9 @@ public interface ITenantService
     Task<TenantDto> UpdateAsync(int id, UpdateTenantDto dto, CancellationToken cancellationToken = default);
     Task DeleteAsync(int id, CancellationToken cancellationToken = default);
     Task<bool> SlugExistsAsync(string slug, int? ignoreTenantId = null, CancellationToken cancellationToken = default);
-    Task ProvisionDatabaseAsync(int id, CancellationToken cancellationToken = default);
-    Task<TenantConnectionInfoDto?> GetConnectionInfoAsync(int id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retorna os tenants que o usuário tem acesso via TenantMemberships.
+    /// </summary>
+    Task<IEnumerable<TenantDto>> GetUserTenantsAsync(int userId, CancellationToken cancellationToken = default);
 }

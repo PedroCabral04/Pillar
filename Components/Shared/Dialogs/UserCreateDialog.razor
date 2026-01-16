@@ -304,6 +304,20 @@
     
     private void Cancel() => MudDialog.Cancel();
 
+    private async Task<string?> ValidateUsernameAsync(string username)
+    {
+        if (string.IsNullOrWhiteSpace(username))
+            return "Nome é obrigatório";
+
+        if (username.Trim().Length < 3)
+            return "Nome deve ter pelo menos 3 caracteres";
+
+        if (username.Trim().Length > 100)
+            return "Nome não pode exceder 100 caracteres";
+
+        return await Task.FromResult<string?>(null);
+    }
+
     private string? ValidateFullName(string fullname)
     {
         if (string.IsNullOrWhiteSpace(fullname))

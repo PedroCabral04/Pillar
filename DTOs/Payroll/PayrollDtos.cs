@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using erp.Models.Payroll;
 
 namespace erp.DTOs.Payroll;
 
@@ -95,4 +96,12 @@ public class PayPayrollPeriodRequest
 
     [StringLength(1000)]
     public string? Notes { get; set; }
+}
+
+public class CalculatePayrollPeriodRequest
+{
+    /// <summary>
+    /// Modo de cálculo da folha. Simplified não calcula INSS/IRRF. Full calcula todos os impostos.
+    /// </summary>
+    public PayrollCalculationMode Mode { get; set; } = PayrollCalculationMode.Full;
 }

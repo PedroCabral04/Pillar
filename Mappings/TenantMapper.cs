@@ -10,7 +10,6 @@ public partial class TenantMapper
 {
     public partial TenantDto TenantToTenantDto(Tenant tenant);
     public partial IEnumerable<TenantDto> TenantsToTenantDtos(IEnumerable<Tenant> tenants);
-    public partial TenantConnectionInfoDto TenantToConnectionInfoDto(Tenant tenant);
 
     public partial Tenant CreateTenantDtoToTenant(CreateTenantDto dto);
 

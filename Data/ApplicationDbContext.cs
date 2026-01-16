@@ -7,6 +7,7 @@ using erp.Models.Financial;
 using erp.Models.Payroll;
 using erp.Models.Tenancy;
 using erp.Models.Dashboard;
+using erp.Services.Tenancy;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
@@ -25,12 +26,8 @@ namespace erp.Data;
 /// </remarks>
 public class ApplicationDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, int>
 {
-    // Legacy User/Role/UserRole DbSets - kept for backwards compatibility only.
-    // These duplicate the Identity entities (ApplicationUser, ApplicationRole) and should not be used in new code.
-    // TODO: Migrate consumers to use ApplicationUser/ApplicationRole and remove these DbSets.
-    public new DbSet<User> Users { get; set; } = null!;
-    public new DbSet<Role> Roles { get; set; } = null!;
-    public new DbSet<UserRole> UserRoles { get; set; } = null!;
+    // IdentityDbContext already provides Users, Roles, and UserRole management.
+    // Legacy models are being removed to ensure consistency.
 
     // Kanban
     public DbSet<Models.Kanban.KanbanBoard> KanbanBoards { get; set; } = null!;
@@ -86,6 +83,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     
     // Audit
     public DbSet<AuditLog> AuditLogs { get; set; } = null!;
+    public DbSet<AuditLogArchive> AuditLogArchives { get; set; } = null!;
     public DbSet<PayrollPeriod> PayrollPeriods { get; set; } = null!;
     public DbSet<PayrollEntry> PayrollEntries { get; set; } = null!;
     public DbSet<PayrollResult> PayrollResults { get; set; } = null!;
@@ -296,15 +294,15 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     {
         var entries = ChangeTracker
             .Entries()
-            .Where(e => e.Entity is User &&
+            .Where(e => e.Entity is ApplicationUser &&
                         e.State is EntityState.Added or EntityState.Modified);
 
         foreach (var entityEntry in entries )
         {
-            var userEntity = (User)entityEntry.Entity;
+            var userEntity = (ApplicationUser)entityEntry.Entity;
             if (entityEntry.State == EntityState.Modified)
             {
-                userEntity.LastUpdatedAt = DateTime.UtcNow;
+                userEntity.UpdatedAt = DateTime.UtcNow;
             }
             
             if (entityEntry.State == EntityState.Added)
@@ -829,23 +827,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             }
         }
 
-    // As entidades de Identity usam tabelas padrão: AspNetUsers, AspNetRoles, etc.
-    // As entidades do app usam suas próprias tabelas: Users, Roles, UserRoles.
-        modelBuilder.Entity<UserRole>(entity =>
-        {
-            entity.HasKey(ur => new { ur.UserId, ur.RoleId });
-
-            entity.HasOne(ur => ur.User)
-                .WithMany(u => u.UserRoles)
-                .HasForeignKey(ur => ur.UserId)
-                .IsRequired();
-
-            entity.HasOne(ur => ur.Role)
-                .WithMany(r => r.UserRoles)
-                .HasForeignKey(ur => ur.RoleId)
-                .IsRequired();
-    });
-
+        // Application specific configurations follow below.
+        
         // Kanban model configuration
         modelBuilder.Entity<Models.Kanban.KanbanBoard>(b =>
         {
@@ -992,7 +975,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             .IsUnique();
 
         // Payroll model configuration
-        // ConfigurePayrollModels(modelBuilder); // TODO: Implement this method
+        ConfigurePayrollModels(modelBuilder); 
 
         // Time tracking / payroll configuration
         ConfigureTimeTrackingModels(modelBuilder);
@@ -1040,18 +1023,15 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             tenant.Property(x => x.PrimaryContactName).HasMaxLength(200);
             tenant.Property(x => x.PrimaryContactEmail).HasMaxLength(200);
             tenant.Property(x => x.PrimaryContactPhone).HasMaxLength(20);
-            tenant.Property(x => x.DatabaseName).HasMaxLength(200);
-            tenant.Property(x => x.ConnectionString).HasMaxLength(500);
             tenant.Property(x => x.Region).HasMaxLength(200);
             tenant.Property(x => x.Notes).HasMaxLength(2000);
             tenant.Property(x => x.ConfigurationJson).HasColumnType("jsonb");
 
-            tenant.HasIndex(x => x.Slug).IsUnique();
+            tenant.HasIndex(x => x.Slug)
+                .IsUnique()
+                .HasFilter("\"Status\" != 4"); // 4 = TenantStatus.Archived
             tenant.HasIndex(x => x.Status);
             tenant.HasIndex(x => x.DocumentNumber);
-            tenant.HasIndex(x => x.DatabaseName)
-                .IsUnique()
-                .HasFilter("\"DatabaseName\" IS NOT NULL");
 
             tenant.HasOne(x => x.Branding)
                 .WithMany()
@@ -1113,6 +1093,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             p.Property(x => x.SalePrice).HasPrecision(18, 2);
             p.Property(x => x.WholesalePrice).HasPrecision(18, 2);
             p.Property(x => x.CommissionPercent).HasPrecision(5, 2);
+
+            // Concurrency Token (PostgreSQL xmin)
+            p.Property(x => x.Version).IsRowVersion();
             
             // Indexes
             p.HasIndex(x => x.Sku).IsUnique();
@@ -2422,6 +2405,74 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .HasForeignKey(x => x.ConversationId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
+    }
+
+    private void ConfigureTenantQueryFilters(ModelBuilder modelBuilder)
+    {
+        // Apply global query filters to all entities implementing IMustHaveTenant
+        // This ensures multi-tenant data isolation at the query level
+        // Filter logic:
+        // - No filter when tenant context is not available (tests, admin operations, anonymous endpoints)
+        // - Filter to current tenant when tenant context is available
+        
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            if (!typeof(IMustHaveTenant).IsAssignableFrom(entityType.ClrType))
+                continue;
+            
+            // Skip entities that already have a query filter configured (e.g., AuditLog, ChatConversation)
+            if (entityType.GetQueryFilter() != null)
+                continue;
+            
+            var parameter = System.Linq.Expressions.Expression.Parameter(entityType.ClrType, "e");
+            var tenantIdProperty = System.Linq.Expressions.Expression.Property(parameter, nameof(IMustHaveTenant.TenantId));
+            
+            // Build the filter expression:
+            // e => _tenantContextAccessor == null || 
+            //      _tenantContextAccessor.Current == null || 
+            //      !_tenantContextAccessor.Current.TenantId.HasValue || 
+            //      e.TenantId == _tenantContextAccessor.Current.TenantId.GetValueOrDefault()
+            
+            var accessorField = System.Linq.Expressions.Expression.Constant(this);
+            var accessorProperty = System.Linq.Expressions.Expression.Field(accessorField, "_tenantContextAccessor");
+            
+            // _tenantContextAccessor == null
+            var accessorNull = System.Linq.Expressions.Expression.Equal(
+                accessorProperty, 
+                System.Linq.Expressions.Expression.Constant(null, typeof(ITenantContextAccessor)));
+            
+            // _tenantContextAccessor.Current
+            var currentProperty = System.Linq.Expressions.Expression.Property(accessorProperty, "Current");
+            
+            // _tenantContextAccessor.Current == null
+            var currentNull = System.Linq.Expressions.Expression.Equal(
+                currentProperty, 
+                System.Linq.Expressions.Expression.Constant(null, typeof(TenantContext)));
+            
+            // _tenantContextAccessor.Current.TenantId
+            var currentTenantIdProperty = System.Linq.Expressions.Expression.Property(currentProperty, "TenantId");
+            
+            // !_tenantContextAccessor.Current.TenantId.HasValue
+            var hasValueProperty = System.Linq.Expressions.Expression.Property(currentTenantIdProperty, "HasValue");
+            var noTenantId = System.Linq.Expressions.Expression.Not(hasValueProperty);
+            
+            // _tenantContextAccessor.Current.TenantId.GetValueOrDefault()
+            var getValueOrDefaultMethod = typeof(int?).GetMethod("GetValueOrDefault", Type.EmptyTypes)!;
+            var currentTenantValue = System.Linq.Expressions.Expression.Call(currentTenantIdProperty, getValueOrDefaultMethod);
+            
+            // e.TenantId == _tenantContextAccessor.Current.TenantId.GetValueOrDefault()
+            var tenantMatch = System.Linq.Expressions.Expression.Equal(tenantIdProperty, currentTenantValue);
+            
+            // Combine: accessorNull || currentNull || noTenantId || tenantMatch
+            var filterExpression = System.Linq.Expressions.Expression.OrElse(
+                System.Linq.Expressions.Expression.OrElse(
+                    System.Linq.Expressions.Expression.OrElse(accessorNull, currentNull),
+                    noTenantId),
+                tenantMatch);
+            
+            var lambda = System.Linq.Expressions.Expression.Lambda(filterExpression, parameter);
+            entityType.SetQueryFilter(lambda);
+        }
     }
 }
 

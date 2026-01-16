@@ -112,7 +112,7 @@
     {
         try
         {
-            _order = await ApiService.GetAsync<ServiceOrderDto>($"/api/service-orders/{OrderId}");
+            _order = await ApiService.GetAsync<ServiceOrderDto>($"/api/ordens-servico/{OrderId}");
             if (_order != null)
             {
                 _dto = new UpdateServiceOrderDto
@@ -148,7 +148,7 @@
 
         try
         {
-            var response = await ApiService.PutAsync<ServiceOrderDto>($"/api/service-orders/{OrderId}", _dto);
+            var response = await ApiService.PutAsync<ServiceOrderDto>($"/api/ordens-servico/{OrderId}", _dto);
             if (response != null)
             {
                 Snackbar.Add($"Ordem {_order!.OrderNumber} atualizada com sucesso!", Severity.Success);

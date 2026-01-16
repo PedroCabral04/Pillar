@@ -205,11 +205,11 @@
             if (string.IsNullOrWhiteSpace(value))
             {
                 // If the user opens the dropdown without typing, return the first page of active products
-                endpoint = "/api/products?page=1&pageSize=20&status=Ativo";
+                endpoint = "/api/produtos?page=1&pageSize=20&status=Ativo";
             }
             else
             {
-                endpoint = $"/api/products?search={Uri.EscapeDataString(value)}&pageSize=20&status=Ativo";
+                endpoint = $"/api/produtos?search={Uri.EscapeDataString(value)}&pageSize=20&status=Ativo";
             }
 
             var response = await ApiService.GetAsync<PaginatedProductsResponse>(endpoint, ct);
@@ -326,7 +326,7 @@
             _newMovement.MovementDate = _movementDate ?? DateTime.Now;
             
             var result = await ApiService.PostAsync<StockMovementDto>(
-                "/api/inventory/movements", _newMovement);
+                "/api/estoque/movements", _newMovement);
             
             if (result != null)
             {

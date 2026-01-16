@@ -15,7 +15,7 @@ namespace erp.Controllers;
 /// Controller responsável pela autenticação e gerenciamento de senhas
 /// </summary>
 [ApiController]
-[Route("api/auth")]
+[Route("api/autenticacao")]
 public class AuthController(
     SignInManager<ApplicationUser> signInManager, 
     UserManager<ApplicationUser> userManager,
@@ -238,7 +238,18 @@ public class AuthController(
 
         // Gera token de reset
         var resetToken = await userManager.GeneratePasswordResetTokenAsync(user);
-        
+
+        // SECURITY WARNING: Token de reset sendo enviado na URL (query parameter)
+        // Riscos:
+        // - Tokens podem ser logados em server access logs
+        // - URLs ficam no histórico do navegador
+        // - URLs podem ser compartilhadas acidentalmente
+        //
+        // Recomendação para produção:
+        // 1. Usar um token temporário (UUID curto) na URL
+        // 2. Armazenar o token real no backend vinculado ao UUID
+        // 3. Frontend usa o UUID para fazer POST com token real no body
+        //
         // Constrói URL de reset (ajuste conforme sua aplicação)
         var resetUrl = $"{Request.Scheme}://{Request.Host}/reset-password?email={HttpUtility.UrlEncode(request.Email)}&token={HttpUtility.UrlEncode(resetToken)}";
 

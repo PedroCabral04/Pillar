@@ -6,7 +6,7 @@ using erp.Services.Reports;
 namespace erp.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/relatorios")]
 [Authorize]
 public class ReportsController : ControllerBase
 {

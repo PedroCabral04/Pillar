@@ -2,7 +2,6 @@
 @using System.Net.Http.Json
 @using erp.DTOs.Kanban
 @using erp.Models.Kanban
-@using erp.Models.Kanban
 @using erp.Services
 @using erp.Services.Authorization
 @using MudBlazor
@@ -79,74 +78,12 @@
                 </MudButton>
             </div>
         </div>
-        <div class="kanban-header-content">
-            <div class="kanban-title-section">
-                @* <div class="kanban-icon-wrapper">
-                    <MudIcon Icon="@Icons.Material.Filled.ViewKanban" Size="MudBlazor.Size.Large" />
-                </div> *@
-                <div>
-                    <MudText Typo="Typo.h5" Class="kanban-main-title">@(_board?.Name ?? "Meu Kanban")</MudText>
-                    <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">
-                        @if (_stats != null)
-                        {
-                            <span>@_stats.TotalCards cards • @_stats.CompletedCards concluídos</span>
-                        }
-                    </MudText>
-                </div>
-            </div>
-            
-            <div class="kanban-header-actions">
-                @if (_columns?.Count > 3)
-                {
-                    <MudChip T="string" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Primary" Variant="Variant.Text" Icon="@Icons.Material.Filled.SwipeRight">
-                        @_columns.Count colunas
-                    </MudChip>
-                }
-                @if (_isLoading)
-                {
-                    <MudProgressCircular Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Primary" Indeterminate="true"/>
-                }
-                @if (_columns?.Count > 3)
-                {
-                    <MudButtonGroup Variant="Variant.Outlined" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Default">
-                        <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" 
-                                      OnClick="ScrollLeft"
-                                      Title="Rolar para esquerda" />
-                        <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" 
-                                      OnClick="ScrollRight"
-                                      Title="Rolar para direita" />
-                    </MudButtonGroup>
-                }
-                <MudTooltip Text="Gerenciar Etiquetas">
-                    <MudIconButton Icon="@Icons.Material.Filled.Label" 
-                                   Color="MudBlazor.Color.Default"
-                                   Variant="Variant.Outlined"
-                                   Size="MudBlazor.Size.Medium"
-                                   OnClick="OpenLabelsDialog" />
-                </MudTooltip>
-                <MudTooltip Text="Meus Quadros">
-                    <MudIconButton Icon="@Icons.Material.Filled.Dashboard" 
-                                   Color="MudBlazor.Color.Default"
-                                   Variant="Variant.Outlined"
-                                   Size="MudBlazor.Size.Medium"
-                                   OnClick="OpenBoardsDialog" />
-                </MudTooltip>
-                <MudButton Color="MudBlazor.Color.Primary" 
-                           Variant="Variant.Filled" 
-                           StartIcon="@Icons.Material.Filled.Add"
-                           OnClick="NewColumn"
-                           Disabled="@_isLoading"
-                           Class="new-column-btn">
-                    Nova Coluna
-                </MudButton>
-            </div>
-        </div>
     </div>
 
     <MudSwipeArea @ref="@_swipeArea" 
                   Class="kanban-scroll" 
-                  OnSwipeMove="HandleSwipeMove" 
-                  OnSwipeEnd="@OnSwipeEnd"
+                  OnSwipeMove="@(args => HandleSwipeMove(args))" 
+                  OnSwipeEnd="@(args => OnSwipeEnd(args))"
                   PreventDefault="true">
         @if (_columns is null)
         {
@@ -176,12 +113,9 @@
                               @ref="_dropContainer"
                               Items="@_allCards"
                               ItemsSelector="@((KanbanCardDto item, string column) => FilterCard(item) && string.Equals(item.ColumnId.ToString(), column, StringComparison.Ordinal))"
-                              ItemsSelector="@((KanbanCardDto item, string column) => FilterCard(item) && string.Equals(item.ColumnId.ToString(), column, StringComparison.Ordinal))"
                               ItemDropped="OnCardDropped"
                               Class="kanban-board d-flex flex-row">
-                              Class="kanban-board d-flex flex-row">
                 <ChildContent>
-                    @{ var colIndex = 0; }
                     @{ var colIndex = 0; }
                     @foreach (var col in _columns.OrderBy(c => c.Position))
                     {
@@ -208,29 +142,6 @@
                                 </div>
                                 
                                 <MudDropZone T="KanbanCardDto" Identifier="@col.Id.ToString()" Class="kanban-cards" AllowReorder="true" />
-                        var filteredCount = _allCards.Count(c => c.ColumnId == col.Id && FilterCard(c));
-                        var columnColor = GetColumnColor(colIndex);
-                        colIndex++;
-                        
-                        <div class="kanban-column-wrapper">
-                            <MudPaper Elevation="0" Class="kanban-column">
-                                <div class="column-header" style="@($"border-top: 3px solid {columnColor};")">
-                                    <div class="column-header-content">
-                                        <div class="column-title-group">
-                                            <span class="column-title">@col.Title</span>
-                                            <span class="column-count" style="@($"background: {columnColor}20; color: {columnColor};")">@filteredCount</span>
-                                        </div>
-                                        <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="MudBlazor.Size.Small" Dense="true" AnchorOrigin="Origin.BottomRight">
-                                            <MudMenuItem Icon="@Icons.Material.Filled.Edit" OnClick="() => EditColumn(col)">Editar</MudMenuItem>
-                                            <MudMenuItem Icon="@Icons.Material.Filled.ArrowBack" OnClick="() => MoveColumnLeft(col)">Mover para Esquerda</MudMenuItem>
-                                            <MudMenuItem Icon="@Icons.Material.Filled.ArrowForward" OnClick="() => MoveColumnRight(col)">Mover para Direita</MudMenuItem>
-                                            <MudDivider />
-                                            <MudMenuItem Icon="@Icons.Material.Filled.Delete" IconColor="MudBlazor.Color.Error" OnClick="() => DeleteColumn(col)">Excluir</MudMenuItem>
-                                        </MudMenu>
-                                    </div>
-                                </div>
-                                
-                                <MudDropZone T="KanbanCardDto" Identifier="@col.Id.ToString()" Class="kanban-cards" AllowReorder="true" />
 
                                 <MudDropZone T="KanbanCardDto" Identifier="@($"delete-{col.Id}")" Class="kanban-delete-zone" AllowReorder="false">
                                     <div class="delete-zone-content">
@@ -238,26 +149,7 @@
                                         <span>Excluir</span>
                                     </div>
                                 </MudDropZone>
-                                <MudDropZone T="KanbanCardDto" Identifier="@($"delete-{col.Id}")" Class="kanban-delete-zone" AllowReorder="false">
-                                    <div class="delete-zone-content">
-                                        <MudIcon Icon="@Icons.Material.Filled.DeleteOutline" Size="@MudBlazor.Size.Small" />
-                                        <span>Excluir</span>
-                                    </div>
-                                </MudDropZone>
 
-                                <div class="column-footer">
-                                    <MudButton Size="MudBlazor.Size.Small" 
-                                              Variant="Variant.Text" 
-                                              StartIcon="@Icons.Material.Filled.Add" 
-                                              OnClick="() => CreateCard(col)"
-                                              FullWidth="true"
-                                              Class="add-card-btn"
-                                              Color="MudBlazor.Color.Primary">
-                                        Adicionar card
-                                    </MudButton>
-                                </div>
-                            </MudPaper>
-                        </div>
                                 <div class="column-footer">
                                     <MudButton Size="MudBlazor.Size.Small" 
                                               Variant="Variant.Text" 
@@ -300,35 +192,7 @@
                         }
 
                         @* Title *@
-                    @{
-                        var cardStyle = !string.IsNullOrEmpty(context.Color) 
-                            ? $"border-left: 4px solid {context.Color}; cursor: grab;" 
-                            : "cursor: grab;";
-                    }
-                    <MudPaper Elevation="2" Class="pa-3 rounded-lg my-2 kanban-item" Style="@cardStyle" @onclick="() => EditCard(context)">
-                        @* Labels *@
-                        @if (context.Labels?.Any() == true)
-                        {
-                            <div class="d-flex flex-wrap gap-1 mb-2">
-                                @foreach (var label in context.Labels.Take(3))
-                                {
-                                    <MudChip T="string" Size="MudBlazor.Size.Small" Style="@($"background-color: {label.Color}; color: white;")" Dense="true">
-                                        @label.Name
-                                    </MudChip>
-                                }
-                                @if (context.Labels.Count > 3)
-                                {
-                                    <MudChip T="string" Size="MudBlazor.Size.Small" Variant="Variant.Outlined" Dense="true">
-                                        +@(context.Labels.Count - 3)
-                                    </MudChip>
-                                }
-                            </div>
-                        }
-
-                        @* Title *@
                         <MudText Typo="Typo.body1" Class="kanban-card-title">@context.Title</MudText>
-
-                        @* Description *@
 
                         @* Description *@
                         @if (!string.IsNullOrWhiteSpace(context.Description))
@@ -336,73 +200,7 @@
                             <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary" Class="mt-1 kanban-card-desc">
                                 @(context.Description.Length > 80 ? context.Description[..80] + "..." : context.Description)
                             </MudText>
-                            <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary" Class="mt-1 kanban-card-desc">
-                                @(context.Description.Length > 80 ? context.Description[..80] + "..." : context.Description)
-                            </MudText>
                         }
-
-                        @* Footer with metadata *@
-                        <div class="kanban-card-footer mt-2 d-flex align-center gap-2 flex-wrap">
-                            @* Priority indicator *@
-                            @if (context.Priority != KanbanPriority.None)
-                            {
-                                <MudTooltip Text="@GetPriorityText(context.Priority)">
-                                    <MudIcon Icon="@GetPriorityIcon(context.Priority)" 
-                                             Color="@GetPriorityColor(context.Priority)" 
-                                             Size="MudBlazor.Size.Small" />
-                                </MudTooltip>
-                            }
-
-                            @* Due date *@
-                            @if (context.DueDate.HasValue)
-                            {
-                                var isOverdue = context.DueDate.Value.Date < DateTime.Today && context.CompletedAt == null;
-                                var isToday = context.DueDate.Value.Date == DateTime.Today;
-                                <MudChip T="string" Size="MudBlazor.Size.Small" 
-                                         Color="@(isOverdue ? MudBlazor.Color.Error : (isToday ? MudBlazor.Color.Warning : MudBlazor.Color.Default))"
-                                         Variant="Variant.Outlined" Dense="true"
-                                         Icon="@Icons.Material.Filled.CalendarToday">
-                                    @context.DueDate.Value.ToString("dd/MM")
-                                </MudChip>
-                            }
-
-                            @* Completed indicator *@
-                            @if (context.CompletedAt.HasValue)
-                            {
-                                <MudTooltip Text="@($"Concluído em {context.CompletedAt.Value:dd/MM/yyyy HH:mm}")">
-                                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="MudBlazor.Color.Success" Size="MudBlazor.Size.Small" />
-                                </MudTooltip>
-                            }
-
-                            @* Comments count *@
-                            @if (context.CommentCount > 0)
-                            {
-                                <MudTooltip Text="@($"{context.CommentCount} comentário(s)")">
-                                    <div class="d-flex align-center gap-1">
-                                        <MudIcon Icon="@Icons.Material.Filled.Comment" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Default" />
-                                        <MudText Typo="Typo.caption">@context.CommentCount</MudText>
-                                    </div>
-                                </MudTooltip>
-                            }
-
-                            <MudSpacer />
-
-                            @* Assigned user avatar *@
-                            @if (context.AssignedUserId.HasValue)
-                            {
-                                <MudTooltip Text="@context.AssignedUserName">
-                                    @if (!string.IsNullOrEmpty(context.AssignedUserPhoto))
-                                    {
-                                        <MudAvatar Size="MudBlazor.Size.Small" Image="@context.AssignedUserPhoto" />
-                                    }
-                                    else
-                                    {
-                                        <MudAvatar Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Primary">
-                                            @(context.AssignedUserName?.FirstOrDefault())
-                                        </MudAvatar>
-                                    }
-                                </MudTooltip>
-                            }
 
                         @* Footer with metadata *@
                         <div class="kanban-card-footer mt-2 d-flex align-center gap-2 flex-wrap">
@@ -695,35 +493,10 @@
         };
         var options = new DialogOptions { CloseOnEscapeKey = true, CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
         var dialog = await DialogService.ShowAsync<KanbanCardDialogV2>("Novo Card", parameters, options);
-        var parameters = new DialogParameters<KanbanCardDialogV2>
-        {
-            { x => x.ColumnId, col.Id },
-            { x => x.IsEdit, false },
-            { x => x.BoardLabels, _boardLabels },
-            { x => x.AssignableUsers, _assignableUsers.Select(u => new KanbanCardDialogV2.UserOption(u.Id, u.FullName, u.Photo)).ToList() }
-        };
-        var options = new DialogOptions { CloseOnEscapeKey = true, CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
-        var dialog = await DialogService.ShowAsync<KanbanCardDialogV2>("Novo Card", parameters, options);
         var result = await dialog.Result;
         
         if (result is { Canceled: false } && result.Data is KanbanCardDialogV2.CardDialogResult dialogResult)
-        if (result is { Canceled: false } && result.Data is KanbanCardDialogV2.CardDialogResult dialogResult)
         {
-            var request = new CreateCardRequest(
-                col.Id,
-                dialogResult.Title,
-                dialogResult.Description,
-                dialogResult.DueDate,
-                dialogResult.Priority,
-                dialogResult.AssignedUserId,
-                dialogResult.Color,
-                dialogResult.LabelIds
-            );
-            
-            var response = await Api.PostAsJsonAsync<CreateCardRequest, KanbanCardDto>("api/kanban/cards", request);
-            if (response is not null)
-            {
-                await LoadDataAsync();
             var request = new CreateCardRequest(
                 col.Id,
                 dialogResult.Title,
@@ -752,11 +525,7 @@
     private async Task EditCard(KanbanCardDto card)
     {
         var parameters = new DialogParameters<KanbanCardDialogV2>
-        var parameters = new DialogParameters<KanbanCardDialogV2>
         {
-            { x => x.CardId, card.Id },
-            { x => x.ColumnId, card.ColumnId },
-            { x => x.IsEdit, true },
             { x => x.CardId, card.Id },
             { x => x.ColumnId, card.ColumnId },
             { x => x.IsEdit, true },
@@ -770,37 +539,15 @@
             { x => x.InitialLabelIds, card.Labels?.Select(l => l.Id).ToList() ?? new() },
             { x => x.BoardLabels, _boardLabels },
             { x => x.AssignableUsers, _assignableUsers.Select(u => new KanbanCardDialogV2.UserOption(u.Id, u.FullName, u.Photo)).ToList() }
-            { x => x.InitialDueDate, card.DueDate },
-            { x => x.InitialPriority, card.Priority },
-            { x => x.InitialColor, card.Color },
-            { x => x.InitialAssignedUserId, card.AssignedUserId },
-            { x => x.InitialAssignedUserName, card.AssignedUserName },
-            { x => x.InitialLabelIds, card.Labels?.Select(l => l.Id).ToList() ?? new() },
-            { x => x.BoardLabels, _boardLabels },
-            { x => x.AssignableUsers, _assignableUsers.Select(u => new KanbanCardDialogV2.UserOption(u.Id, u.FullName, u.Photo)).ToList() }
         };
-        var options = new DialogOptions { CloseOnEscapeKey = true, CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
-        var dialog = await DialogService.ShowAsync<KanbanCardDialogV2>("Editar Card", parameters, options);
         var options = new DialogOptions { CloseOnEscapeKey = true, CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
         var dialog = await DialogService.ShowAsync<KanbanCardDialogV2>("Editar Card", parameters, options);
         var result = await dialog.Result;
         
         if (result is { Canceled: false } && result.Data is KanbanCardDialogV2.CardDialogResult dialogResult && _columns is not null)
-        if (result is { Canceled: false } && result.Data is KanbanCardDialogV2.CardDialogResult dialogResult && _columns is not null)
         {
             if (dialogResult.Delete)
-            if (dialogResult.Delete)
             {
-                // Delete the card
-                var deleteRes = await Api.DeleteAsync($"api/kanban/cards/{card.Id}");
-                if (deleteRes.IsSuccessStatusCode)
-                {
-                    _allCards.RemoveAll(c => c.Id == card.Id);
-                    foreach (var col in _columns)
-                    {
-                        col.Cards.RemoveAll(c => c.Id == card.Id);
-                    }
-                    _dropContainer?.Refresh();
                 // Delete the card
                 var deleteRes = await Api.DeleteAsync($"api/kanban/cards/{card.Id}");
                 if (deleteRes.IsSuccessStatusCode)
@@ -819,37 +566,11 @@
                 }
             }
             else if (dialogResult.Archive)
-            else if (dialogResult.Archive)
             {
                 // Archive the card
                 var archiveRes = await Api.PutAsJsonAsync($"api/kanban/cards/{card.Id}/archive", new ArchiveCardRequest(true));
                 if (archiveRes.IsSuccessStatusCode)
-                // Archive the card
-                var archiveRes = await Api.PutAsJsonAsync($"api/kanban/cards/{card.Id}/archive", new ArchiveCardRequest(true));
-                if (archiveRes.IsSuccessStatusCode)
                 {
-                    await LoadDataAsync();
-                    _dropContainer?.Refresh();
-                    Snackbar.Add("Card arquivado com sucesso!", Severity.Success);
-                }
-                else
-                {
-                    Snackbar.Add("Erro ao arquivar card.", Severity.Error);
-                }
-            }
-            else
-            {
-                // Update the card
-                var request = new UpdateCardRequest(
-                    dialogResult.Title,
-                    dialogResult.Description,
-                    dialogResult.DueDate,
-                    dialogResult.Priority,
-                    dialogResult.AssignedUserId,
-                    dialogResult.Color,
-                    dialogResult.LabelIds,
-                    dialogResult.CompletedAt
-                );
                     await LoadDataAsync();
                     _dropContainer?.Refresh();
                     Snackbar.Add("Card arquivado com sucesso!", Severity.Success);
@@ -874,11 +595,8 @@
                 );
                 
                 var updateRes = await Api.PutAsJsonAsync($"api/kanban/cards/{card.Id}", request);
-                var updateRes = await Api.PutAsJsonAsync($"api/kanban/cards/{card.Id}", request);
                 if (updateRes.IsSuccessStatusCode)
                 {
-                    await LoadDataAsync();
-                    _dropContainer?.Refresh();
                     await LoadDataAsync();
                     _dropContainer?.Refresh();
                     Snackbar.Add("Card atualizado com sucesso!", Severity.Success);
@@ -906,17 +624,6 @@
                 
                 StateHasChanged();
             });
-            await LoadDataAsync();
-            
-            await InvokeAsync(() =>
-            {
-                if (_dropContainer is not null)
-                {
-                    _dropContainer.Refresh();
-                }
-                
-                StateHasChanged();
-            });
         }
         catch (Exception ex)
         {
@@ -929,6 +636,21 @@
 
     private MudDropContainer<KanbanCardDto>? _dropContainer;
     private List<KanbanCardDto> _allCards = new();
+    private MudSwipeArea? _swipeArea;
+
+    private void HandleSwipeMove(MultiDimensionSwipeEventArgs args)
+    {
+        // Handle swipe move for scrolling - scroll kanban horizontally based on swipe delta
+        if (args.SwipeDeltas?.Count > 0 && args.SwipeDeltas[0].HasValue)
+        {
+            _ = JS.InvokeVoidAsync("scrollKanbanByDelta", -args.SwipeDeltas[0].Value);
+        }
+    }
+
+    private void OnSwipeEnd(SwipeEventArgs args)
+    {
+        // Handle swipe end
+    }
 
     private async Task OnCardDropped(MudItemDropInfo<KanbanCardDto> info)
     {
@@ -987,8 +709,6 @@
                 var m = _allCards[idx];
                 // Create updated card preserving all properties, just changing ColumnId
                 var updatedCard = m with { ColumnId = toColumnId };
-                // Create updated card preserving all properties, just changing ColumnId
-                var updatedCard = m with { ColumnId = toColumnId };
                 _allCards[idx] = updatedCard;
                 
                 // Update in columns list too
@@ -1044,147 +764,9 @@
 
     // Simple JS prompt bridge
     [Inject] IJSRuntime JS { get; set; } = default!;
+
     private async Task<string?> PromptAsync(string message, string? defaultValue = null)
         => await JS.InvokeAsync<string?>("prompt", message, defaultValue);
-
-    private async Task OpenLabelsDialog()
-    {
-        var parameters = new DialogParameters<KanbanLabelsDialog>
-        {
-            { x => x.BoardId, _board?.Id ?? 0 }
-        };
-        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
-        var dialog = await DialogService.ShowAsync<KanbanLabelsDialog>("Gerenciar Etiquetas", parameters, options);
-        var result = await dialog.Result;
-        
-        // Reload labels after dialog closes
-        var boardIdParam = _board?.Id > 0 ? $"?boardId={_board.Id}" : "";
-        _boardLabels = await Api.GetAsync<List<KanbanLabelDto>>($"api/kanban/labels{boardIdParam}") ?? new();
-        // Reload cards to update label associations
-        await LoadDataAsync();
-        StateHasChanged();
-    }
-
-    private async Task OpenBoardsDialog()
-    {
-        var parameters = new DialogParameters<KanbanBoardsDialog>
-        {
-            { x => x.CurrentBoardId, _board?.Id ?? 0 }
-        };
-        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
-        var dialog = await DialogService.ShowAsync<KanbanBoardsDialog>("Meus Quadros", parameters, options);
-        var result = await dialog.Result;
-        
-        if (result is { Canceled: false } && result.Data is int selectedBoardId)
-        {
-            // If a different board was selected, load that specific board
-            if (selectedBoardId != _board?.Id)
-            {
-                // Load the selected board specifically
-                _board = await Api.GetAsync<KanbanBoardDto>($"api/kanban/boards/{selectedBoardId}");
-                await LoadDataAsync();
-                StateHasChanged();
-            }
-        }
-        else
-        {
-            // Dialog was closed, refresh board in case name changed
-            if (_board?.Id > 0)
-            {
-                _board = await Api.GetAsync<KanbanBoardDto>($"api/kanban/boards/{_board.Id}");
-            }
-            else
-            {
-                _board = await Api.GetAsync<KanbanBoardDto>("api/kanban/board");
-            }
-            StateHasChanged();
-        }
-    }
-
-    private async Task DeleteColumn(ColumnVm col)
-    {
-        // Check if column has cards
-        var hasCards = _allCards.Any(c => c.ColumnId == col.Id);
-        if (hasCards)
-        {
-            Snackbar.Add("Não é possível excluir uma coluna com cards. Mova ou exclua os cards primeiro.", Severity.Warning);
-            return;
-        }
-
-        var parameters = new DialogParameters
-        {
-            { "ContentText", $"Tem certeza que deseja excluir a coluna \"{col.Title}\"?" },
-            { "ButtonText", "Excluir" },
-            { "Color", MudBlazor.Color.Error }
-        };
-        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirmar Exclusão", parameters, options);
-        var result = await dialog.Result;
-        
-        if (result is { Canceled: false })
-        {
-            var res = await Api.DeleteAsync($"api/kanban/columns/{col.Id}");
-            if (res.IsSuccessStatusCode)
-            {
-                _columns?.Remove(col);
-                Snackbar.Add("Coluna excluída com sucesso!", Severity.Success);
-                StateHasChanged();
-            }
-            else
-            {
-                var error = await res.Content.ReadAsStringAsync();
-                Snackbar.Add($"Erro ao excluir coluna: {error}", Severity.Error);
-            }
-        }
-    }
-
-    private async Task MoveColumnLeft(ColumnVm col)
-    {
-        if (col.Position <= 0 || _columns is null) return;
-        
-        var newPosition = col.Position - 1;
-        var res = await Api.PostAsJsonAsync("api/kanban/columns/reorder", new ReorderColumnRequest(col.Id, newPosition));
-        if (res.IsSuccessStatusCode)
-        {
-            // Update local positions
-            var otherCol = _columns.FirstOrDefault(c => c.Position == newPosition);
-            if (otherCol != null)
-            {
-                otherCol.Position = col.Position;
-            }
-            col.Position = newPosition;
-            StateHasChanged();
-        }
-        else
-        {
-            Snackbar.Add("Erro ao mover coluna.", Severity.Error);
-        }
-    }
-
-    private async Task MoveColumnRight(ColumnVm col)
-    {
-        if (_columns is null) return;
-        var maxPosition = _columns.Max(c => c.Position);
-        if (col.Position >= maxPosition) return;
-        
-        var newPosition = col.Position + 1;
-        var res = await Api.PostAsJsonAsync("api/kanban/columns/reorder", new ReorderColumnRequest(col.Id, newPosition));
-        if (res.IsSuccessStatusCode)
-        {
-            // Update local positions
-            var otherCol = _columns.FirstOrDefault(c => c.Position == newPosition);
-            if (otherCol != null)
-            {
-                otherCol.Position = col.Position;
-            }
-            col.Position = newPosition;
-            StateHasChanged();
-        }
-        else
-        {
-            Snackbar.Add("Erro ao mover coluna.", Severity.Error);
-        }
-    }
 
     private async Task OpenLabelsDialog()
     {
@@ -1340,10 +922,6 @@
    KANBAN PAGE - MODERN DESIGN
    ============================================ */
 
-/* ============================================
-   KANBAN PAGE - MODERN DESIGN
-   ============================================ */
-
 .kanban-page { 
     display: flex; 
     flex-direction: column; 
@@ -1360,18 +938,9 @@
    HEADER SECTION
    ============================================ */
 
-/* ============================================
-   HEADER SECTION
-   ============================================ */
-
 .kanban-header { 
     padding: 20px 24px;
-    padding: 20px 24px;
     background: var(--mud-palette-surface);
-    border-bottom: 1px solid rgba(0,0,0,0.08);
-    position: sticky;
-    top: 0;
-    z-index: 10;
     border-bottom: 1px solid rgba(0,0,0,0.08);
     position: sticky;
     top: 0;
@@ -1451,14 +1020,7 @@
     background: var(--mud-palette-surface);
     border-radius: 16px;
     margin: 20px;
-    background: var(--mud-palette-surface);
-    border-radius: 16px;
-    margin: 20px;
 }
-
-/* ============================================
-   KANBAN BOARD
-   ============================================ */
 
 /* ============================================
    KANBAN BOARD
@@ -1471,16 +1033,8 @@
     gap: 20px; 
     padding: 4px;
     min-height: calc(100vh - 280px);
-    padding: 4px;
-    min-height: calc(100vh - 280px);
 }
 
-/* ============================================
-   COLUMN STYLES - MODERN
-   ============================================ */
-
-.kanban-column-wrapper {
-    flex-shrink: 0;
 /* ============================================
    COLUMN STYLES - MODERN
    ============================================ */
@@ -1491,9 +1045,7 @@
 
 .kanban-column { 
     width: 320px;
-    width: 320px;
     background: var(--mud-palette-surface);
-    border-radius: 16px;
     border-radius: 16px;
     display: flex;
     flex-direction: column;
@@ -1502,14 +1054,8 @@
     transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
 }
-    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-    border: 1px solid rgba(0,0,0,0.06);
-    transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
-    overflow: hidden;
-}
 
 .kanban-column:hover {
-    box-shadow: 0 8px 30px rgba(0,0,0,0.12);
     box-shadow: 0 8px 30px rgba(0,0,0,0.12);
     transform: translateY(-2px);
 }
@@ -1559,61 +1105,7 @@
     font-weight: 600 !important;
     transition: all 200ms ease !important;
     opacity: 0.7;
-/* Column Header */
-.column-header {
-    padding: 16px;
-    background: var(--mud-palette-surface);
 }
-
-.column-header-content {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.column-title-group {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.column-title {
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--mud-palette-text-primary);
-    letter-spacing: -0.3px;
-}
-
-.column-count {
-    font-size: 12px;
-    font-weight: 700;
-    padding: 4px 10px;
-    border-radius: 20px;
-    min-width: 28px;
-    text-align: center;
-}
-
-/* Column Footer */
-.column-footer {
-    padding: 12px 16px 16px;
-    background: var(--mud-palette-surface);
-}
-
-.add-card-btn {
-    border-radius: 10px !important;
-    font-weight: 600 !important;
-    transition: all 200ms ease !important;
-    opacity: 0.7;
-}
-
-.add-card-btn:hover {
-    opacity: 1;
-    background: rgba(var(--mud-palette-primary-rgb), 0.08) !important;
-}
-
-/* ============================================
-   CARDS DROP ZONE
-   ============================================ */
 
 .add-card-btn:hover {
     opacity: 1;
@@ -1630,8 +1122,6 @@
     gap: 10px; 
     padding: 8px 16px;
     min-height: 120px;
-    padding: 8px 16px;
-    min-height: 120px;
     flex: 1;
     background: transparent;
 }
@@ -1640,23 +1130,7 @@
 .mud-drop-zone {
     transition: all 200ms ease;
     border-radius: 12px;
-    background: transparent;
 }
-
-/* Drop zone feedback */
-.mud-drop-zone {
-    transition: all 200ms ease;
-    border-radius: 12px;
-}
-
-.kanban-cards.mud-drop-zone-drag-enter {
-    background: rgba(var(--mud-palette-primary-rgb), 0.06);
-    border: 2px dashed var(--mud-palette-primary);
-}
-
-/* ============================================
-   CARD ITEMS
-   ============================================ */
 
 .kanban-cards.mud-drop-zone-drag-enter {
     background: rgba(var(--mud-palette-primary-rgb), 0.06);
@@ -1670,18 +1144,13 @@
 .kanban-item {
     background: var(--mud-palette-surface);
     border-radius: 12px;
-    border-radius: 12px;
     cursor: grab;
     transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
-    border: 1px solid rgba(0,0,0,0.06);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     border: 1px solid rgba(0,0,0,0.06);
     box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
 
 .kanban-item:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
     transform: translateY(-3px);
     box-shadow: 0 8px 25px rgba(0,0,0,0.1);
     border-color: var(--mud-palette-primary);
@@ -1691,24 +1160,17 @@
     cursor: grabbing;
     transform: scale(0.98);
     box-shadow: 0 2px 10px rgba(0,0,0,0.15);
-    box-shadow: 0 2px 10px rgba(0,0,0,0.15);
 }
 
 .kanban-card-title {
     font-weight: 600;
     font-size: 14px;
     line-height: 1.5;
-    font-size: 14px;
-    line-height: 1.5;
     word-break: break-word;
-    color: var(--mud-palette-text-primary);
     color: var(--mud-palette-text-primary);
 }
 
 .kanban-card-desc {
-    font-size: 13px;
-    line-height: 1.5;
-    color: var(--mud-palette-text-secondary);
     font-size: 13px;
     line-height: 1.5;
     color: var(--mud-palette-text-secondary);
@@ -1728,29 +1190,8 @@
     margin-top: 12px;
     padding-top: 10px;
     border-top: 1px solid rgba(0,0,0,0.06);
-    align-items: center;
-    justify-content: flex-start;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-top: 12px;
-    padding-top: 10px;
-    border-top: 1px solid rgba(0,0,0,0.06);
 }
 
-/* ============================================
-   DELETE ZONE
-   ============================================ */
-
-.kanban-delete-zone {
-    max-height: 0;
-    overflow: hidden;
-    border-radius: 10px;
-    background: rgba(239, 68, 68, 0.05);
-    border: 2px dashed transparent;
-    margin: 0 16px;
-    opacity: 0;
-    transform: translateY(4px);
-    transition: all 220ms cubic-bezier(0.4, 0, 0.2, 1);
 /* ============================================
    DELETE ZONE
    ============================================ */
@@ -1776,15 +1217,6 @@
     color: #EF4444;
     font-weight: 600;
     font-size: 13px;
-.kanban-delete-zone .delete-zone-content {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    justify-content: center;
-    padding: 12px;
-    color: #EF4444;
-    font-weight: 600;
-    font-size: 13px;
 }
 
 .kanban-dragging .kanban-delete-zone {
@@ -1793,42 +1225,7 @@
     transform: translateY(0);
     border-color: rgba(239, 68, 68, 0.3);
     margin-bottom: 8px;
-.kanban-dragging .kanban-delete-zone {
-    max-height: 60px;
-    opacity: 1;
-    transform: translateY(0);
-    border-color: rgba(239, 68, 68, 0.3);
-    margin-bottom: 8px;
 }
-
-.kanban-delete-zone.mud-drop-zone-drag-enter {
-    background: rgba(239, 68, 68, 0.1);
-    border-color: #EF4444;
-    transform: scale(1.02);
-}
-
-/* ============================================
-   ANIMATIONS
-   ============================================ */
-
-@@keyframes slideIn {
-    from {
-        opacity: 0;
-        transform: translateY(-8px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.kanban-item {
-    animation: slideIn 200ms ease-out;
-}
-
-/* ============================================
-   SCROLLBAR
-   ============================================ */
 
 .kanban-delete-zone.mud-drop-zone-drag-enter {
     background: rgba(239, 68, 68, 0.1);
@@ -1861,62 +1258,25 @@
 
 .kanban-scroll::-webkit-scrollbar {
     height: 10px;
-    height: 10px;
 }
 
 .kanban-scroll::-webkit-scrollbar-track {
-    background: rgba(0,0,0,0.03);
     background: rgba(0,0,0,0.03);
     border-radius: 10px;
 }
 
 .kanban-scroll::-webkit-scrollbar-thumb {
     background: rgba(0,0,0,0.15);
-    background: rgba(0,0,0,0.15);
     border-radius: 10px;
-    border: 2px solid transparent;
     border: 2px solid transparent;
     background-clip: padding-box;
 }
 
 .kanban-scroll::-webkit-scrollbar-thumb:hover {
     background: rgba(0,0,0,0.25);
-    background: rgba(0,0,0,0.25);
     background-clip: padding-box;
 }
 
-/* ============================================
-   RESPONSIVE
-   ============================================ */
-
-@@media (max-width: 768px) {
-    .kanban-header-content {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-    
-    .kanban-header-actions {
-        width: 100%;
-        justify-content: flex-end;
-    }
-    
-    .kanban-board {
-        flex-direction: column;
-        align-items: stretch;
-        padding: 0;
-    }
-    
-    .kanban-column-wrapper {
-        width: 100%;
-    }
-    
-    .kanban-column {
-        width: 100%;
-    }
-    
-    .kanban-scroll {
-        padding: 16px;
-    }
 /* ============================================
    RESPONSIVE
    ============================================ */

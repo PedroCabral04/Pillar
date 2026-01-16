@@ -12,7 +12,7 @@ public interface IPayrollService
     Task<IReadOnlyList<PayrollPeriod>> GetPeriodsAsync(int? year, PayrollPeriodStatus? status, CancellationToken cancellationToken = default);
     Task<PayrollPeriod?> GetPeriodAsync(int id, CancellationToken cancellationToken = default);
     Task<PayrollPeriod> CreatePeriodAsync(int month, int year, int createdById, CancellationToken cancellationToken = default);
-    Task<PayrollPeriod> CalculatePeriodAsync(int periodId, int requestedById, CancellationToken cancellationToken = default);
+    Task<PayrollPeriod> CalculatePeriodAsync(int periodId, int requestedById, PayrollCalculationMode mode = PayrollCalculationMode.Full, CancellationToken cancellationToken = default);
     Task<PayrollPeriod> ApprovePeriodAsync(int periodId, int requestedById, string? notes, CancellationToken cancellationToken = default);
     Task<PayrollPeriod> MarkAsPaidAsync(int periodId, DateTime paymentDate, int requestedById, string? notes, CancellationToken cancellationToken = default);
     Task<PayrollSlip> GenerateSlipAsync(int periodId, int resultId, int requestedById, CancellationToken cancellationToken = default);
@@ -89,9 +89,9 @@ public class PayrollService : IPayrollService
         return await _timeTrackingService.CreatePeriodAsync(month, year, createdById, cancellationToken);
     }
 
-    public Task<PayrollPeriod> CalculatePeriodAsync(int periodId, int requestedById, CancellationToken cancellationToken = default)
+    public Task<PayrollPeriod> CalculatePeriodAsync(int periodId, int requestedById, PayrollCalculationMode mode = PayrollCalculationMode.Full, CancellationToken cancellationToken = default)
     {
-        return _calculationService.CalculateAsync(periodId, requestedById, cancellationToken);
+        return _calculationService.CalculateAsync(periodId, requestedById, mode, cancellationToken);
     }
 
     public async Task<PayrollPeriod> ApprovePeriodAsync(int periodId, int requestedById, string? notes, CancellationToken cancellationToken = default)

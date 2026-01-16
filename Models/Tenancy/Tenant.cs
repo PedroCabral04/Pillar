@@ -29,12 +29,6 @@ public class Tenant : IAuditable
     public TenantStatus Status { get; set; } = TenantStatus.Provisioning;
 
     [MaxLength(200)]
-    public string? DatabaseName { get; set; }
-
-    [MaxLength(500)]
-    public string? ConnectionString { get; set; }
-
-    [MaxLength(200)]
     public string? Region { get; set; }
 
     public bool IsDemo { get; set; }

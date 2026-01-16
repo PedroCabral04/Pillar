@@ -365,7 +365,7 @@
     {
         try
         {
-            _statistics = await ApiService.GetAsync<ProductStatisticsDto>("/api/products/statistics");
+            _statistics = await ApiService.GetAsync<ProductStatisticsDto>("/api/produtos/statistics");
         }
         catch (Exception ex)
         {
@@ -377,7 +377,7 @@
     {
         try
         {
-            var response = await ApiService.GetAsync<PaginatedCategoriesResponse>("/api/products/categories?pageSize=100");
+            var response = await ApiService.GetAsync<PaginatedCategoriesResponse>("/api/produtos/categories?pageSize=100");
             _categories = response?.Items ?? new List<ProductCategoryDto>();
         }
         catch (Exception ex)
@@ -439,7 +439,7 @@
             }
 
             var query = string.Join("&", queryParams);
-            var response = await ApiService.GetAsync<PaginatedProductsResponse>($"/api/products?{query}");
+            var response = await ApiService.GetAsync<PaginatedProductsResponse>($"/api/produtos?{query}");
 
             if (response != null)
             {
@@ -513,7 +513,7 @@
             }
 
             var query = string.Join("&", queryParams);
-            var url = $"/api/products/export?{query}";
+            var url = $"/api/produtos/export?{query}";
 
             await JS.InvokeVoidAsync("open", url, "_blank");
             Snackbar.Add("Exportação iniciada! O download começará em instantes.", Severity.Success);
@@ -597,7 +597,7 @@
         {
             try
             {
-                await ApiService.DeleteAsync($"/api/products/{product.Id}");
+                await ApiService.DeleteAsync($"/api/produtos/{product.Id}");
                 Snackbar.Add("Produto excluído com sucesso", Severity.Success);
                 await LoadStatistics();
                 await _table!.ReloadServerData();

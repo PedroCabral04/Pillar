@@ -8,7 +8,7 @@
     <meta name="theme-color" content="@Branding.PrimaryColor" />
     @if (!string.IsNullOrWhiteSpace(Branding.FaviconUrl))
     {
-        <link rel="icon" href="@Branding.FaviconUrl" />
+        <link rel="icon" href="@Branding.FaviconUrlWithCacheBust" />
     }
     <style id="tenant-branding-vars">
         :root {

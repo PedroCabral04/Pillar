@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using erp.Services.Assets;
 using erp.DTOs.Assets;
 using erp.Models;
+using erp.Security;
 using System.Security.Claims;
 
 namespace erp.Controllers;
@@ -12,18 +13,21 @@ namespace erp.Controllers;
 /// </summary>
 [Authorize]
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/ativos")]
 public class AssetsController : ControllerBase
 {
     private readonly IAssetService _assetService;
     private readonly ILogger<AssetsController> _logger;
+    private readonly IFileValidationService _fileValidationService;
 
     public AssetsController(
         IAssetService assetService,
-        ILogger<AssetsController> logger)
+        ILogger<AssetsController> logger,
+        IFileValidationService fileValidationService)
     {
         _assetService = assetService;
         _logger = logger;
+        _fileValidationService = fileValidationService;
     }
 
     private int GetCurrentUserId()
@@ -761,10 +765,13 @@ public class AssetsController : ControllerBase
                 return BadRequest(new { message = "Arquivo não fornecido ou vazio" });
             }
 
-            // Validação de tamanho (50MB max)
-            if (formData.File.Length > 50 * 1024 * 1024)
+            // Validação de segurança do arquivo (tipo, magic bytes, tamanho)
+            var validationResult = await _fileValidationService.ValidateFileAsync(formData.File);
+            if (!validationResult.IsValid)
             {
-                return BadRequest(new { message = "Arquivo muito grande. Tamanho máximo: 50MB" });
+                _logger.LogWarning("Upload de arquivo rejeitado: {Reason}. Arquivo: {FileName}",
+                    validationResult.ErrorMessage, formData.File.FileName);
+                return BadRequest(new { message = validationResult.ErrorMessage });
             }
 
             var dto = new CreateAssetDocumentDto
@@ -780,7 +787,7 @@ public class AssetsController : ControllerBase
             using var stream = formData.File.OpenReadStream();
             var userId = GetCurrentUserId();
             var document = await _assetService.CreateDocumentAsync(dto, stream, userId);
-            
+
             return CreatedAtAction(
                 nameof(GetDocumentById),
                 new { docId = document.Id },

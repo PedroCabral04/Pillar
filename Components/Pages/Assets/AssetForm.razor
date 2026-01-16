@@ -437,6 +437,24 @@
     private DateTime? _purchaseDate;
     private DateTime? _warrantyExpiryDate;
 
+    // Quick category creation
+    private bool _showCategoryPopover = false;
+    private string _newCategoryName = "";
+    private string _newCategoryIcon = Icons.Material.Filled.Category;
+    private bool _creatingCategory = false;
+    private List<(string Label, string Value)> _iconOptions = new()
+    {
+        ("Computador", Icons.Material.Filled.Computer),
+        ("Celular", Icons.Material.Filled.Smartphone),
+        ("Tablet", Icons.Material.Filled.Tablet),
+        ("Notebook", Icons.Material.Filled.Laptop),
+        ("Monitor", Icons.Material.Filled.Monitor),
+        ("Impressora", Icons.Material.Filled.Print),
+        ("Cadeira", Icons.Material.Filled.EventSeat),
+        ("Mesa", Icons.Material.Filled.Desk),
+        ("Outro", Icons.Material.Filled.Category)
+    };
+
     protected override async Task OnInitializedAsync()
     {
         await LoadCategories();

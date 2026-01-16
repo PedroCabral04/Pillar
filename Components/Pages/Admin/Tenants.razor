@@ -15,7 +15,7 @@
         <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
             <MudStack Spacing="1">
                 <MudText Typo="Typo.h4">Tenants</MudText>
-                <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Secondary">Gerenciamento de empresas, provisionamento e status de bancos.</MudText>
+                <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Secondary">Gerenciamento de empresas e status.</MudText>
             </MudStack>
             <MudButton Variant="Variant.Filled" Color="MudBlazor.Color.Primary" StartIcon="@Icons.Material.Filled.AddBusiness" OnClick="CreateTenant">
                 Novo tenant
@@ -36,7 +36,6 @@
                         <MudTh>Status</MudTh>
                         <MudTh>Contato</MudTh>
                         <MudTh>Região</MudTh>
-                        <MudTh>Provisionamento</MudTh>
                         <MudTh Align="Align.Right">Ações</MudTh>
                     </HeaderContent>
                     <RowTemplate>
@@ -52,10 +51,6 @@
                         </MudTd>
                         <MudTd DataLabel="Status">
                             <MudChip T="string" Color="@GetStatusColor(context.Status)" Variant="Variant.Filled" Size="MudBlazor.Size.Small">@GetStatusLabel(context.Status)</MudChip>
-                            @if (!string.IsNullOrWhiteSpace(context.DatabaseName))
-                            {
-                                <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">BD: @context.DatabaseName</MudText>
-                            }
                         </MudTd>
                         <MudTd DataLabel="Contato">
                             <MudText Typo="Typo.subtitle2">@context.PrimaryContactName</MudText>
@@ -63,25 +58,9 @@
                             <MudText Typo="Typo.caption">@context.PrimaryContactPhone</MudText>
                         </MudTd>
                         <MudTd DataLabel="Região">@context.Region</MudTd>
-                        <MudTd DataLabel="Provisionamento">
-                            <MudStack>
-                                <MudText Typo="Typo.caption">@((context.ConnectionString is null) ? "Template" : "Custom")</MudText>
-                                <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">
-                                    @if (context.ActivatedAt.HasValue)
-                                    {
-                                        <text>Ativado em @context.ActivatedAt.Value.ToString("dd/MM/yyyy HH:mm")</text>
-                                    }
-                                    else
-                                    {
-                                        <text>Aguardando provisionamento</text>
-                                    }
-                                </MudText>
-                            </MudStack>
-                        </MudTd>
                         <MudTd Align="Align.Right">
                             <MudButtonGroup Variant="Variant.Text" Dense="true">
                                 <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="MudBlazor.Color.Info" Title="Editar" OnClick="@(() => EditTenant(context))" />
-                                <MudIconButton Icon="@Icons.Material.Filled.Storage" Color="MudBlazor.Color.Primary" Title="Provisionar" OnClick="@(() => ProvisionTenant(context))" Disabled="_provisioningIds.Contains(context.Id)" />
                                 <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="MudBlazor.Color.Error" Title="Excluir" Disabled="true" />
                             </MudButtonGroup>
                         </MudTd>
@@ -99,7 +78,6 @@
     private List<TenantDto> _tenants = new();
     private string? _loadError;
     private string _search = string.Empty;
-    private readonly HashSet<int> _provisioningIds = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -151,40 +129,6 @@
         if (result is { Canceled: false })
         {
             await LoadTenantsAsync();
-        }
-    }
-
-    private async Task ProvisionTenant(TenantDto tenant)
-    {
-        var parameters = new DialogParameters
-        {
-            { "ContentText", $"Executar provisionamento do tenant '{tenant.Name}'?" },
-            { "ButtonText", "Provisionar" },
-            { "Color", MudBlazor.Color.Primary }
-        };
-        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small };
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Provisionar tenant", parameters, options);
-        var result = await dialog.Result;
-        if (result?.Canceled != false)
-        {
-            return;
-        }
-
-        try
-        {
-            _provisioningIds.Add(tenant.Id);
-            await ApiService.PostAsJsonAsync($"api/tenants/{tenant.Id}/provision", new { });
-            Snackbar.Add($"Provisionamento de '{tenant.Name}' iniciado.", Severity.Success);
-            await LoadTenantsAsync();
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Erro ao provisionar tenant {Tenant}", tenant.Name);
-            Snackbar.Add("Não foi possível provisionar o tenant.", Severity.Error);
-        }
-        finally
-        {
-            _provisioningIds.Remove(tenant.Id);
         }
     }
 

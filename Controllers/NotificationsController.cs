@@ -7,7 +7,7 @@ using System.Security.Claims;
 namespace erp.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/notificacoes")]
 [Authorize]
 /// <summary>
 /// Controlador responsável por operações relacionadas a notificações.

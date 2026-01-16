@@ -12,22 +12,19 @@ public class TenantService : ITenantService
     private readonly ApplicationDbContext _db;
     private readonly TenantMapper _mapper;
     private readonly ILogger<TenantService> _logger;
-    private readonly ITenantProvisioningService _provisioningService;
     private readonly ITenantContextAccessor _tenantContextAccessor;
     private readonly ITenantBrandingProvider _brandingProvider;
 
     public TenantService(
-        ApplicationDbContext db, 
-        TenantMapper mapper, 
-        ILogger<TenantService> logger, 
-        ITenantProvisioningService provisioningService,
+        ApplicationDbContext db,
+        TenantMapper mapper,
+        ILogger<TenantService> logger,
         ITenantContextAccessor tenantContextAccessor,
         ITenantBrandingProvider brandingProvider)
     {
         _db = db;
         _mapper = mapper;
         _logger = logger;
-        _provisioningService = provisioningService;
         _tenantContextAccessor = tenantContextAccessor;
         _brandingProvider = brandingProvider;
     }
@@ -75,21 +72,11 @@ public class TenantService : ITenantService
         var tenant = _mapper.CreateTenantDtoToTenant(dto);
         tenant.Slug = dto.Slug.ToLowerInvariant();
         tenant.CreatedAt = DateTime.UtcNow;
-        tenant.Status = TenantStatus.Provisioning;
+        tenant.Status = TenantStatus.Active;
         tenant.Memberships = new List<TenantMembership>();
-        var normalizedDatabaseName = NormalizeDatabaseName(dto.DatabaseName);
-        await EnsureDatabaseNameAvailableAsync(normalizedDatabaseName, null, cancellationToken, dto.DatabaseName);
-        tenant.DatabaseName = normalizedDatabaseName ?? tenant.DatabaseName;
-        tenant.ConnectionString = dto.ConnectionString ?? tenant.ConnectionString;
 
         _db.Tenants.Add(tenant);
         await _db.SaveChangesAsync(cancellationToken);
-
-        if (dto.ProvisionDatabase)
-        {
-            await _provisioningService.ProvisionAsync(tenant, cancellationToken);
-            await _db.SaveChangesAsync(cancellationToken);
-        }
 
         _logger.LogInformation("Tenant {TenantName} criado pelo usuário {UserId}", tenant.Name, userId);
 
@@ -108,7 +95,7 @@ public class TenantService : ITenantService
         }
 
         _mapper.UpdateTenantFromDto(dto, tenant);
-        
+
         // Handle branding update manually to ensure proper EF Core tracking
         if (dto.Branding is not null)
         {
@@ -129,23 +116,8 @@ public class TenantService : ITenantService
             _db.Remove(tenant.Branding);
             tenant.Branding = null;
         }
-        
-        tenant.UpdatedAt = DateTime.UtcNow;
-        if (dto.DatabaseName is not null)
-        {
-            var normalizedDatabaseName = NormalizeDatabaseName(dto.DatabaseName);
-            if (!string.Equals(normalizedDatabaseName, tenant.DatabaseName, StringComparison.Ordinal))
-            {
-                await EnsureDatabaseNameAvailableAsync(normalizedDatabaseName, tenant.Id, cancellationToken, dto.DatabaseName);
-                tenant.DatabaseName = normalizedDatabaseName ?? tenant.DatabaseName;
-            }
-        }
-        tenant.ConnectionString = dto.ConnectionString ?? tenant.ConnectionString;
 
-        if (dto.ProvisionDatabase)
-        {
-            await _provisioningService.ProvisionAsync(tenant, cancellationToken);
-        }
+        tenant.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync(cancellationToken);
 
@@ -159,15 +131,6 @@ public class TenantService : ITenantService
         return _mapper.TenantToTenantDto(tenant);
     }
 
-    public async Task<TenantConnectionInfoDto?> GetConnectionInfoAsync(int id, CancellationToken cancellationToken = default)
-    {
-        var tenant = await _db.Tenants
-            .AsNoTracking()
-            .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
-
-        return tenant is null ? null : _mapper.TenantToConnectionInfoDto(tenant);
-    }
-
     public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
     {
         var tenant = await _db.Tenants.FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
@@ -176,8 +139,28 @@ public class TenantService : ITenantService
             return;
         }
 
-        _db.Tenants.Remove(tenant);
+        // Soft delete: marca como arquivado em vez de remover
+        tenant.Status = TenantStatus.Archived;
+        tenant.DeletedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Tenant {TenantName} (ID: {TenantId}) arquivado", tenant.Name, id);
+    }
+
+    public async Task<IEnumerable<TenantDto>> GetUserTenantsAsync(int userId, CancellationToken cancellationToken = default)
+    {
+        // Busca tenants onde o usuário tem membership ativa
+        var tenants = await _db.TenantMemberships
+            .AsNoTracking()
+            .Where(m => m.UserId == userId && m.RevokedAt == null)
+            .Include(m => m.Tenant)
+                .ThenInclude(t => t!.Branding)
+            .Where(m => m.Tenant != null && m.Tenant.Status == TenantStatus.Active)
+            .Select(m => m.Tenant!)
+            .OrderBy(t => t.Name)
+            .ToListAsync(cancellationToken);
+
+        return _mapper.TenantsToTenantDtos(tenants);
     }
 
     public async Task<bool> SlugExistsAsync(string slug, int? ignoreTenantId = null, CancellationToken cancellationToken = default)
@@ -188,54 +171,8 @@ public class TenantService : ITenantService
         }
 
         var normalizedSlug = slug.ToLowerInvariant();
-        return await _db.Tenants.AnyAsync(t => t.Slug == normalizedSlug && (!ignoreTenantId.HasValue || t.Id != ignoreTenantId), cancellationToken);
-    }
-
-    public async Task ProvisionDatabaseAsync(int id, CancellationToken cancellationToken = default)
-    {
-        var tenant = await _db.Tenants.FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
-        if (tenant is null)
-        {
-            throw new KeyNotFoundException($"Tenant {id} não encontrado.");
-        }
-
-        await _provisioningService.ProvisionAsync(tenant, cancellationToken);
-        await _db.SaveChangesAsync(cancellationToken);
-    }
-
-    private static string? NormalizeDatabaseName(string? databaseName)
-    {
-        if (string.IsNullOrWhiteSpace(databaseName))
-        {
-            return null;
-        }
-
-        return databaseName.Trim().ToLowerInvariant();
-    }
-
-    private async Task EnsureDatabaseNameAvailableAsync(
-        string? normalizedDatabaseName,
-        int? ignoreTenantId,
-        CancellationToken cancellationToken,
-        string? displayValue = null)
-    {
-        if (string.IsNullOrWhiteSpace(normalizedDatabaseName))
-        {
-            return;
-        }
-
-        var conflict = await _db.Tenants
-            .AsNoTracking()
-            .AnyAsync(
-                t => t.DatabaseName != null
-                     && t.DatabaseName.ToLower() == normalizedDatabaseName
-                     && (!ignoreTenantId.HasValue || t.Id != ignoreTenantId),
-                cancellationToken);
-
-        if (conflict)
-        {
-            var shown = string.IsNullOrWhiteSpace(displayValue) ? normalizedDatabaseName : displayValue!.Trim();
-            throw new InvalidOperationException($"DatabaseName '{shown}' já está em uso por outro tenant.");
-        }
+        return await _db.Tenants.AnyAsync(t => t.Slug == normalizedSlug
+            && t.Status != TenantStatus.Archived
+            && (!ignoreTenantId.HasValue || t.Id != ignoreTenantId), cancellationToken);
     }
 }

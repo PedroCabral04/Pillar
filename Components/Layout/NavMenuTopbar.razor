@@ -6,6 +6,7 @@
 
 @inject NavigationManager NavigationManager
 @inject ITenantBrandingProvider BrandingProvider
+@inject ILogger<NavMenuTopbar> Logger
 
 <MudAppBar Elevation="2" Dense="false" Class="px-3">
     <div class="d-flex align-center mr-6">
@@ -43,6 +44,7 @@
              StartIcon="@Icons.Material.Filled.ArrowDropDown"
              EndIcon="">
         <MudMenuItem Href="sales" Icon="@Icons.Material.Filled.Receipt">Vendas</MudMenuItem>
+        <MudMenuItem Href="service-orders" Icon="@Icons.Material.Filled.Build">Ordens de Serviço</MudMenuItem>
         <MudMenuItem Href="sales/customers" Icon="@Icons.Material.Filled.People">Clientes</MudMenuItem>
     </MudMenu>
     
@@ -195,8 +197,11 @@
                 await JS.InvokeVoidAsync("erpAuth.logout");
                 NavigationManager.NavigateTo("/login", forceLoad: true);
             }
-            catch
+            catch (Exception ex)
             {
+                // JavaScript logout failed, but redirect to login anyway
+                // The server-side session will be cleared, but client-side state might be stale
+                Logger.LogWarning(ex, "[NavMenuTopbar] JavaScript logout failed, redirecting to login anyway");
                 NavigationManager.NavigateTo("/login", forceLoad: true);
             }
         }

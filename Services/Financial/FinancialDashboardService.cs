@@ -83,8 +83,12 @@ public class FinancialDashboardService : IFinancialDashboardService
             .Where(x => x.DueDate >= projectionStart && x.DueDate <= projectionEnd && x.Status != AccountStatus.Paid && x.Status != AccountStatus.Cancelled)
             .GroupBy(x => x.DueDate.Date)
             .ToDictionary(g => g.Key, g => g.Sum(x => x.RemainingAmount));
-        
+
         // Get realized (paid) accounts to show what already happened
+        var today = DateTime.UtcNow.Date;
+        var historyDays = 30;
+        var finalDate = projectionEnd;
+
         var flowPayablesPaid = payables
             .Where(x => x.PaymentDate.HasValue && x.PaymentDate.Value.Date >= today.AddDays(-historyDays) && x.PaymentDate.Value.Date <= finalDate && x.Status == AccountStatus.Paid)
             .GroupBy(x => x.PaymentDate!.Value.Date)
@@ -96,22 +100,21 @@ public class FinancialDashboardService : IFinancialDashboardService
             .ToDictionary(g => g.Key, g => g.Sum(x => x.PaidAmount));
 
         // Calculate cumulative balance starting from initial balance
-        decimal cumulativeBalance = initialBalance;
-        
-        for (int i = 0; i <= projectionDays; i++)
+        decimal cumulativeBalance = dto.TotalReceivablePaid - dto.TotalPayablePaid;
+
         for (int i = 0; i <= projectionDays; i++)
         {
             var date = projectionStart.AddDays(i);
             var revenue = flowReceivables.ContainsKey(date) ? flowReceivables[date] : 0;
             var expense = flowPayables.ContainsKey(date) ? flowPayables[date] : 0;
-            
-            cumulativeBalance += (totalRevenue - totalExpense);
-            
+
+            cumulativeBalance += (revenue - expense);
+
             var cashFlowItem = new CashFlowItemDto
             {
                 Date = date,
-                Expense = totalExpense,
-                Revenue = totalRevenue,
+                Expense = expense,
+                Revenue = revenue,
                 CumulativeBalance = cumulativeBalance
             };
             

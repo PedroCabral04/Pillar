@@ -1,3 +1,8 @@
+/* Global font family - Poppins */
+html, body {
+    font-family: 'Poppins', 'Roboto', 'Segoe UI', 'Arial', sans-serif !important;
+}
+
 /* Tenant branding defaults */
 :root {
     --tenant-primary: #594AE2;
@@ -6,7 +11,7 @@
     --tenant-primary-rgb: 89, 74, 226;
     --tenant-secondary-rgb: 0, 172, 193;
     --tenant-accent-rgb: 255, 193, 7;
-    
+
     /* Font size preference - default values */
     --erp-font-size-table: 0.875rem;
     --erp-font-size-table-header: 0.875rem;

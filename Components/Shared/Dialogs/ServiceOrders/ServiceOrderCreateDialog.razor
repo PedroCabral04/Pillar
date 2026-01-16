@@ -9,51 +9,104 @@
 @inject IApiService ApiService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject CurrencyFormatService Currency
 
-<MudDialog>
+ <MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Build" Color="Color.Primary" Size="Size.Large" />
+            <MudText Typo="Typo.h6">Nova Ordem de Serviço</MudText>
+        </MudStack>
+    </TitleContent>
     <DialogContent>
-        <MudForm @ref="@_form" @bind-IsValid="@_isValid" @bind-Errors="@_errors">
-            <MudStack Spacing="3">
-                <!-- Cliente -->
-                <MudSelect T="int?" Label="Cliente" @bind-Value="_dto.CustomerId"
-                        Variant="Variant.Outlined" Dense="true"
-                        SearchBox="true" SearchBoxPlaceholder="Buscar cliente..."
-                        Required="true" RequiredError="Cliente é obrigatório">
-                    @if (_customers != null)
-                    {
-                        @foreach (var customer in _customers)
-                        {
-                            <MudSelectItem T="int?" Value="@customer.Id">@customer.Name - @customer.Document</MudSelectItem>
-                        }
-                    }
-                </MudSelect>
-
-                <!-- Datas -->
-                <MudStack Row="true" Spacing="2">
-                    <MudItem xs="6">
-                        <DatePicker Label="Data Entrada" @bind-Date="_entryDate" Dense="true" Required="true"/>
+        @if (_loading)
+        {
+            <MudStack AlignItems="AlignItems.Center" Spacing="3" Class="pa-6">
+                <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+                <MudText Typo="Typo.body1" Color="Color.Secondary">Carregando dados...</MudText>
+            </MudStack>
+        }
+        else
+        {
+            <MudForm @ref="@_form" @bind-IsValid="@_isValid" @bind-Errors="@_errors" Class="pa-2">
+                <MudGrid Spacing="3">
+                    <!-- Informações da Ordem -->
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-2">
+                            <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Class="mr-1" />
+                            Informações da Ordem
+                        </MudText>
                     </MudItem>
-                    <MudItem xs="6">
-                        <DatePicker Label="Previsão Entrega" @bind-Date="_dto.EstimatedCompletionDate" Dense="true"/>
-                    </MudItem>
-                </MudStack>
 
-                <!-- Informações do Aparelho -->
-                <MudText Typo="Typo.subtitle2" Class="mt-2">Informações do Aparelho</MudText>
-                <MudStack Row="true" Spacing="2">
-                    <MudItem xs="6">
+                    <MudItem xs="12" md="6">
+                        <MudAutocomplete T="CustomerDto"
+                                        Label="Cliente"
+                                        @bind-Value="_selectedCustomer"
+                                        SearchFunc="SearchCustomers"
+                                        ToStringFunc="@(c => c != null ? $"{c.Name} - {c.Document}" : "")"
+                                        Variant="Variant.Outlined"
+                                        Required="true"
+                                        Clearable="true"
+                                        Adornment="Adornment.Start"
+                                        AdornmentIcon="@Icons.Material.Filled.Person"
+                                        DebounceInterval="300"/>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudSelect T="string" Label="Status" @bind-Value="_dto.Status"
+                                Variant="Variant.Outlined"
+                                Adornment="Adornment.Start"
+                                AdornmentIcon="@Icons.Material.Filled.RadioButtonChecked">
+                            <MudSelectItem T="string" Value="@("Open")">Aberta</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("InProgress")">Em Andamento</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Completed")">Concluída</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Cancelled")">Cancelada</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <DatePicker Label="Data Entrada"
+                                    @bind-Date="_entryDate"
+                                    Required="true"
+                                    Adornment="Adornment.Start"
+                                    AdornmentIcon="@Icons.Material.Filled.Event"/>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <DatePicker Label="Previsão Entrega"
+                                    @bind-Date="_dto.EstimatedCompletionDate"
+                                    Adornment="Adornment.Start"
+                                    AdornmentIcon="@Icons.Material.Filled.Schedule"/>
+                    </MudItem>
+
+                    <MudDivider Class="my-2"/>
+
+                    <!-- Informações do Aparelho -->
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-2">
+                            <MudIcon Icon="@Icons.Material.Filled.Devices" Size="Size.Small" Class="mr-1" />
+                            Informações do Aparelho
+                        </MudText>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
                         <MudTextField T="string" Label="Marca" @bind-Value="_dto.DeviceBrand"
-                                    Variant="Variant.Outlined" Dense="true"/>
+                                    Variant="Variant.Outlined"
+                                    Adornment="Adornment.Start"
+                                    AdornmentIcon="@Icons.Material.Filled.PhoneAndroid"/>
                     </MudItem>
-                    <MudItem xs="6">
+                    <MudItem xs="12" md="6">
                         <MudTextField T="string" Label="Modelo" @bind-Value="_dto.DeviceModel"
-                                    Variant="Variant.Outlined" Dense="true"/>
+                                    Variant="Variant.Outlined"
+                                    Adornment="Adornment.Start"
+                                    AdornmentIcon="@Icons.Material.Filled.PhoneIphone"/>
                     </MudItem>
-                </MudStack>
-                <MudStack Row="true" Spacing="2">
-                    <MudItem xs="6">
+
+                    <MudItem xs="12" md="6">
                         <MudSelect T="string" Label="Tipo" @bind-Value="_dto.DeviceType"
-                                Variant="Variant.Outlined" Dense="true">
+                                Variant="Variant.Outlined"
+                                Adornment="Adornment.Start"
+                                AdornmentIcon="@Icons.Material.Filled.Category">
                             <MudSelectItem T="string" Value="@("Smartphone")">Smartphone</MudSelectItem>
                             <MudSelectItem T="string" Value="@("Tablet")">Tablet</MudSelectItem>
                             <MudSelectItem T="string" Value="@("Notebook")">Notebook</MudSelectItem>
@@ -64,82 +117,164 @@
                             <MudSelectItem T="string" Value="@("Other")">Outro</MudSelectItem>
                         </MudSelect>
                     </MudItem>
-                    <MudItem xs="6">
+
+                    <MudItem xs="12" md="6">
                         <MudTextField T="string" Label="Número de Série" @bind-Value="_dto.SerialNumber"
-                                    Variant="Variant.Outlined" Dense="true"/>
+                                    Variant="Variant.Outlined"
+                                    Adornment="Adornment.Start"
+                                    AdornmentIcon="@Icons.Material.Filled.Tag"/>
                     </MudItem>
-                </MudStack>
-                <MudTextField T="string" Label="Senha do Aparelho (opcional)" @bind-Value="_dto.Password"
-                            Variant="Variant.Outlined" Dense="true" InputType="InputType.Password"/>
 
-                <!-- Problema -->
-                <MudTextField T="string" Label="Descrição do Problema" @bind-Value="_dto.ProblemDescription"
-                            Variant="Variant.Outlined" Dense="true" Multiline="true" Lines="3"
-                            Required="true" RequiredError="Descrição do problema é obrigatória"/>
+                    <MudItem xs="12">
+                        <MudTextField T="string" Label="Senha do Aparelho (opcional)" @bind-Value="_dto.Password"
+                                    Variant="Variant.Outlined" InputType="@_devicePasswordInput"
+                                    Adornment="Adornment.End"
+                                    AdornmentIcon="@_devicePasswordIcon"
+                                    OnAdornmentClick="ToggleDevicePasswordVisibility"/>
+                    </MudItem>
 
-                <!-- Serviços -->
-                <MudText Typo="Typo.subtitle2">Serviços a Realizar</MudText>
-                @foreach (var item in _dto.Items)
-                {
-                    <MudPaper Class="pa-3 mb-2">
-                        <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
-                            <MudItem xs="5">
-                                <MudTextField T="string" @bind-Value="item.Description" Label="Descrição"
-                                            Variant="Variant.Outlined" Dense="true" Required="true"/>
-                            </MudItem>
-                            <MudItem xs="3">
-                                <MudNumericField T="decimal" @bind-Value="item.Price" Label="Preço"
-                                            Variant="Variant.Outlined" Dense="true" Required="true"/>
-                            </MudItem>
-                            <MudItem xs="3">
-                                <MudTextField T="string" @bind-Value="item.ServiceType" Label="Tipo"
-                                            Variant="Variant.Outlined" Dense="true"/>
-                            </MudItem>
-                            <MudItem xs="1">
-                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
-                                            OnClick="@(() => RemoveItem(item))"/>
-                            </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField T="string" Label="Descrição do Problema" @bind-Value="_dto.ProblemDescription"
+                                    Variant="Variant.Outlined" Multiline="true" Lines="3"
+                                    Required="true" RequiredError="Descrição do problema é obrigatória"
+                                    Adornment="Adornment.Start"
+                                    AdornmentIcon="@Icons.Material.Filled.ReportProblem"/>
+                    </MudItem>
+
+                    <MudDivider Class="my-2"/>
+
+                    <!-- Serviços a Realizar -->
+                    <MudItem xs="12">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+                            <MudText Typo="Typo.subtitle2" Color="Color.Primary">
+                                <MudIcon Icon="@Icons.Material.Filled.Build" Size="Size.Small" Class="mr-1" />
+                                Serviços a Realizar
+                            </MudText>
+                            <MudButton OnClick="AddItem"
+                                      StartIcon="@Icons.Material.Filled.Add"
+                                      Size="Size.Small"
+                                      Variant="Variant.Outlined"
+                                      Color="Color.Primary">
+                                Adicionar Serviço
+                            </MudButton>
                         </MudStack>
-                    </MudPaper>
-                }
-                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="AddItem"
-                        StartIcon="@Icons.Material.Filled.Add" Size="Size.Small" Class="mb-2">
-                    Adicionar Serviço
-                </MudButton>
-
-                <!-- Notas e Garantia -->
-                <MudStack Row="true" Spacing="2">
-                    <MudItem xs="6">
-                        <MudTextField T="string" Label="Notas Técnicas" @bind-Value="_dto.TechnicalNotes"
-                                    Variant="Variant.Outlined" Dense="true" Multiline="true" Lines="2"/>
                     </MudItem>
-                    <MudItem xs="6">
-                        <MudTextField T="string" Label="Notas ao Cliente" @bind-Value="_dto.CustomerNotes"
-                                    Variant="Variant.Outlined" Dense="true" Multiline="true" Lines="2"/>
-                    </MudItem>
-                </MudStack>
 
-                <MudStack Row="true" Spacing="2">
-                    <MudItem xs="6">
+                    @if (_dto.Items.Any())
+                    {
+                        <MudItem xs="12">
+                            <MudPaper Elevation="2" Class="pa-3">
+                                @foreach (var (item, index) in _dto.Items.Select((item, idx) => (item, idx)))
+                                {
+                                    <MudPaper Elevation="1" Class="pa-3 mb-3" Style="border-left: 3px solid var(--mud-palette-primary);">
+                                        <MudGrid Spacing="2">
+                                            <MudItem xs="12" md="5">
+                                                <MudTextField T="string" @bind-Value="item.Description" Label="Descrição"
+                                                            Variant="Variant.Outlined" Dense="true" Required="true"/>
+                                            </MudItem>
+                                            <MudItem xs="12" md="3">
+                                                <MudNumericField T="decimal" @bind-Value="item.Price" Label="Preço"
+                                                            Variant="Variant.Outlined" Dense="true" Required="true" Format="C2"
+                                                            Adornment="Adornment.Start" AdornmentText="R$"/>
+                                            </MudItem>
+                                            <MudItem xs="12" md="3">
+                                                <MudTextField T="string" @bind-Value="item.ServiceType" Label="Tipo"
+                                                            Variant="Variant.Outlined" Dense="true"/>
+                                            </MudItem>
+                                            <MudItem xs="12" md="1" Class="d-flex align-center justify-center">
+                                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                                                              Size="Size.Small" OnClick="@(() => RemoveItem(index))"/>
+                                            </MudItem>
+                                        </MudGrid>
+                                    </MudPaper>
+                                }
+                            </MudPaper>
+                        </MudItem>
+                    }
+                    else
+                    {
+                        <MudItem xs="12">
+                            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                                Nenhum serviço adicionado. Clique em "Adicionar Serviço" para começar.
+                            </MudAlert>
+                        </MudItem>
+                    }
+
+                    <MudDivider Class="my-2"/>
+
+                    <!-- Totais e Condições -->
+                    <MudItem xs="12" md="6">
+                        <MudNumericField T="decimal" Label="Desconto" @bind-Value="_dto.DiscountAmount"
+                                    Variant="Variant.Outlined" Min="0" Format="C2"
+                                    Adornment="Adornment.Start" AdornmentText="R$"/>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
                         <MudSelect T="string" Label="Garantia" @bind-Value="_dto.WarrantyType"
-                                Variant="Variant.Outlined" Dense="true">
-                            <MudSelectItem T="string" Value="@("")">Sem garantia</MudSelectItem>
+                                Variant="Variant.Outlined"
+                                Adornment="Adornment.Start"
+                                AdornmentIcon="@Icons.Material.Filled.VerifiedUser">
+                            <MudSelectItem T="string" Value="@("none")">Sem garantia</MudSelectItem>
                             <MudSelectItem T="string" Value="@("30 dias")">30 dias</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("60 dias")">60 dias</MudSelectItem>
                             <MudSelectItem T="string" Value="@("90 dias")">90 dias</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("120 dias")">120 dias</MudSelectItem>
                         </MudSelect>
                     </MudItem>
-                    <MudItem xs="6">
-                        <MudNumericField T="decimal" Label="Desconto" @bind-Value="_dto.DiscountAmount"
-                                    Variant="Variant.Outlined" Dense="true" Min="0"/>
+
+                    <MudItem xs="12" md="6">
+                        <MudPaper Elevation="3" Class="pa-3" Style="background: var(--mud-palette-primary); color: white;">
+                            <MudStack Spacing="1">
+                                <MudText Typo="Typo.caption">Total dos Serviços</MudText>
+                                <MudText Typo="Typo.h6">@GetServicesTotal()</MudText>
+                                <MudDivider Light="true" Class="my-1"/>
+                                <MudText Typo="Typo.caption">Desconto</MudText>
+                                <MudText Typo="Typo.body2">@GetDiscountAmount()</MudText>
+                                <MudDivider Light="true" Class="my-1"/>
+                                <MudText Typo="Typo.subtitle1" Style="font-weight: bold;">TOTAL: @GetNetTotal()</MudText>
+                            </MudStack>
+                        </MudPaper>
                     </MudItem>
-                </MudStack>
-            </MudStack>
-        </MudForm>
+
+                    <MudDivider Class="my-2"/>
+
+                    <!-- Notas -->
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-2">
+                            <MudIcon Icon="@Icons.Material.Filled.Notes" Size="Size.Small" Class="mr-1" />
+                            Notas
+                        </MudText>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudTextField T="string" Label="Notas Técnicas" @bind-Value="_dto.TechnicalNotes"
+                                    Variant="Variant.Outlined" Multiline="true" Lines="2"
+                                    Adornment="Adornment.Start"
+                                    AdornmentIcon="@Icons.Material.Filled.Engineering"/>
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField T="string" Label="Notas ao Cliente" @bind-Value="_dto.CustomerNotes"
+                                    Variant="Variant.Outlined" Multiline="true" Lines="2"
+                                    Adornment="Adornment.Start"
+                                    AdornmentIcon="@Icons.Material.Filled.Comment"/>
+                    </MudItem>
+                </MudGrid>
+            </MudForm>
+        }
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="Cancel">Cancelar</MudButton>
-        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="@(!_isValid)">
-            Criar Ordem
+        <MudButton OnClick="Cancel" Variant="Variant.Outlined">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="@(_loading || !_isValid || !_dto.Items.Any())">
+            @if (_processing)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2"/>
+                <text>Criando...</text>
+            }
+            else
+            {
+                <MudIcon Icon="@Icons.Material.Filled.Build" Class="mr-1"/>
+                <text>Criar Ordem</text>
+            }
         </MudButton>
     </DialogActions>
 </MudDialog>
@@ -152,37 +287,66 @@
     private string[] _errors = Array.Empty<string>();
     private readonly CreateServiceOrderDto _dto = new() { Status = "Open" };
     private DateTime? _entryDate = DateTime.Now;
-    private List<CustomerDto>? _customers;
+    private CustomerDto? _selectedCustomer;
+    private bool _loading = false;
+    private bool _processing = false;
 
-    protected override async Task OnInitializedAsync()
+    private bool _showDevicePassword = false;
+    private InputType _devicePasswordInput = InputType.Password;
+    private string _devicePasswordIcon = Icons.Material.Filled.VisibilityOff;
+
+    private void ToggleDevicePasswordVisibility()
     {
-        await LoadCustomers();
+        _showDevicePassword = !_showDevicePassword;
+        _devicePasswordInput = _showDevicePassword ? InputType.Text : InputType.Password;
+        _devicePasswordIcon = _showDevicePassword ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff;
     }
 
-    private async Task LoadCustomers()
+    private async Task<IEnumerable<CustomerDto>> SearchCustomers(string value, CancellationToken ct)
     {
         try
         {
-            var response = await ApiService.GetAsync<List<CustomerDto>>("/api/sales/customers");
-            if (response != null)
-            {
-                _customers = response.Where(c => c.IsActive).ToList();
-            }
+            var url = string.IsNullOrWhiteSpace(value)
+                ? "/api/vendas/customers?pageSize=10"
+                : $"/api/vendas/customers?search={Uri.EscapeDataString(value)}&pageSize=10";
+
+            var response = await ApiService.GetAsync<PaginatedCustomersResponse>(url);
+            return response?.Items ?? new List<CustomerDto>();
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Erro ao carregar clientes: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Erro ao buscar clientes: {ex.Message}", Severity.Error);
+            return new List<CustomerDto>();
         }
     }
 
     private void AddItem()
     {
         _dto.Items.Add(new CreateServiceOrderItemDto());
+        StateHasChanged();
     }
 
-    private void RemoveItem(CreateServiceOrderItemDto item)
+    private void RemoveItem(int index)
     {
-        _dto.Items.Remove(item);
+        _dto.Items.RemoveAt(index);
+        StateHasChanged();
+    }
+
+    private string GetServicesTotal()
+    {
+        var total = _dto.Items.Sum(i => i.Price);
+        return Currency.Format(total);
+    }
+
+    private string GetDiscountAmount()
+    {
+        return Currency.Format(_dto.DiscountAmount);
+    }
+
+    private string GetNetTotal()
+    {
+        var total = _dto.Items.Sum(i => i.Price) - _dto.DiscountAmount;
+        return Currency.Format(total);
     }
 
     private void Cancel()
@@ -203,20 +367,26 @@
             return;
         }
 
+        _dto.CustomerId = _selectedCustomer?.Id;
         _dto.EntryDate = _entryDate ?? DateTime.Now;
 
+        _processing = true;
         try
         {
-            var response = await ApiService.PostAsync<ServiceOrderDto>("/api/service-orders", _dto);
+            var response = await ApiService.PostAsync<ServiceOrderDto>("/api/ordens-servico", _dto);
             if (response != null)
             {
                 Snackbar.Add($"Ordem de serviço {response.OrderNumber} criada com sucesso!", Severity.Success);
-                MudDialog.Close();
+                MudDialog.Close(DialogResult.Ok(response));
             }
         }
         catch (Exception ex)
         {
             Snackbar.Add($"Erro ao criar ordem: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _processing = false;
         }
     }
 }

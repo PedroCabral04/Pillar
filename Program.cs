@@ -30,6 +30,7 @@ using Microsoft.AspNetCore.Authorization;
 using System.Reflection;
 using Microsoft.Extensions.Options;
 using ApexCharts;
+using Microsoft.Extensions.Logging;
 
 // Prefer using DotNetEnv to load .env into environment variables in dev.
 // This keeps the bootstrap simple and delegates parsing to a tested library.
@@ -59,8 +60,10 @@ builder.Services.AddAuthorization(options =>
     // Module-based authorization policies
     options.AddPolicy(ModulePolicies.Dashboard, policy => 
         policy.Requirements.Add(new ModuleAccessRequirement(ModuleKeys.Dashboard)));
-    options.AddPolicy(ModulePolicies.Sales, policy => 
+    options.AddPolicy(ModulePolicies.Sales, policy =>
         policy.Requirements.Add(new ModuleAccessRequirement(ModuleKeys.Sales)));
+    options.AddPolicy(ModulePolicies.ServiceOrder, policy =>
+        policy.Requirements.Add(new ModuleAccessRequirement(ModuleKeys.ServiceOrder)));
     options.AddPolicy(ModulePolicies.Inventory, policy => 
         policy.Requirements.Add(new ModuleAccessRequirement(ModuleKeys.Inventory)));
     options.AddPolicy(ModulePolicies.Financial, policy => 
@@ -80,6 +83,63 @@ builder.Services.AddAuthorization(options =>
 // Register authorization handler
 builder.Services.AddScoped<IAuthorizationHandler, ModuleAccessHandler>();
 builder.Services.AddMemoryCache();
+
+// CORS Configuration - Security: Restrict cross-origin requests
+var allowedOrigins = builder.Configuration["Security:CorsAllowedOrigins"];
+if (!string.IsNullOrEmpty(allowedOrigins))
+{
+    builder.Services.AddCors(options =>
+    {
+        options.AddDefaultPolicy(policy =>
+        {
+            var origins = allowedOrigins.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (origins.Contains("*"))
+            {
+                // SECURITY: Block wildcard CORS in production
+                if (builder.Environment.IsProduction())
+                {
+                    throw new InvalidOperationException(
+                        "CORS wildcard (*) is not allowed in production. " +
+                        "Please configure specific origins in Security:CorsAllowedOrigins.");
+                }
+
+                // WARNING: AllowAll origins is not secure for production
+                policy.AllowAnyOrigin()
+                      .AllowAnyMethod()
+                      .AllowAnyHeader();
+            }
+            else
+            {
+                policy.WithOrigins(origins)
+                      .WithMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
+                      .WithHeaders("Content-Type", "Authorization", "X-CSRF-TOKEN")
+                      .AllowCredentials();
+            }
+        });
+    });
+}
+else
+{
+    // Default policy for development - allow same origin only
+    builder.Services.AddCors(options =>
+    {
+        options.AddDefaultPolicy(policy =>
+        {
+            if (builder.Environment.IsDevelopment())
+            {
+                policy.AllowAnyOrigin()
+                      .AllowAnyMethod()
+                      .AllowAnyHeader();
+            }
+            else
+            {
+                // Production: same origin only by default
+                policy.WithMethods("GET", "POST", "PUT", "DELETE", "PATCH")
+                      .WithHeaders("Content-Type", "Authorization", "X-CSRF-TOKEN");
+            }
+        });
+    });
+}
 
 // Data Protection keys persistence (optional, via env DATAPROTECTION__KEYS_DIRECTORY)
 var dataProtectionKeysDir = Environment.GetEnvironmentVariable("DATAPROTECTION__KEYS_DIRECTORY");
@@ -116,19 +176,37 @@ builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
     .AddCookie(IdentityConstants.ApplicationScheme, options =>
     {
         options.LoginPath = "/login";
-        options.LogoutPath = "/api/auth/logout";
+        options.LogoutPath = "/api/autenticacao/logout";
         options.Cookie.Name = "erp.auth";
-        options.ExpireTimeSpan = TimeSpan.FromDays(7);
-        options.SlidingExpiration = true;
+
+        // SECURITY: Configuração de expiração de cookie (configurável via appsettings)
+        var sessionHours = builder.Configuration.GetValue<int>("Security:SessionExpirationHours", 8);
+        options.ExpireTimeSpan = TimeSpan.FromHours(sessionHours);
+        options.SlidingExpiration = builder.Configuration.GetValue<bool>("Security:SlidingExpiration", true);
+
     // Harden cookie
-    options.Cookie.HttpOnly = true;
-    options.Cookie.SameSite = SameSiteMode.Lax; // prevents CSRF on cross-site navigations, still works for same-site
-        // Use SameAsRequest to support TLS termination at the proxy (Coolify/nginx)
-        // and avoid antiforgery exceptions when the incoming connection to Kestrel is HTTP
-        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+    options.Cookie.HttpOnly = true; // Previne acesso via JavaScript (anti-XSS)
+
+        // SECURITY: SameSite configuration
+        // Lax é necessário para Blazor Server funcionar com navegadores modernos
+        // Strict pode ser usado para endpoints de API sensíveis se necessário
+        var sameSiteMode = builder.Configuration.GetValue<string>("Security:SameSiteMode", "Lax");
+        options.Cookie.SameSite = Enum.Parse<SameSiteMode>(sameSiteMode);
+
+        // SECURITY: SecurePolicy - Always em produção quando HTTPS está habilitado
+        if (builder.Environment.IsProduction())
+        {
+            options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        }
+        else
+        {
+            // Desenvolvimento: SameAsRequest para suportar TLS termination
+            options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        }
+
     options.Cookie.Path = "/";
     options.Cookie.IsEssential = true; // ensure cookie not blocked by consent if used
-    
+
     // Configure API-specific events to return JSON instead of redirecting
     options.Events.OnRedirectToLogin = context =>
     {
@@ -279,30 +357,77 @@ builder.Services.AddAntiforgery(o =>
     // HeaderName can be customized if you post forms via JS: o.HeaderName = "X-CSRF-TOKEN";
 });
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
+                    ?? builder.Configuration["DbContextSettings:ConnectionString"];
+
+// SECURITY: Valida que connection string está configurada em produção
+if (builder.Environment.IsProduction() && string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException(
+        "Database connection string not configured. Please set ConnectionStrings__DefaultConnection or DbContextSettings__ConnectionString environment variable.");
+}
+
 builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =>
 {
-    var resolver = serviceProvider.GetRequiredService<erp.Services.Tenancy.ITenantConnectionResolver>();
-    var effectiveConnection = resolver.GetCurrentConnectionString();
+    // SECURITY: Verifica se a connection string padrão foi deixada
+    if (connectionString != null)
+    {
+        // Check for common/default passwords patterns
+        var passwordMatch = System.Text.RegularExpressions.Regex.Match(
+            connectionString,
+            @"Password=(?:123|password|Password123|admin|root|postgres|test|demo)",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        if (passwordMatch.Success)
+        {
+            // SECURITY: Block weak passwords in production
+            if (builder.Environment.IsProduction())
+            {
+                throw new InvalidOperationException(
+                    "Weak database password detected. The connection string contains a common/default password. " +
+                    "Please use a strong, unique password for your database.");
+            }
+            // Log warning in development - would need ILogger here but not available at this stage
+            // The warning will be visible in the exception above if run in production
+        }
+    }
+
     options.UseNpgsql(
-        effectiveConnection ?? connectionString ?? "Host=localhost;Database=erp;Username=postgres;Password=123",
+        connectionString ?? "Host=localhost;Database=erp;Username=postgres",
         npgsql => npgsql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)
     );
 });
 
 builder.Services.AddDbContextFactory<ApplicationDbContext>((serviceProvider, options) =>
 {
-    var resolver = serviceProvider.GetRequiredService<erp.Services.Tenancy.ITenantConnectionResolver>();
-    var effectiveConnection = resolver.GetCurrentConnectionString();
+    // SECURITY: Verifica se a connection string padrão foi deixada
+    if (connectionString != null)
+    {
+        // Check for common/default passwords patterns
+        var passwordMatch = System.Text.RegularExpressions.Regex.Match(
+            connectionString,
+            @"Password=(?:123|password|Password123|admin|root|postgres|test|demo)",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        if (passwordMatch.Success)
+        {
+            // SECURITY: Block weak passwords in production
+            if (builder.Environment.IsProduction())
+            {
+                throw new InvalidOperationException(
+                    "Weak database password detected. The connection string contains a common/default password. " +
+                    "Please use a strong, unique password for your database.");
+            }
+        }
+    }
+
     options.UseNpgsql(
-        effectiveConnection ?? connectionString ?? "Host=localhost;Database=erp;Username=postgres;Password=123",
+        connectionString ?? "Host=localhost;Database=erp;Username=postgres",
         npgsql => npgsql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)
     );
 }, ServiceLifetime.Scoped);
 
 // Registra DAOs e Serviços
-builder.Services.AddScoped<IUserDao, UserDao>();
-builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<PreferenceService>();
 builder.Services.AddScoped<CurrencyFormatService>();
 builder.Services.AddScoped<ThemeService>();
@@ -398,6 +523,7 @@ builder.Services.AddScoped<erp.DAOs.Assets.IAssetDao, erp.DAOs.Assets.AssetDao>(
 builder.Services.AddScoped<erp.Services.Assets.IAssetService, erp.Services.Assets.AssetService>();
 builder.Services.AddScoped<erp.Services.Assets.IQRCodeService, erp.Services.Assets.QRCodeService>();
 builder.Services.AddScoped<erp.Services.Assets.IFileStorageService, erp.Services.Assets.LocalFileStorageService>();
+builder.Services.AddScoped<erp.Security.IFileValidationService, erp.Security.FileValidationService>();
 builder.Services.AddScoped<erp.Mappings.AssetMapper>();
 
 // Time tracking services
@@ -410,6 +536,7 @@ builder.Services.AddScoped<erp.Services.Payroll.IPayrollService, erp.Services.Pa
 
 // Audit services
 builder.Services.AddScoped<erp.Services.Audit.IAuditService, erp.Services.Audit.AuditService>();
+builder.Services.AddScoped<erp.Services.Audit.IAuditRetentionService, erp.Services.Audit.AuditRetentionService>();
 
 // Authorization / Permission services
 builder.Services.AddScoped<IPermissionService, PermissionService>();
@@ -419,6 +546,7 @@ builder.Services.AddSingleton<erp.Services.Chatbot.IChatbotCacheService, erp.Ser
 builder.Services.AddScoped<erp.Services.Chatbot.IChatbotService, erp.Services.Chatbot.ChatbotService>();
 builder.Services.AddScoped<erp.Services.Chatbot.IChatConversationService, erp.Services.Chatbot.ChatConversationService>();
 builder.Services.AddScoped<erp.DAOs.Chatbot.IChatConversationDao, erp.DAOs.Chatbot.ChatConversationDao>();
+builder.Services.AddScoped<erp.Services.Chatbot.IChatbotUserContext, erp.Services.Chatbot.ChatbotUserContext>();
 
 // Browser Service (Mobile/Responsive)
 builder.Services.AddScoped<erp.Services.Browser.IBrowserService, erp.Services.Browser.BrowserService>();
@@ -428,11 +556,34 @@ builder.Services.AddScoped<erp.Services.Tenancy.ITenantService, erp.Services.Ten
 builder.Services.AddScoped<erp.Services.Tenancy.ITenantBrandingService, erp.Services.Tenancy.TenantBrandingService>();
 builder.Services.AddScoped<erp.Services.Tenancy.ITenantContextAccessor, erp.Services.Tenancy.TenantContextAccessor>();
 builder.Services.AddScoped<erp.Services.Tenancy.ITenantResolver, erp.Services.Tenancy.DefaultTenantResolver>();
-builder.Services.AddScoped<erp.Services.Tenancy.ITenantDbContextFactory, erp.Services.Tenancy.TenantDbContextFactory>();
-builder.Services.AddScoped<erp.Services.Tenancy.ITenantProvisioningService, erp.Services.Tenancy.TenantProvisioningService>();
-builder.Services.AddScoped<erp.Services.Tenancy.ITenantConnectionResolver, erp.Services.Tenancy.TenantConnectionResolver>();
 builder.Services.AddScoped<erp.Services.Tenancy.ITenantBrandingProvider, erp.Services.Tenancy.TenantBrandingProvider>();
-builder.Services.Configure<erp.Services.Tenancy.TenantDatabaseOptions>(builder.Configuration.GetSection("MultiTenancy:Database"));
+
+// Administration services
+builder.Services.AddScoped<erp.Services.Administration.IDepartmentService, erp.Services.Administration.DepartmentService>();
+builder.Services.AddScoped<erp.DAOs.Administration.IDepartmentDao, erp.DAOs.Administration.DepartmentDao>();
+builder.Services.AddScoped<erp.Services.Administration.IPositionService, erp.Services.Administration.PositionService>();
+builder.Services.AddScoped<erp.DAOs.Administration.IPositionDao, erp.DAOs.Administration.PositionDao>();
+
+// Kanban services
+builder.Services.AddScoped<erp.Services.Kanban.IKanbanService, erp.Services.Kanban.KanbanService>();
+builder.Services.AddScoped<erp.DAOs.Kanban.IKanbanDao, erp.DAOs.Kanban.KanbanDao>();
+
+// Inventory DAOs
+builder.Services.AddScoped<erp.DAOs.Inventory.IProductDao, erp.DAOs.Inventory.ProductDao>();
+builder.Services.AddScoped<erp.DAOs.Inventory.IProductCategoryDao, erp.DAOs.Inventory.ProductCategoryDao>();
+builder.Services.AddScoped<erp.DAOs.Inventory.IStockMovementDao, erp.DAOs.Inventory.StockMovementDao>();
+builder.Services.AddScoped<erp.DAOs.Inventory.IWarehouseDao, erp.DAOs.Inventory.WarehouseDao>();
+
+// Sales DAOs
+builder.Services.AddScoped<erp.DAOs.Sales.ICustomerDao, erp.DAOs.Sales.CustomerDao>();
+builder.Services.AddScoped<erp.DAOs.Sales.ISaleDao, erp.DAOs.Sales.SaleDao>();
+
+// Payroll DAOs
+builder.Services.AddScoped<erp.DAOs.Payroll.IPayrollPeriodDao, erp.DAOs.Payroll.PayrollPeriodDao>();
+builder.Services.AddScoped<erp.DAOs.Payroll.IPayrollEntryDao, erp.DAOs.Payroll.PayrollEntryDao>();
+
+// Service Orders DAOs
+builder.Services.AddScoped<erp.DAOs.ServiceOrders.IServiceOrderDao, erp.DAOs.ServiceOrders.ServiceOrderDao>();
 
 // Email services
 builder.Services.Configure<erp.Services.Email.EmailSettings>(builder.Configuration.GetSection("Email"));
@@ -447,7 +598,6 @@ builder.Services.AddScoped<erp.Services.Reports.IPdfExportService, erp.Services.
 builder.Services.AddScoped<erp.Services.Reports.IExcelExportService, erp.Services.Reports.ExcelExportService>();
 
 // ------- REGISTRO DO MAPPERLY -------
-builder.Services.AddScoped<UserMapper, UserMapper>();
 builder.Services.AddScoped<ProductMapper, ProductMapper>();
 builder.Services.AddScoped<StockMovementMapper, StockMovementMapper>();
 builder.Services.AddScoped<StockCountMapper, StockCountMapper>();
@@ -494,7 +644,13 @@ else
 
 app.UseHttpsRedirection(); // Redireciona HTTP para HTTPS
 
+// Security Headers - Protege contra XSS, clickjacking, MIME sniffing
+app.UseSecurityHeaders();
+
 app.UseStaticFiles(); // Permite servir arquivos estáticos como CSS, JS, imagens
+
+// CORS - Deve vir antes de Authentication/Authorization
+app.UseCors();
 
 // Enforce secure cookie behaviors globally
 app.UseCookiePolicy(new CookiePolicyOptions
@@ -554,6 +710,7 @@ app.MapRazorComponents<App>() // Mapeia os componentes Blazor
 // Seed inicial de Identity (ambiente de dev)
 using (var scope = app.Services.CreateScope())
 {
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     try
     {
         // Bootstrap flag: forces EnsureCreated on first deploys when migrations aren't available
@@ -563,212 +720,6 @@ using (var scope = app.Services.CreateScope())
         var dbBootstrap = bootstrapCfg || string.Equals(bootstrapEnv, "true", StringComparison.OrdinalIgnoreCase);
 
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        
-        // --- HOTFIX: Increase PayrollEntry precision ---
-        try
-        {
-            await db.Database.ExecuteSqlRawAsync(@"
-                ALTER TABLE ""PayrollEntries"" ALTER COLUMN ""HorasExtras"" TYPE numeric(18,2);
-                ALTER TABLE ""PayrollEntries"" ALTER COLUMN ""Faltas"" TYPE numeric(18,2);
-                ALTER TABLE ""PayrollEntries"" ALTER COLUMN ""Atrasos"" TYPE numeric(18,2);
-                ALTER TABLE ""PayrollEntries"" ALTER COLUMN ""Abonos"" TYPE numeric(18,2);
-            ");
-            Console.WriteLine("[Hotfix] PayrollEntry precision increased.");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Hotfix] Error increasing precision (might be already applied): {ex.Message}");
-        }
-        
-        // --- AUTO-FIX: Baseline migrations if missing (Self-Healing for Coolify) ---
-        try 
-        {
-            // Check if AspNetUsers exists (implies DB was created with EnsureCreated)
-            var userTableExists = await db.Database.SqlQueryRaw<int>(
-                "SELECT count(*)::int FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'AspNetUsers'")
-                .FirstOrDefaultAsync() > 0;
-
-            // Check if history table exists
-            var historyTableExists = await db.Database.SqlQueryRaw<int>(
-                "SELECT count(*)::int FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '__EFMigrationsHistory'")
-                .FirstOrDefaultAsync() > 0;
-
-            if (userTableExists && !historyTableExists)
-            {
-                Console.WriteLine("[DB] CRITICAL: Existing database detected without migration history. Injecting baseline...");
-                
-                // 1. Create history table
-                await db.Database.ExecuteSqlRawAsync(@"
-                    CREATE TABLE IF NOT EXISTS ""__EFMigrationsHistory"" (
-                        ""MigrationId"" character varying(150) NOT NULL,
-                        ""ProductVersion"" character varying(32) NOT NULL,
-                        CONSTRAINT ""PK___EFMigrationsHistory"" PRIMARY KEY (""MigrationId"")
-                    );
-                ");
-
-                // 2. Always inject identity3 (base)
-                await db.Database.ExecuteSqlRawAsync(@"
-                    INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"") VALUES
-                    ('20250819121312_identity3', '9.0.0')
-                    ON CONFLICT DO NOTHING;
-                ");
-
-                // 3. Check for PreferencesJson column to decide if we inject the rest
-                var preferencesColumnExists = await db.Database.SqlQueryRaw<int>(
-                    "SELECT count(*)::int FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'AspNetUsers' AND column_name = 'PreferencesJson'")
-                    .FirstOrDefaultAsync() > 0;
-
-                if (preferencesColumnExists)
-                {
-                    Console.WriteLine("[DB] PreferencesJson column found. Injecting full history.");
-                    await db.Database.ExecuteSqlRawAsync(@"
-                        INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"") VALUES
-                        ('20251010180810_AddPreferencesJsonToUser', '9.0.0'),
-                        ('20251013022123_first', '9.0.0'),
-                        ('20251013055802_AddInventoryModule', '9.0.0'),
-                        ('20251013115625_AddSalesModule', '9.0.0'),
-                        ('20251013120656_AddSaleOrderForeignKeyToStockMovement', '9.0.0'),
-                        ('20251013121723_StandardizeTableNaming', '9.0.0'),
-                        ('20251031173129_SyncModelChanges', '9.0.0'),
-                        ('20251031180038_AddChatbotPersistence', '9.0.0'),
-                        ('20251031184135_rollback', '9.0.0'),
-                        ('20251103134934_AddHRManagementModule', '9.0.0'),
-                        ('20251107224217_AddAuditSystem', '9.0.0'),
-                        ('20251108001102_FixAuditSystemIdCapture', '9.0.0'),
-                        ('20251108025347_OptimizeAuditIndexes', '9.0.0'),
-                        ('20251108025813_OptimizeAuditIndexesComposite', '9.0.0'),
-                        ('20251108031849_AddAuditReadTracking', '9.0.0'),
-                        ('20251109234656_AddTimeTrackingModule', '9.0.0'),
-                        ('20251110025704_AddPayrollTimeTracking', '9.0.0'),
-                        ('20251110052846_AddFinancialModule', '9.0.0'),
-                        ('20251110133012_Payroll', '9.0.0'),
-                        ('20251112125954_AddAssetManagement', '9.0.0'),
-                        ('20251112164546_AddAssetDocumentsAndTransfers', '9.0.0'),
-                        ('20251113232410_assets', '9.0.0'),
-                        ('20251117172535_20251117120000_AddPayrollModule', '9.0.0'),
-                        ('20251118130514_20251118103000_AddTenancyFoundation', '9.0.0'),
-                        ('20251118173420_20251118121500_AddTenantDatabaseNameUniqueIndex', '9.0.0'),
-                        ('20251118181714_AddTenantIdToCustomerAndSupplier', '9.0.0'),
-                        ('20251119173014_AddOnboardingPersistence', '9.0.0'),
-                        ('20251119175842_AddUserOnboardingProgress', '9.0.0'),
-                        ('20251124204325_slq', '9.0.0'),
-                        ('20251124235058_AddTenancyToIdentity', '9.0.0'),
-                        ('20251126112516_AddDashboardEntities', '9.0.0'),
-                        ('20251201063720_update2', '9.0.0')
-                        ON CONFLICT DO NOTHING;
-                    ");
-                }
-                else
-                {
-                    Console.WriteLine("[DB] PreferencesJson column NOT found. Skipping full history injection to allow migration.");
-                }
-                
-                Console.WriteLine("[DB] Baseline injected successfully.");
-            }
-            
-            // --- AUTO-FIX: Create missing Dashboard tables ---
-            var dashboardTablesExist = await db.Database.SqlQueryRaw<int>(
-                "SELECT count(*)::int FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'WidgetRoleConfigurations'")
-                .FirstOrDefaultAsync() > 0;
-                
-            if (!dashboardTablesExist)
-            {
-                Console.WriteLine("[DB] Dashboard tables missing. Creating WidgetRoleConfigurations and UserDashboardLayouts...");
-                await db.Database.ExecuteSqlRawAsync(@"
-                    CREATE TABLE IF NOT EXISTS ""UserDashboardLayouts"" (
-                        ""Id"" integer GENERATED BY DEFAULT AS IDENTITY,
-                        ""UserId"" integer NOT NULL,
-                        ""LayoutJson"" jsonb NOT NULL,
-                        ""LayoutType"" character varying(20) NOT NULL,
-                        ""Columns"" integer NOT NULL DEFAULT 3,
-                        ""LastModified"" timestamp with time zone NOT NULL,
-                        ""CreatedAt"" timestamp with time zone NOT NULL,
-                        CONSTRAINT ""PK_UserDashboardLayouts"" PRIMARY KEY (""Id""),
-                        CONSTRAINT ""FK_UserDashboardLayouts_AspNetUsers_UserId"" FOREIGN KEY (""UserId"") REFERENCES ""AspNetUsers"" (""Id"") ON DELETE CASCADE
-                    );
-                    
-                    CREATE UNIQUE INDEX IF NOT EXISTS ""IX_UserDashboardLayouts_UserId"" ON ""UserDashboardLayouts"" (""UserId"");
-                    
-                    CREATE TABLE IF NOT EXISTS ""WidgetRoleConfigurations"" (
-                        ""Id"" integer GENERATED BY DEFAULT AS IDENTITY,
-                        ""ProviderKey"" character varying(50) NOT NULL,
-                        ""WidgetKey"" character varying(100) NOT NULL,
-                        ""RolesJson"" jsonb,
-                        ""LastModified"" timestamp with time zone NOT NULL,
-                        ""ModifiedByUserId"" integer,
-                        CONSTRAINT ""PK_WidgetRoleConfigurations"" PRIMARY KEY (""Id""),
-                        CONSTRAINT ""FK_WidgetRoleConfigurations_AspNetUsers_ModifiedByUserId"" FOREIGN KEY (""ModifiedByUserId"") REFERENCES ""AspNetUsers"" (""Id"") ON DELETE SET NULL
-                    );
-                    
-                    CREATE INDEX IF NOT EXISTS ""IX_WidgetRoleConfigurations_ModifiedByUserId"" ON ""WidgetRoleConfigurations"" (""ModifiedByUserId"");
-                    CREATE UNIQUE INDEX IF NOT EXISTS ""IX_WidgetRoleConfigurations_ProviderKey_WidgetKey"" ON ""WidgetRoleConfigurations"" (""ProviderKey"", ""WidgetKey"");
-                    
-                    INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"") VALUES
-                    ('20251126112516_AddDashboardEntities', '9.0.0')
-                    ON CONFLICT DO NOTHING;
-                ");
-                Console.WriteLine("[DB] Dashboard tables created successfully.");
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[DB] Baseline/Dashboard table check failed: {ex.Message}");
-        }
-        
-        // --- FORCE CREATE: Dashboard tables (separate try-catch for reliability) ---
-        try
-        {
-            Console.WriteLine("[DB] Ensuring Dashboard tables exist...");
-            await db.Database.ExecuteSqlRawAsync(@"
-                CREATE TABLE IF NOT EXISTS ""UserDashboardLayouts"" (
-                    ""Id"" integer GENERATED BY DEFAULT AS IDENTITY,
-                    ""UserId"" integer NOT NULL,
-                    ""LayoutJson"" jsonb NOT NULL DEFAULT '{}'::jsonb,
-                    ""LayoutType"" character varying(20) NOT NULL DEFAULT 'grid',
-                    ""Columns"" integer NOT NULL DEFAULT 3,
-                    ""LastModified"" timestamp with time zone NOT NULL DEFAULT NOW(),
-                    ""CreatedAt"" timestamp with time zone NOT NULL DEFAULT NOW(),
-                    CONSTRAINT ""PK_UserDashboardLayouts"" PRIMARY KEY (""Id"")
-                );
-                
-                DO $$ BEGIN
-                    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_UserDashboardLayouts_AspNetUsers_UserId') THEN
-                        ALTER TABLE ""UserDashboardLayouts"" 
-                        ADD CONSTRAINT ""FK_UserDashboardLayouts_AspNetUsers_UserId"" 
-                        FOREIGN KEY (""UserId"") REFERENCES ""AspNetUsers"" (""Id"") ON DELETE CASCADE;
-                    END IF;
-                END $$;
-                
-                CREATE UNIQUE INDEX IF NOT EXISTS ""IX_UserDashboardLayouts_UserId"" ON ""UserDashboardLayouts"" (""UserId"");
-                
-                CREATE TABLE IF NOT EXISTS ""WidgetRoleConfigurations"" (
-                    ""Id"" integer GENERATED BY DEFAULT AS IDENTITY,
-                    ""ProviderKey"" character varying(50) NOT NULL,
-                    ""WidgetKey"" character varying(100) NOT NULL,
-                    ""RolesJson"" jsonb,
-                    ""LastModified"" timestamp with time zone NOT NULL DEFAULT NOW(),
-                    ""ModifiedByUserId"" integer,
-                    CONSTRAINT ""PK_WidgetRoleConfigurations"" PRIMARY KEY (""Id"")
-                );
-                
-                DO $$ BEGIN
-                    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_WidgetRoleConfigurations_AspNetUsers_ModifiedByUserId') THEN
-                        ALTER TABLE ""WidgetRoleConfigurations"" 
-                        ADD CONSTRAINT ""FK_WidgetRoleConfigurations_AspNetUsers_ModifiedByUserId"" 
-                        FOREIGN KEY (""ModifiedByUserId"") REFERENCES ""AspNetUsers"" (""Id"") ON DELETE SET NULL;
-                    END IF;
-                END $$;
-                
-                CREATE INDEX IF NOT EXISTS ""IX_WidgetRoleConfigurations_ModifiedByUserId"" ON ""WidgetRoleConfigurations"" (""ModifiedByUserId"");
-                CREATE UNIQUE INDEX IF NOT EXISTS ""IX_WidgetRoleConfigurations_ProviderKey_WidgetKey"" ON ""WidgetRoleConfigurations"" (""ProviderKey"", ""WidgetKey"");
-            ");
-            Console.WriteLine("[DB] Dashboard tables ensured successfully.");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[DB] Dashboard table creation warning: {ex.Message}");
-        }
-        // ------------------------------------------------
 
         // Prefer Migrate when migrations exist; allow forcing EnsureCreated via DB_BOOTSTRAP
         var anyModelMigrations = db.Database.GetMigrations().Any();
@@ -780,13 +731,22 @@ using (var scope = app.Services.CreateScope())
         {
             if (bootstrapDropCreate)
             {
-                Console.WriteLine("[DB] Bootstrap DROP+CREATE enabled -> EnsureDeleted() + EnsureCreated()");
-                try { db.Database.EnsureDeleted(); } catch (Exception ex) { Console.WriteLine($"[DB] EnsureDeleted warning: {ex.Message}"); }
+                // SECURITY: Block dropcreate in production to prevent accidental data loss
+                var env = scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>();
+                if (env.IsProduction())
+                {
+                    throw new InvalidOperationException(
+                        "DB_BOOTSTRAP=dropcreate is not allowed in production environment. " +
+                        "This operation would delete all database data.");
+                }
+
+                logger.LogWarning("[DB] Bootstrap DROP+CREATE enabled -> EnsureDeleted() + EnsureCreated()");
+                try { db.Database.EnsureDeleted(); } catch (Exception ex) { logger.LogWarning(ex, "[DB] EnsureDeleted warning"); }
                 db.Database.EnsureCreated();
             }
             else
             {
-                Console.WriteLine("[DB] Bootstrap mode enabled -> EnsureCreated()/CreateTables()");
+                logger.LogInformation("[DB] Bootstrap mode enabled -> EnsureCreated()/CreateTables()");
                 var created = db.Database.EnsureCreated();
                 if (!created)
                 {
@@ -794,23 +754,23 @@ using (var scope = app.Services.CreateScope())
                     {
                         var databaseCreator = (RelationalDatabaseCreator)db.Database.GetService<IRelationalDatabaseCreator>();
                         databaseCreator.CreateTables();
-                        Console.WriteLine("[DB] CreateTables executed successfully.");
+                        logger.LogInformation("[DB] CreateTables executed successfully.");
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[DB] CreateTables fallback failed: {ex.Message}");
+                        logger.LogError(ex, "[DB] CreateTables fallback failed");
                     }
                 }
             }
         }
         else if (anyModelMigrations)
         {
-            Console.WriteLine("[DB] Applying migrations -> Migrate()");
+            logger.LogInformation("[DB] Applying migrations -> Migrate()");
             db.Database.Migrate();
         }
         else
         {
-            Console.WriteLine("[DB] No migrations found -> EnsureCreated()");
+            logger.LogInformation("[DB] No migrations found -> EnsureCreated()");
             db.Database.EnsureCreated();
         }
 
@@ -839,7 +799,7 @@ using (var scope = app.Services.CreateScope())
         await EnsureRole("Financeiro", "Departamento Financeiro", "AccountBalance");
 
         // Seed Module Permissions
-        await SeedModulePermissionsAsync(db, roleManager);
+        await SeedModulePermissionsAsync(db, roleManager, logger);
 
         var adminEmail = "admin@erp.local";
         var admin = await userManager.FindByEmailAsync(adminEmail);
@@ -871,27 +831,34 @@ using (var scope = app.Services.CreateScope())
         try
         {
             var demoSeedOptions = scope.ServiceProvider.GetRequiredService<IOptions<DemoSeedOptions>>();
-            if (demoSeedOptions.Value.Enabled)
+            var env = scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>();
+
+            // SECURITY: Block demo data seeding in production
+            if (demoSeedOptions.Value.Enabled && !env.IsProduction())
             {
                 var demoSeeder = scope.ServiceProvider.GetRequiredService<DemoDataSeeder>();
                 await demoSeeder.SeedAsync();
             }
+            else if (demoSeedOptions.Value.Enabled && env.IsProduction())
+            {
+                logger.LogWarning("[Seed] DemoSeed is enabled but skipped in production environment.");
+            }
         }
         catch (Exception demoSeedEx)
         {
-            Console.WriteLine($"Demo data seed error: {demoSeedEx.Message}");
+            logger.LogError(demoSeedEx, "Demo data seed error");
         }
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Identity seed error: {ex.Message}");
+        logger.LogError(ex, "Identity seed error");
     }
 }
 
 /// <summary>
 /// Seeds module permissions and assigns them to roles
 /// </summary>
-static async Task SeedModulePermissionsAsync(ApplicationDbContext db, RoleManager<ApplicationRole> roleManager)
+static async Task SeedModulePermissionsAsync(ApplicationDbContext db, RoleManager<ApplicationRole> roleManager, ILogger logger)
 {
     try
     {
@@ -900,13 +867,14 @@ static async Task SeedModulePermissionsAsync(ApplicationDbContext db, RoleManage
         {
             new ModulePermission { ModuleKey = ModuleKeys.Dashboard, DisplayName = "Dashboard", Description = "Painel principal com visão geral", Icon = "Dashboard", DisplayOrder = 1 },
             new ModulePermission { ModuleKey = ModuleKeys.Sales, DisplayName = "Vendas", Description = "Gestão de vendas e clientes", Icon = "ShoppingCart", DisplayOrder = 2 },
-            new ModulePermission { ModuleKey = ModuleKeys.Inventory, DisplayName = "Estoque", Description = "Controle de produtos e movimentações", Icon = "Inventory", DisplayOrder = 3 },
-            new ModulePermission { ModuleKey = ModuleKeys.Financial, DisplayName = "Financeiro", Description = "Contas a pagar/receber, fornecedores", Icon = "AccountBalance", DisplayOrder = 4 },
-            new ModulePermission { ModuleKey = ModuleKeys.HR, DisplayName = "RH", Description = "Recursos Humanos e folha de pagamento", Icon = "Groups", DisplayOrder = 5 },
-            new ModulePermission { ModuleKey = ModuleKeys.Assets, DisplayName = "Ativos", Description = "Gestão de patrimônio", Icon = "Devices", DisplayOrder = 6 },
-            new ModulePermission { ModuleKey = ModuleKeys.Kanban, DisplayName = "Kanban", Description = "Quadros de tarefas", Icon = "ViewKanban", DisplayOrder = 7 },
-            new ModulePermission { ModuleKey = ModuleKeys.Reports, DisplayName = "Relatórios", Description = "Relatórios gerenciais", Icon = "Assessment", DisplayOrder = 8 },
-            new ModulePermission { ModuleKey = ModuleKeys.Admin, DisplayName = "Administração", Description = "Configurações do sistema", Icon = "AdminPanelSettings", DisplayOrder = 9 }
+            new ModulePermission { ModuleKey = ModuleKeys.ServiceOrder, DisplayName = "Ordens de Serviço", Description = "Gestão de ordens de serviço", Icon = "Build", DisplayOrder = 3 },
+            new ModulePermission { ModuleKey = ModuleKeys.Inventory, DisplayName = "Estoque", Description = "Controle de produtos e movimentações", Icon = "Inventory", DisplayOrder = 4 },
+            new ModulePermission { ModuleKey = ModuleKeys.Financial, DisplayName = "Financeiro", Description = "Contas a pagar/receber, fornecedores", Icon = "AccountBalance", DisplayOrder = 5 },
+            new ModulePermission { ModuleKey = ModuleKeys.HR, DisplayName = "RH", Description = "Recursos Humanos e folha de pagamento", Icon = "Groups", DisplayOrder = 6 },
+            new ModulePermission { ModuleKey = ModuleKeys.Assets, DisplayName = "Ativos", Description = "Gestão de patrimônio", Icon = "Devices", DisplayOrder = 7 },
+            new ModulePermission { ModuleKey = ModuleKeys.Kanban, DisplayName = "Kanban", Description = "Quadros de tarefas", Icon = "ViewKanban", DisplayOrder = 8 },
+            new ModulePermission { ModuleKey = ModuleKeys.Reports, DisplayName = "Relatórios", Description = "Relatórios gerenciais", Icon = "Assessment", DisplayOrder = 9 },
+            new ModulePermission { ModuleKey = ModuleKeys.Admin, DisplayName = "Administração", Description = "Configurações do sistema", Icon = "AdminPanelSettings", DisplayOrder = 10 }
         };
 
         // Add modules if they don't exist
@@ -927,20 +895,20 @@ static async Task SeedModulePermissionsAsync(ApplicationDbContext db, RoleManage
         var roleModules = new Dictionary<string, string[]>
         {
             // Administrador gets all modules (handled in code, but seed anyway for completeness)
-            ["Administrador"] = new[] { ModuleKeys.Dashboard, ModuleKeys.Sales, ModuleKeys.Inventory, ModuleKeys.Financial, ModuleKeys.HR, ModuleKeys.Assets, ModuleKeys.Kanban, ModuleKeys.Reports, ModuleKeys.Admin },
-            
+            ["Administrador"] = new[] { ModuleKeys.Dashboard, ModuleKeys.Sales, ModuleKeys.ServiceOrder, ModuleKeys.Inventory, ModuleKeys.Financial, ModuleKeys.HR, ModuleKeys.Assets, ModuleKeys.Kanban, ModuleKeys.Reports, ModuleKeys.Admin },
+
             // Gerente gets most modules except Admin
-            ["Gerente"] = new[] { ModuleKeys.Dashboard, ModuleKeys.Sales, ModuleKeys.Inventory, ModuleKeys.Financial, ModuleKeys.HR, ModuleKeys.Assets, ModuleKeys.Kanban, ModuleKeys.Reports },
-            
-            // Vendedor gets Sales, Dashboard, Kanban
-            ["Vendedor"] = new[] { ModuleKeys.Dashboard, ModuleKeys.Sales, ModuleKeys.Kanban },
-            
+            ["Gerente"] = new[] { ModuleKeys.Dashboard, ModuleKeys.Sales, ModuleKeys.ServiceOrder, ModuleKeys.Inventory, ModuleKeys.Financial, ModuleKeys.HR, ModuleKeys.Assets, ModuleKeys.Kanban, ModuleKeys.Reports },
+
+            // Vendedor gets Sales, ServiceOrder, Dashboard, Kanban
+            ["Vendedor"] = new[] { ModuleKeys.Dashboard, ModuleKeys.Sales, ModuleKeys.ServiceOrder, ModuleKeys.Kanban },
+
             // Estoque gets Inventory, Dashboard, Reports
             ["Estoque"] = new[] { ModuleKeys.Dashboard, ModuleKeys.Inventory, ModuleKeys.Reports },
-            
+
             // RH gets HR, Dashboard, Reports
             ["RH"] = new[] { ModuleKeys.Dashboard, ModuleKeys.HR, ModuleKeys.Reports },
-            
+
             // Financeiro gets Financial, Dashboard, Reports
             ["Financeiro"] = new[] { ModuleKeys.Dashboard, ModuleKeys.Financial, ModuleKeys.Reports }
         };
@@ -971,11 +939,11 @@ static async Task SeedModulePermissionsAsync(ApplicationDbContext db, RoleManage
         }
 
         await db.SaveChangesAsync();
-        Console.WriteLine("[Seed] Module permissions seeded successfully.");
+        logger.LogInformation("[Seed] Module permissions seeded successfully.");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[Seed] Module permissions seed error: {ex.Message}");
+        logger.LogError(ex, "[Seed] Module permissions seed error");
     }
 }
 

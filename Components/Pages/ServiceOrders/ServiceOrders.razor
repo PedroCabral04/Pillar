@@ -182,7 +182,7 @@
             if (_endDate.HasValue)
                 queryParams.Add($"endDate={_endDate.Value:yyyy-MM-dd}");
 
-            var url = $"/api/service-orders?{string.Join("&", queryParams)}";
+            var url = $"/api/ordens-servico?{string.Join("&", queryParams)}";
 
             var response = await ApiService.GetAsync<PaginatedServiceOrdersResponse>(url);
             if (response == null)

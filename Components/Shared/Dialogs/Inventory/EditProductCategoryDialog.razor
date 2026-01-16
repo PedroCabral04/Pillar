@@ -118,7 +118,7 @@
         try
         {
             // Carrega todas as categorias exceto a atual
-            var response = await ApiService.GetAsync<PaginatedCategoryResponse>("/api/products/categories?pageSize=1000");
+            var response = await ApiService.GetAsync<PaginatedCategoryResponse>("/api/produtos/categories?pageSize=1000");
             _categories = response?.Items ?? new List<ProductCategoryDto>();
             
             // Preenche os dados da categoria atual
@@ -185,7 +185,7 @@
         try
         {
             var result = await ApiService.PutAsync<ProductCategoryDto>(
-                $"/api/products/categories/{Category.Id}", _updateCategory);
+                $"/api/produtos/categories/{Category.Id}", _updateCategory);
             
             if (result != null)
             {

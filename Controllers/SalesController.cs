@@ -12,7 +12,7 @@ namespace erp.Controllers;
 /// </summary>
 [Authorize]
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/vendas")]
 public class SalesController : ControllerBase
 {
     private readonly ISalesService _salesService;

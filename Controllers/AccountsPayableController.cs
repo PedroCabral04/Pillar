@@ -11,7 +11,7 @@ namespace erp.Controllers;
 /// Controller para gerenciamento de contas a pagar (fornecedores)
 /// </summary>
 [ApiController]
-[Route("api/accounts-payable")]
+[Route("api/contas-pagar")]
 [Authorize]
 public class AccountsPayableController : ControllerBase
 {

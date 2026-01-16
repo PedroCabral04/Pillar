@@ -121,6 +121,14 @@
                     </MudNavGroup>
                 }
 
+                @* Ordens de Serviço *@
+                @if (HasModuleAccess(ModuleKeys.ServiceOrder))
+                {
+                    <MudNavGroup Title="Serviços" Icon="@Icons.Material.Filled.Build" Class="nav-group" AriaLabel="Seção Serviços">
+                        <MudNavLink Href="/service-orders" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.ReceiptLong" Class="nav-subitem">Ordens de Serviço</MudNavLink>
+                    </MudNavGroup>
+                }
+
                 @* Estoque *@
                 @if (HasModuleAccess(ModuleKeys.Inventory))
                 {
@@ -226,6 +234,12 @@
                         <MudNavLink Href="/sales" Icon="@Icons.Material.Filled.ShoppingCart" Class="mini-nav-item" AriaLabel="Vendas"/>
                     </MudTooltip>
                 }
+                @if (HasModuleAccess(ModuleKeys.ServiceOrder))
+                {
+                    <MudTooltip Text="Serviços" Placement="Placement.Right" Arrow="true" Duration="200">
+                        <MudNavLink Href="/service-orders" Icon="@Icons.Material.Filled.Build" Class="mini-nav-item" AriaLabel="Serviços"/>
+                    </MudTooltip>
+                }
                 @if (HasModuleAccess(ModuleKeys.Inventory))
                 {
                     <MudTooltip Text="Produtos" Placement="Placement.Right" Arrow="true" Duration="200">
@@ -319,6 +333,8 @@
         // Vendas
         new("Vendas", "/sales", Icons.Material.Filled.Receipt, "Vendas"),
         new("Clientes", "/sales/customers", Icons.Material.Filled.People, "Vendas"),
+        // Serviços
+        new("Ordens de Serviço", "/service-orders", Icons.Material.Filled.Build, "Serviços"),
         // Estoque
         new("Produtos", "/inventory/products", Icons.Material.Filled.Category, "Estoque"),
         new("Categorias", "/inventory/categories", Icons.Material.Filled.FolderOpen, "Estoque"),

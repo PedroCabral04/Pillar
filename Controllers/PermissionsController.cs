@@ -13,7 +13,7 @@ namespace erp.Controllers;
 /// Controller para gerenciamento de permissões de módulos e atribuições de função
 /// </summary>
 [ApiController]
-[Route("api/permissions")]
+[Route("api/permissoes")]
 [Authorize(Roles = "Administrador")]
 public class PermissionsController : ControllerBase
 {

@@ -17,8 +17,6 @@ public class ThemeService
             if (_isDarkMode != value)
             {
                 _isDarkMode = value;
-                _preferenceService.CurrentPreferences.Ui.DarkMode = value;
-                _ = _preferenceService.SaveAsync();
                 OnThemeChanged?.Invoke();
             }
         }
@@ -143,7 +141,7 @@ public class ThemeService
             _isDarkMode = value;
             _preferenceService.CurrentPreferences.Ui.DarkMode = value;
             await _preferenceService.SaveAsync();
-            UpdateTheme();
+            // UpdateTheme() será chamado via evento OnPreferenceChanged
         }
     }
 
@@ -198,11 +196,39 @@ public class ThemeService
         }
         else
         {
-            // Reset to defaults (simplified, ideally we should store original values or re-init)
-            InitializeDefaultTheme();
-            // Re-apply primary color if needed, but InitializeDefaultTheme resets it. 
-            // We might need to store the custom primary color if we support it.
-            // For now, let's assume primary color is handled separately or we re-apply it if we had it stored.
+            // Restore default colors WITHOUT resetting PrimaryColor (which is user-configurable)
+            Theme.PaletteLight.Background = "#F8FAFC";
+            Theme.PaletteLight.Surface = "#FFFFFF";
+            Theme.PaletteLight.AppbarBackground = "#FFFFFF";
+            Theme.PaletteLight.AppbarText = "#1E293B";
+            Theme.PaletteLight.DrawerBackground = "#FFFFFF";
+            Theme.PaletteLight.DrawerText = "#334155";
+            Theme.PaletteLight.TextPrimary = "#0F172A";
+            Theme.PaletteLight.TextSecondary = "#64748B";
+            Theme.PaletteLight.ActionDefault = "#64748B";
+            Theme.PaletteLight.LinesDefault = "#E2E8F0";
+            Theme.PaletteLight.TableLines = "#E2E8F0";
+            Theme.PaletteLight.Divider = "#E2E8F0";
+
+            Theme.PaletteDark.Background = "#020617";
+            Theme.PaletteDark.Surface = "#1E293B";
+            Theme.PaletteDark.AppbarBackground = "#1E293B";
+            Theme.PaletteDark.AppbarText = "#F8FAFC";
+            Theme.PaletteDark.DrawerBackground = "#0F172A";
+            Theme.PaletteDark.DrawerText = "#CBD5E1";
+            Theme.PaletteDark.TextPrimary = "#F8FAFC";
+            Theme.PaletteDark.TextSecondary = "#94A3B8";
+            Theme.PaletteDark.ActionDefault = "#94A3B8";
+            Theme.PaletteDark.LinesDefault = "#334155";
+            Theme.PaletteDark.TableLines = "#334155";
+            Theme.PaletteDark.Divider = "#334155";
+
+            // Re-apply custom primary color (it was preserved in the code above)
+            if (!string.IsNullOrEmpty(customColor) && customColor != "#2563EB")
+            {
+                Theme.PaletteLight.Primary = customColor;
+                Theme.PaletteDark.Primary = customColor;
+            }
         }
 
         // Apply Font Size

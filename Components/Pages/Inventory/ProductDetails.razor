@@ -378,7 +378,7 @@
         _loading = true;
         try
         {
-            _product = await ApiService.GetAsync<ProductDto>($"/api/products/{Id}");
+            _product = await ApiService.GetAsync<ProductDto>($"/api/produtos/{Id}");
             
             if (_product != null)
             {

@@ -64,12 +64,16 @@ public class ModuleAccessHandler : AuthorizationHandler<ModuleAccessRequirement>
 }
 
 /// <summary>
-/// Policy names for module access
+/// Authorization policy names for module-based access control.
+/// Policy names follow the format "Module.{ModuleName}" where ModuleName
+/// is the PascalCase version of the module key. Use GetPolicyName() to
+/// generate policy names dynamically from module keys.
 /// </summary>
 public static class ModulePolicies
 {
     public const string Dashboard = "Module.Dashboard";
     public const string Sales = "Module.Sales";
+    public const string ServiceOrder = "Module.ServiceOrder";
     public const string Inventory = "Module.Inventory";
     public const string Financial = "Module.Financial";
     public const string HR = "Module.HR";
@@ -77,12 +81,20 @@ public static class ModulePolicies
     public const string Kanban = "Module.Kanban";
     public const string Reports = "Module.Reports";
     public const string Admin = "Module.Admin";
-    
+
     /// <summary>
-    /// Get policy name for a module key
+    /// Get policy name for a module key. Handles kebab-case keys (e.g., "service-orders" -> "Module.ServiceOrder").
     /// </summary>
     public static string GetPolicyName(string moduleKey)
     {
+        // Handle kebab-case: convert "service-orders" to "ServiceOrder"
+        if (moduleKey.Contains('-'))
+        {
+            var parts = moduleKey.Split('-', StringSplitOptions.RemoveEmptyEntries);
+            var pascalCase = string.Concat(parts.Select(p => char.ToUpper(p[0]) + p[1..]));
+            return $"Module.{pascalCase}";
+        }
+        // Handle simple case: "sales" -> "Sales"
         return $"Module.{char.ToUpper(moduleKey[0])}{moduleKey[1..]}";
     }
 }

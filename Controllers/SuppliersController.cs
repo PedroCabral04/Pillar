@@ -11,7 +11,7 @@ namespace erp.Controllers;
 /// Controller para gerenciamento de fornecedores (cadastro, consulta e integrações externas)
 /// </summary>
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/fornecedores")]
 [Authorize]
 public class SuppliersController : ControllerBase
 {

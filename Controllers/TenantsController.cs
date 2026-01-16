@@ -1,5 +1,6 @@
 using erp.DTOs.Tenancy;
 using erp.Services.Tenancy;
+using erp.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -7,24 +8,29 @@ using System.Security.Claims;
 namespace erp.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/tenants")]
 [Authorize(Roles = "Administrador")]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 /// <summary>
 /// Controller responsável por gerenciar tenants (locatários) do sistema.
 /// Exponha endpoints de listagem, consulta por id/slug, criação, atualização,
-/// exclusão, provisionamento da base e operações de branding (logo/favicon).
+/// exclusão e operações de branding (logo/favicon).
 /// Requer autorização com a role "Administrador".
 /// </summary>
 public class TenantsController : ControllerBase
 {
     private readonly ITenantService _tenantService;
     private readonly ITenantBrandingService _brandingService;
+    private readonly IFileValidationService _fileValidationService;
 
-    public TenantsController(ITenantService tenantService, ITenantBrandingService brandingService)
+    public TenantsController(
+        ITenantService tenantService, 
+        ITenantBrandingService brandingService,
+        IFileValidationService fileValidationService)
     {
         _tenantService = tenantService;
         _brandingService = brandingService;
+        _fileValidationService = fileValidationService;
     }
 
     /// <summary>
@@ -76,21 +82,24 @@ public class TenantsController : ControllerBase
     }
 
     /// <summary>
-    /// Recupera informações de conexão (ex.: connection string) do tenant.
+    /// Recupera os tenants que o usuário atual tem acesso via TenantMemberships.
+    /// Endpoint para permitir tenant switching.
     /// </summary>
-    /// <param name="id">Identificador do tenant.</param>
     /// <param name="cancellationToken">Token para cancelamento da operação.</param>
-    /// <returns>Objeto <see cref="TenantConnectionInfoDto"/> ou 404 se não encontrado.</returns>
-    [HttpGet("{id:int}/connection-info")]
-    public async Task<ActionResult<TenantConnectionInfoDto>> GetConnectionInfoAsync(int id, CancellationToken cancellationToken)
+    /// <returns>Lista de <see cref="TenantDto"/> que o usuário pode acessar.</returns>
+    [HttpGet("my-tenants")]
+    [AllowAnonymous] // Permite acesso sem ser admin, mas requer autenticação
+    [Authorize] // Requer autenticação
+    public async Task<ActionResult<IEnumerable<TenantDto>>> GetMyTenantsAsync(CancellationToken cancellationToken)
     {
-        var info = await _tenantService.GetConnectionInfoAsync(id, cancellationToken);
-        if (info is null)
+        var userId = GetCurrentUserId();
+        if (userId == 0)
         {
-            return NotFound();
+            return Unauthorized();
         }
 
-        return Ok(info);
+        var tenants = await _tenantService.GetUserTenantsAsync(userId, cancellationToken);
+        return Ok(tenants);
     }
 
     /// <summary>
@@ -165,26 +174,6 @@ public class TenantsController : ControllerBase
     }
 
     /// <summary>
-    /// Executa o provisionamento da base de dados para o tenant (criação/migração de schema).
-    /// </summary>
-    /// <param name="id">Identificador do tenant a ser provisionado.</param>
-    /// <param name="cancellationToken">Token para cancelamento da operação.</param>
-    /// <returns>HTTP 204 se bem-sucedido ou 404 se o tenant não existir.</returns>
-    [HttpPost("{id:int}/provision")]
-    public async Task<IActionResult> ProvisionAsync(int id, CancellationToken cancellationToken)
-    {
-        try
-        {
-            await _tenantService.ProvisionDatabaseAsync(id, cancellationToken);
-            return NoContent();
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
-    }
-
-    /// <summary>
     /// Upload a branding image (logo or favicon) for a tenant.
     /// Images exceeding maximum dimensions will be auto-resized.
     /// </summary>
@@ -203,6 +192,13 @@ public class TenantsController : ControllerBase
         if (file is null || file.Length == 0)
         {
             return BadRequest(new BrandingUploadResult(false, null, "Nenhum arquivo enviado.", false, 0, 0));
+        }
+
+        // Validação de segurança do arquivo (tipo, magic bytes, tamanho)
+        var validationResult = await _fileValidationService.ValidateFileAsync(file, cancellationToken);
+        if (!validationResult.IsValid)
+        {
+            return BadRequest(new BrandingUploadResult(false, null, validationResult.ErrorMessage, false, 0, 0));
         }
 
         await using var stream = file.OpenReadStream();

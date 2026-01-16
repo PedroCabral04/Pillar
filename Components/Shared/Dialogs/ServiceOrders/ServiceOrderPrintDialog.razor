@@ -170,7 +170,7 @@
     {
         try
         {
-            _order = await ApiService.GetAsync<ServiceOrderDto>($"/api/service-orders/{OrderId}");
+            _order = await ApiService.GetAsync<ServiceOrderDto>($"/api/ordens-servico/{OrderId}");
         }
         catch (Exception ex)
         {
@@ -202,7 +202,7 @@
     {
         try
         {
-            var response = await ApiService.GetAsync($"/api/service-orders/{OrderId}/export/pdf");
+            var response = await ApiService.GetAsync($"/api/ordens-servico/{OrderId}/export/pdf");
             var pdfBytes = await response.Content.ReadAsByteArrayAsync();
             await JS.InvokeVoidAsync("downloadFile", $"OS_{_order!.OrderNumber}.pdf", Convert.ToBase64String(pdfBytes));
             Snackbar.Add("PDF baixado com sucesso!", Severity.Success);
@@ -217,7 +217,7 @@
     {
         try
         {
-            var printUrl = $"/api/service-orders/{OrderId}/print";
+            var printUrl = $"/api/ordens-servico/{OrderId}/print";
             await JS.InvokeVoidAsync("open", printUrl, "_blank");
         }
         catch (Exception ex)
