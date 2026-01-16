@@ -5,8 +5,8 @@ WORKDIR /src
 
 # copy csproj and restore as distinct layers
 COPY erp.csproj ./
-COPY Pillar.ServiceDefaults/Pillar.ServiceDefaults.csproj Pillar.ServiceDefaults/
 RUN dotnet restore "erp.csproj"
+
 
 # copy everything else and build
 COPY . .

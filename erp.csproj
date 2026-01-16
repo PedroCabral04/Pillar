@@ -64,9 +64,4 @@
     <ItemGroup>
       <Compile Remove="Tests\**\*.cs" />
     </ItemGroup>
-    <!-- Exclude sources from sibling project folders so the web project doesn't try to compile them -->
-    <ItemGroup>
-      <Compile Remove="Pillar.AppHost\**\*.cs" />
-      <Compile Remove="Pillar.ServiceDefaults\**\*.cs" />
-    </ItemGroup>
 </Project>
