@@ -20,27 +20,49 @@ public class DefaultTenantResolver : ITenantResolver
 
     public async Task<Tenant?> ResolveAsync(HttpContext httpContext, CancellationToken cancellationToken)
     {
-        var slugCandidate = ExtractSlugFromHeader(httpContext) ?? ExtractSlugFromHost(httpContext);
+        // 1. Try from Header (X-Tenant-Id or X-Tenant slug) - Primary for API calls
+        var tenantIdStr = httpContext.Request.Headers["X-Tenant-Id"].FirstOrDefault();
+        if (int.TryParse(tenantIdStr, out var tenantId))
+        {
+            var tenant = await FindTenantByIdAsync(tenantId, cancellationToken);
+            if (tenant != null) return tenant;
+        }
 
+        var slugCandidate = ExtractSlugFromHeader(httpContext);
         if (!string.IsNullOrWhiteSpace(slugCandidate))
         {
             var tenant = await FindTenantBySlugAsync(slugCandidate, cancellationToken);
-            if (tenant is not null)
-            {
-                return tenant;
-            }
+            if (tenant is not null) return tenant;
         }
 
+        // 2. Try from User context (Claims/DB)
         if (httpContext.User.Identity?.IsAuthenticated == true)
         {
             var tenantFromClaim = await ResolveFromUserAsync(httpContext.User, cancellationToken);
-            if (tenantFromClaim is not null)
-            {
-                return tenantFromClaim;
-            }
+            if (tenantFromClaim is not null) return tenantFromClaim;
         }
 
         return null;
+    }
+
+    private async Task<Tenant?> FindTenantByIdAsync(int id, CancellationToken cancellationToken)
+    {
+        try 
+        {
+            await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+            var tenant = await db.Tenants
+                .AsNoTracking()
+                .Include(t => t.Branding)
+                .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
+
+            if (tenant != null && IsTenantAccessible(tenant)) return tenant;
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao buscar tenant por ID {Id}", id);
+            return null;
+        }
     }
 
     private async Task<Tenant?> ResolveFromUserAsync(ClaimsPrincipal user, CancellationToken cancellationToken)
@@ -84,22 +106,36 @@ public class DefaultTenantResolver : ITenantResolver
     private async Task<Tenant?> FindTenantBySlugAsync(string slug, CancellationToken cancellationToken)
     {
         var normalized = slug.ToLowerInvariant();
-        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
-
-        var tenant = await db.Tenants
-            .AsNoTracking()
-            .Include(t => t.Branding)
-            .FirstOrDefaultAsync(t => t.Slug == normalized, cancellationToken);
-
-        // Verificar se o tenant está em um status que permite acesso
-        if (tenant is not null && !IsTenantAccessible(tenant))
+        
+        try 
         {
-            _logger.LogWarning("Tenant '{Slug}' encontrado mas com status {Status} - acesso negado", 
-                slug, tenant.Status);
+            await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+            var tenant = await db.Tenants
+                .AsNoTracking()
+                .Include(t => t.Branding)
+                .FirstOrDefaultAsync(t => t.Slug == normalized, cancellationToken);
+
+            if (tenant == null)
+            {
+                return null;
+            }
+
+            // Verificar se o tenant está em um status que permite acesso
+            if (!IsTenantAccessible(tenant))
+            {
+                _logger.LogWarning("Tenant '{Slug}' encontrado mas com status {Status} - acesso negado", 
+                    slug, tenant.Status);
+                return null;
+            }
+
+            return tenant;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao buscar tenant por slug {Slug}", slug);
             return null;
         }
-
-        return tenant;
     }
 
     /// <summary>
@@ -119,29 +155,5 @@ public class DefaultTenantResolver : ITenantResolver
         }
 
         return null;
-    }
-
-    private static string? ExtractSlugFromHost(HttpContext context)
-    {
-        var host = context.Request.Host.Host;
-        if (string.IsNullOrWhiteSpace(host))
-        {
-            return null;
-        }
-
-        // Ignore localhost or direct IPs
-        if (host.Equals("localhost", StringComparison.OrdinalIgnoreCase) || System.Net.IPAddress.TryParse(host, out _))
-        {
-            return null;
-        }
-
-        var segments = host.Split('.', StringSplitOptions.RemoveEmptyEntries);
-        if (segments.Length < 3)
-        {
-            return null;
-        }
-
-        var candidate = segments[0];
-        return string.IsNullOrWhiteSpace(candidate) ? null : candidate.ToLowerInvariant();
     }
 }

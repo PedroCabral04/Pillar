@@ -15,7 +15,7 @@ namespace erp.Controllers;
 /// Controller responsável pela autenticação e gerenciamento de senhas
 /// </summary>
 [ApiController]
-[Route("api/autenticacao")]
+[Route("api/auth")]
 public class AuthController(
     SignInManager<ApplicationUser> signInManager, 
     UserManager<ApplicationUser> userManager,

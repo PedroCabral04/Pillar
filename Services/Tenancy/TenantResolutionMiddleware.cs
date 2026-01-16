@@ -30,7 +30,8 @@ public class TenantResolutionMiddleware
             else
             {
                 contextAccessor.Clear();
-                context.Items.Remove(TenantItemKey);
+                if (context.Items.ContainsKey(TenantItemKey))
+                    context.Items.Remove(TenantItemKey);
             }
         }
         catch (Exception ex)

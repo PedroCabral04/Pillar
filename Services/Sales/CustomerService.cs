@@ -9,15 +9,18 @@ namespace erp.Services.Sales;
 public class CustomerService : ICustomerService
 {
     private readonly ApplicationDbContext _context;
+    private readonly erp.Services.Tenancy.ITenantContextAccessor _tenantContextAccessor;
     private readonly SalesMapper _mapper;
     private readonly ILogger<CustomerService> _logger;
 
     public CustomerService(
         ApplicationDbContext context, 
+        erp.Services.Tenancy.ITenantContextAccessor tenantContextAccessor,
         SalesMapper mapper,
         ILogger<CustomerService> logger)
     {
         _context = context;
+        _tenantContextAccessor = tenantContextAccessor;
         _mapper = mapper;
         _logger = logger;
     }
@@ -36,6 +39,13 @@ public class CustomerService : ICustomerService
 
             var customer = _mapper.ToEntity(dto);
             customer.CreatedAt = DateTime.UtcNow;
+            
+            // Explicitly set TenantId if available in context
+            if (customer.TenantId == 0 && _tenantContextAccessor.Current.TenantId.HasValue)
+            {
+                customer.TenantId = _tenantContextAccessor.Current.TenantId.Value;
+                _logger.LogInformation("Setting TenantId {TenantId} explicitly in CustomerService", customer.TenantId);
+            }
 
             _context.Customers.Add(customer);
             await _context.SaveChangesAsync();
