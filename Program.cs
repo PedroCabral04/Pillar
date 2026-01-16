@@ -378,6 +378,15 @@ builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =
 
         if (passwordMatch.Success)
         {
+            // SECURITY: Block weak passwords in production
+            if (builder.Environment.IsProduction())
+            {
+                throw new InvalidOperationException(
+                    "Weak database password detected. The connection string contains a common/default password. " +
+                    "Please use a strong, unique password for your database.");
+            }
+            // Log warning in development - would need ILogger here but not available at this stage
+            // The warning will be visible in the exception above if run in production
         }
     }
 
@@ -400,6 +409,13 @@ builder.Services.AddDbContextFactory<ApplicationDbContext>((serviceProvider, opt
 
         if (passwordMatch.Success)
         {
+            // SECURITY: Block weak passwords in production
+            if (builder.Environment.IsProduction())
+            {
+                throw new InvalidOperationException(
+                    "Weak database password detected. The connection string contains a common/default password. " +
+                    "Please use a strong, unique password for your database.");
+            }
         }
     }
 
@@ -518,6 +534,7 @@ builder.Services.AddScoped<erp.Services.Payroll.IPayrollService, erp.Services.Pa
 
 // Audit services
 builder.Services.AddScoped<erp.Services.Audit.IAuditService, erp.Services.Audit.AuditService>();
+builder.Services.AddScoped<erp.Services.Audit.IAuditRetentionService, erp.Services.Audit.AuditRetentionService>();
 
 // Authorization / Permission services
 builder.Services.AddScoped<IPermissionService, PermissionService>();

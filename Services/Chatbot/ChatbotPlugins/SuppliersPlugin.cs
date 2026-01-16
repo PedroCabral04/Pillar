@@ -280,7 +280,8 @@ public class SuppliersPlugin
                 IsActive = true
             };
 
-            var currentUserId = _userContext.CurrentUserId ?? 1;
+            var currentUserId = _userContext.CurrentUserId
+                ?? throw new InvalidOperationException("User context not set. Chatbot operations require a valid user context for audit purposes.");
             var supplier = await _supplierService.CreateAsync(createDto, currentUserId: currentUserId);
 
             var addressParts = new List<string>();

@@ -93,7 +93,7 @@ public class PayrollCalculationService : IPayrollCalculationService
             var grossAmount = DecimalRound(Math.Max(earningsTotal - preTaxDeductions, 0));
 
             var inssAmount = CalculateProgressiveTax(grossAmount, inssBrackets, isSimpleDeduction: false);
-            var dependents = employee.DependentCount > 0 ? employee.DependentCount : 0;
+            var dependents = employee.DependentCount;
             var irrfBase = Math.Max(grossAmount - inssAmount - (dependents * DependentDeduction), 0);
             var irrfAmount = CalculateProgressiveTax(irrfBase, irrfBrackets, isSimpleDeduction: true);
 

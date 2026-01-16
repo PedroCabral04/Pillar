@@ -12,7 +12,7 @@ public interface IAuditRetentionService
 {
     Task ArchiveOldLogsAsync(int daysToKeep = 365);
     Task DeleteArchivedLogsAsync(int daysToKeep = 1825); // 5 anos
-    Task<long> GetStorageSizeAsync();
+    Task<long?> GetStorageSizeAsync();
 }
 
 public class AuditRetentionService : IAuditRetentionService
@@ -128,16 +128,16 @@ public class AuditRetentionService : IAuditRetentionService
     /// <summary>
     /// Calcula tamanho estimado da tabela de auditoria
     /// </summary>
-    public async Task<long> GetStorageSizeAsync()
+    public async Task<long?> GetStorageSizeAsync()
     {
-        // PostgreSQL specific query
+        // PostgreSQL specific query - table name is constant, not user input
         var sql = @"
             SELECT pg_total_relation_size('""AuditLogs""') as size_bytes";
-        
+
         var result = await _context.Database
-            .SqlQueryRaw<long>(sql)
+            .SqlQueryRaw<long?>(sql)
             .FirstOrDefaultAsync();
 
-        return result;
+        return result ?? 0;
     }
 }

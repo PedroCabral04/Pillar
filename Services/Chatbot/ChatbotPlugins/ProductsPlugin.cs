@@ -187,7 +187,8 @@ public class ProductsPlugin
                 CurrentStock = initialQuantity
             };
 
-            var currentUserId = _userContext.CurrentUserId ?? 1;
+            var currentUserId = _userContext.CurrentUserId
+                ?? throw new InvalidOperationException("User context not set. Chatbot operations require a valid user context for audit purposes.");
             var createdProduct = await _inventoryService.CreateProductAsync(productDto, currentUserId);
 
             // Invalidar cache de listagem de produtos após criar novo
