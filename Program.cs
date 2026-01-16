@@ -30,6 +30,7 @@ using Microsoft.AspNetCore.Authorization;
 using System.Reflection;
 using Microsoft.Extensions.Options;
 using ApexCharts;
+using Microsoft.Extensions.Logging;
 
 // Prefer using DotNetEnv to load .env into environment variables in dev.
 // This keeps the bootstrap simple and delegates parsing to a tested library.
@@ -92,6 +93,14 @@ if (!string.IsNullOrEmpty(allowedOrigins))
             var origins = allowedOrigins.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             if (origins.Contains("*"))
             {
+                // SECURITY: Block wildcard CORS in production
+                if (builder.Environment.IsProduction())
+                {
+                    throw new InvalidOperationException(
+                        "CORS wildcard (*) is not allowed in production. " +
+                        "Please configure specific origins in Security:CorsAllowedOrigins.");
+                }
+
                 // WARNING: AllowAll origins is not secure for production
                 policy.AllowAnyOrigin()
                       .AllowAnyMethod()
@@ -362,10 +371,19 @@ builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =
     var finalConnection = effectiveConnection ?? connectionString;
 
     // SECURITY: Verifica se a connection string padrão foi deixada
-    if (finalConnection != null && finalConnection.Contains("Password=123"))
+    if (finalConnection != null)
     {
-        throw new InvalidOperationException(
-            "Default database password detected. Please change the password in the connection string.");
+        // Check for common/default passwords patterns
+        var passwordMatch = System.Text.RegularExpressions.Regex.Match(
+            finalConnection,
+            @"Password=(?:123|password|Password123|admin|root|postgres|test|demo)",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        if (passwordMatch.Success)
+        {
+            throw new InvalidOperationException(
+                "Default or weak database password detected. Please change the password in the connection string.");
+        }
     }
 
     options.UseNpgsql(
@@ -381,10 +399,19 @@ builder.Services.AddDbContextFactory<ApplicationDbContext>((serviceProvider, opt
     var finalConnection = effectiveConnection ?? connectionString;
 
     // SECURITY: Verifica se a connection string padrão foi deixada
-    if (finalConnection != null && finalConnection.Contains("Password=123"))
+    if (finalConnection != null)
     {
-        throw new InvalidOperationException(
-            "Default database password detected. Please change the password in the connection string.");
+        // Check for common/default passwords patterns
+        var passwordMatch = System.Text.RegularExpressions.Regex.Match(
+            finalConnection,
+            @"Password=(?:123|password|Password123|admin|root|postgres|test|demo)",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        if (passwordMatch.Success)
+        {
+            throw new InvalidOperationException(
+                "Default or weak database password detected. Please change the password in the connection string.");
+        }
     }
 
     options.UseNpgsql(
@@ -678,6 +705,7 @@ app.MapRazorComponents<App>() // Mapeia os componentes Blazor
 // Seed inicial de Identity (ambiente de dev)
 using (var scope = app.Services.CreateScope())
 {
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     try
     {
         // Bootstrap flag: forces EnsureCreated on first deploys when migrations aren't available
@@ -687,198 +715,6 @@ using (var scope = app.Services.CreateScope())
         var dbBootstrap = bootstrapCfg || string.Equals(bootstrapEnv, "true", StringComparison.OrdinalIgnoreCase);
 
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-        // --- AUTO-FIX: Baseline migrations if missing (Self-Healing for Coolify) ---
-        // SECURITY NOTE: SqlQueryRaw/ExecuteSqlRawAsync são usados para consultar/metadados do PostgreSQL.
-        // Estas queries não aceitam input de usuário - são SQL hardcoded para verificar estrutura do DB.
-        try
-        {
-            // Check if AspNetUsers exists (implies DB was created with EnsureCreated)
-            var userTableExists = await db.Database.SqlQueryRaw<int>(
-                "SELECT count(*)::int FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'AspNetUsers'")
-                .FirstOrDefaultAsync() > 0;
-
-            // Check if history table exists
-            var historyTableExists = await db.Database.SqlQueryRaw<int>(
-                "SELECT count(*)::int FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '__EFMigrationsHistory'")
-                .FirstOrDefaultAsync() > 0;
-
-            if (userTableExists && !historyTableExists)
-            {
-                Console.WriteLine("[DB] CRITICAL: Existing database detected without migration history. Injecting baseline...");
-                
-                // 1. Create history table
-                await db.Database.ExecuteSqlRawAsync(@"
-                    CREATE TABLE IF NOT EXISTS ""__EFMigrationsHistory"" (
-                        ""MigrationId"" character varying(150) NOT NULL,
-                        ""ProductVersion"" character varying(32) NOT NULL,
-                        CONSTRAINT ""PK___EFMigrationsHistory"" PRIMARY KEY (""MigrationId"")
-                    );
-                ");
-
-                // 2. Always inject identity3 (base)
-                await db.Database.ExecuteSqlRawAsync(@"
-                    INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"") VALUES
-                    ('20250819121312_identity3', '9.0.0')
-                    ON CONFLICT DO NOTHING;
-                ");
-
-                // 3. Check for PreferencesJson column to decide if we inject the rest
-                var preferencesColumnExists = await db.Database.SqlQueryRaw<int>(
-                    "SELECT count(*)::int FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'AspNetUsers' AND column_name = 'PreferencesJson'")
-                    .FirstOrDefaultAsync() > 0;
-
-                if (preferencesColumnExists)
-                {
-                    Console.WriteLine("[DB] PreferencesJson column found. Injecting full history.");
-                    await db.Database.ExecuteSqlRawAsync(@"
-                        INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"") VALUES
-                        ('20251010180810_AddPreferencesJsonToUser', '9.0.0'),
-                        ('20251013022123_first', '9.0.0'),
-                        ('20251013055802_AddInventoryModule', '9.0.0'),
-                        ('20251013115625_AddSalesModule', '9.0.0'),
-                        ('20251013120656_AddSaleOrderForeignKeyToStockMovement', '9.0.0'),
-                        ('20251013121723_StandardizeTableNaming', '9.0.0'),
-                        ('20251031173129_SyncModelChanges', '9.0.0'),
-                        ('20251031180038_AddChatbotPersistence', '9.0.0'),
-                        ('20251031184135_rollback', '9.0.0'),
-                        ('20251103134934_AddHRManagementModule', '9.0.0'),
-                        ('20251107224217_AddAuditSystem', '9.0.0'),
-                        ('20251108001102_FixAuditSystemIdCapture', '9.0.0'),
-                        ('20251108025347_OptimizeAuditIndexes', '9.0.0'),
-                        ('20251108025813_OptimizeAuditIndexesComposite', '9.0.0'),
-                        ('20251108031849_AddAuditReadTracking', '9.0.0'),
-                        ('20251109234656_AddTimeTrackingModule', '9.0.0'),
-                        ('20251110025704_AddPayrollTimeTracking', '9.0.0'),
-                        ('20251110052846_AddFinancialModule', '9.0.0'),
-                        ('20251110133012_Payroll', '9.0.0'),
-                        ('20251112125954_AddAssetManagement', '9.0.0'),
-                        ('20251112164546_AddAssetDocumentsAndTransfers', '9.0.0'),
-                        ('20251113232410_assets', '9.0.0'),
-                        ('20251117172535_20251117120000_AddPayrollModule', '9.0.0'),
-                        ('20251118130514_20251118103000_AddTenancyFoundation', '9.0.0'),
-                        ('20251118173420_20251118121500_AddTenantDatabaseNameUniqueIndex', '9.0.0'),
-                        ('20251118181714_AddTenantIdToCustomerAndSupplier', '9.0.0'),
-                        ('20251119173014_AddOnboardingPersistence', '9.0.0'),
-                        ('20251119175842_AddUserOnboardingProgress', '9.0.0'),
-                        ('20251124204325_slq', '9.0.0'),
-                        ('20251124235058_AddTenancyToIdentity', '9.0.0'),
-                        ('20251126112516_AddDashboardEntities', '9.0.0'),
-                        ('20251201063720_update2', '9.0.0')
-                        ON CONFLICT DO NOTHING;
-                    ");
-                }
-                else
-                {
-                    Console.WriteLine("[DB] PreferencesJson column NOT found. Skipping full history injection to allow migration.");
-                }
-                
-                Console.WriteLine("[DB] Baseline injected successfully.");
-            }
-            
-            // --- AUTO-FIX: Create missing Dashboard tables ---
-            var dashboardTablesExist = await db.Database.SqlQueryRaw<int>(
-                "SELECT count(*)::int FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'WidgetRoleConfigurations'")
-                .FirstOrDefaultAsync() > 0;
-                
-            if (!dashboardTablesExist)
-            {
-                Console.WriteLine("[DB] Dashboard tables missing. Creating WidgetRoleConfigurations and UserDashboardLayouts...");
-                await db.Database.ExecuteSqlRawAsync(@"
-                    CREATE TABLE IF NOT EXISTS ""UserDashboardLayouts"" (
-                        ""Id"" integer GENERATED BY DEFAULT AS IDENTITY,
-                        ""UserId"" integer NOT NULL,
-                        ""LayoutJson"" jsonb NOT NULL,
-                        ""LayoutType"" character varying(20) NOT NULL,
-                        ""Columns"" integer NOT NULL DEFAULT 3,
-                        ""LastModified"" timestamp with time zone NOT NULL,
-                        ""CreatedAt"" timestamp with time zone NOT NULL,
-                        CONSTRAINT ""PK_UserDashboardLayouts"" PRIMARY KEY (""Id""),
-                        CONSTRAINT ""FK_UserDashboardLayouts_AspNetUsers_UserId"" FOREIGN KEY (""UserId"") REFERENCES ""AspNetUsers"" (""Id"") ON DELETE CASCADE
-                    );
-                    
-                    CREATE UNIQUE INDEX IF NOT EXISTS ""IX_UserDashboardLayouts_UserId"" ON ""UserDashboardLayouts"" (""UserId"");
-                    
-                    CREATE TABLE IF NOT EXISTS ""WidgetRoleConfigurations"" (
-                        ""Id"" integer GENERATED BY DEFAULT AS IDENTITY,
-                        ""ProviderKey"" character varying(50) NOT NULL,
-                        ""WidgetKey"" character varying(100) NOT NULL,
-                        ""RolesJson"" jsonb,
-                        ""LastModified"" timestamp with time zone NOT NULL,
-                        ""ModifiedByUserId"" integer,
-                        CONSTRAINT ""PK_WidgetRoleConfigurations"" PRIMARY KEY (""Id""),
-                        CONSTRAINT ""FK_WidgetRoleConfigurations_AspNetUsers_ModifiedByUserId"" FOREIGN KEY (""ModifiedByUserId"") REFERENCES ""AspNetUsers"" (""Id"") ON DELETE SET NULL
-                    );
-                    
-                    CREATE INDEX IF NOT EXISTS ""IX_WidgetRoleConfigurations_ModifiedByUserId"" ON ""WidgetRoleConfigurations"" (""ModifiedByUserId"");
-                    CREATE UNIQUE INDEX IF NOT EXISTS ""IX_WidgetRoleConfigurations_ProviderKey_WidgetKey"" ON ""WidgetRoleConfigurations"" (""ProviderKey"", ""WidgetKey"");
-                    
-                    INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"") VALUES
-                    ('20251126112516_AddDashboardEntities', '9.0.0')
-                    ON CONFLICT DO NOTHING;
-                ");
-                Console.WriteLine("[DB] Dashboard tables created successfully.");
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[DB] Baseline/Dashboard table check failed: {ex.Message}");
-        }
-        
-        // --- FORCE CREATE: Dashboard tables (separate try-catch for reliability) ---
-        try
-        {
-            Console.WriteLine("[DB] Ensuring Dashboard tables exist...");
-            await db.Database.ExecuteSqlRawAsync(@"
-                CREATE TABLE IF NOT EXISTS ""UserDashboardLayouts"" (
-                    ""Id"" integer GENERATED BY DEFAULT AS IDENTITY,
-                    ""UserId"" integer NOT NULL,
-                    ""LayoutJson"" jsonb NOT NULL DEFAULT '{}'::jsonb,
-                    ""LayoutType"" character varying(20) NOT NULL DEFAULT 'grid',
-                    ""Columns"" integer NOT NULL DEFAULT 3,
-                    ""LastModified"" timestamp with time zone NOT NULL DEFAULT NOW(),
-                    ""CreatedAt"" timestamp with time zone NOT NULL DEFAULT NOW(),
-                    CONSTRAINT ""PK_UserDashboardLayouts"" PRIMARY KEY (""Id"")
-                );
-                
-                DO $$ BEGIN
-                    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_UserDashboardLayouts_AspNetUsers_UserId') THEN
-                        ALTER TABLE ""UserDashboardLayouts"" 
-                        ADD CONSTRAINT ""FK_UserDashboardLayouts_AspNetUsers_UserId"" 
-                        FOREIGN KEY (""UserId"") REFERENCES ""AspNetUsers"" (""Id"") ON DELETE CASCADE;
-                    END IF;
-                END $$;
-                
-                CREATE UNIQUE INDEX IF NOT EXISTS ""IX_UserDashboardLayouts_UserId"" ON ""UserDashboardLayouts"" (""UserId"");
-                
-                CREATE TABLE IF NOT EXISTS ""WidgetRoleConfigurations"" (
-                    ""Id"" integer GENERATED BY DEFAULT AS IDENTITY,
-                    ""ProviderKey"" character varying(50) NOT NULL,
-                    ""WidgetKey"" character varying(100) NOT NULL,
-                    ""RolesJson"" jsonb,
-                    ""LastModified"" timestamp with time zone NOT NULL DEFAULT NOW(),
-                    ""ModifiedByUserId"" integer,
-                    CONSTRAINT ""PK_WidgetRoleConfigurations"" PRIMARY KEY (""Id"")
-                );
-                
-                DO $$ BEGIN
-                    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_WidgetRoleConfigurations_AspNetUsers_ModifiedByUserId') THEN
-                        ALTER TABLE ""WidgetRoleConfigurations"" 
-                        ADD CONSTRAINT ""FK_WidgetRoleConfigurations_AspNetUsers_ModifiedByUserId"" 
-                        FOREIGN KEY (""ModifiedByUserId"") REFERENCES ""AspNetUsers"" (""Id"") ON DELETE SET NULL;
-                    END IF;
-                END $$;
-                
-                CREATE INDEX IF NOT EXISTS ""IX_WidgetRoleConfigurations_ModifiedByUserId"" ON ""WidgetRoleConfigurations"" (""ModifiedByUserId"");
-                CREATE UNIQUE INDEX IF NOT EXISTS ""IX_WidgetRoleConfigurations_ProviderKey_WidgetKey"" ON ""WidgetRoleConfigurations"" (""ProviderKey"", ""WidgetKey"");
-            ");
-            Console.WriteLine("[DB] Dashboard tables ensured successfully.");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[DB] Dashboard table creation warning: {ex.Message}");
-        }
-        // ------------------------------------------------
 
         // Prefer Migrate when migrations exist; allow forcing EnsureCreated via DB_BOOTSTRAP
         var anyModelMigrations = db.Database.GetMigrations().Any();
@@ -890,13 +726,22 @@ using (var scope = app.Services.CreateScope())
         {
             if (bootstrapDropCreate)
             {
-                Console.WriteLine("[DB] Bootstrap DROP+CREATE enabled -> EnsureDeleted() + EnsureCreated()");
-                try { db.Database.EnsureDeleted(); } catch (Exception ex) { Console.WriteLine($"[DB] EnsureDeleted warning: {ex.Message}"); }
+                // SECURITY: Block dropcreate in production to prevent accidental data loss
+                var env = scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>();
+                if (env.IsProduction())
+                {
+                    throw new InvalidOperationException(
+                        "DB_BOOTSTRAP=dropcreate is not allowed in production environment. " +
+                        "This operation would delete all database data.");
+                }
+
+                logger.LogWarning("[DB] Bootstrap DROP+CREATE enabled -> EnsureDeleted() + EnsureCreated()");
+                try { db.Database.EnsureDeleted(); } catch (Exception ex) { logger.LogWarning(ex, "[DB] EnsureDeleted warning"); }
                 db.Database.EnsureCreated();
             }
             else
             {
-                Console.WriteLine("[DB] Bootstrap mode enabled -> EnsureCreated()/CreateTables()");
+                logger.LogInformation("[DB] Bootstrap mode enabled -> EnsureCreated()/CreateTables()");
                 var created = db.Database.EnsureCreated();
                 if (!created)
                 {
@@ -904,23 +749,23 @@ using (var scope = app.Services.CreateScope())
                     {
                         var databaseCreator = (RelationalDatabaseCreator)db.Database.GetService<IRelationalDatabaseCreator>();
                         databaseCreator.CreateTables();
-                        Console.WriteLine("[DB] CreateTables executed successfully.");
+                        logger.LogInformation("[DB] CreateTables executed successfully.");
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[DB] CreateTables fallback failed: {ex.Message}");
+                        logger.LogError(ex, "[DB] CreateTables fallback failed");
                     }
                 }
             }
         }
         else if (anyModelMigrations)
         {
-            Console.WriteLine("[DB] Applying migrations -> Migrate()");
+            logger.LogInformation("[DB] Applying migrations -> Migrate()");
             db.Database.Migrate();
         }
         else
         {
-            Console.WriteLine("[DB] No migrations found -> EnsureCreated()");
+            logger.LogInformation("[DB] No migrations found -> EnsureCreated()");
             db.Database.EnsureCreated();
         }
 
@@ -949,7 +794,7 @@ using (var scope = app.Services.CreateScope())
         await EnsureRole("Financeiro", "Departamento Financeiro", "AccountBalance");
 
         // Seed Module Permissions
-        await SeedModulePermissionsAsync(db, roleManager);
+        await SeedModulePermissionsAsync(db, roleManager, logger);
 
         var adminEmail = "admin@erp.local";
         var admin = await userManager.FindByEmailAsync(adminEmail);
@@ -981,27 +826,34 @@ using (var scope = app.Services.CreateScope())
         try
         {
             var demoSeedOptions = scope.ServiceProvider.GetRequiredService<IOptions<DemoSeedOptions>>();
-            if (demoSeedOptions.Value.Enabled)
+            var env = scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>();
+
+            // SECURITY: Block demo data seeding in production
+            if (demoSeedOptions.Value.Enabled && !env.IsProduction())
             {
                 var demoSeeder = scope.ServiceProvider.GetRequiredService<DemoDataSeeder>();
                 await demoSeeder.SeedAsync();
             }
+            else if (demoSeedOptions.Value.Enabled && env.IsProduction())
+            {
+                logger.LogWarning("[Seed] DemoSeed is enabled but skipped in production environment.");
+            }
         }
         catch (Exception demoSeedEx)
         {
-            Console.WriteLine($"Demo data seed error: {demoSeedEx.Message}");
+            logger.LogError(demoSeedEx, "Demo data seed error");
         }
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Identity seed error: {ex.Message}");
+        logger.LogError(ex, "Identity seed error");
     }
 }
 
 /// <summary>
 /// Seeds module permissions and assigns them to roles
 /// </summary>
-static async Task SeedModulePermissionsAsync(ApplicationDbContext db, RoleManager<ApplicationRole> roleManager)
+static async Task SeedModulePermissionsAsync(ApplicationDbContext db, RoleManager<ApplicationRole> roleManager, ILogger logger)
 {
     try
     {
@@ -1081,11 +933,11 @@ static async Task SeedModulePermissionsAsync(ApplicationDbContext db, RoleManage
         }
 
         await db.SaveChangesAsync();
-        Console.WriteLine("[Seed] Module permissions seeded successfully.");
+        logger.LogInformation("[Seed] Module permissions seeded successfully.");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[Seed] Module permissions seed error: {ex.Message}");
+        logger.LogError(ex, "[Seed] Module permissions seed error");
     }
 }
 
