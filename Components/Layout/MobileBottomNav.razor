@@ -34,6 +34,12 @@
         <!-- Hidden activator, controlled programmatically -->
     </ActivatorContent>
     <ChildContent>
+        <MudMenuItem OnClick="@(() => NavigateTo("/service-orders"))">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <MudIcon Icon="@Icons.Material.Filled.Build" Size="MudBlazor.Size.Small"/>
+                <span>Ordens de Serviço</span>
+            </div>
+        </MudMenuItem>
         <MudMenuItem OnClick="@(() => NavigateTo("/hr"))">
             <div style="display: flex; align-items: center; gap: 8px;">
                 <MudIcon Icon="@Icons.Material.Filled.People" Size="MudBlazor.Size.Small"/>
