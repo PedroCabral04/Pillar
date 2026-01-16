@@ -19,6 +19,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using erp.Security;
 using erp.Models.Identity;
+using erp.Models.Tenancy;
 using erp.Services.Dashboard;
 using erp.Services.Dashboard.Providers.Sales;
 using erp.Services.Dashboard.Providers.Finance;
@@ -176,7 +177,7 @@ builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
     .AddCookie(IdentityConstants.ApplicationScheme, options =>
     {
         options.LoginPath = "/login";
-        options.LogoutPath = "/api/autenticacao/logout";
+        options.LogoutPath = "/api/auth/logout";
         options.Cookie.Name = "erp.auth";
 
         // SECURITY: Configuração de expiração de cookie (configurável via appsettings)
@@ -777,6 +778,25 @@ using (var scope = app.Services.CreateScope())
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
 
+        async Task<Tenant> EnsureTenant(string slug, string name)
+        {
+            var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Slug == slug);
+            if (tenant == null)
+            {
+                tenant = new Tenant 
+                { 
+                    Slug = slug, 
+                    Name = name, 
+                    Status = TenantStatus.Active,
+                    CreatedAt = DateTime.UtcNow
+                };
+                db.Tenants.Add(tenant);
+                await db.SaveChangesAsync();
+                logger.LogInformation("[Seed] Created tenant: {Slug}", slug);
+            }
+            return tenant;
+        }
+
         async Task EnsureRole(string name, string? description = null, string? icon = null)
         {
             if (!await roleManager.RoleExistsAsync(name))
@@ -801,6 +821,9 @@ using (var scope = app.Services.CreateScope())
         // Seed Module Permissions
         await SeedModulePermissionsAsync(db, roleManager, logger);
 
+        // Ensure Admin Tenant exists
+        var adminTenant = await EnsureTenant("admin", "Administração");
+
         var adminEmail = "admin@erp.local";
         var admin = await userManager.FindByEmailAsync(adminEmail);
         if (admin is null)
@@ -819,12 +842,42 @@ using (var scope = app.Services.CreateScope())
             {
                 UserName = "admin",
                 Email = adminEmail,
-                EmailConfirmed = true
+                EmailConfirmed = true,
+                TenantId = adminTenant.Id
             };
             var created = await userManager.CreateAsync(admin, defaultPassword);
             if (created.Succeeded)
             {
                 await userManager.AddToRoleAsync(admin, "Administrador");
+                
+                // Add membership
+                db.TenantMemberships.Add(new TenantMembership 
+                { 
+                    TenantId = adminTenant.Id, 
+                    UserId = admin.Id,
+                    IsDefault = true,
+                    CreatedAt = DateTime.UtcNow
+                });
+                await db.SaveChangesAsync();
+            }
+        }
+        else if (admin.TenantId == null)
+        {
+            // Update existing admin if it has no tenant
+            admin.TenantId = adminTenant.Id;
+            await userManager.UpdateAsync(admin);
+            
+            // Ensure membership exists
+            if (!await db.TenantMemberships.AnyAsync(m => m.TenantId == adminTenant.Id && m.UserId == admin.Id))
+            {
+                db.TenantMemberships.Add(new TenantMembership 
+                { 
+                    TenantId = adminTenant.Id, 
+                    UserId = admin.Id,
+                    IsDefault = true,
+                    CreatedAt = DateTime.UtcNow
+                });
+                await db.SaveChangesAsync();
             }
         }
 

@@ -60,10 +60,12 @@
                         </MudItem>
                     </MudStack>
 
-                    <!-- Notas -->
+                     <!-- Notas -->
                     <MudTextField T="string" Label="Notas Técnicas" @bind-Value="_dto.TechnicalNotes"
+                                Placeholder="Observações internas para o técnico..."
                                 Variant="Variant.Outlined" Dense="true" Multiline="true" Lines="3"/>
                     <MudTextField T="string" Label="Notas ao Cliente" @bind-Value="_dto.CustomerNotes"
+                                Placeholder="Observações que aparecerão na ordem impressa..."
                                 Variant="Variant.Outlined" Dense="true" Multiline="true" Lines="2"/>
 
                     <!-- Garantia -->

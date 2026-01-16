@@ -223,7 +223,7 @@
             catch
             {
                 // Fallback: se função não existir (cache antigo), usa fetchJson diretamente
-                resultJson = await JS.InvokeAsync<string>("erpAuth.fetchJson", "/api/autenticacao/verify-2fa", payload);
+                resultJson = await JS.InvokeAsync<string>("erpAuth.fetchJson", "/api/auth/verify-2fa", payload);
             }
             var result = JsonSerializer.Deserialize<JsResult>(resultJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
@@ -278,7 +278,7 @@
             catch
             {
                 // Fallback para ambientes onde verify2fa ainda não está disponível no cache do navegador
-                resultJson = await JS.InvokeAsync<string>("erpAuth.fetchJson", "/api/autenticacao/verify-2fa", payload);
+                resultJson = await JS.InvokeAsync<string>("erpAuth.fetchJson", "/api/auth/verify-2fa", payload);
             }
             var result = JsonSerializer.Deserialize<JsResult>(resultJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 

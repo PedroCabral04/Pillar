@@ -1,4 +1,5 @@
 @using erp.DTOs.Tenancy
+@using erp.Models.Tenancy
 @using erp.Services
 @using erp.Services.Tenancy
 @using MudBlazor
@@ -90,39 +91,32 @@ else if (_tenants.Count == 1)
             return;
         }
 
-        // Redireciona para a home com o header X-Tenant ou via subdomain
-        // Por simplicidade, usamos query param que o middleware pode ler
-        // Alternativa: usar subdomain (tenant.Slug.pillar.local)
-        
-        // Opção 1: Usar localStorage para persistir a escolha do tenant
-        // Opção 2: Redirecionar para subdomain
-        // Opção 3: Usar cookie
-        
-        // Por agora, vamos usar a abordagem de subdomain se disponível,
-        // caso contrário mostramos uma mensagem
-        
-        var currentUri = new Uri(NavigationManager.Uri);
-        var host = currentUri.Host;
-        
-        // Tenta construir URL com subdomain
-        if (host.Contains('.'))
+        // Atualiza o contexto do tenant no circuito Blazor
+        // Isso fará com que o ApiService inclua o header X-Tenant nas próximas requisições
+        var tenantModel = new Tenant
         {
-            // Remove o subdomain atual e adiciona o novo
-            var parts = host.Split('.');
-            if (parts.Length >= 2)
+            Id = tenant.Id,
+            Slug = tenant.Slug,
+            Name = tenant.Name,
+            Status = tenant.Status,
+            IsDemo = tenant.IsDemo,
+            Branding = tenant.Branding != null ? new TenantBranding
             {
-                // Assume formato: tenant.domain.tld ou tenant.domain.local
-                parts[0] = tenant.Slug;
-                var newHost = string.Join('.', parts);
-                var newUrl = $"{currentUri.Scheme}://{newHost}:{currentUri.Port}/";
-                NavigationManager.NavigateTo(newUrl, forceLoad: true);
-                return;
-            }
-        }
-        
-        // Fallback: se não puder usar subdomain, mostra mensagem
-        Snackbar.Add($"Para trocar para {tenant.Name}, acesse: {tenant.Slug}.pillar.local", Severity.Info);
+                LogoUrl = tenant.Branding.LogoUrl,
+                FaviconUrl = tenant.Branding.FaviconUrl,
+                PrimaryColor = tenant.Branding.PrimaryColor,
+                SecondaryColor = tenant.Branding.SecondaryColor,
+                AccentColor = tenant.Branding.AccentColor,
+                LoginBackgroundUrl = tenant.Branding.LoginBackgroundUrl,
+                EmailFooterHtml = tenant.Branding.EmailFooterHtml,
+                CustomCss = tenant.Branding.CustomCss
+            } : null
+        };
+
+        TenantContextAccessor.SetTenant(tenantModel);
         _currentTenant = tenant;
+        
         BrandingProvider.NotifyBrandingChanged();
+        Snackbar.Add($"Tenant alterado para {tenant.Name}", Severity.Success);
     }
 }

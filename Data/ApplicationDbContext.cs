@@ -228,6 +228,30 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     private void SetTenantId()
     {
         var currentTenantId = _tenantContextAccessor?.Current?.TenantId;
+        
+        // 1. Fallback: Try to resolve from HttpContext.Items (populated by middleware)
+        if (!currentTenantId.HasValue || currentTenantId.Value == 0)
+        {
+            var httpContext = _httpContextAccessor?.HttpContext;
+            if (httpContext != null && httpContext.Items.TryGetValue(erp.Services.Tenancy.TenantResolutionMiddleware.TenantItemKey, out var tenantObj))
+            {
+                if (tenantObj is Tenant tenant)
+                {
+                    currentTenantId = tenant.Id;
+                }
+            }
+        }
+        
+        // 2. Fallback: Try to resolve from User Claims directly
+        if (!currentTenantId.HasValue || currentTenantId.Value == 0)
+        {
+            var user = _httpContextAccessor?.HttpContext?.User;
+            var tenantIdClaim = user?.FindFirst(erp.Services.Tenancy.TenantClaimTypes.TenantId)?.Value;
+            if (int.TryParse(tenantIdClaim, out var tid))
+            {
+                currentTenantId = tid;
+            }
+        }
 
         var entries = ChangeTracker.Entries()
             .Where(e => e.Entity is IMustHaveTenant && e.State == EntityState.Added)
@@ -247,7 +271,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             
             // Try to inherit TenantId from parent entity (for child entities like SaleItem, KanbanColumn, etc.)
             var inheritedTenantId = TryGetParentTenantId(entry);
-            if (inheritedTenantId.HasValue && inheritedTenantId.Value != 0)
+            if (inheritedTenantId.HasValue && inheritedTenantId.HasValue && inheritedTenantId.Value != 0)
             {
                 entity.TenantId = inheritedTenantId.Value;
                 continue;
@@ -257,10 +281,13 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             if (!currentTenantId.HasValue || currentTenantId.Value == 0)
             {
                 var entityType = entry.Entity.GetType().Name;
+                var xTenant = _httpContextAccessor?.HttpContext?.Request?.Headers["X-Tenant"].ToString() ?? "N/A";
+                var userIdentity = _httpContextAccessor?.HttpContext?.User?.Identity?.Name ?? "Anonymous";
+
                 throw new InvalidOperationException(
                     $"Cannot save entity '{entityType}' without tenant context. " +
-                    $"Entities implementing IMustHaveTenant require a valid TenantId. " +
-                    $"Ensure the request has a valid tenant context (subdomain, X-Tenant header, or user claim).");
+                    $"Debug: X-Tenant={xTenant}, User={userIdentity}. " +
+                    $"Entities implementing IMustHaveTenant require a valid TenantId.");
             }
             
             entity.TenantId = currentTenantId.Value;

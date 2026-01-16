@@ -89,7 +89,7 @@
     {
         try
         {
-            await ApiService.PostAsync<object>("/api/autenticacao/logout", null);
+            await ApiService.PostAsync<object>("/api/auth/logout", null);
             Navigation.NavigateTo("/login", forceLoad: true);
         }
         catch (Exception ex)

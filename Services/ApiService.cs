@@ -33,6 +33,7 @@ public class ApiService : IApiService
 {
     private readonly HttpClient _httpClient;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly erp.Services.Tenancy.ITenantContextAccessor _tenantContextAccessor;
     private readonly ILogger<ApiService> _logger;
     private int _activeRequests = 0;
     private bool _isLoading;
@@ -54,10 +55,15 @@ public class ApiService : IApiService
         }
     }
 
-    public ApiService(HttpClient httpClient, IHttpContextAccessor httpContextAccessor, ILogger<ApiService> logger)
+    public ApiService(
+        HttpClient httpClient, 
+        IHttpContextAccessor httpContextAccessor, 
+        erp.Services.Tenancy.ITenantContextAccessor tenantContextAccessor,
+        ILogger<ApiService> logger)
     {
         _httpClient = httpClient;
         _httpContextAccessor = httpContextAccessor;
+        _tenantContextAccessor = tenantContextAccessor;
         _logger = logger;
         // Timeout is configured in Program.cs via AddHttpClient
         _defaultTimeout = _httpClient.Timeout;
@@ -92,6 +98,31 @@ public class ApiService : IApiService
     private HttpRequestMessage CreateRequestWithCookies(HttpMethod method, string endpoint)
     {
         var request = new HttpRequestMessage(method, endpoint);
+        
+        // Add Tenant Headers if resolved
+        var currentTenant = _tenantContextAccessor?.Current;
+        if (currentTenant != null && currentTenant.IsResolved)
+        {
+            var slug = currentTenant.Slug;
+            var id = currentTenant.TenantId;
+            
+            if (!string.IsNullOrEmpty(slug))
+            {
+                request.Headers.Add("X-Tenant", slug);
+                System.Diagnostics.Debug.WriteLine($"[ApiService] Adding X-Tenant: {slug}");
+            }
+            
+            if (id.HasValue)
+            {
+                request.Headers.Add("X-Tenant-Id", id.Value.ToString());
+                System.Diagnostics.Debug.WriteLine($"[ApiService] Adding X-Tenant-Id: {id.Value}");
+            }
+        }
+        else
+        {
+            System.Diagnostics.Debug.WriteLine("[ApiService] WARNING: No tenant resolved in ITenantContextAccessor. Header NOT added.");
+            _logger.LogWarning("No tenant resolved in TenantContextAccessor for API request to {Endpoint}", endpoint);
+        }
         
         var httpContext = _httpContextAccessor.HttpContext;
         if (httpContext != null)

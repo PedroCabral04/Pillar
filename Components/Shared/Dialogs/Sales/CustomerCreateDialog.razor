@@ -5,7 +5,9 @@
 @using MudBlazor
 @using Size = MudBlazor.Size
 @using Color = MudBlazor.Color
+@using erp.Services.Tenancy
 @inject IApiService ApiService
+@inject ITenantContextAccessor TenantContextAccessor
 @inject ISnackbar Snackbar
 @inject ILogger<CustomerCreateDialog> Logger
 
@@ -21,6 +23,18 @@
             <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-3">
                 <MudIcon Icon="@Icons.Material.Filled.Badge" Size="Size.Small" Class="mr-1" />
                 Dados Principais
+                @if (TenantContextAccessor.Current.IsResolved)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Class="ml-2">
+                        Tenant: @TenantContextAccessor.Current.Name
+                    </MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Error" Class="ml-2">
+                        ERRO: Nenhum Tenant selecionado!
+                    </MudChip>
+                }
             </MudText>
             <MudGrid Spacing="3">
                 <MudItem xs="12" md="3">
@@ -303,6 +317,12 @@
 
     private async Task Submit()
     {
+        if (!TenantContextAccessor.Current.IsResolved)
+        {
+            Snackbar.Add("Erro: Selecione um tenant antes de criar um cliente.", Severity.Error);
+            return;
+        }
+
         await _form!.Validate();
         if (!_form.IsValid)
         {

@@ -30,7 +30,7 @@ public class TwoFactorTests : IClassFixture<TestWebApplicationFactory>
         });
 
         // Login as seeded admin
-        var loginResp = await client.PostAsJsonAsync("/api/autenticacao/login", new
+        var loginResp = await client.PostAsJsonAsync("/api/auth/login", new
         {
             email = "admin@erp.local",
             password = "Admin@123!",
@@ -59,7 +59,7 @@ public class TwoFactorTests : IClassFixture<TestWebApplicationFactory>
         });
 
         // Login as seeded admin
-        var loginResp = await client.PostAsJsonAsync("/api/autenticacao/login", new
+        var loginResp = await client.PostAsJsonAsync("/api/auth/login", new
         {
             email = "admin@erp.local",
             password = "Admin@123!",
@@ -82,7 +82,7 @@ public class TwoFactorTests : IClassFixture<TestWebApplicationFactory>
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
         // 1) Login with admin credentials (no 2FA yet)
-        var loginResp = await client.PostAsJsonAsync("/api/autenticacao/login", new { email = "admin@erp.local", password = "Admin@123!", rememberMe = false });
+        var loginResp = await client.PostAsJsonAsync("/api/auth/login", new { email = "admin@erp.local", password = "Admin@123!", rememberMe = false });
         loginResp.EnsureSuccessStatusCode();
 
         // 2) Enable 2FA and capture secret from AuthenticatorUri
@@ -105,11 +105,11 @@ public class TwoFactorTests : IClassFixture<TestWebApplicationFactory>
         codesDto!.RecoveryCodes.Should().NotBeNull();
 
         // 4) Logout
-        var logoutResp = await client.PostAsync("/api/autenticacao/logout", content: null);
+        var logoutResp = await client.PostAsync("/api/auth/logout", content: null);
         logoutResp.EnsureSuccessStatusCode();
 
         // 5) Login again: should now require 2FA
-        var login2 = await client.PostAsJsonAsync("/api/autenticacao/login", new { email = "admin@erp.local", password = "Admin@123!", rememberMe = false });
+        var login2 = await client.PostAsJsonAsync("/api/auth/login", new { email = "admin@erp.local", password = "Admin@123!", rememberMe = false });
         login2.EnsureSuccessStatusCode();
         var loginPayload = JsonSerializer.Deserialize<LoginTwoFactorProbe>(await login2.Content.ReadAsStringAsync(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         loginPayload.Should().NotBeNull();
@@ -117,15 +117,15 @@ public class TwoFactorTests : IClassFixture<TestWebApplicationFactory>
 
         // 6) Provide authenticator code and set rememberMachine = true
         var code2 = GenerateCurrentTotp(secret!);
-        var verify2fa = await client.PostAsJsonAsync("/api/autenticacao/verify-2fa", new { code = code2, rememberMachine = true, isRecoveryCode = false });
+        var verify2fa = await client.PostAsJsonAsync("/api/auth/verify-2fa", new { code = code2, rememberMachine = true, isRecoveryCode = false });
         verify2fa.EnsureSuccessStatusCode();
 
         // 7) Logout again
-        var logout2 = await client.PostAsync("/api/autenticacao/logout", content: null);
+        var logout2 = await client.PostAsync("/api/auth/logout", content: null);
         logout2.EnsureSuccessStatusCode();
 
         // 8) Login again: should NOT require 2FA due to remembered machine
-        var login3 = await client.PostAsJsonAsync("/api/autenticacao/login", new { email = "admin@erp.local", password = "Admin@123!", rememberMe = false });
+        var login3 = await client.PostAsJsonAsync("/api/auth/login", new { email = "admin@erp.local", password = "Admin@123!", rememberMe = false });
         login3.EnsureSuccessStatusCode();
         var text3 = await login3.Content.ReadAsStringAsync();
         text3.Should().NotContain("requiresTwoFactor");
@@ -138,7 +138,7 @@ public class TwoFactorTests : IClassFixture<TestWebApplicationFactory>
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
         // Login and enable 2FA if not already
-        var loginResp = await client.PostAsJsonAsync("/api/autenticacao/login", new { email = "admin@erp.local", password = "Admin@123!", rememberMe = false });
+        var loginResp = await client.PostAsJsonAsync("/api/auth/login", new { email = "admin@erp.local", password = "Admin@123!", rememberMe = false });
         loginResp.EnsureSuccessStatusCode();
 
         var enableResp = await client.PostAsJsonAsync("/api/two-factor/enable", new { });
@@ -154,21 +154,21 @@ public class TwoFactorTests : IClassFixture<TestWebApplicationFactory>
         var recoveryCode = codesDto.RecoveryCodes!.First();
 
         // Logout
-        await client.PostAsync("/api/autenticacao/logout", content: null);
+        await client.PostAsync("/api/auth/logout", content: null);
 
         // Login again requires 2FA
-        var login2 = await client.PostAsJsonAsync("/api/autenticacao/login", new { email = "admin@erp.local", password = "Admin@123!", rememberMe = false });
+        var login2 = await client.PostAsJsonAsync("/api/auth/login", new { email = "admin@erp.local", password = "Admin@123!", rememberMe = false });
         login2.EnsureSuccessStatusCode();
 
         // Use recovery code successfully
-        var useRecovery = await client.PostAsJsonAsync("/api/autenticacao/verify-2fa", new { code = recoveryCode, rememberMachine = false, isRecoveryCode = true });
+        var useRecovery = await client.PostAsJsonAsync("/api/auth/verify-2fa", new { code = recoveryCode, rememberMachine = false, isRecoveryCode = true });
         useRecovery.EnsureSuccessStatusCode();
 
         // Logout and login again to attempt reuse (should fail)
-        await client.PostAsync("/api/autenticacao/logout", content: null);
-        var login3 = await client.PostAsJsonAsync("/api/autenticacao/login", new { email = "admin@erp.local", password = "Admin@123!", rememberMe = false });
+        await client.PostAsync("/api/auth/logout", content: null);
+        var login3 = await client.PostAsJsonAsync("/api/auth/login", new { email = "admin@erp.local", password = "Admin@123!", rememberMe = false });
         login3.EnsureSuccessStatusCode();
-        var reuse = await client.PostAsJsonAsync("/api/autenticacao/verify-2fa", new { code = recoveryCode, rememberMachine = false, isRecoveryCode = true });
+        var reuse = await client.PostAsJsonAsync("/api/auth/verify-2fa", new { code = recoveryCode, rememberMachine = false, isRecoveryCode = true });
         reuse.StatusCode.Should().Be(System.Net.HttpStatusCode.Unauthorized);
     }
 
@@ -179,7 +179,7 @@ public class TwoFactorTests : IClassFixture<TestWebApplicationFactory>
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
         // Ensure logged in and 2FA enabled
-        await client.PostAsJsonAsync("/api/autenticacao/login", new { email = "admin@erp.local", password = "Admin@123!", rememberMe = false });
+        await client.PostAsJsonAsync("/api/auth/login", new { email = "admin@erp.local", password = "Admin@123!", rememberMe = false });
         var enableResp = await client.PostAsJsonAsync("/api/two-factor/enable", new { });
         var enableDto = await enableResp.Content.ReadFromJsonAsync<EnableTwoFactorResponseDto>();
         var secret = ParseSecretFromOtpauthUri(enableDto!.AuthenticatorUri);
@@ -191,8 +191,8 @@ public class TwoFactorTests : IClassFixture<TestWebApplicationFactory>
         disableResp.EnsureSuccessStatusCode();
 
         // Logout and login should not require 2FA
-        await client.PostAsync("/api/autenticacao/logout", content: null);
-        var login2 = await client.PostAsJsonAsync("/api/autenticacao/login", new { email = "admin@erp.local", password = "Admin@123!", rememberMe = false });
+        await client.PostAsync("/api/auth/logout", content: null);
+        var login2 = await client.PostAsJsonAsync("/api/auth/login", new { email = "admin@erp.local", password = "Admin@123!", rememberMe = false });
         login2.EnsureSuccessStatusCode();
         var text = await login2.Content.ReadAsStringAsync();
         text.Should().NotContain("requiresTwoFactor");
