@@ -403,7 +403,7 @@
         try
         {
             // Carrega categorias - aumenta pageSize para pegar todas
-            var response = await ApiService.GetAsync<PaginatedCategoryResponse>("/api/products/categories?pageSize=1000");
+            var response = await ApiService.GetAsync<PaginatedCategoryResponse>("/api/produtos/categories?pageSize=1000");
             _categories = response?.Items ?? new List<ProductCategoryDto>();
             
             // Inicializa valores padrão
@@ -476,7 +476,7 @@
                 _newProduct.CurrentStock = _initialStock.Value;
             }
             
-            var result = await ApiService.PostAsync<ProductDto>("/api/products", _newProduct);
+            var result = await ApiService.PostAsync<ProductDto>("/api/produtos", _newProduct);
             
             if (result != null)
             {

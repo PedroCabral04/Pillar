@@ -10,7 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace erp.Controllers;
 
 [ApiController]
-[Route("api/payroll")]
+[Route("api/folha-pagamento")]
 [Authorize(Roles = "Administrador,Gerente,RH")]
 [ResponseCache(NoStore = true)]
 public class PayrollController : ControllerBase

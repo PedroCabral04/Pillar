@@ -77,12 +77,15 @@ public class RoleModulePermission
 }
 
 /// <summary>
-/// Static class containing all module keys for type-safe access
+/// Static class containing all module keys for type-safe access.
+/// Module keys must match route paths (e.g., "sales", "service-orders", "inventory").
+/// IMPORTANT: When adding a new module key, also update PermissionService.AllModuleKeys.
 /// </summary>
 public static class ModuleKeys
 {
     public const string Dashboard = "dashboard";
     public const string Sales = "sales";
+    public const string ServiceOrder = "service-orders";
     public const string Inventory = "inventory";
     public const string Financial = "financial";
     public const string HR = "hr";

@@ -8,7 +8,7 @@ namespace erp.Controllers;
 
 [Authorize]
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/auditoria")]
 public class AuditController : ControllerBase
 {
     private readonly IAuditService _auditService;

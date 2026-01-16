@@ -10,7 +10,7 @@ namespace erp.Controllers;
 /// </summary>
 [Authorize]
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/movimentacoes-estoque")]
 public class StockMovementsController : ControllerBase
 {
     private readonly IStockMovementService _stockMovementService;

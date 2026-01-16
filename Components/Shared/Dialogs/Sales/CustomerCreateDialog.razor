@@ -315,7 +315,7 @@
         {
             // Ensure document contains only digits before submit
             _model.Document = BrazilianDocumentValidator.RemoveFormatting(_model.Document);
-            var customer = await ApiService.PostAsync<CustomerDto>("/api/sales/customers", _model);
+            var customer = await ApiService.PostAsync<CustomerDto>("/api/vendas/customers", _model);
             Snackbar.Add("Cliente criado com sucesso!", Severity.Success);
             MudDialog.Close(DialogResult.Ok(customer));
         }

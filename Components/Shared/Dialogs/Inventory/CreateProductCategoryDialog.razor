@@ -110,7 +110,7 @@
         try
         {
             // Carrega todas as categorias para poder selecionar como pai
-            var response = await ApiService.GetAsync<PaginatedCategoryResponse>("/api/products/categories?pageSize=1000");
+            var response = await ApiService.GetAsync<PaginatedCategoryResponse>("/api/produtos/categories?pageSize=1000");
             _categories = response?.Items ?? new List<ProductCategoryDto>();
             
             // Inicializa como ativa por padrão
@@ -159,7 +159,7 @@
         _loading = true;
         try
         {
-            var result = await ApiService.PostAsync<ProductCategoryDto>("/api/products/categories", _newCategory);
+            var result = await ApiService.PostAsync<ProductCategoryDto>("/api/produtos/categories", _newCategory);
             
             if (result != null)
             {

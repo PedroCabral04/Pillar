@@ -6,7 +6,9 @@
       "Bash(dotnet tool restore:*)",
       "Bash(dotnet build:*)",
       "Bash(grep:*)",
-      "Bash(del:*)"
+      "Bash(del:*)",
+      "Bash(powershell:*)",
+      "Bash(find:*)"
     ]
   }
 }

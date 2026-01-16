@@ -11,7 +11,7 @@ namespace erp.Controllers;
 /// </summary>
 [Authorize]
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/estoque")]
 public class InventoryController : ControllerBase
 {
     private readonly IStockCountService _stockCountService;

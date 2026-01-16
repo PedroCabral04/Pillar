@@ -172,7 +172,7 @@
         try
         {
             // Carrega todas as categorias para o filtro (usando um tamanho de página grande)
-            var response = await ApiService.GetAsync<PaginatedCategoriesResponse>("/api/products/categories?pageSize=1000");
+            var response = await ApiService.GetAsync<PaginatedCategoriesResponse>("/api/produtos/categories?pageSize=1000");
             if (response != null)
             {
                 _parentCategories = response.Items.OrderBy(c => c.Name).ToList();
@@ -238,7 +238,7 @@
             }
 
             var query = string.Join("&", queryParams);
-            var response = await ApiService.GetAsync<PaginatedCategoriesResponse>($"/api/products/categories?{query}");
+            var response = await ApiService.GetAsync<PaginatedCategoriesResponse>($"/api/produtos/categories?{query}");
 
             if (response != null)
             {
@@ -334,7 +334,7 @@
         {
             try
             {
-                await ApiService.DeleteAsync($"/api/products/categories/{category.Id}");
+                await ApiService.DeleteAsync($"/api/produtos/categories/{category.Id}");
                 Snackbar.Add("Categoria excluída com sucesso", Severity.Success);
                 _table?.ReloadServerData();
             }

@@ -163,7 +163,7 @@
     {
         try
         {
-            var response = await ApiService.GetAsync<List<CustomerDto>>("/api/sales/customers");
+            var response = await ApiService.GetAsync<List<CustomerDto>>("/api/vendas/customers");
             if (response != null)
             {
                 _customers = response.Where(c => c.IsActive).ToList();
@@ -207,7 +207,7 @@
 
         try
         {
-            var response = await ApiService.PostAsync<ServiceOrderDto>("/api/service-orders", _dto);
+            var response = await ApiService.PostAsync<ServiceOrderDto>("/api/ordens-servico", _dto);
             if (response != null)
             {
                 Snackbar.Add($"Ordem de serviço {response.OrderNumber} criada com sucesso!", Severity.Success);

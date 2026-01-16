@@ -8,7 +8,7 @@ using System.Security.Claims;
 namespace erp.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/categorias-financeiras")]
 [Authorize]
 public class FinancialCategoriesController : ControllerBase
 {

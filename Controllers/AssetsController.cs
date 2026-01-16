@@ -13,7 +13,7 @@ namespace erp.Controllers;
 /// </summary>
 [Authorize]
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/ativos")]
 public class AssetsController : ControllerBase
 {
     private readonly IAssetService _assetService;

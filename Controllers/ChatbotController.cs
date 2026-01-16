@@ -7,7 +7,7 @@ using System.Security.Claims;
 namespace erp.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/assistente")]
 [Authorize]
 public class ChatbotController : ControllerBase
 {

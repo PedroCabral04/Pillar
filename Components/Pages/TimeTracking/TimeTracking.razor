@@ -224,7 +224,7 @@
         if (_period == null) return;
 
         // Get all users
-        var users = await ApiService.GetAsync<List<UserDto>>("/api/users");
+        var users = await ApiService.GetAsync<List<UserDto>>("/api/usuarios");
         if (users == null) return;
 
         // Filter out users already in the period

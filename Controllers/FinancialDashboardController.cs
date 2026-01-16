@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace erp.Controllers;
 
 [ApiController]
-[Route("api/financial-dashboard")]
+[Route("api/dashboard-financeiro")]
 [Authorize]
 public class FinancialDashboardController : ControllerBase
 {

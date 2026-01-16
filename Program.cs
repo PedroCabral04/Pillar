@@ -60,8 +60,10 @@ builder.Services.AddAuthorization(options =>
     // Module-based authorization policies
     options.AddPolicy(ModulePolicies.Dashboard, policy => 
         policy.Requirements.Add(new ModuleAccessRequirement(ModuleKeys.Dashboard)));
-    options.AddPolicy(ModulePolicies.Sales, policy => 
+    options.AddPolicy(ModulePolicies.Sales, policy =>
         policy.Requirements.Add(new ModuleAccessRequirement(ModuleKeys.Sales)));
+    options.AddPolicy(ModulePolicies.ServiceOrder, policy =>
+        policy.Requirements.Add(new ModuleAccessRequirement(ModuleKeys.ServiceOrder)));
     options.AddPolicy(ModulePolicies.Inventory, policy => 
         policy.Requirements.Add(new ModuleAccessRequirement(ModuleKeys.Inventory)));
     options.AddPolicy(ModulePolicies.Financial, policy => 
@@ -174,7 +176,7 @@ builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
     .AddCookie(IdentityConstants.ApplicationScheme, options =>
     {
         options.LoginPath = "/login";
-        options.LogoutPath = "/api/auth/logout";
+        options.LogoutPath = "/api/autenticacao/logout";
         options.Cookie.Name = "erp.auth";
 
         // SECURITY: Configuração de expiração de cookie (configurável via appsettings)
@@ -865,13 +867,14 @@ static async Task SeedModulePermissionsAsync(ApplicationDbContext db, RoleManage
         {
             new ModulePermission { ModuleKey = ModuleKeys.Dashboard, DisplayName = "Dashboard", Description = "Painel principal com visão geral", Icon = "Dashboard", DisplayOrder = 1 },
             new ModulePermission { ModuleKey = ModuleKeys.Sales, DisplayName = "Vendas", Description = "Gestão de vendas e clientes", Icon = "ShoppingCart", DisplayOrder = 2 },
-            new ModulePermission { ModuleKey = ModuleKeys.Inventory, DisplayName = "Estoque", Description = "Controle de produtos e movimentações", Icon = "Inventory", DisplayOrder = 3 },
-            new ModulePermission { ModuleKey = ModuleKeys.Financial, DisplayName = "Financeiro", Description = "Contas a pagar/receber, fornecedores", Icon = "AccountBalance", DisplayOrder = 4 },
-            new ModulePermission { ModuleKey = ModuleKeys.HR, DisplayName = "RH", Description = "Recursos Humanos e folha de pagamento", Icon = "Groups", DisplayOrder = 5 },
-            new ModulePermission { ModuleKey = ModuleKeys.Assets, DisplayName = "Ativos", Description = "Gestão de patrimônio", Icon = "Devices", DisplayOrder = 6 },
-            new ModulePermission { ModuleKey = ModuleKeys.Kanban, DisplayName = "Kanban", Description = "Quadros de tarefas", Icon = "ViewKanban", DisplayOrder = 7 },
-            new ModulePermission { ModuleKey = ModuleKeys.Reports, DisplayName = "Relatórios", Description = "Relatórios gerenciais", Icon = "Assessment", DisplayOrder = 8 },
-            new ModulePermission { ModuleKey = ModuleKeys.Admin, DisplayName = "Administração", Description = "Configurações do sistema", Icon = "AdminPanelSettings", DisplayOrder = 9 }
+            new ModulePermission { ModuleKey = ModuleKeys.ServiceOrder, DisplayName = "Ordens de Serviço", Description = "Gestão de ordens de serviço", Icon = "Build", DisplayOrder = 3 },
+            new ModulePermission { ModuleKey = ModuleKeys.Inventory, DisplayName = "Estoque", Description = "Controle de produtos e movimentações", Icon = "Inventory", DisplayOrder = 4 },
+            new ModulePermission { ModuleKey = ModuleKeys.Financial, DisplayName = "Financeiro", Description = "Contas a pagar/receber, fornecedores", Icon = "AccountBalance", DisplayOrder = 5 },
+            new ModulePermission { ModuleKey = ModuleKeys.HR, DisplayName = "RH", Description = "Recursos Humanos e folha de pagamento", Icon = "Groups", DisplayOrder = 6 },
+            new ModulePermission { ModuleKey = ModuleKeys.Assets, DisplayName = "Ativos", Description = "Gestão de patrimônio", Icon = "Devices", DisplayOrder = 7 },
+            new ModulePermission { ModuleKey = ModuleKeys.Kanban, DisplayName = "Kanban", Description = "Quadros de tarefas", Icon = "ViewKanban", DisplayOrder = 8 },
+            new ModulePermission { ModuleKey = ModuleKeys.Reports, DisplayName = "Relatórios", Description = "Relatórios gerenciais", Icon = "Assessment", DisplayOrder = 9 },
+            new ModulePermission { ModuleKey = ModuleKeys.Admin, DisplayName = "Administração", Description = "Configurações do sistema", Icon = "AdminPanelSettings", DisplayOrder = 10 }
         };
 
         // Add modules if they don't exist
@@ -892,20 +895,20 @@ static async Task SeedModulePermissionsAsync(ApplicationDbContext db, RoleManage
         var roleModules = new Dictionary<string, string[]>
         {
             // Administrador gets all modules (handled in code, but seed anyway for completeness)
-            ["Administrador"] = new[] { ModuleKeys.Dashboard, ModuleKeys.Sales, ModuleKeys.Inventory, ModuleKeys.Financial, ModuleKeys.HR, ModuleKeys.Assets, ModuleKeys.Kanban, ModuleKeys.Reports, ModuleKeys.Admin },
-            
+            ["Administrador"] = new[] { ModuleKeys.Dashboard, ModuleKeys.Sales, ModuleKeys.ServiceOrder, ModuleKeys.Inventory, ModuleKeys.Financial, ModuleKeys.HR, ModuleKeys.Assets, ModuleKeys.Kanban, ModuleKeys.Reports, ModuleKeys.Admin },
+
             // Gerente gets most modules except Admin
-            ["Gerente"] = new[] { ModuleKeys.Dashboard, ModuleKeys.Sales, ModuleKeys.Inventory, ModuleKeys.Financial, ModuleKeys.HR, ModuleKeys.Assets, ModuleKeys.Kanban, ModuleKeys.Reports },
-            
-            // Vendedor gets Sales, Dashboard, Kanban
-            ["Vendedor"] = new[] { ModuleKeys.Dashboard, ModuleKeys.Sales, ModuleKeys.Kanban },
-            
+            ["Gerente"] = new[] { ModuleKeys.Dashboard, ModuleKeys.Sales, ModuleKeys.ServiceOrder, ModuleKeys.Inventory, ModuleKeys.Financial, ModuleKeys.HR, ModuleKeys.Assets, ModuleKeys.Kanban, ModuleKeys.Reports },
+
+            // Vendedor gets Sales, ServiceOrder, Dashboard, Kanban
+            ["Vendedor"] = new[] { ModuleKeys.Dashboard, ModuleKeys.Sales, ModuleKeys.ServiceOrder, ModuleKeys.Kanban },
+
             // Estoque gets Inventory, Dashboard, Reports
             ["Estoque"] = new[] { ModuleKeys.Dashboard, ModuleKeys.Inventory, ModuleKeys.Reports },
-            
+
             // RH gets HR, Dashboard, Reports
             ["RH"] = new[] { ModuleKeys.Dashboard, ModuleKeys.HR, ModuleKeys.Reports },
-            
+
             // Financeiro gets Financial, Dashboard, Reports
             ["Financeiro"] = new[] { ModuleKeys.Dashboard, ModuleKeys.Financial, ModuleKeys.Reports }
         };

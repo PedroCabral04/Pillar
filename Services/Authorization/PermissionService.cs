@@ -116,12 +116,14 @@ public class PermissionService : IPermissionService
     }
     
     /// <summary>
-    /// All available module keys (for admins and fallback scenarios)
+    /// All available module keys (for admins and fallback scenarios).
+    /// IMPORTANT: Keep this array in sync with ModuleKeys class - add new keys here when adding modules.
     /// </summary>
     private static readonly IReadOnlyList<string> AllModuleKeys = new[]
     {
         ModuleKeys.Dashboard,
         ModuleKeys.Sales,
+        ModuleKeys.ServiceOrder,
         ModuleKeys.Inventory,
         ModuleKeys.Financial,
         ModuleKeys.HR,

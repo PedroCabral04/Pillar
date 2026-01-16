@@ -8,7 +8,7 @@ using System.Security.Claims;
 namespace erp.Controllers;
 
 [ApiController]
-[Route("api/accounts-receivable")]
+[Route("api/contas-receber")]
 [Authorize]
 public class AccountsReceivableController : ControllerBase
 {

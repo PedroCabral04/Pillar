@@ -12,7 +12,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace erp.Controllers;
 
 [ApiController]
-[Route("api/time-tracking")]
+[Route("api/apontamento")]
 [Authorize(Roles = "Administrador,Gerente")]
 [ResponseCache(NoStore = true)]
 public class TimeTrackingController : ControllerBase

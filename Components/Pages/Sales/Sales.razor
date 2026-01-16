@@ -222,7 +222,7 @@
             }
 
             var query = string.Join("&", queryParams);
-            var response = await ApiService.GetAsync<PaginatedSalesResponse>($"/api/sales?{query}");
+            var response = await ApiService.GetAsync<PaginatedSalesResponse>($"/api/vendas?{query}");
 
             if (response != null)
             {
@@ -307,7 +307,7 @@
 
             try
             {
-                await ApiService.PostAsync<object>($"/api/sales/{sale.Id}/finalize", null);
+                await ApiService.PostAsync<object>($"/api/vendas/{sale.Id}/finalize", null);
                 Snackbar.Add("Venda finalizada com sucesso", Severity.Success);
                 await _table!.ReloadServerData();
             }
@@ -337,7 +337,7 @@
         {
             try
             {
-                await ApiService.PostAsync<object>($"/api/sales/{sale.Id}/cancel", null);
+                await ApiService.PostAsync<object>($"/api/vendas/{sale.Id}/cancel", null);
                 Snackbar.Add("Venda cancelada com sucesso", Severity.Success);
                 await _table!.ReloadServerData();
             }
@@ -367,7 +367,7 @@
         {
             try
             {
-                var product = await ApiService.GetAsync<ProductDto>($"/api/products/{item.ProductId}");
+                var product = await ApiService.GetAsync<ProductDto>($"/api/produtos/{item.ProductId}");
                 if (product == null)
                 {
                     insufficient.Add($"Produto {item.ProductName} (SKU: {item.ProductSku}) não encontrado");

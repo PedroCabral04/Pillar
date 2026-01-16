@@ -11,7 +11,7 @@ namespace erp.Controllers;
 /// Controller para gerenciamento de comissões
 /// </summary>
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/comissoes")]
 [Authorize]
 public class CommissionsController : ControllerBase
 {

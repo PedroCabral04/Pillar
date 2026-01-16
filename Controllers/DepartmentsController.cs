@@ -7,7 +7,7 @@ using erp.Models.Audit;
 namespace erp.Controllers;
 
 [ApiController]
-[Route("api/departments")]
+[Route("api/departamentos")]
 [Authorize]
 public class DepartmentsController : ControllerBase
 {

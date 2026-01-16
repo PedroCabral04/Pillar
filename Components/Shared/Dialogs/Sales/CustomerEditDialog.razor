@@ -276,7 +276,7 @@
     {
         try
         {
-            var customer = await ApiService.GetAsync<CustomerDto>($"/api/sales/customers/{CustomerId}");
+            var customer = await ApiService.GetAsync<CustomerDto>($"/api/vendas/customers/{CustomerId}");
             if (customer != null)
             {
                 _model = new UpdateCustomerDto
@@ -329,7 +329,7 @@
         _processing = true;
         try
         {
-            var customer = await ApiService.PutAsync<CustomerDto>($"/api/sales/customers/{CustomerId}", _model ?? new());
+            var customer = await ApiService.PutAsync<CustomerDto>($"/api/vendas/customers/{CustomerId}", _model ?? new());
             Snackbar.Add("Cliente atualizado com sucesso!", Severity.Success);
             MudDialog.Close(DialogResult.Ok(customer));
         }

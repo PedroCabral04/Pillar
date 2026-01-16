@@ -281,8 +281,8 @@
         try
         {
             var url = string.IsNullOrWhiteSpace(value)
-                ? "/api/sales/customers?pageSize=10"
-                : $"/api/sales/customers?search={Uri.EscapeDataString(value)}&pageSize=10";
+                ? "/api/vendas/customers?pageSize=10"
+                : $"/api/vendas/customers?search={Uri.EscapeDataString(value)}&pageSize=10";
 
             var response = await ApiService.GetAsync<PaginatedCustomersResponse>(url);
             return response?.Items ?? new List<CustomerDto>();
@@ -299,8 +299,8 @@
         try
         {
             var url = string.IsNullOrWhiteSpace(value)
-                ? "/api/products?pageSize=20&status=Ativo"
-                : $"/api/products?search={Uri.EscapeDataString(value)}&pageSize=20&status=Ativo";
+                ? "/api/produtos?pageSize=20&status=Ativo"
+                : $"/api/produtos?search={Uri.EscapeDataString(value)}&pageSize=20&status=Ativo";
 
             var response = await ApiService.GetAsync<PaginatedProductsResponse>(url);
             return response?.Items ?? new List<ProductDto>();
@@ -405,7 +405,7 @@
             _newSale.CustomerId = _selectedCustomer?.Id;
             _newSale.SaleDate = _saleDate ?? DateTime.Now;
             
-            var result = await ApiService.PostAsync<SaleDto>("/api/sales", _newSale);
+            var result = await ApiService.PostAsync<SaleDto>("/api/vendas", _newSale);
             
             if (result != null)
             {

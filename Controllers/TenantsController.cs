@@ -8,7 +8,7 @@ using System.Security.Claims;
 namespace erp.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/tenants")]
 [Authorize(Roles = "Administrador")]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 /// <summary>

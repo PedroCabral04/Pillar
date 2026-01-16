@@ -179,7 +179,7 @@
             _newCount.CountDate = _countDate ?? DateTime.Now;
             
             var result = await ApiService.PostAsync<StockCountDto>(
-                "/api/inventory/counts", _newCount);
+                "/api/estoque/counts", _newCount);
             
             if (result != null)
             {

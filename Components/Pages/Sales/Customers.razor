@@ -182,7 +182,7 @@
             }
 
             var query = string.Join("&", queryParams);
-            var response = await ApiService.GetAsync<PaginatedCustomersResponse>($"/api/sales/customers?{query}");
+            var response = await ApiService.GetAsync<PaginatedCustomersResponse>($"/api/vendas/customers?{query}");
 
             if (response != null)
             {
@@ -260,7 +260,7 @@
         {
             try
             {
-                await ApiService.DeleteAsync($"/api/sales/customers/{customer.Id}");
+                await ApiService.DeleteAsync($"/api/vendas/customers/{customer.Id}");
                 Snackbar.Add("Cliente inativado com sucesso", Severity.Success);
                 await _table!.ReloadServerData();
             }
