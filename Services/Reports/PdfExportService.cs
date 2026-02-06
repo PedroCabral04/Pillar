@@ -11,6 +11,7 @@ public interface IPdfExportService
 {
     byte[] ExportSalesReportToPdf(SalesReportResultDto report, SalesReportFilterDto filter);
     byte[] ExportCashFlowReportToPdf(CashFlowReportDto report, FinancialReportFilterDto filter);
+    byte[] ExportDailyClosingReportToPdf(DailyClosingReportDto report, FinancialReportFilterDto filter);
     byte[] ExportProfitLossReportToPdf(ProfitLossReportDto report, FinancialReportFilterDto filter);
     byte[] ExportStockLevelsReportToPdf(StockLevelsReportDto report, InventoryReportFilterDto filter);
     byte[] ExportHeadcountReportToPdf(HeadcountReportDto report, HRReportFilterDto filter);
@@ -208,6 +209,154 @@ public class PdfExportService : IPdfExportService
                         x.Span("Página ");
                         x.CurrentPageNumber();
                     });
+            });
+        });
+
+        return document.GeneratePdf();
+    }
+
+    public byte[] ExportDailyClosingReportToPdf(DailyClosingReportDto report, FinancialReportFilterDto filter)
+    {
+        var document = Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A4);
+                page.Margin(2, Unit.Centimetre);
+                page.PageColor(Colors.White);
+                page.DefaultTextStyle(x => x.FontSize(10));
+
+                page.Header()
+                    .Text("Fechamento Diario de Caixa")
+                    .SemiBold().FontSize(20).FontColor(Colors.Blue.Medium);
+
+                page.Content()
+                    .PaddingVertical(1, Unit.Centimetre)
+                    .Column(column =>
+                    {
+                        column.Spacing(14);
+
+                        column.Item().Text($"Data de referencia: {report.Summary.ReportDate:dd/MM/yyyy}");
+
+                        column.Item().Background(Colors.Grey.Lighten3).Padding(10).Column(summaryCol =>
+                        {
+                            summaryCol.Spacing(2);
+                            summaryCol.Item().Text("Resumo do Fechamento").Bold().FontSize(13);
+                            summaryCol.Item().Text($"Saldo Inicial: {CurrencyFormatService.FormatStatic(report.Summary.OpeningBalance)}");
+                            summaryCol.Item().Text($"Entradas Realizadas: {CurrencyFormatService.FormatStatic(report.Summary.TotalEntriesRealized)}");
+                            summaryCol.Item().Text($"Saidas Realizadas: {CurrencyFormatService.FormatStatic(report.Summary.TotalExitsRealized)}");
+                            summaryCol.Item().Text($"Resultado Liquido Realizado: {CurrencyFormatService.FormatStatic(report.Summary.NetRealized)}").Bold();
+                            summaryCol.Item().Text($"Saldo Final: {CurrencyFormatService.FormatStatic(report.Summary.ClosingBalance)}").Bold();
+                            summaryCol.Item().Text($"Entradas Previstas (vencimento): {CurrencyFormatService.FormatStatic(report.Summary.TotalEntriesDue)}");
+                            summaryCol.Item().Text($"Saidas Previstas (vencimento): {CurrencyFormatService.FormatStatic(report.Summary.TotalExitsDue)}");
+                            summaryCol.Item().Text($"Diferenca Realizado x Previsto: {CurrencyFormatService.FormatStatic(report.Summary.DifferenceRealizedVsDue)}");
+                        });
+
+                        column.Item().Text("Movimentos Realizados no Dia").Bold().FontSize(12);
+                        column.Item().Table(table =>
+                        {
+                            table.ColumnsDefinition(columns =>
+                            {
+                                columns.ConstantColumn(55);
+                                columns.RelativeColumn(2);
+                                columns.RelativeColumn(2);
+                                columns.ConstantColumn(70);
+                                columns.ConstantColumn(70);
+                            });
+
+                            table.Header(header =>
+                            {
+                                header.Cell().Element(HeaderCell).Text("Tipo").Bold();
+                                header.Cell().Element(HeaderCell).Text("Contraparte").Bold();
+                                header.Cell().Element(HeaderCell).Text("Descricao").Bold();
+                                header.Cell().Element(HeaderCell).Text("Pagamento").Bold();
+                                header.Cell().Element(HeaderCell).AlignRight().Text("Valor").Bold();
+
+                                static IContainer HeaderCell(IContainer container)
+                                {
+                                    return container.DefaultTextStyle(x => x.SemiBold())
+                                        .PaddingVertical(4)
+                                        .BorderBottom(1)
+                                        .BorderColor(Colors.Black);
+                                }
+                            });
+
+                            foreach (var item in report.TopRealizedMovements.Take(20))
+                            {
+                                table.Cell().Element(RowCell).Text(item.Type);
+                                table.Cell().Element(RowCell).Text(item.Counterparty);
+                                table.Cell().Element(RowCell).Text(item.Description);
+                                table.Cell().Element(RowCell).Text(item.PaymentMethod);
+                                table.Cell().Element(RowCell).AlignRight().Text(CurrencyFormatService.FormatStatic(item.PaidAmount > 0 ? item.PaidAmount : item.NetAmount));
+
+                                static IContainer RowCell(IContainer container)
+                                {
+                                    return container.BorderBottom(1)
+                                        .BorderColor(Colors.Grey.Lighten2)
+                                        .PaddingVertical(4);
+                                }
+                            }
+                        });
+
+                        column.Item().Text("Vencimentos do Dia").Bold().FontSize(12);
+                        column.Item().Table(table =>
+                        {
+                            table.ColumnsDefinition(columns =>
+                            {
+                                columns.ConstantColumn(55);
+                                columns.RelativeColumn(2);
+                                columns.RelativeColumn(2);
+                                columns.ConstantColumn(70);
+                                columns.ConstantColumn(70);
+                            });
+
+                            table.Header(header =>
+                            {
+                                header.Cell().Element(HeaderCell).Text("Tipo").Bold();
+                                header.Cell().Element(HeaderCell).Text("Contraparte").Bold();
+                                header.Cell().Element(HeaderCell).Text("Categoria").Bold();
+                                header.Cell().Element(HeaderCell).Text("Status").Bold();
+                                header.Cell().Element(HeaderCell).AlignRight().Text("Valor").Bold();
+
+                                static IContainer HeaderCell(IContainer container)
+                                {
+                                    return container.DefaultTextStyle(x => x.SemiBold())
+                                        .PaddingVertical(4)
+                                        .BorderBottom(1)
+                                        .BorderColor(Colors.Black);
+                                }
+                            });
+
+                            foreach (var item in report.TopDueMovements.Take(20))
+                            {
+                                table.Cell().Element(RowCell).Text(item.Type);
+                                table.Cell().Element(RowCell).Text(item.Counterparty);
+                                table.Cell().Element(RowCell).Text(item.Category);
+                                table.Cell().Element(RowCell).Text(item.Status);
+                                table.Cell().Element(RowCell).AlignRight().Text(CurrencyFormatService.FormatStatic(item.NetAmount));
+
+                                static IContainer RowCell(IContainer container)
+                                {
+                                    return container.BorderBottom(1)
+                                        .BorderColor(Colors.Grey.Lighten2)
+                                        .PaddingVertical(4);
+                                }
+                            }
+                        });
+
+                        column.Item().Background(Colors.Red.Lighten5).Padding(8).Column(alertCol =>
+                        {
+                            alertCol.Item().Text("Pendencias em Atraso").Bold().FontSize(11);
+                            alertCol.Item().Text($"Contas a Receber vencidas: {report.Summary.OverdueReceivablesCount} | {CurrencyFormatService.FormatStatic(report.Summary.OverdueReceivablesAmount)}");
+                            alertCol.Item().Text($"Contas a Pagar vencidas: {report.Summary.OverduePayablesCount} | {CurrencyFormatService.FormatStatic(report.Summary.OverduePayablesAmount)}");
+                        });
+                    });
+
+                page.Footer().AlignCenter().Text(x =>
+                {
+                    x.Span("Pagina ");
+                    x.CurrentPageNumber();
+                });
             });
         });
 

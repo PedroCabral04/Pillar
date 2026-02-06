@@ -31,6 +31,11 @@
                    OnClick="@(() => NavigateTo("/financial/suppliers"))">
             Fornecedores
         </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="MudBlazor.Color.Info"
+                   StartIcon="@Icons.Material.Filled.Assessment"
+                   OnClick="@(() => NavigateTo("/reports/financial?tab=daily"))">
+            Relatorio Diario
+        </MudButton>
     </MudStack>
 
     @if (isLoading)

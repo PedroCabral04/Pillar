@@ -9,6 +9,7 @@ public interface IExcelExportService
 {
     byte[] ExportSalesReportToExcel(SalesReportResultDto report, SalesReportFilterDto filter);
     byte[] ExportCashFlowReportToExcel(CashFlowReportDto report, FinancialReportFilterDto filter);
+    byte[] ExportDailyClosingReportToExcel(DailyClosingReportDto report, FinancialReportFilterDto filter);
     byte[] ExportProfitLossReportToExcel(ProfitLossReportDto report, FinancialReportFilterDto filter);
     byte[] ExportStockLevelsReportToExcel(StockLevelsReportDto report, InventoryReportFilterDto filter);
     byte[] ExportStockMovementReportToExcel(StockMovementReportDto report, InventoryReportFilterDto filter);
@@ -178,6 +179,82 @@ public class ExcelExportService : IExcelExportService
         return package.GetAsByteArray();
     }
 
+    public byte[] ExportDailyClosingReportToExcel(DailyClosingReportDto report, FinancialReportFilterDto filter)
+    {
+        using var package = new ExcelPackage();
+
+        var summary = package.Workbook.Worksheets.Add("Fechamento Diario");
+        summary.Cells["A1"].Value = "Fechamento Diario de Caixa";
+        summary.Cells["A1:F1"].Merge = true;
+        summary.Cells["A1"].Style.Font.Size = 16;
+        summary.Cells["A1"].Style.Font.Bold = true;
+        summary.Cells["A1"].Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
+
+        summary.Cells["A2"].Value = $"Data: {report.Summary.ReportDate:dd/MM/yyyy}";
+        summary.Cells["A2:F2"].Merge = true;
+
+        var row = 4;
+        summary.Cells[$"A{row}"].Value = "Saldo Inicial";
+        summary.Cells[$"B{row}"].Value = report.Summary.OpeningBalance;
+        summary.Cells[$"B{row}"].Style.Numberformat.Format = "R$ #,##0.00";
+
+        row++;
+        summary.Cells[$"A{row}"].Value = "Entradas Realizadas";
+        summary.Cells[$"B{row}"].Value = report.Summary.TotalEntriesRealized;
+        summary.Cells[$"B{row}"].Style.Numberformat.Format = "R$ #,##0.00";
+
+        row++;
+        summary.Cells[$"A{row}"].Value = "Saidas Realizadas";
+        summary.Cells[$"B{row}"].Value = report.Summary.TotalExitsRealized;
+        summary.Cells[$"B{row}"].Style.Numberformat.Format = "R$ #,##0.00";
+
+        row++;
+        summary.Cells[$"A{row}"].Value = "Resultado Liquido Realizado";
+        summary.Cells[$"B{row}"].Value = report.Summary.NetRealized;
+        summary.Cells[$"B{row}"].Style.Numberformat.Format = "R$ #,##0.00";
+        summary.Cells[$"A{row}:B{row}"].Style.Font.Bold = true;
+
+        row++;
+        summary.Cells[$"A{row}"].Value = "Saldo Final";
+        summary.Cells[$"B{row}"].Value = report.Summary.ClosingBalance;
+        summary.Cells[$"B{row}"].Style.Numberformat.Format = "R$ #,##0.00";
+        summary.Cells[$"A{row}:B{row}"].Style.Font.Bold = true;
+
+        row += 2;
+        summary.Cells[$"A{row}"].Value = "Entradas Previstas (Vencimento)";
+        summary.Cells[$"B{row}"].Value = report.Summary.TotalEntriesDue;
+        summary.Cells[$"B{row}"].Style.Numberformat.Format = "R$ #,##0.00";
+
+        row++;
+        summary.Cells[$"A{row}"].Value = "Saidas Previstas (Vencimento)";
+        summary.Cells[$"B{row}"].Value = report.Summary.TotalExitsDue;
+        summary.Cells[$"B{row}"].Style.Numberformat.Format = "R$ #,##0.00";
+
+        row++;
+        summary.Cells[$"A{row}"].Value = "Diferenca Realizado x Previsto";
+        summary.Cells[$"B{row}"].Value = report.Summary.DifferenceRealizedVsDue;
+        summary.Cells[$"B{row}"].Style.Numberformat.Format = "R$ #,##0.00";
+
+        row += 2;
+        summary.Cells[$"A{row}"].Value = "Atrasos Receber";
+        summary.Cells[$"B{row}"].Value = report.Summary.OverdueReceivablesCount;
+        summary.Cells[$"C{row}"].Value = report.Summary.OverdueReceivablesAmount;
+        summary.Cells[$"C{row}"].Style.Numberformat.Format = "R$ #,##0.00";
+
+        row++;
+        summary.Cells[$"A{row}"].Value = "Atrasos Pagar";
+        summary.Cells[$"B{row}"].Value = report.Summary.OverduePayablesCount;
+        summary.Cells[$"C{row}"].Value = report.Summary.OverduePayablesAmount;
+        summary.Cells[$"C{row}"].Style.Numberformat.Format = "R$ #,##0.00";
+
+        FillDailyMovementsSheet(package.Workbook.Worksheets.Add("Realizado"), report.RealizedEntries.Concat(report.RealizedExits).ToList());
+        FillDailyMovementsSheet(package.Workbook.Worksheets.Add("Vencimentos"), report.DueEntries.Concat(report.DueExits).ToList());
+        FillDailyMovementsSheet(package.Workbook.Worksheets.Add("Atrasos"), report.OverdueReceivables.Concat(report.OverduePayables).ToList());
+
+        summary.Cells.AutoFitColumns();
+        return package.GetAsByteArray();
+    }
+
     public byte[] ExportProfitLossReportToExcel(ProfitLossReportDto report, FinancialReportFilterDto filter)
     {
         using var package = new ExcelPackage();
@@ -274,6 +351,59 @@ public class ExcelExportService : IExcelExportService
         worksheet.Cells.AutoFitColumns();
 
         return package.GetAsByteArray();
+    }
+
+    private static void FillDailyMovementsSheet(ExcelWorksheet worksheet, List<DailyClosingItemDto> items)
+    {
+        worksheet.Cells["A1"].Value = "Tipo";
+        worksheet.Cells["B1"].Value = "Origem";
+        worksheet.Cells["C1"].Value = "Contraparte";
+        worksheet.Cells["D1"].Value = "Descricao";
+        worksheet.Cells["E1"].Value = "Categoria";
+        worksheet.Cells["F1"].Value = "Centro de Custo";
+        worksheet.Cells["G1"].Value = "Pagamento";
+        worksheet.Cells["H1"].Value = "Status";
+        worksheet.Cells["I1"].Value = "Emissao";
+        worksheet.Cells["J1"].Value = "Vencimento";
+        worksheet.Cells["K1"].Value = "Pagamento Data";
+        worksheet.Cells["L1"].Value = "Valor Movimento";
+        worksheet.Cells["M1"].Value = "Valor Liquido";
+        worksheet.Cells["N1"].Value = "Saldo";
+
+        using (var range = worksheet.Cells["A1:N1"])
+        {
+            range.Style.Font.Bold = true;
+            range.Style.Fill.PatternType = ExcelFillStyle.Solid;
+            range.Style.Fill.BackgroundColor.SetColor(Color.LightBlue);
+        }
+
+        var row = 2;
+        foreach (var item in items)
+        {
+            worksheet.Cells[$"A{row}"].Value = item.Type;
+            worksheet.Cells[$"B{row}"].Value = item.Source;
+            worksheet.Cells[$"C{row}"].Value = item.Counterparty;
+            worksheet.Cells[$"D{row}"].Value = item.Description;
+            worksheet.Cells[$"E{row}"].Value = item.Category;
+            worksheet.Cells[$"F{row}"].Value = item.CostCenter;
+            worksheet.Cells[$"G{row}"].Value = item.PaymentMethod;
+            worksheet.Cells[$"H{row}"].Value = item.Status;
+            worksheet.Cells[$"I{row}"].Value = item.IssueDate;
+            worksheet.Cells[$"I{row}"].Style.Numberformat.Format = "dd/mm/yyyy";
+            worksheet.Cells[$"J{row}"].Value = item.DueDate;
+            worksheet.Cells[$"J{row}"].Style.Numberformat.Format = "dd/mm/yyyy";
+            worksheet.Cells[$"K{row}"].Value = item.PaymentDate;
+            worksheet.Cells[$"K{row}"].Style.Numberformat.Format = "dd/mm/yyyy";
+            worksheet.Cells[$"L{row}"].Value = item.PaidAmount > 0 ? item.PaidAmount : item.NetAmount;
+            worksheet.Cells[$"L{row}"].Style.Numberformat.Format = "R$ #,##0.00";
+            worksheet.Cells[$"M{row}"].Value = item.NetAmount;
+            worksheet.Cells[$"M{row}"].Style.Numberformat.Format = "R$ #,##0.00";
+            worksheet.Cells[$"N{row}"].Value = item.RemainingAmount;
+            worksheet.Cells[$"N{row}"].Style.Numberformat.Format = "R$ #,##0.00";
+            row++;
+        }
+
+        worksheet.Cells.AutoFitColumns();
     }
 
     public byte[] ExportStockLevelsReportToExcel(StockLevelsReportDto report, InventoryReportFilterDto filter)

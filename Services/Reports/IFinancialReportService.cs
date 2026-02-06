@@ -7,4 +7,5 @@ public interface IFinancialReportService
     Task<CashFlowReportDto> GenerateCashFlowReportAsync(FinancialReportFilterDto filter);
     Task<ProfitLossReportDto> GenerateProfitLossReportAsync(FinancialReportFilterDto filter);
     Task<BalanceSheetReportDto> GenerateBalanceSheetReportAsync(FinancialReportFilterDto filter);
+    Task<DailyClosingReportDto> GenerateDailyClosingReportAsync(FinancialReportFilterDto filter);
 }

@@ -5,6 +5,7 @@
 @using erp.Services
 @using erp.Components.Shared
 @using erp.Models.Financial
+@using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Authorization
 @using Color = MudBlazor.Color
 @using Size = MudBlazor.Size
@@ -21,10 +22,10 @@
         Relatórios Financeiros
     </MudText>
     <MudText Typo="Typo.body1" Class="mb-6">
-        Análise financeira completa com fluxo de caixa, DRE e balanço patrimonial.
+        Análise financeira completa com fluxo de caixa, fechamento diário de caixa, DRE e balanço patrimonial.
     </MudText>
 
-    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
+    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6" ActivePanelIndex="@_activeTabIndex" ActivePanelIndexChanged="OnTabChanged">
         <!-- Cash Flow Tab -->
         <MudTabPanel Text="Fluxo de Caixa" Icon="@Icons.Material.Filled.TrendingUp">
             <MudCard Elevation="3" Class="mb-4">
@@ -38,13 +39,13 @@
                         </MudItem>
                         <MudItem xs="12" md="6">
                             <MudSelect T="PaymentMethod?" Label="Método de Pagamento" @bind-Value="_cashFlowFilter.PaymentMethod" Clearable="true">
-                                <MudSelectItem Value="@PaymentMethod.Cash">Dinheiro</MudSelectItem>
-                                <MudSelectItem Value="@PaymentMethod.Pix">PIX</MudSelectItem>
-                                <MudSelectItem Value="@PaymentMethod.CreditCard">Cartão de Crédito</MudSelectItem>
-                                <MudSelectItem Value="@PaymentMethod.DebitCard">Cartão de Débito</MudSelectItem>
-                                <MudSelectItem Value="@PaymentMethod.BankSlip">Boleto</MudSelectItem>
-                                <MudSelectItem Value="@PaymentMethod.BankTransfer">Transferência</MudSelectItem>
-                                <MudSelectItem Value="@PaymentMethod.Check">Cheque</MudSelectItem>
+                                <MudSelectItem T="PaymentMethod?" Value="@PaymentMethod.Cash">Dinheiro</MudSelectItem>
+                                <MudSelectItem T="PaymentMethod?" Value="@PaymentMethod.Pix">PIX</MudSelectItem>
+                                <MudSelectItem T="PaymentMethod?" Value="@PaymentMethod.CreditCard">Cartão de Crédito</MudSelectItem>
+                                <MudSelectItem T="PaymentMethod?" Value="@PaymentMethod.DebitCard">Cartão de Débito</MudSelectItem>
+                                <MudSelectItem T="PaymentMethod?" Value="@PaymentMethod.BankSlip">Boleto</MudSelectItem>
+                                <MudSelectItem T="PaymentMethod?" Value="@PaymentMethod.BankTransfer">Transferência</MudSelectItem>
+                                <MudSelectItem T="PaymentMethod?" Value="@PaymentMethod.Check">Cheque</MudSelectItem>
                             </MudSelect>
                         </MudItem>
                         <MudItem xs="12">
@@ -153,6 +154,182 @@
             }
         </MudTabPanel>
 
+        <!-- Daily Closing Tab -->
+        <MudTabPanel Text="Fechamento Diario" Icon="@Icons.Material.Filled.PointOfSale">
+            <MudCard Elevation="3" Class="mb-4">
+                <MudCardContent>
+                    <MudGrid>
+                        <MudItem xs="12" md="6">
+                            <DatePicker Label="Data do Fechamento" @bind-Date="_dailyClosingDate" />
+                        </MudItem>
+                        <MudItem xs="12" md="6" Class="d-flex align-end">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadDailyClosingReport" StartIcon="@Icons.Material.Filled.Search">
+                                Gerar Fechamento
+                            </MudButton>
+                        </MudItem>
+                    </MudGrid>
+                </MudCardContent>
+            </MudCard>
+
+            @if (_loadingDailyClosing)
+            {
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+            }
+
+            @if (_dailyClosingReport != null)
+            {
+                <MudCard Elevation="3" Class="mb-4">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Fechamento de Caixa - @_dailyClosingReport.Summary.ReportDate.ToString("dd/MM/yyyy")</MudText>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small">
+                                <MudButton StartIcon="@Icons.Material.Filled.PictureAsPdf" OnClick='() => ExportReport("daily-closing", "pdf")' Color="Color.Error">
+                                    Exportar PDF
+                                </MudButton>
+                                <MudButton StartIcon="@Icons.Material.Filled.TableChart" OnClick='() => ExportReport("daily-closing", "excel")' Color="Color.Success">
+                                    Exportar Excel
+                                </MudButton>
+                            </MudButtonGroup>
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudGrid>
+                            <MudItem xs="12" sm="6" md="3">
+                                <MudPaper Class="pa-3" Elevation="0">
+                                    <MudText Typo="Typo.caption">Saldo Inicial</MudText>
+                                    <MudText Typo="Typo.h6">@Currency.Format(_dailyClosingReport.Summary.OpeningBalance)</MudText>
+                                </MudPaper>
+                            </MudItem>
+                            <MudItem xs="12" sm="6" md="3">
+                                <MudPaper Class="pa-3" Elevation="0">
+                                    <MudText Typo="Typo.caption" Color="Color.Success">Entradas Realizadas</MudText>
+                                    <MudText Typo="Typo.h6">@Currency.Format(_dailyClosingReport.Summary.TotalEntriesRealized)</MudText>
+                                </MudPaper>
+                            </MudItem>
+                            <MudItem xs="12" sm="6" md="3">
+                                <MudPaper Class="pa-3" Elevation="0">
+                                    <MudText Typo="Typo.caption" Color="Color.Error">Saidas Realizadas</MudText>
+                                    <MudText Typo="Typo.h6">@Currency.Format(_dailyClosingReport.Summary.TotalExitsRealized)</MudText>
+                                </MudPaper>
+                            </MudItem>
+                            <MudItem xs="12" sm="6" md="3">
+                                <MudPaper Class="pa-3" Elevation="0">
+                                    <MudText Typo="Typo.caption">Saldo Final</MudText>
+                                    <MudText Typo="Typo.h6" Color="@(_dailyClosingReport.Summary.ClosingBalance >= 0 ? Color.Success : Color.Error)">
+                                        @Currency.Format(_dailyClosingReport.Summary.ClosingBalance)
+                                    </MudText>
+                                </MudPaper>
+                            </MudItem>
+                        </MudGrid>
+
+                        <MudGrid Class="mt-2">
+                            <MudItem xs="12" md="6">
+                                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                                    <MudText Typo="Typo.subtitle2">Visao Realizada (por pagamento)</MudText>
+                                    <MudText Typo="Typo.body2">Resultado Liquido: @Currency.Format(_dailyClosingReport.Summary.NetRealized)</MudText>
+                                    <MudText Typo="Typo.body2">Entradas: @_dailyClosingReport.Summary.RealizedEntriesCount | Saidas: @_dailyClosingReport.Summary.RealizedExitsCount</MudText>
+                                </MudAlert>
+                            </MudItem>
+                            <MudItem xs="12" md="6">
+                                <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined">
+                                    <MudText Typo="Typo.subtitle2">Visao Prevista (por vencimento)</MudText>
+                                    <MudText Typo="Typo.body2">Resultado Previsto: @Currency.Format(_dailyClosingReport.Summary.NetDue)</MudText>
+                                    <MudText Typo="Typo.body2">Diferenca Realizado x Previsto: @Currency.Format(_dailyClosingReport.Summary.DifferenceRealizedVsDue)</MudText>
+                                </MudAlert>
+                            </MudItem>
+                        </MudGrid>
+
+                        <MudDivider Class="my-4" />
+
+                        <MudText Typo="Typo.h6" GutterBottom="true">Movimentos Realizados</MudText>
+                        <MudTable Items="_dailyClosingReport.TopRealizedMovements" Dense="true" Hover="true" Striped="true">
+                            <HeaderContent>
+                                <MudTh>Tipo</MudTh>
+                                <MudTh>Origem</MudTh>
+                                <MudTh>Contraparte</MudTh>
+                                <MudTh>Categoria</MudTh>
+                                <MudTh>Pagamento</MudTh>
+                                <MudTh>Status</MudTh>
+                                <MudTh>Valor</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Tipo">@context.Type</MudTd>
+                                <MudTd DataLabel="Origem">@context.Source</MudTd>
+                                <MudTd DataLabel="Contraparte">@context.Counterparty</MudTd>
+                                <MudTd DataLabel="Categoria">@context.Category</MudTd>
+                                <MudTd DataLabel="Pagamento">@context.PaymentMethod</MudTd>
+                                <MudTd DataLabel="Status">@context.Status</MudTd>
+                                <MudTd DataLabel="Valor">@Currency.Format(context.PaidAmount > 0 ? context.PaidAmount : context.NetAmount)</MudTd>
+                            </RowTemplate>
+                        </MudTable>
+
+                        <MudText Typo="Typo.h6" Class="mt-4" GutterBottom="true">Vencimentos do Dia</MudText>
+                        <MudTable Items="_dailyClosingReport.TopDueMovements" Dense="true" Hover="true" Striped="true">
+                            <HeaderContent>
+                                <MudTh>Tipo</MudTh>
+                                <MudTh>Origem</MudTh>
+                                <MudTh>Contraparte</MudTh>
+                                <MudTh>Vencimento</MudTh>
+                                <MudTh>Status</MudTh>
+                                <MudTh>Valor</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Tipo">@context.Type</MudTd>
+                                <MudTd DataLabel="Origem">@context.Source</MudTd>
+                                <MudTd DataLabel="Contraparte">@context.Counterparty</MudTd>
+                                <MudTd DataLabel="Vencimento">@context.DueDate.ToString("dd/MM/yyyy")</MudTd>
+                                <MudTd DataLabel="Status">@context.Status</MudTd>
+                                <MudTd DataLabel="Valor">@Currency.Format(context.NetAmount)</MudTd>
+                            </RowTemplate>
+                        </MudTable>
+
+                        <MudGrid Class="mt-4">
+                            <MudItem xs="12" md="6">
+                                <MudPaper Class="pa-3" Elevation="0">
+                                    <MudText Typo="Typo.subtitle2">Atrasos de Recebimento</MudText>
+                                    <MudText Typo="Typo.body2">Quantidade: @_dailyClosingReport.Summary.OverdueReceivablesCount</MudText>
+                                    <MudText Typo="Typo.body2">Valor: @Currency.Format(_dailyClosingReport.Summary.OverdueReceivablesAmount)</MudText>
+                                </MudPaper>
+                            </MudItem>
+                            <MudItem xs="12" md="6">
+                                <MudPaper Class="pa-3" Elevation="0">
+                                    <MudText Typo="Typo.subtitle2">Atrasos de Pagamento</MudText>
+                                    <MudText Typo="Typo.body2">Quantidade: @_dailyClosingReport.Summary.OverduePayablesCount</MudText>
+                                    <MudText Typo="Typo.body2">Valor: @Currency.Format(_dailyClosingReport.Summary.OverduePayablesAmount)</MudText>
+                                </MudPaper>
+                            </MudItem>
+                        </MudGrid>
+
+                        @if (_dailyClosingReport.RealizedEntriesByPaymentMethod.Any() || _dailyClosingReport.RealizedExitsByPaymentMethod.Any())
+                        {
+                            <MudText Typo="Typo.h6" Class="mt-4" GutterBottom="true">Realizado por Metodo de Pagamento</MudText>
+                            <MudSimpleTable Dense="true">
+                                <thead>
+                                    <tr>
+                                        <th>Metodo</th>
+                                        <th>Entradas</th>
+                                        <th>Saidas</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var method in _dailyClosingReport.RealizedEntriesByPaymentMethod.Keys.Union(_dailyClosingReport.RealizedExitsByPaymentMethod.Keys).OrderBy(x => x))
+                                    {
+                                        <tr>
+                                            <td>@method</td>
+                                            <td>@Currency.Format(_dailyClosingReport.RealizedEntriesByPaymentMethod.GetValueOrDefault(method, 0m))</td>
+                                            <td>@Currency.Format(_dailyClosingReport.RealizedExitsByPaymentMethod.GetValueOrDefault(method, 0m))</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </MudSimpleTable>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            }
+        </MudTabPanel>
+
         <!-- P&L Tab -->
         <MudTabPanel Text="DRE (P&L)" Icon="@Icons.Material.Filled.Receipt">
             <MudCard Elevation="3" Class="mb-4">
@@ -166,13 +343,13 @@
                         </MudItem>
                         <MudItem xs="12" md="6">
                             <MudSelect T="PaymentMethod?" Label="Método de Pagamento" @bind-Value="_profitLossFilter.PaymentMethod" Clearable="true">
-                                <MudSelectItem Value="@PaymentMethod.Cash">Dinheiro</MudSelectItem>
-                                <MudSelectItem Value="@PaymentMethod.Pix">PIX</MudSelectItem>
-                                <MudSelectItem Value="@PaymentMethod.CreditCard">Cartão de Crédito</MudSelectItem>
-                                <MudSelectItem Value="@PaymentMethod.DebitCard">Cartão de Débito</MudSelectItem>
-                                <MudSelectItem Value="@PaymentMethod.BankSlip">Boleto</MudSelectItem>
-                                <MudSelectItem Value="@PaymentMethod.BankTransfer">Transferência</MudSelectItem>
-                                <MudSelectItem Value="@PaymentMethod.Check">Cheque</MudSelectItem>
+                                <MudSelectItem T="PaymentMethod?" Value="@PaymentMethod.Cash">Dinheiro</MudSelectItem>
+                                <MudSelectItem T="PaymentMethod?" Value="@PaymentMethod.Pix">PIX</MudSelectItem>
+                                <MudSelectItem T="PaymentMethod?" Value="@PaymentMethod.CreditCard">Cartão de Crédito</MudSelectItem>
+                                <MudSelectItem T="PaymentMethod?" Value="@PaymentMethod.DebitCard">Cartão de Débito</MudSelectItem>
+                                <MudSelectItem T="PaymentMethod?" Value="@PaymentMethod.BankSlip">Boleto</MudSelectItem>
+                                <MudSelectItem T="PaymentMethod?" Value="@PaymentMethod.BankTransfer">Transferência</MudSelectItem>
+                                <MudSelectItem T="PaymentMethod?" Value="@PaymentMethod.Check">Cheque</MudSelectItem>
                             </MudSelect>
                         </MudItem>
                         <MudItem xs="12">
@@ -341,17 +518,64 @@
 </MudContainer>
 
 @code {
+    [SupplyParameterFromQuery(Name = "tab")]
+    public string? Tab { get; set; }
+
     private FinancialReportFilterDto _cashFlowFilter = new() { StartDate = DateTime.Now.AddMonths(-3), EndDate = DateTime.Now };
     private FinancialReportFilterDto _profitLossFilter = new() { StartDate = DateTime.Now.AddMonths(-3), EndDate = DateTime.Now };
     private FinancialReportFilterDto _balanceSheetFilter = new() { StartDate = DateTime.Now };
+    private DateTime? _dailyClosingDate = DateTime.Now.Date;
+    private int _activeTabIndex;
+    private string? _lastTabParam;
+    private bool _shouldAutoLoadDaily;
     
     private CashFlowReportDto? _cashFlowReport;
+    private DailyClosingReportDto? _dailyClosingReport;
     private ProfitLossReportDto? _profitLossReport;
     private BalanceSheetReportDto? _balanceSheetReport;
     
     private bool _loadingCashFlow;
+    private bool _loadingDailyClosing;
     private bool _loadingProfitLoss;
     private bool _loadingBalanceSheet;
+
+    protected override void OnParametersSet()
+    {
+        if (string.Equals(_lastTabParam, Tab, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _lastTabParam = Tab;
+        _activeTabIndex = Tab?.ToLowerInvariant() switch
+        {
+            "daily" => 1,
+            "profit-loss" => 2,
+            "dre" => 2,
+            "balance-sheet" => 3,
+            _ => 0
+        };
+
+        if (_activeTabIndex == 1 && _dailyClosingReport == null)
+        {
+            _shouldAutoLoadDaily = true;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_shouldAutoLoadDaily && !_loadingDailyClosing)
+        {
+            _shouldAutoLoadDaily = false;
+            await LoadDailyClosingReport();
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void OnTabChanged(int index)
+    {
+        _activeTabIndex = index;
+    }
 
     private async Task LoadCashFlowReport()
     {
@@ -407,6 +631,40 @@
         }
     }
 
+    private async Task LoadDailyClosingReport()
+    {
+        try
+        {
+            _loadingDailyClosing = true;
+            var selectedDate = (_dailyClosingDate ?? DateTime.Now.Date).Date;
+            var filter = new FinancialReportFilterDto
+            {
+                StartDate = selectedDate,
+                EndDate = selectedDate
+            };
+
+            var response = await ApiService.PostAsync<DailyClosingReportDto>("/api/reports/financial/daily-closing", filter);
+
+            if (response != null)
+            {
+                _dailyClosingReport = response;
+                Snackbar.Add("Fechamento diario gerado com sucesso!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Erro ao gerar fechamento diario", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingDailyClosing = false;
+        }
+    }
+
     private async Task LoadBalanceSheetReport()
     {
         try
@@ -451,6 +709,12 @@
                 case "balance-sheet":
                     url += $"&StartDate={_balanceSheetFilter.StartDate:yyyy-MM-dd}";
                     break;
+                case "daily-closing":
+                {
+                    var selectedDate = (_dailyClosingDate ?? DateTime.Now.Date).Date;
+                    url += $"&StartDate={selectedDate:yyyy-MM-dd}&EndDate={selectedDate:yyyy-MM-dd}";
+                    break;
+                }
             }
             
             await JS.InvokeVoidAsync("open", url, "_blank");

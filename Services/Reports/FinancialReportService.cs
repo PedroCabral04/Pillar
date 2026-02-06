@@ -131,6 +131,187 @@ public class FinancialReportService : IFinancialReportService
         }
     }
 
+    public async Task<DailyClosingReportDto> GenerateDailyClosingReportAsync(FinancialReportFilterDto filter)
+    {
+        try
+        {
+            var reportDate = (filter.StartDate ?? DateTime.UtcNow).ToUniversalTime().Date;
+            var nextDate = reportDate.AddDays(1);
+
+            var receivablesQuery = _context.AccountsReceivable
+                .Include(a => a.Category)
+                .Include(a => a.CostCenter)
+                .Include(a => a.Customer)
+                .AsQueryable();
+
+            var payablesQuery = _context.AccountsPayable
+                .Include(a => a.Category)
+                .Include(a => a.CostCenter)
+                .Include(a => a.Supplier)
+                .AsQueryable();
+
+            if (filter.CategoryId.HasValue)
+            {
+                receivablesQuery = receivablesQuery.Where(a => a.CategoryId == filter.CategoryId.Value);
+                payablesQuery = payablesQuery.Where(a => a.CategoryId == filter.CategoryId.Value);
+            }
+
+            if (filter.CostCenterId.HasValue)
+            {
+                receivablesQuery = receivablesQuery.Where(a => a.CostCenterId == filter.CostCenterId.Value);
+                payablesQuery = payablesQuery.Where(a => a.CostCenterId == filter.CostCenterId.Value);
+            }
+
+            if (filter.SupplierId.HasValue)
+            {
+                payablesQuery = payablesQuery.Where(a => a.SupplierId == filter.SupplierId.Value);
+            }
+
+            if (filter.PaymentMethod.HasValue)
+            {
+                receivablesQuery = receivablesQuery.Where(a => a.PaymentMethod == filter.PaymentMethod.Value);
+                payablesQuery = payablesQuery.Where(a => a.PaymentMethod == filter.PaymentMethod.Value);
+            }
+
+            var receivables = await receivablesQuery.ToListAsync();
+            var payables = await payablesQuery.ToListAsync();
+
+            var openingEntries = receivables
+                .Where(r => r.PaymentDate.HasValue
+                    && r.PaymentDate.Value.Date < reportDate
+                    && (r.Status == AccountStatus.Paid || r.Status == AccountStatus.PartiallyPaid))
+                .Sum(r => r.PaidAmount);
+
+            var openingExits = payables
+                .Where(p => p.PaymentDate.HasValue
+                    && p.PaymentDate.Value.Date < reportDate
+                    && (p.Status == AccountStatus.Paid || p.Status == AccountStatus.PartiallyPaid))
+                .Sum(p => p.PaidAmount);
+
+            var realizedEntries = receivables
+                .Where(r => r.PaymentDate.HasValue
+                    && r.PaymentDate.Value.Date >= reportDate
+                    && r.PaymentDate.Value.Date < nextDate
+                    && (r.Status == AccountStatus.Paid || r.Status == AccountStatus.PartiallyPaid)
+                    && r.PaidAmount > 0)
+                .Select(r => MapReceivableToDailyClosingItem(r, reportDate))
+                .OrderBy(x => x.PaymentDate)
+                .ThenBy(x => x.DueDate)
+                .ToList();
+
+            var realizedExits = payables
+                .Where(p => p.PaymentDate.HasValue
+                    && p.PaymentDate.Value.Date >= reportDate
+                    && p.PaymentDate.Value.Date < nextDate
+                    && (p.Status == AccountStatus.Paid || p.Status == AccountStatus.PartiallyPaid)
+                    && p.PaidAmount > 0)
+                .Select(p => MapPayableToDailyClosingItem(p, reportDate))
+                .OrderBy(x => x.PaymentDate)
+                .ThenBy(x => x.DueDate)
+                .ToList();
+
+            var dueEntries = receivables
+                .Where(r => r.DueDate.Date >= reportDate
+                    && r.DueDate.Date < nextDate
+                    && r.Status != AccountStatus.Cancelled)
+                .Select(r => MapReceivableToDailyClosingItem(r, reportDate))
+                .OrderBy(x => x.DueDate)
+                .ToList();
+
+            var dueExits = payables
+                .Where(p => p.DueDate.Date >= reportDate
+                    && p.DueDate.Date < nextDate
+                    && p.Status != AccountStatus.Cancelled)
+                .Select(p => MapPayableToDailyClosingItem(p, reportDate))
+                .OrderBy(x => x.DueDate)
+                .ToList();
+
+            var overdueReceivables = receivables
+                .Where(r => r.DueDate.Date < reportDate
+                    && r.Status != AccountStatus.Paid
+                    && r.Status != AccountStatus.Cancelled
+                    && r.RemainingAmount > 0)
+                .Select(r => MapReceivableToDailyClosingItem(r, reportDate))
+                .OrderByDescending(x => x.DueDate)
+                .ToList();
+
+            var overduePayables = payables
+                .Where(p => p.DueDate.Date < reportDate
+                    && p.Status != AccountStatus.Paid
+                    && p.Status != AccountStatus.Cancelled
+                    && p.RemainingAmount > 0)
+                .Select(p => MapPayableToDailyClosingItem(p, reportDate))
+                .OrderByDescending(x => x.DueDate)
+                .ToList();
+
+            var openingBalance = openingEntries - openingExits;
+            var totalEntriesRealized = realizedEntries.Sum(GetMovementAmount);
+            var totalExitsRealized = realizedExits.Sum(GetMovementAmount);
+            var netRealized = totalEntriesRealized - totalExitsRealized;
+            var closingBalance = openingBalance + netRealized;
+
+            var totalEntriesDue = dueEntries.Sum(GetMovementAmount);
+            var totalExitsDue = dueExits.Sum(GetMovementAmount);
+            var netDue = totalEntriesDue - totalExitsDue;
+
+            var summary = new DailyClosingSummaryDto
+            {
+                ReportDate = reportDate,
+                OpeningBalance = openingBalance,
+                TotalEntriesRealized = totalEntriesRealized,
+                TotalExitsRealized = totalExitsRealized,
+                NetRealized = netRealized,
+                ClosingBalance = closingBalance,
+                TotalEntriesDue = totalEntriesDue,
+                TotalExitsDue = totalExitsDue,
+                NetDue = netDue,
+                DifferenceRealizedVsDue = netRealized - netDue,
+                RealizedEntriesCount = realizedEntries.Count,
+                RealizedExitsCount = realizedExits.Count,
+                DueEntriesCount = dueEntries.Count,
+                DueExitsCount = dueExits.Count,
+                OverdueReceivablesCount = overdueReceivables.Count,
+                OverduePayablesCount = overduePayables.Count,
+                OverdueReceivablesAmount = overdueReceivables.Sum(x => x.RemainingAmount),
+                OverduePayablesAmount = overduePayables.Sum(x => x.RemainingAmount)
+            };
+
+            return new DailyClosingReportDto
+            {
+                Summary = summary,
+                RealizedEntries = realizedEntries,
+                RealizedExits = realizedExits,
+                DueEntries = dueEntries,
+                DueExits = dueExits,
+                OverdueReceivables = overdueReceivables,
+                OverduePayables = overduePayables,
+                RealizedEntriesByPaymentMethod = GroupByPaymentMethod(realizedEntries),
+                RealizedExitsByPaymentMethod = GroupByPaymentMethod(realizedExits),
+                DueEntriesByPaymentMethod = GroupByPaymentMethod(dueEntries),
+                DueExitsByPaymentMethod = GroupByPaymentMethod(dueExits),
+                RealizedByCategory = GroupByDimension(realizedEntries, realizedExits, x => x.Category),
+                DueByCategory = GroupByDimension(dueEntries, dueExits, x => x.Category),
+                RealizedByCostCenter = GroupByDimension(realizedEntries, realizedExits, x => x.CostCenter),
+                DueByCostCenter = GroupByDimension(dueEntries, dueExits, x => x.CostCenter),
+                TopRealizedMovements = realizedEntries
+                    .Concat(realizedExits)
+                    .OrderByDescending(GetMovementAmount)
+                    .Take(10)
+                    .ToList(),
+                TopDueMovements = dueEntries
+                    .Concat(dueExits)
+                    .OrderByDescending(GetMovementAmount)
+                    .Take(10)
+                    .ToList()
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao gerar relatório de fechamento diário de caixa");
+            throw;
+        }
+    }
+
     public async Task<ProfitLossReportDto> GenerateProfitLossReportAsync(FinancialReportFilterDto filter)
     {
         try
@@ -266,7 +447,7 @@ public class FinancialReportService : IFinancialReportService
             // Calculate current assets (cash + accounts receivable)
             var receivables = await _context.AccountsReceivable
                 .Where(a => a.Status == AccountStatus.Pending)
-                .SumAsync(a => a.NetAmount);
+                .SumAsync(a => a.OriginalAmount - a.DiscountAmount + a.InterestAmount + a.FineAmount);
 
             // Calculate inventory value as fixed asset
             var inventoryValue = await _context.Products
@@ -276,7 +457,7 @@ public class FinancialReportService : IFinancialReportService
             // Calculate current liabilities (accounts payable)
             var payables = await _context.AccountsPayable
                 .Where(a => a.Status == AccountStatus.Pending)
-                .SumAsync(a => a.NetAmount);
+                .SumAsync(a => a.OriginalAmount - a.DiscountAmount + a.InterestAmount + a.FineAmount);
 
             // Simple balance sheet calculation
             var currentAssets = receivables; // In real scenario, add cash balance
@@ -306,5 +487,103 @@ public class FinancialReportService : IFinancialReportService
             _logger.LogError(ex, "Erro ao gerar balanço patrimonial");
             throw;
         }
+    }
+
+    private static DailyClosingItemDto MapReceivableToDailyClosingItem(AccountReceivable account, DateTime reportDate)
+    {
+        return new DailyClosingItemDto
+        {
+            Id = account.Id,
+            Source = "Conta a Receber",
+            Type = "Entrada",
+            Counterparty = account.Customer?.Name ?? "Cliente nao informado",
+            Description = account.InvoiceNumber ?? account.Notes ?? "Recebimento",
+            Category = account.Category?.Name ?? "Sem categoria",
+            CostCenter = account.CostCenter?.Name ?? "Sem centro de custo",
+            PaymentMethod = account.PaymentMethod.ToDisplayName(),
+            Status = account.Status.ToDisplayName(),
+            IssueDate = account.IssueDate,
+            DueDate = account.DueDate,
+            PaymentDate = account.PaymentDate,
+            OriginalAmount = account.OriginalAmount,
+            DiscountAmount = account.DiscountAmount,
+            InterestAmount = account.InterestAmount,
+            FineAmount = account.FineAmount,
+            NetAmount = account.NetAmount,
+            PaidAmount = account.PaidAmount,
+            RemainingAmount = account.RemainingAmount,
+            IsOverdue = account.DueDate.Date < reportDate && account.Status != AccountStatus.Paid && account.Status != AccountStatus.Cancelled
+        };
+    }
+
+    private static DailyClosingItemDto MapPayableToDailyClosingItem(AccountPayable account, DateTime reportDate)
+    {
+        return new DailyClosingItemDto
+        {
+            Id = account.Id,
+            Source = "Conta a Pagar",
+            Type = "Saida",
+            Counterparty = account.Supplier?.Name ?? "Fornecedor nao informado",
+            Description = account.InvoiceNumber ?? account.Notes ?? "Pagamento",
+            Category = account.Category?.Name ?? "Sem categoria",
+            CostCenter = account.CostCenter?.Name ?? "Sem centro de custo",
+            PaymentMethod = account.PaymentMethod.ToDisplayName(),
+            Status = account.Status.ToDisplayName(),
+            IssueDate = account.IssueDate,
+            DueDate = account.DueDate,
+            PaymentDate = account.PaymentDate,
+            OriginalAmount = account.OriginalAmount,
+            DiscountAmount = account.DiscountAmount,
+            InterestAmount = account.InterestAmount,
+            FineAmount = account.FineAmount,
+            NetAmount = account.NetAmount,
+            PaidAmount = account.PaidAmount,
+            RemainingAmount = account.RemainingAmount,
+            IsOverdue = account.DueDate.Date < reportDate && account.Status != AccountStatus.Paid && account.Status != AccountStatus.Cancelled
+        };
+    }
+
+    private static decimal GetMovementAmount(DailyClosingItemDto item)
+    {
+        return item.PaidAmount > 0 ? item.PaidAmount : item.NetAmount;
+    }
+
+    private static Dictionary<string, decimal> GroupByPaymentMethod(IEnumerable<DailyClosingItemDto> items)
+    {
+        return items
+            .GroupBy(x => x.PaymentMethod)
+            .OrderBy(x => x.Key)
+            .ToDictionary(g => g.Key, g => g.Sum(GetMovementAmount));
+    }
+
+    private static List<DailyClosingGroupDto> GroupByDimension(
+        IEnumerable<DailyClosingItemDto> entries,
+        IEnumerable<DailyClosingItemDto> exits,
+        Func<DailyClosingItemDto, string> keySelector)
+    {
+        var normalizedEntries = entries.ToList();
+        var normalizedExits = exits.ToList();
+        var allKeys = normalizedEntries.Select(keySelector)
+            .Concat(normalizedExits.Select(keySelector))
+            .Distinct()
+            .OrderBy(x => x);
+
+        var result = new List<DailyClosingGroupDto>();
+
+        foreach (var key in allKeys)
+        {
+            var keyEntries = normalizedEntries.Where(x => keySelector(x) == key).ToList();
+            var keyExits = normalizedExits.Where(x => keySelector(x) == key).ToList();
+
+            result.Add(new DailyClosingGroupDto
+            {
+                Group = key,
+                Entries = keyEntries.Sum(GetMovementAmount),
+                Exits = keyExits.Sum(GetMovementAmount),
+                Count = keyEntries.Count + keyExits.Count
+            });
+        }
+
+        return result;
     }
 }

@@ -186,6 +186,65 @@ public class ReportsController : ControllerBase
     /// <summary>
     /// Gera DRE (Demonstrativo de Resultados)
     /// </summary>
+    [HttpPost("financial/daily-closing")]
+    public async Task<ActionResult<DailyClosingReportDto>> GenerateDailyClosingReport([FromBody] FinancialReportFilterDto filter)
+    {
+        try
+        {
+            var report = await _financialReportService.GenerateDailyClosingReportAsync(filter);
+            return Ok(report);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao gerar relatório de fechamento diário");
+            return StatusCode(500, new { message = "Erro ao gerar relatório de fechamento diário" });
+        }
+    }
+
+    /// <summary>
+    /// Exporta relatório de fechamento diário (POST - para chamadas programáticas)
+    /// </summary>
+    [HttpPost("financial/daily-closing/export")]
+    public async Task<IActionResult> ExportDailyClosingReport([FromBody] FinancialReportFilterDto filter)
+    {
+        return await ExportDailyClosingReportInternal(filter);
+    }
+
+    /// <summary>
+    /// Exporta relatório de fechamento diário (GET - para download via browser)
+    /// </summary>
+    [HttpGet("financial/daily-closing/export")]
+    public async Task<IActionResult> ExportDailyClosingReportGet([FromQuery] FinancialReportFilterDto filter)
+    {
+        return await ExportDailyClosingReportInternal(filter);
+    }
+
+    private async Task<IActionResult> ExportDailyClosingReportInternal(FinancialReportFilterDto filter)
+    {
+        try
+        {
+            var report = await _financialReportService.GenerateDailyClosingReportAsync(filter);
+
+            if (filter.ExportFormat?.ToLower() == "pdf")
+            {
+                var pdfBytes = _pdfExportService.ExportDailyClosingReportToPdf(report, filter);
+                return File(pdfBytes, "application/pdf", $"fechamento-caixa-{DateTime.Now:yyyyMMdd}.pdf");
+            }
+
+            var excelBytes = _excelExportService.ExportDailyClosingReportToExcel(report, filter);
+            return File(excelBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"fechamento-caixa-{DateTime.Now:yyyyMMdd}.xlsx");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao exportar relatório de fechamento diário");
+            return StatusCode(500, new { message = "Erro ao exportar relatório de fechamento diário" });
+        }
+    }
+
+    /// <summary>
+    /// Gera DRE (Demonstrativo de Resultados)
+    /// </summary>
     [HttpPost("financial/profit-loss")]
     public async Task<ActionResult<ProfitLossReportDto>> GenerateProfitLossReport([FromBody] FinancialReportFilterDto filter)
     {
