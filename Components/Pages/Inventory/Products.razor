@@ -35,10 +35,16 @@
                     Exportar
                 </MudButton>
             </MudButtonGroup>
+            <MudButton Color="Color.Secondary"
+                       Variant="Variant.Outlined"
+                       StartIcon="@Icons.Material.Filled.FlashOn"
+                       OnClick="@(() => OpenCreateProductDialog(true))">
+                Produto Rápido
+            </MudButton>
             <MudButton Color="Color.Primary" 
                        Variant="Variant.Filled" 
                        StartIcon="@Icons.Material.Filled.Add"
-                       OnClick="OpenCreateProductDialog">
+                       OnClick="@(() => OpenCreateProductDialog(false))">
                 Adicionar Produto
             </MudButton>
         </MudStack>
@@ -530,7 +536,7 @@
         }
     }
 
-    private async Task OpenCreateProductDialog()
+    private async Task OpenCreateProductDialog(bool quickMode)
     {
         var options = new DialogOptions 
         { 
@@ -538,8 +544,13 @@
             MaxWidth = MaxWidth.Medium,
             FullWidth = false
         };
+
+        var parameters = new DialogParameters
+        {
+            { nameof(CreateProductDialog.QuickMode), quickMode }
+        };
         
-        var dialog = await DialogService.ShowAsync<CreateProductDialog>("Adicionar Produto", options);
+        var dialog = await DialogService.ShowAsync<CreateProductDialog>(quickMode ? "Produto Rápido" : "Adicionar Produto", parameters, options);
         var result = await dialog.Result;
         
         if (result != null && !result.Canceled)

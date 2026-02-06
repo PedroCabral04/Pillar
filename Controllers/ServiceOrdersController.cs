@@ -4,6 +4,7 @@ using erp.DTOs.ServiceOrders;
 using erp.Services.ServiceOrders;
 using erp.Services.Tenancy;
 using erp.Services.Reports;
+using Microsoft.AspNetCore.Hosting;
 using System.Security.Claims;
 
 namespace erp.Controllers;
@@ -19,17 +20,20 @@ public class ServiceOrdersController : ControllerBase
     private readonly IServiceOrderService _serviceOrderService;
     private readonly ITenantContextAccessor _tenantContextAccessor;
     private readonly IPdfExportService _pdfExportService;
+    private readonly IWebHostEnvironment _webHostEnvironment;
     private readonly ILogger<ServiceOrdersController> _logger;
 
     public ServiceOrdersController(
         IServiceOrderService serviceOrderService,
         ITenantContextAccessor tenantContextAccessor,
         IPdfExportService pdfExportService,
+        IWebHostEnvironment webHostEnvironment,
         ILogger<ServiceOrdersController> logger)
     {
         _serviceOrderService = serviceOrderService;
         _tenantContextAccessor = tenantContextAccessor;
         _pdfExportService = pdfExportService;
+        _webHostEnvironment = webHostEnvironment;
         _logger = logger;
     }
 
@@ -355,7 +359,9 @@ public class ServiceOrdersController : ControllerBase
             if (order == null)
                 return NotFound(new { message = $"Ordem de serviço com ID {id} não encontrada" });
 
-            var pdf = _pdfExportService.ExportServiceOrderToPdf(order);
+            var tenantName = GetCurrentTenantName();
+            var logoPath = ResolveTenantLogoPhysicalPath();
+            var pdf = _pdfExportService.ExportServiceOrderToPdf(order, logoPath, tenantName);
             return File(pdf, "application/pdf", $"OS_{order.OrderNumber}.pdf");
         }
         catch (Exception ex)
@@ -382,7 +388,7 @@ public class ServiceOrdersController : ControllerBase
             if (order == null)
                 return NotFound(new { message = $"Ordem de serviço com ID {id} não encontrada" });
 
-            var html = GeneratePrintHtml(order);
+            var html = GeneratePrintHtml(order, GetCurrentTenantName(), GetCurrentTenantLogoUrl());
             return Content(html, "text/html");
         }
         catch (Exception ex)
@@ -392,7 +398,33 @@ public class ServiceOrdersController : ControllerBase
         }
     }
 
-    private static string GeneratePrintHtml(ServiceOrderDto order)
+    private string GetCurrentTenantName()
+    {
+        return string.IsNullOrWhiteSpace(_tenantContextAccessor.Current.Name)
+            ? "Pillar ERP"
+            : _tenantContextAccessor.Current.Name!;
+    }
+
+    private string? GetCurrentTenantLogoUrl()
+    {
+        return _tenantContextAccessor.Current.Branding?.LogoUrl;
+    }
+
+    private string? ResolveTenantLogoPhysicalPath()
+    {
+        var logoUrl = GetCurrentTenantLogoUrl();
+        if (string.IsNullOrWhiteSpace(logoUrl))
+            return null;
+
+        if (Uri.TryCreate(logoUrl, UriKind.Absolute, out _))
+            return null;
+
+        var relativePath = logoUrl.Split('?')[0].TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+        var fullPath = Path.Combine(_webHostEnvironment.WebRootPath, relativePath);
+        return System.IO.File.Exists(fullPath) ? fullPath : null;
+    }
+
+    private static string GeneratePrintHtml(ServiceOrderDto order, string tenantName, string? tenantLogoUrl)
     {
         var statusColors = new Dictionary<string, string>
         {
@@ -406,6 +438,7 @@ public class ServiceOrdersController : ControllerBase
         };
 
         var statusColor = statusColors.GetValueOrDefault(order.Status, "#6c757d");
+        var nonFiscalWarning = "ESTE DOCUMENTO NÃO POSSUI VALOR FISCAL. UTILIZAR APENAS COMO COMPROVANTE DA ORDEM DE SERVIÇO.";
 
         var itemsHtml = string.Join("\n", order.Items.Select(item =>
             $@"        <tr>
@@ -420,6 +453,10 @@ public class ServiceOrdersController : ControllerBase
             {(string.IsNullOrEmpty(order.Customer.Mobile) ? "" : $"Tel: {order.Customer.Mobile}<br>")}"
             : "Cliente não informado";
 
+        var logoHtml = string.IsNullOrWhiteSpace(tenantLogoUrl)
+            ? $@"<div class=""title"">{tenantName}</div>"
+            : $@"<img src=""{tenantLogoUrl}"" alt=""{tenantName}"" class=""tenant-logo""/>";
+
         return $@"
 <!DOCTYPE html>
 <html>
@@ -431,6 +468,9 @@ public class ServiceOrdersController : ControllerBase
         .container {{ max-width: 800px; margin: 0 auto; padding: 20px; }}
         .header {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0066cc; padding-bottom: 10px; margin-bottom: 20px; }}
         .title {{ font-size: 24px; font-weight: bold; color: #0066cc; }}
+        .tenant-logo {{ max-height: 56px; max-width: 220px; object-fit: contain; }}
+        .tenant-name {{ font-size: 13px; font-weight: 600; color: #1f2937; margin-top: 6px; }}
+        .non-fiscal-warning {{ background: #fff5f5; color: #8b0000; border: 1px solid #ffcccc; font-weight: 700; text-align: center; padding: 8px; margin-bottom: 15px; }}
         .order-number {{ font-size: 20px; font-weight: bold; }}
         .status {{ background: {statusColor}; color: white; padding: 4px 12px; border-radius: 4px; font-weight: bold; }}
         .section {{ margin-bottom: 15px; }}
@@ -456,7 +496,8 @@ public class ServiceOrdersController : ControllerBase
     <div class=""container"">
         <div class=""header"">
             <div>
-                <div class=""title"">PILLAR ERP</div>
+                {logoHtml}
+                <div class=""tenant-name"">{tenantName}</div>
                 <div>Assistência Técnica</div>
             </div>
             <div style=""text-align: right;"">
@@ -465,6 +506,8 @@ public class ServiceOrdersController : ControllerBase
                 <div class=""status"">{order.StatusDisplay}</div>
             </div>
         </div>
+
+        <div class=""non-fiscal-warning"">{nonFiscalWarning}</div>
 
         <div class=""grid section"">
             <div>
@@ -546,7 +589,8 @@ public class ServiceOrdersController : ControllerBase
         </div>
 
         <div class=""footer"">
-            Documento gerado em {DateTime.Now:dd/MM/yyyy HH:mm} - Pillar ERP - Ordem de Serviço
+            {nonFiscalWarning}<br>
+            Documento gerado em {DateTime.Now:dd/MM/yyyy HH:mm} - {tenantName} - Ordem de Serviço
         </div>
     </div>
 </body>

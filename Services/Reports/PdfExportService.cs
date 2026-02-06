@@ -15,7 +15,7 @@ public interface IPdfExportService
     byte[] ExportStockLevelsReportToPdf(StockLevelsReportDto report, InventoryReportFilterDto filter);
     byte[] ExportHeadcountReportToPdf(HeadcountReportDto report, HRReportFilterDto filter);
     byte[] ExportSaleToPdf(SaleDto sale, string? logoPath = null);
-    byte[] ExportServiceOrderToPdf(ServiceOrderDto order, string? logoPath = null);
+    byte[] ExportServiceOrderToPdf(ServiceOrderDto order, string? logoPath = null, string? tenantName = null);
 }
 
 public class PdfExportService : IPdfExportService
@@ -684,9 +684,11 @@ public class PdfExportService : IPdfExportService
         return document.GeneratePdf();
     }
 
-    public byte[] ExportServiceOrderToPdf(ServiceOrderDto order, string? logoPath = null)
+    public byte[] ExportServiceOrderToPdf(ServiceOrderDto order, string? logoPath = null, string? tenantName = null)
     {
         var headerColor = Colors.Blue.Darken1;
+        var tenantDisplayName = string.IsNullOrWhiteSpace(tenantName) ? "Pillar ERP" : tenantName;
+        var nonFiscalWarning = "ESTE DOCUMENTO NÃO POSSUI VALOR FISCAL. UTILIZAR APENAS COMO COMPROVANTE DA ORDEM DE SERVIÇO.";
 
         var statusColor = order.Status switch
         {
@@ -723,13 +725,14 @@ public class PdfExportService : IPdfExportService
                                 }
                                 catch
                                 {
-                                    logoCol.Item().Text("Pillar ERP").Bold().FontSize(24).FontColor(headerColor);
+                                    logoCol.Item().Text(tenantDisplayName).Bold().FontSize(24).FontColor(headerColor);
                                 }
                             }
                             else
                             {
-                                logoCol.Item().Text("Pillar ERP").Bold().FontSize(24).FontColor(headerColor);
+                                logoCol.Item().Text(tenantDisplayName).Bold().FontSize(24).FontColor(headerColor);
                             }
+                            logoCol.Item().Text(tenantDisplayName).SemiBold().FontSize(11).FontColor(Colors.Grey.Darken2);
                             logoCol.Item().Text("Assistência Técnica").FontSize(10).FontColor(Colors.Grey.Medium);
                         });
 
@@ -750,6 +753,9 @@ public class PdfExportService : IPdfExportService
                 page.Content().PaddingVertical(15).Column(column =>
                 {
                     column.Spacing(12);
+
+                    column.Item().Background(Colors.Red.Lighten5).Border(1).BorderColor(Colors.Red.Lighten3).Padding(8)
+                        .Text(nonFiscalWarning).SemiBold().FontSize(9).FontColor(Colors.Red.Darken2).AlignCenter();
 
                     // Dados da Ordem e Cliente
                     column.Item().Grid(grid =>
@@ -948,13 +954,14 @@ public class PdfExportService : IPdfExportService
                     footerCol.Item().PaddingTop(5).Row(row =>
                     {
                         row.RelativeItem().Text($"Documento gerado em {DateTime.Now:dd/MM/yyyy HH:mm}").FontSize(8).FontColor(Colors.Grey.Medium);
-                        row.RelativeItem().AlignCenter().Text("Pillar ERP - Ordem de Serviço").FontSize(8).FontColor(Colors.Grey.Medium);
+                        row.RelativeItem().AlignCenter().Text($"{tenantDisplayName} - Ordem de Serviço").FontSize(8).FontColor(Colors.Grey.Medium);
                         row.RelativeItem().AlignRight().Text(x =>
                         {
                             x.Span("Página ").FontSize(8).FontColor(Colors.Grey.Medium);
                             x.CurrentPageNumber().FontSize(8).FontColor(Colors.Grey.Medium);
                         });
                     });
+                    footerCol.Item().PaddingTop(2).AlignCenter().Text(nonFiscalWarning).FontSize(7).FontColor(Colors.Red.Darken2);
                 });
             });
         });

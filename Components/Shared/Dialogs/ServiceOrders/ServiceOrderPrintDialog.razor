@@ -1,5 +1,6 @@
 @using erp.DTOs.ServiceOrders
 @using erp.Services
+@using erp.Services.Tenancy
 @using MudBlazor
 @using Microsoft.JSInterop
 @using MudColor = MudBlazor.Color
@@ -8,6 +9,7 @@
 @inject IApiService ApiService
 @inject ISnackbar Snackbar
 @inject IJSRuntime JS
+@inject ITenantBrandingProvider BrandingProvider
 
 <MudDialog>
     <TitleContent>
@@ -29,12 +31,24 @@
                 <!-- Preview -->
                 <div id="print-area" class="print-preview pa-4" style="background: white; border: 1px solid #ddd; max-height: 500px; overflow: auto;">
                     <div style="text-align: center; margin-bottom: 20px; border-bottom: 2px solid #0066cc; padding-bottom: 10px;">
-                        <div style="font-size: 24px; font-weight: bold; color: #0066cc;">PILLAR ERP</div>
+                        @if (!string.IsNullOrWhiteSpace(_branding.LogoUrl))
+                        {
+                            <MudImage Src="@_branding.LogoUrlWithCacheBust" Alt="@_branding.TenantName" Width="180" Height="56" ObjectFit="ObjectFit.Contain" Class="mb-2" />
+                        }
+                        else
+                        {
+                            <div style="font-size: 24px; font-weight: bold; color: #0066cc;">@_branding.TenantName</div>
+                        }
+                        <div style="font-size: 14px; font-weight: 600; color: #243447;">@_branding.TenantName</div>
                         <div>Assistência Técnica</div>
                         <div style="margin-top: 10px;">
                             <span style="font-size: 20px; font-weight: bold;">@_order.OrderNumber</span>
                             <span class="ml-2 px-2 py-1 rounded" style="background: @GetStatusHex(_order.Status); color: white; font-size: 12px;">@_order.StatusDisplay</span>
                         </div>
+                    </div>
+
+                    <div style="background: #fff5f5; color: #8b0000; border: 1px solid #ffcccc; font-weight: 700; text-align: center; padding: 8px; margin-bottom: 15px;">
+                        ESTE DOCUMENTO NÃO POSSUI VALOR FISCAL. UTILIZAR APENAS COMO COMPROVANTE DA ORDEM DE SERVIÇO.
                     </div>
 
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 15px;">
@@ -160,6 +174,12 @@
     [Parameter] public int OrderId { get; set; }
 
     private ServiceOrderDto? _order;
+    private TenantBrandingTheme _branding = TenantBrandingTheme.Default;
+
+    protected override void OnInitialized()
+    {
+        _branding = BrandingProvider.GetCurrentBranding();
+    }
 
     protected override async Task OnParametersSetAsync()
     {

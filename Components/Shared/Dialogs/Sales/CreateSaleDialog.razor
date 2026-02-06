@@ -3,6 +3,7 @@
 @using erp.DTOs.Inventory
 @using erp.Services
 @using erp.Components.Shared.Dialogs
+@using erp.Components.Shared.Dialogs.Inventory
 @using erp.Components.Shared
 @inject ISnackbar Snackbar
 @inject IApiService ApiService
@@ -123,18 +124,26 @@
                                     <MudPaper Elevation="1" Class="pa-3 mb-3" Style="border-left: 3px solid var(--mud-palette-primary);">
                                         <MudGrid Spacing="2">
                                             <MudItem xs="12" md="5">
-                                                <MudAutocomplete T="ProductDto"
-                                                                Label="Produto"
-                                                                Value="_selectedProducts.ContainsKey(index) ? _selectedProducts[index] : null"
-                                                                ValueChanged="@(p => OnProductSelected(index, p))"
-                                                                SearchFunc="SearchProducts"
-                                                                ToStringFunc="@(p => p != null ? $"{p.Sku} - {p.Name}" : "")"
-                                                                Variant="Variant.Outlined"
-                                                                Required="true"
-                                                                Dense="true"
-                                                                Adornment="Adornment.Start"
-                                                                AdornmentIcon="@Icons.Material.Filled.Inventory"
-                                                                DebounceInterval="300"/>
+                                                <MudStack Spacing="1">
+                                                    <MudAutocomplete T="ProductDto"
+                                                                    Label="Produto"
+                                                                    Value="_selectedProducts.ContainsKey(index) ? _selectedProducts[index] : null"
+                                                                    ValueChanged="@(p => OnProductSelected(index, p))"
+                                                                    SearchFunc="SearchProducts"
+                                                                    ToStringFunc="@(p => p != null ? $"{p.Sku} - {p.Name}" : "")"
+                                                                    Variant="Variant.Outlined"
+                                                                    Required="true"
+                                                                    Dense="true"
+                                                                    Adornment="Adornment.Start"
+                                                                    AdornmentIcon="@Icons.Material.Filled.Inventory"
+                                                                    DebounceInterval="300"/>
+                                                    <MudButton Variant="Variant.Text"
+                                                               Size="MudBlazor.Size.Small"
+                                                               StartIcon="@Icons.Material.Filled.FlashOn"
+                                                               OnClick="@(() => OpenQuickProductDialogForItem(index))">
+                                                        Produto não encontrado? Criar rápido
+                                                    </MudButton>
+                                                </MudStack>
                                             </MudItem>
                                             <MudItem xs="12" md="2">
                                                 <MudNumericField T="decimal"
@@ -371,6 +380,30 @@
             _newSale.Items[index].UnitPrice = product.SalePrice;
         }
         StateHasChanged();
+    }
+
+    private async Task OpenQuickProductDialogForItem(int index)
+    {
+        var options = new DialogOptions
+        {
+            CloseOnEscapeKey = true,
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = false
+        };
+
+        var parameters = new DialogParameters
+        {
+            { nameof(CreateProductDialog.QuickMode), true }
+        };
+
+        var dialog = await DialogService.ShowAsync<CreateProductDialog>("Produto Rápido", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled && result.Data is ProductDto createdProduct)
+        {
+            OnProductSelected(index, createdProduct);
+            Snackbar.Add($"Produto {createdProduct.Sku} criado e selecionado no item.", Severity.Success);
+        }
     }
     
     private decimal GetItemsTotal()

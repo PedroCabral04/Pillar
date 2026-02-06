@@ -1,6 +1,7 @@
 @using MudBlazor
 @using erp.DTOs.Inventory
 @using erp.Services
+@using erp.Services.Inventory
 @inject ISnackbar Snackbar
 @inject IApiService ApiService
 @inject ILogger<CreateProductDialog> Logger
@@ -8,8 +9,8 @@
 <MudDialog>
     <TitleContent>
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.Inventory" Color="MudBlazor.Color.Primary" Size="MudBlazor.Size.Large" />
-            <MudText Typo="Typo.h6">Adicionar Novo Produto</MudText>
+            <MudIcon Icon="@(QuickMode ? Icons.Material.Filled.FlashOn : Icons.Material.Filled.Inventory)" Color="MudBlazor.Color.Primary" Size="MudBlazor.Size.Large" />
+            <MudText Typo="Typo.h6">@(QuickMode ? "Produto Rápido" : "Adicionar Novo Produto")</MudText>
         </MudStack>
     </TitleContent>
     <DialogContent>
@@ -23,6 +24,67 @@
         else
         {
             <MudForm @ref="_form" Class="pa-2">
+                @if (QuickMode)
+                {
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12">
+                            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
+                                Cadastro rápido: informe apenas o essencial. SKU será gerado automaticamente.
+                            </MudAlert>
+                        </MudItem>
+
+                        <MudItem xs="12">
+                            <MudTextField T="string"
+                                         Label="Nome do Produto"
+                                         @bind-Value="_newProduct.Name"
+                                         Variant="Variant.Outlined"
+                                         Required="true"
+                                         Adornment="Adornment.Start"
+                                         AdornmentIcon="@Icons.Material.Filled.Inventory"/>
+                        </MudItem>
+
+                        <MudItem xs="12">
+                            <MudSelect T="int"
+                                       Label="Categoria"
+                                       @bind-Value="_newProduct.CategoryId"
+                                       Variant="Variant.Outlined"
+                                       Required="true"
+                                       Adornment="Adornment.Start"
+                                       AdornmentIcon="@Icons.Material.Filled.Category">
+                                @foreach (var category in _categories)
+                                {
+                                    <MudSelectItem T="int" Value="@category.Id">@category.Name</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+
+                        <MudItem xs="12">
+                            <MudNumericField T="decimal"
+                                             Label="Preço de Venda"
+                                             @bind-Value="_newProduct.SalePrice"
+                                             Min="0"
+                                             Step="0.01m"
+                                             Variant="Variant.Outlined"
+                                             Required="true"
+                                             Format="C2"
+                                             Adornment="Adornment.Start"
+                                             AdornmentText="R$"/>
+                        </MudItem>
+
+                        <MudItem xs="12">
+                            <MudNumericField T="decimal?"
+                                             Label="Estoque Inicial (opcional)"
+                                             @bind-Value="_initialStock"
+                                             Min="0"
+                                             Step="1"
+                                             Variant="Variant.Outlined"
+                                             Adornment="Adornment.Start"
+                                             AdornmentIcon="@Icons.Material.Filled.Inventory"/>
+                        </MudItem>
+                    </MudGrid>
+                }
+                else
+                {
                 <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4" Style="min-height: 420px;" Color="MudBlazor.Color.Primary">
                     <!-- Aba: Informações Básicas -->
                     <MudTabPanel Text="Informações Básicas" Icon="@Icons.Material.Filled.Info">
@@ -363,6 +425,7 @@
                         </MudGrid>
                     </MudTabPanel>
                 </MudTabs>
+                }
             </MudForm>
         }
     </DialogContent>
@@ -380,13 +443,16 @@
             else
             {
                 <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-1"/>
-                <text>Criar Produto</text>
+                <text>@(QuickMode ? "Criar Rápido" : "Criar Produto")</text>
             }
         </MudButton>
     </DialogActions>
 </MudDialog>
 
 @code {
+    [Parameter]
+    public bool QuickMode { get; set; }
+
     [CascadingParameter] 
     private IMudDialogInstance MudDialog { get; set; } = null!;
     
@@ -448,13 +514,6 @@
             }
         }
         
-        // Validações adicionais
-        if (string.IsNullOrWhiteSpace(_newProduct.Sku))
-        {
-            Snackbar.Add("O SKU é obrigatório", Severity.Warning);
-            return;
-        }
-        
         if (string.IsNullOrWhiteSpace(_newProduct.Name))
         {
             Snackbar.Add("O nome do produto é obrigatório", Severity.Warning);
@@ -466,12 +525,27 @@
             Snackbar.Add("Selecione uma categoria", Severity.Warning);
             return;
         }
+
+        if (_newProduct.SalePrice <= 0)
+        {
+            Snackbar.Add("Informe um preço de venda maior que zero", Severity.Warning);
+            return;
+        }
+
+        if (!QuickMode && string.IsNullOrWhiteSpace(_newProduct.Sku))
+        {
+            Snackbar.Add("O SKU é obrigatório", Severity.Warning);
+            return;
+        }
         
         _saving = true;
         try
         {
-            // Definir estoque inicial se informado
-            if (_initialStock.HasValue && _initialStock.Value > 0)
+            if (QuickMode)
+            {
+                QuickProductDefaults.Apply(_newProduct, _initialStock);
+            }
+            else if (_initialStock.HasValue && _initialStock.Value > 0)
             {
                 _newProduct.CurrentStock = _initialStock.Value;
             }

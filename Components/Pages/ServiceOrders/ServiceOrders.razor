@@ -237,10 +237,27 @@
         };
     }
 
-    private void OpenCreateDialog()
+    private async Task OpenCreateDialog()
     {
         var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
-        DialogService.Show<ServiceOrderCreateDialog>("Nova Ordem de Serviço", options);
+        var dialog = await DialogService.ShowAsync<ServiceOrderCreateDialog>("Nova Ordem de Serviço", options);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled && result.Data is ServiceOrderDto createdOrder)
+        {
+            await _table!.ReloadServerData();
+
+            Snackbar.Add($"OS {createdOrder.OrderNumber} criada com sucesso.", Severity.Success, cfg =>
+            {
+                cfg.VisibleStateDuration = 7000;
+                cfg.Action = "Imprimir comprovante";
+                cfg.ActionVariant = Variant.Filled;
+                cfg.ActionColor = Color.Primary;
+                cfg.OnClick = async _ => await OpenPrintDialog(createdOrder);
+            });
+
+            await OpenPrintDialog(createdOrder);
+        }
     }
 
     private void OpenDetailsDialog(ServiceOrderDto order)

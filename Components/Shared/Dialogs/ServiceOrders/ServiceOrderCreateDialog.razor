@@ -1,6 +1,8 @@
 @using erp.DTOs.ServiceOrders
 @using erp.DTOs.Sales
+@using erp.DTOs.Inventory
 @using erp.Services
+@using erp.Components.Shared.Dialogs.Inventory
 @using erp.Components.Shared
 @using MudBlazor
 @using Size = MudBlazor.Size
@@ -340,6 +342,37 @@
     {
         _dto.Items.RemoveAt(index);
         StateHasChanged();
+    }
+
+    private async Task OpenQuickProductDialogForService()
+    {
+        var options = new DialogOptions
+        {
+            CloseOnEscapeKey = true,
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = false
+        };
+
+        var parameters = new DialogParameters
+        {
+            { nameof(CreateProductDialog.QuickMode), true }
+        };
+
+        var dialog = await DialogService.ShowAsync<CreateProductDialog>("Produto Rápido", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled && result.Data is ProductDto createdProduct)
+        {
+            _dto.Items.Add(new CreateServiceOrderItemDto
+            {
+                Description = $"Peça: {createdProduct.Name} ({createdProduct.Sku})",
+                Price = createdProduct.SalePrice,
+                ServiceType = "Peça"
+            });
+
+            Snackbar.Add($"Produto {createdProduct.Sku} criado e adicionado como item da OS.", Severity.Success);
+            StateHasChanged();
+        }
     }
 
     private string GetServicesTotal()
