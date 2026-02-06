@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using erp.Data;
 using erp.DTOs.Sales;
 using erp.Models.Sales;
+using erp.Models.Financial;
 using erp.Mappings;
 using erp.Services.Financial;
 
@@ -120,6 +121,8 @@ public class SalesService : ISalesService
 
                 _context.Sales.Add(sale);
                 await _context.SaveChangesAsync();
+
+                await EnsureFinancialReceivableForSaleAsync(sale);
                 await transaction.CommitAsync();
 
                 // Calcular comissões se finalizada
@@ -318,6 +321,8 @@ public class SalesService : ISalesService
             sale.Status = "Cancelada";
             sale.UpdatedAt = DateTime.UtcNow;
 
+            await CancelFinancialReceivableForSaleAsync(sale);
+
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
 
@@ -411,6 +416,8 @@ public class SalesService : ISalesService
             sale.Status = "Finalizada";
             sale.UpdatedAt = DateTime.UtcNow;
 
+            await EnsureFinancialReceivableForSaleAsync(sale);
+
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
 
@@ -486,5 +493,62 @@ public class SalesService : ISalesService
 
         var lastNumber = int.Parse(lastSale.SaleNumber.Substring(prefix.Length));
         return $"{prefix}{(lastNumber + 1):D3}";
+    }
+
+    private async Task EnsureFinancialReceivableForSaleAsync(Sale sale)
+    {
+        if (!string.Equals(sale.Status, "Finalizada", StringComparison.OrdinalIgnoreCase) || !sale.CustomerId.HasValue)
+        {
+            return;
+        }
+
+        var existing = await _context.AccountsReceivable
+            .FirstOrDefaultAsync(a => a.InvoiceNumber == sale.SaleNumber && a.CustomerId == sale.CustomerId.Value);
+
+        if (existing != null)
+        {
+            return;
+        }
+
+        var method = PaymentMethodResolver.FromSaleText(sale.PaymentMethod);
+        var isPaid = PaymentMethodResolver.IsImmediatelyPaid(method);
+        var now = DateTime.UtcNow;
+
+        var receivable = new AccountReceivable
+        {
+            TenantId = sale.TenantId,
+            CustomerId = sale.CustomerId.Value,
+            InvoiceNumber = sale.SaleNumber,
+            OriginalAmount = sale.NetAmount,
+            DiscountAmount = 0,
+            InterestAmount = 0,
+            FineAmount = 0,
+            PaidAmount = isPaid ? sale.NetAmount : 0,
+            IssueDate = sale.SaleDate,
+            DueDate = sale.SaleDate,
+            PaymentDate = isPaid ? now : null,
+            Status = isPaid ? AccountStatus.Paid : AccountStatus.Pending,
+            PaymentMethod = method,
+            Notes = $"Gerado automaticamente pela venda {sale.SaleNumber}",
+            CreatedAt = now,
+            CreatedByUserId = sale.UserId,
+            ReceivedByUserId = isPaid ? sale.UserId : null
+        };
+
+        _context.AccountsReceivable.Add(receivable);
+    }
+
+    private async Task CancelFinancialReceivableForSaleAsync(Sale sale)
+    {
+        var receivable = await _context.AccountsReceivable
+            .FirstOrDefaultAsync(a => a.InvoiceNumber == sale.SaleNumber && a.CustomerId == sale.CustomerId);
+
+        if (receivable == null)
+        {
+            return;
+        }
+
+        receivable.Status = AccountStatus.Cancelled;
+        receivable.UpdatedAt = DateTime.UtcNow;
     }
 }

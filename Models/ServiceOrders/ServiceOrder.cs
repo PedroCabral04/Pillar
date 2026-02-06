@@ -119,6 +119,9 @@ public class ServiceOrder : IAuditable, IMustHaveTenant
     [Precision(18, 2)]
     public decimal NetAmount { get; set; }
 
+    [MaxLength(50)]
+    public string? PaymentMethod { get; set; }
+
     // ===== Datas de Conclusão =====
 
     /// <summary>

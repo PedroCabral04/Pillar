@@ -515,6 +515,7 @@ public class ServiceOrdersController : ControllerBase
                 Data Entrada: {order.EntryDate:dd/MM/yyyy}<br>
                 {(order.EstimatedCompletionDate.HasValue ? $"Previsão: {order.EstimatedCompletionDate.Value:dd/MM/yyyy}<br>" : "")}
                 {(order.ActualCompletionDate.HasValue ? $"Conclusão: {order.ActualCompletionDate.Value:dd/MM/yyyy}<br>" : "")}
+                {(!string.IsNullOrWhiteSpace(order.PaymentMethod) ? $"Pagamento: {order.PaymentMethod}<br>" : "")}
                 {(!string.IsNullOrEmpty(order.WarrantyType) ? $"Garantia: {order.WarrantyType}" : "")}
             </div>
             <div>

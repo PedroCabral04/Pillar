@@ -220,6 +220,20 @@
                     </MudItem>
 
                     <MudItem xs="12" md="6">
+                        <MudSelect T="string" Label="Método de Pagamento" @bind-Value="_dto.PaymentMethod"
+                                Variant="Variant.Outlined"
+                                Adornment="Adornment.Start"
+                                AdornmentIcon="@Icons.Material.Filled.Payment">
+                            <MudSelectItem T="string" Value="@("Dinheiro")">Dinheiro</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Cartão de Débito")">Cartão de Débito</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Cartão de Crédito")">Cartão de Crédito</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("PIX")">PIX</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Boleto")">Boleto</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Transferência")">Transferência</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
                         <MudSelect T="string" Label="Garantia" @bind-Value="_dto.WarrantyType"
                                 Variant="Variant.Outlined"
                                 Adornment="Adornment.Start"
@@ -297,7 +311,7 @@
     private MudForm? _form;
     private bool _isValid;
     private string[] _errors = Array.Empty<string>();
-    private readonly CreateServiceOrderDto _dto = new() { Status = "Open" };
+    private readonly CreateServiceOrderDto _dto = new() { Status = "Open", PaymentMethod = "Dinheiro" };
     private DateTime? _entryDate = DateTime.Now;
     private CustomerDto? _selectedCustomer;
     private bool _loading = false;

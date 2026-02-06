@@ -37,6 +37,7 @@ public class ServiceOrderDto
     public decimal TotalAmount { get; set; }
     public decimal DiscountAmount { get; set; }
     public decimal NetAmount { get; set; }
+    public string? PaymentMethod { get; set; }
 
     // ===== Datas de Conclusão =====
 

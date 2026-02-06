@@ -9,6 +9,7 @@ public class FinancialReportFilterDto : ReportFilterDto
     public int? CategoryId { get; set; }
     public int? CostCenterId { get; set; }
     public int? SupplierId { get; set; }
+    public Models.Financial.PaymentMethod? PaymentMethod { get; set; }
 }
 
 /// <summary>
@@ -26,6 +27,7 @@ public class CashFlowItemDto
     public string Description { get; set; } = string.Empty;
     public string Type { get; set; } = string.Empty; // Receita/Despesa
     public string Category { get; set; } = string.Empty;
+    public string PaymentMethod { get; set; } = string.Empty;
     public decimal Amount { get; set; }
     public string Status { get; set; } = string.Empty;
 }
@@ -37,6 +39,8 @@ public class CashFlowSummaryDto
     public decimal NetCashFlow { get; set; }
     public decimal PendingReceivables { get; set; }
     public decimal PendingPayables { get; set; }
+    public Dictionary<string, decimal> RevenueByPaymentMethod { get; set; } = new();
+    public Dictionary<string, decimal> ExpensesByPaymentMethod { get; set; } = new();
 }
 
 /// <summary>

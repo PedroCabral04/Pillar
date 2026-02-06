@@ -1,5 +1,6 @@
 using erp.Data;
 using erp.DTOs.Reports;
+using erp.Extensions;
 using erp.Models.Financial;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,11 +23,36 @@ public class FinancialReportService : IFinancialReportService
         {
             var receivablesQuery = _context.AccountsReceivable
                 .Include(a => a.Category)
+                .Include(a => a.Customer)
                 .AsQueryable();
 
             var payablesQuery = _context.AccountsPayable
                 .Include(a => a.Category)
+                .Include(a => a.Supplier)
                 .AsQueryable();
+
+            if (filter.CategoryId.HasValue)
+            {
+                receivablesQuery = receivablesQuery.Where(a => a.CategoryId == filter.CategoryId.Value);
+                payablesQuery = payablesQuery.Where(a => a.CategoryId == filter.CategoryId.Value);
+            }
+
+            if (filter.CostCenterId.HasValue)
+            {
+                receivablesQuery = receivablesQuery.Where(a => a.CostCenterId == filter.CostCenterId.Value);
+                payablesQuery = payablesQuery.Where(a => a.CostCenterId == filter.CostCenterId.Value);
+            }
+
+            if (filter.SupplierId.HasValue)
+            {
+                payablesQuery = payablesQuery.Where(a => a.SupplierId == filter.SupplierId.Value);
+            }
+
+            if (filter.PaymentMethod.HasValue)
+            {
+                receivablesQuery = receivablesQuery.Where(a => a.PaymentMethod == filter.PaymentMethod.Value);
+                payablesQuery = payablesQuery.Where(a => a.PaymentMethod == filter.PaymentMethod.Value);
+            }
 
             // Apply date filters
             if (filter.StartDate.HasValue)
@@ -55,6 +81,7 @@ public class FinancialReportService : IFinancialReportService
                 Description = r.Customer?.Name ?? "Conta a receber",
                 Type = "Receita",
                 Category = r.Category?.Name ?? "Sem categoria",
+                PaymentMethod = r.PaymentMethod.ToDisplayName(),
                 Amount = r.NetAmount,
                 Status = r.Status.ToString()
             }));
@@ -66,6 +93,7 @@ public class FinancialReportService : IFinancialReportService
                 Description = p.Supplier?.Name ?? "Conta a pagar",
                 Type = "Despesa",
                 Category = p.Category?.Name ?? "Sem categoria",
+                PaymentMethod = p.PaymentMethod.ToDisplayName(),
                 Amount = p.NetAmount,
                 Status = p.Status.ToString()
             }));
@@ -77,7 +105,15 @@ public class FinancialReportService : IFinancialReportService
                 TotalRevenue = receivables.Where(r => r.Status == AccountStatus.Paid).Sum(r => r.NetAmount),
                 TotalExpenses = payables.Where(p => p.Status == AccountStatus.Paid).Sum(p => p.NetAmount),
                 PendingReceivables = receivables.Where(r => r.Status == AccountStatus.Pending).Sum(r => r.NetAmount),
-                PendingPayables = payables.Where(p => p.Status == AccountStatus.Pending).Sum(p => p.NetAmount)
+                PendingPayables = payables.Where(p => p.Status == AccountStatus.Pending).Sum(p => p.NetAmount),
+                RevenueByPaymentMethod = receivables
+                    .Where(r => r.Status == AccountStatus.Paid)
+                    .GroupBy(r => r.PaymentMethod.ToDisplayName())
+                    .ToDictionary(g => g.Key, g => g.Sum(x => x.NetAmount)),
+                ExpensesByPaymentMethod = payables
+                    .Where(p => p.Status == AccountStatus.Paid)
+                    .GroupBy(p => p.PaymentMethod.ToDisplayName())
+                    .ToDictionary(g => g.Key, g => g.Sum(x => x.NetAmount))
             };
 
             summary.NetCashFlow = summary.TotalRevenue - summary.TotalExpenses;
@@ -101,21 +137,31 @@ public class FinancialReportService : IFinancialReportService
         {
             // Get sales revenue
             var salesQuery = _context.Sales.AsQueryable();
+            var serviceOrdersQuery = _context.ServiceOrders.AsQueryable();
             
             if (filter.StartDate.HasValue)
             {
                 var startDate = filter.StartDate.Value.ToUniversalTime();
                 salesQuery = salesQuery.Where(s => s.SaleDate >= startDate);
+                serviceOrdersQuery = serviceOrdersQuery.Where(o => o.EntryDate >= startDate);
             }
             
             if (filter.EndDate.HasValue)
             {
                 var endDate = filter.EndDate.Value.ToUniversalTime();
                 salesQuery = salesQuery.Where(s => s.SaleDate <= endDate);
+                serviceOrdersQuery = serviceOrdersQuery.Where(o => o.EntryDate <= endDate);
             }
 
-            var sales = await salesQuery.Where(s => s.Status != "Cancelada").ToListAsync();
-            var totalRevenue = sales.Sum(s => s.NetAmount);
+            var sales = await salesQuery
+                .Where(s => s.Status == "Finalizada")
+                .ToListAsync();
+
+            var serviceOrders = await serviceOrdersQuery
+                .Where(o => o.Status == "Completed" || o.Status == "Delivered")
+                .ToListAsync();
+
+            var totalRevenue = sales.Sum(s => s.NetAmount) + serviceOrders.Sum(o => o.NetAmount);
 
             // Get COGS (Cost of Goods Sold) from stock movements
             var movementsQuery = _context.StockMovements
@@ -152,6 +198,26 @@ public class FinancialReportService : IFinancialReportService
             {
                 var endDate = filter.EndDate.Value.ToUniversalTime();
                 expensesQuery = expensesQuery.Where(a => a.PaymentDate <= endDate);
+            }
+
+            if (filter.CategoryId.HasValue)
+            {
+                expensesQuery = expensesQuery.Where(a => a.CategoryId == filter.CategoryId.Value);
+            }
+
+            if (filter.CostCenterId.HasValue)
+            {
+                expensesQuery = expensesQuery.Where(a => a.CostCenterId == filter.CostCenterId.Value);
+            }
+
+            if (filter.SupplierId.HasValue)
+            {
+                expensesQuery = expensesQuery.Where(a => a.SupplierId == filter.SupplierId.Value);
+            }
+
+            if (filter.PaymentMethod.HasValue)
+            {
+                expensesQuery = expensesQuery.Where(a => a.PaymentMethod == filter.PaymentMethod.Value);
             }
 
             var expenses = await expensesQuery.ToListAsync();

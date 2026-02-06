@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using erp.Data;
 using erp.DTOs.ServiceOrders;
+using erp.Models.Financial;
 using erp.Models.ServiceOrders;
 using erp.Mappings;
+using erp.Services.Financial;
 
 namespace erp.Services.ServiceOrders;
 
@@ -63,6 +65,8 @@ public class ServiceOrderService : IServiceOrderService
 
                 _context.ServiceOrders.Add(order);
                 await _context.SaveChangesAsync();
+
+                await EnsureFinancialReceivableForServiceOrderAsync(order);
                 await transaction.CommitAsync();
 
                 _logger.LogInformation("Ordem de Serviço {OrderId} criada com sucesso. Número: {OrderNumber}",
@@ -273,6 +277,12 @@ public class ServiceOrderService : IServiceOrderService
 
         order.NetAmount = order.TotalAmount - dto.DiscountAmount;
 
+        await EnsureFinancialReceivableForServiceOrderAsync(order);
+        if (order.Status == ServiceOrderStatus.Cancelled.ToString())
+        {
+            await CancelFinancialReceivableForServiceOrderAsync(order);
+        }
+
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Ordem de Serviço {OrderId} atualizada com sucesso", id);
@@ -322,6 +332,13 @@ public class ServiceOrderService : IServiceOrderService
         if (status == ServiceOrderStatus.Completed.ToString() && !order.ActualCompletionDate.HasValue)
         {
             order.ActualCompletionDate = DateTime.UtcNow;
+        }
+
+        await EnsureFinancialReceivableForServiceOrderAsync(order);
+
+        if (status == ServiceOrderStatus.Cancelled.ToString())
+        {
+            await CancelFinancialReceivableForServiceOrderAsync(order);
         }
 
         await _context.SaveChangesAsync();
@@ -464,5 +481,61 @@ public class ServiceOrderService : IServiceOrderService
         };
 
         return validTransitions.TryGetValue(currentStatus, out var allowed) && allowed.Contains(newStatus);
+    }
+
+    private async Task EnsureFinancialReceivableForServiceOrderAsync(ServiceOrder order)
+    {
+        var isConcluded = order.Status == ServiceOrderStatus.Completed.ToString() || order.Status == ServiceOrderStatus.Delivered.ToString();
+        if (!isConcluded || !order.CustomerId.HasValue)
+        {
+            return;
+        }
+
+        var existing = await _context.AccountsReceivable
+            .FirstOrDefaultAsync(a => a.InvoiceNumber == order.OrderNumber && a.CustomerId == order.CustomerId.Value);
+
+        if (existing != null)
+        {
+            return;
+        }
+
+        var method = PaymentMethodResolver.FromSaleText(order.PaymentMethod);
+        var isPaid = PaymentMethodResolver.IsImmediatelyPaid(method);
+        var now = DateTime.UtcNow;
+        var competenceDate = order.ActualCompletionDate ?? order.EntryDate;
+
+        var receivable = new AccountReceivable
+        {
+            TenantId = order.TenantId,
+            CustomerId = order.CustomerId.Value,
+            InvoiceNumber = order.OrderNumber,
+            OriginalAmount = order.NetAmount,
+            IssueDate = competenceDate,
+            DueDate = competenceDate,
+            PaidAmount = isPaid ? order.NetAmount : 0,
+            PaymentDate = isPaid ? now : null,
+            Status = isPaid ? AccountStatus.Paid : AccountStatus.Pending,
+            PaymentMethod = method,
+            Notes = $"Gerado automaticamente pela ordem de servico {order.OrderNumber}",
+            CreatedAt = now,
+            CreatedByUserId = order.UserId,
+            ReceivedByUserId = isPaid ? order.UserId : null
+        };
+
+        _context.AccountsReceivable.Add(receivable);
+    }
+
+    private async Task CancelFinancialReceivableForServiceOrderAsync(ServiceOrder order)
+    {
+        var receivable = await _context.AccountsReceivable
+            .FirstOrDefaultAsync(a => a.InvoiceNumber == order.OrderNumber && a.CustomerId == order.CustomerId);
+
+        if (receivable == null)
+        {
+            return;
+        }
+
+        receivable.Status = AccountStatus.Cancelled;
+        receivable.UpdatedAt = DateTime.UtcNow;
     }
 }

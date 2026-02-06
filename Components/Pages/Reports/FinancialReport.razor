@@ -4,6 +4,7 @@
 @using erp.DTOs.Reports
 @using erp.Services
 @using erp.Components.Shared
+@using erp.Models.Financial
 @using Microsoft.AspNetCore.Authorization
 @using Color = MudBlazor.Color
 @using Size = MudBlazor.Size
@@ -34,6 +35,17 @@
                         </MudItem>
                         <MudItem xs="12" md="6">
                             <DatePicker Label="Data Fim" @bind-Date="_cashFlowFilter.EndDate" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="PaymentMethod?" Label="Método de Pagamento" @bind-Value="_cashFlowFilter.PaymentMethod" Clearable="true">
+                                <MudSelectItem Value="@PaymentMethod.Cash">Dinheiro</MudSelectItem>
+                                <MudSelectItem Value="@PaymentMethod.Pix">PIX</MudSelectItem>
+                                <MudSelectItem Value="@PaymentMethod.CreditCard">Cartão de Crédito</MudSelectItem>
+                                <MudSelectItem Value="@PaymentMethod.DebitCard">Cartão de Débito</MudSelectItem>
+                                <MudSelectItem Value="@PaymentMethod.BankSlip">Boleto</MudSelectItem>
+                                <MudSelectItem Value="@PaymentMethod.BankTransfer">Transferência</MudSelectItem>
+                                <MudSelectItem Value="@PaymentMethod.Check">Cheque</MudSelectItem>
+                            </MudSelect>
                         </MudItem>
                         <MudItem xs="12">
                             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadCashFlowReport" StartIcon="@Icons.Material.Filled.Search">
@@ -95,6 +107,7 @@
                                 <MudTh>Descrição</MudTh>
                                 <MudTh>Tipo</MudTh>
                                 <MudTh>Categoria</MudTh>
+                                <MudTh>Pagamento</MudTh>
                                 <MudTh>Valor</MudTh>
                                 <MudTh>Status</MudTh>
                             </HeaderContent>
@@ -103,6 +116,7 @@
                                 <MudTd DataLabel="Descrição">@context.Description</MudTd>
                                 <MudTd DataLabel="Tipo">@context.Type</MudTd>
                                 <MudTd DataLabel="Categoria">@context.Category</MudTd>
+                                <MudTd DataLabel="Pagamento">@context.PaymentMethod</MudTd>
                                 <MudTd DataLabel="Valor">
                                     <MudText Color="@(context.Type == "Receita" ? Color.Success : Color.Error)">
                                         @Currency.Format(context.Amount)
@@ -111,6 +125,29 @@
                                 <MudTd DataLabel="Status">@context.Status</MudTd>
                             </RowTemplate>
                         </MudTable>
+
+                        @if (_cashFlowReport.Summary.RevenueByPaymentMethod.Any() || _cashFlowReport.Summary.ExpensesByPaymentMethod.Any())
+                        {
+                            <MudSimpleTable Dense="true" Class="mt-4">
+                                <thead>
+                                    <tr>
+                                        <th>Método</th>
+                                        <th>Receitas</th>
+                                        <th>Despesas</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var method in _cashFlowReport.Summary.RevenueByPaymentMethod.Keys.Union(_cashFlowReport.Summary.ExpensesByPaymentMethod.Keys).OrderBy(x => x))
+                                    {
+                                        <tr>
+                                            <td>@method</td>
+                                            <td>@Currency.Format(_cashFlowReport.Summary.RevenueByPaymentMethod.GetValueOrDefault(method, 0m))</td>
+                                            <td>@Currency.Format(_cashFlowReport.Summary.ExpensesByPaymentMethod.GetValueOrDefault(method, 0m))</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </MudSimpleTable>
+                        }
                     </MudCardContent>
                 </MudCard>
             }
@@ -126,6 +163,17 @@
                         </MudItem>
                         <MudItem xs="12" md="6">
                             <DatePicker Label="Data Fim" @bind-Date="_profitLossFilter.EndDate" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="PaymentMethod?" Label="Método de Pagamento" @bind-Value="_profitLossFilter.PaymentMethod" Clearable="true">
+                                <MudSelectItem Value="@PaymentMethod.Cash">Dinheiro</MudSelectItem>
+                                <MudSelectItem Value="@PaymentMethod.Pix">PIX</MudSelectItem>
+                                <MudSelectItem Value="@PaymentMethod.CreditCard">Cartão de Crédito</MudSelectItem>
+                                <MudSelectItem Value="@PaymentMethod.DebitCard">Cartão de Débito</MudSelectItem>
+                                <MudSelectItem Value="@PaymentMethod.BankSlip">Boleto</MudSelectItem>
+                                <MudSelectItem Value="@PaymentMethod.BankTransfer">Transferência</MudSelectItem>
+                                <MudSelectItem Value="@PaymentMethod.Check">Cheque</MudSelectItem>
+                            </MudSelect>
                         </MudItem>
                         <MudItem xs="12">
                             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadProfitLossReport" StartIcon="@Icons.Material.Filled.Search">

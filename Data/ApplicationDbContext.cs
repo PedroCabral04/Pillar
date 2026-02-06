@@ -1404,6 +1404,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             entity.Property(e => e.TotalAmount).HasPrecision(18, 2);
             entity.Property(e => e.DiscountAmount).HasPrecision(18, 2);
             entity.Property(e => e.NetAmount).HasPrecision(18, 2);
+            entity.Property(e => e.PaymentMethod).HasMaxLength(50);
 
             entity.Property(e => e.WarrantyType).HasMaxLength(50);
 
