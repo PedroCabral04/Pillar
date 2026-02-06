@@ -13,8 +13,8 @@
 <MudDialog>
     <TitleContent>
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.ShoppingCart" Color="MudBlazor.Color.Primary" Size="MudBlazor.Size.Large" />
-            <MudText Typo="Typo.h6">Nova Venda</MudText>
+            <MudIcon Icon="@(QuickMode ? Icons.Material.Filled.FlashOn : Icons.Material.Filled.ShoppingCart)" Color="MudBlazor.Color.Primary" Size="MudBlazor.Size.Large" />
+            <MudText Typo="Typo.h6">@(QuickMode ? "Venda Rápida" : "Nova Venda")</MudText>
         </MudStack>
     </TitleContent>
     <DialogContent>
@@ -50,13 +50,16 @@
                                         DebounceInterval="300"/>
                     </MudItem>
                     
-                    <MudItem xs="12" md="6">
-                        <DatePicker Label="Data da Venda"
-                                    @bind-Date="_saleDate"
-                                    Required="true"
-                                    Adornment="Adornment.Start"
-                                    AdornmentIcon="@Icons.Material.Filled.CalendarToday"/>
-                    </MudItem>
+                    @if (!QuickMode)
+                    {
+                        <MudItem xs="12" md="6">
+                            <DatePicker Label="Data da Venda"
+                                        @bind-Date="_saleDate"
+                                        Required="true"
+                                        Adornment="Adornment.Start"
+                                        AdornmentIcon="@Icons.Material.Filled.CalendarToday"/>
+                        </MudItem>
+                    }
                     
                     <MudItem xs="12" md="6">
                         <MudSelect T="string"
@@ -74,18 +77,21 @@
                         </MudSelect>
                     </MudItem>
                     
-                    <MudItem xs="12" md="6">
-                        <MudSelect T="string"
-                                  Label="Status"
-                                  @bind-Value="_newSale.Status"
-                                  Variant="Variant.Outlined"
-                                  Required="true"
-                                  Adornment="Adornment.Start"
-                                  AdornmentIcon="@Icons.Material.Filled.CheckCircle">
-                            <MudSelectItem T="string" Value="@("Pendente")">Pendente</MudSelectItem>
-                            <MudSelectItem T="string" Value="@("Finalizada")">Finalizada</MudSelectItem>
-                        </MudSelect>
-                    </MudItem>
+                    @if (!QuickMode)
+                    {
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="string"
+                                      Label="Status"
+                                      @bind-Value="_newSale.Status"
+                                      Variant="Variant.Outlined"
+                                      Required="true"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.CheckCircle">
+                                <MudSelectItem T="string" Value="@("Pendente")">Pendente</MudSelectItem>
+                                <MudSelectItem T="string" Value="@("Finalizada")">Finalizada</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                    }
 
                     <!-- Itens da Venda -->
                     <MudItem xs="12">
@@ -95,13 +101,16 @@
                                 <MudIcon Icon="@Icons.Material.Filled.ShoppingBasket" Size="MudBlazor.Size.Small" Class="mr-1" />
                                 Itens da Venda
                             </MudText>
-                            <MudButton OnClick="AddItem" 
-                                      StartIcon="@Icons.Material.Filled.Add" 
-                                      Size="MudBlazor.Size.Small"
-                                      Variant="Variant.Outlined"
-                                      Color="MudBlazor.Color.Primary">
-                                Adicionar Item
-                            </MudButton>
+                            @if (!QuickMode)
+                            {
+                                <MudButton OnClick="AddItem" 
+                                          StartIcon="@Icons.Material.Filled.Add" 
+                                          Size="MudBlazor.Size.Small"
+                                          Variant="Variant.Outlined"
+                                          Color="MudBlazor.Color.Primary">
+                                    Adicionar Item
+                                </MudButton>
+                            }
                         </MudStack>
                     </MudItem>
                     
@@ -152,24 +161,30 @@
                                                                 Adornment="Adornment.Start"
                                                                 AdornmentText="R$"/>
                                             </MudItem>
-                                            <MudItem xs="12" md="2">
-                                                <MudNumericField T="decimal"
-                                                                Label="Desconto"
-                                                                @bind-Value="item.Discount"
-                                                                Min="0"
-                                                                Step="0.01m"
-                                                                Variant="Variant.Outlined"
-                                                                Dense="true"
-                                                                Format="C2"
-                                                                Adornment="Adornment.Start"
-                                                                AdornmentText="R$"/>
-                                            </MudItem>
-                                            <MudItem xs="12" md="1" Class="d-flex align-center justify-center">
-                                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                                              Color="MudBlazor.Color.Error"
-                                                              Size="MudBlazor.Size.Small"
-                                                              OnClick="@(() => RemoveItem(index))"/>
-                                            </MudItem>
+                                            @if (!QuickMode)
+                                            {
+                                                <MudItem xs="12" md="2">
+                                                    <MudNumericField T="decimal"
+                                                                    Label="Desconto"
+                                                                    @bind-Value="item.Discount"
+                                                                    Min="0"
+                                                                    Step="0.01m"
+                                                                    Variant="Variant.Outlined"
+                                                                    Dense="true"
+                                                                    Format="C2"
+                                                                    Adornment="Adornment.Start"
+                                                                    AdornmentText="R$"/>
+                                                </MudItem>
+                                            }
+                                            @if (!QuickMode || _newSale.Items.Count > 1)
+                                            {
+                                                <MudItem xs="12" md="1" Class="d-flex align-center justify-center">
+                                                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                                  Color="MudBlazor.Color.Error"
+                                                                  Size="MudBlazor.Size.Small"
+                                                                  OnClick="@(() => RemoveItem(index))"/>
+                                                </MudItem>
+                                            }
                                             <MudItem xs="12">
                                                 <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">
                                                     <strong>Subtotal:</strong> @Currency.Format(item.Quantity * item.UnitPrice - item.Discount)
@@ -195,17 +210,20 @@
                         <MudDivider Class="my-2"/>
                     </MudItem>
                     
-                    <MudItem xs="12" md="6">
-                        <MudNumericField T="decimal"
-                                        Label="Desconto Geral"
-                                        @bind-Value="_newSale.DiscountAmount"
-                                        Min="0"
-                                        Step="0.01m"
-                                        Variant="Variant.Outlined"
-                                        Format="C2"
-                                        Adornment="Adornment.Start"
-                                        AdornmentText="R$"/>
-                    </MudItem>
+                    @if (!QuickMode)
+                    {
+                        <MudItem xs="12" md="6">
+                            <MudNumericField T="decimal"
+                                            Label="Desconto Geral"
+                                            @bind-Value="_newSale.DiscountAmount"
+                                            Min="0"
+                                            Step="0.01m"
+                                            Variant="Variant.Outlined"
+                                            Format="C2"
+                                            Adornment="Adornment.Start"
+                                            AdornmentText="R$"/>
+                        </MudItem>
+                    }
                     
                     <MudItem xs="12" md="6">
                         <MudPaper Elevation="3" Class="pa-3" Style="background: var(--mud-palette-primary); color: white;">
@@ -221,15 +239,18 @@
                         </MudPaper>
                     </MudItem>
                     
-                    <MudItem xs="12">
-                        <MudTextField T="string"
-                                     Label="Observações"
-                                     @bind-Value="_newSale.Notes"
-                                     Variant="Variant.Outlined"
-                                     Lines="3"
-                                     Adornment="Adornment.Start"
-                                     AdornmentIcon="@Icons.Material.Filled.Notes"/>
-                    </MudItem>
+                    @if (!QuickMode)
+                    {
+                        <MudItem xs="12">
+                            <MudTextField T="string"
+                                         Label="Observações"
+                                         @bind-Value="_newSale.Notes"
+                                         Variant="Variant.Outlined"
+                                         Lines="3"
+                                         Adornment="Adornment.Start"
+                                         AdornmentIcon="@Icons.Material.Filled.Notes"/>
+                        </MudItem>
+                    }
                 </MudGrid>
             </MudForm>
         }
@@ -238,14 +259,19 @@
         <MudButton OnClick="Cancel" Variant="Variant.Outlined">Cancelar</MudButton>
         <MudButton OnClick="Submit" Variant="Variant.Filled" Color="MudBlazor.Color.Primary" Disabled="@(_loading || !_newSale.Items.Any())">
             <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-1"/>
-            Criar Venda
+            @(QuickMode ? "Finalizar Venda" : "Criar Venda")
         </MudButton>
     </DialogActions>
 </MudDialog>
 
 @code {
+    private const string QuickSaleMarker = "[VENDA_RAPIDA]";
+
     [CascadingParameter] 
     private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public bool QuickMode { get; set; }
     
     private MudForm? _form;
     private bool _loading = false;
@@ -266,8 +292,14 @@
         _loading = true;
         try
         {
-            // Inicializa com status pendente
-            _newSale.Status = "Pendente";
+            _newSale.Status = QuickMode ? "Finalizada" : "Pendente";
+            if (QuickMode)
+            {
+                _newSale.PaymentMethod = "Dinheiro";
+                _newSale.Notes = QuickSaleMarker;
+                AddItem();
+            }
+
             _newSale.SaleDate = DateTime.Now;
         }
         finally
@@ -404,6 +436,13 @@
         {
             _newSale.CustomerId = _selectedCustomer?.Id;
             _newSale.SaleDate = _saleDate ?? DateTime.Now;
+            _newSale.Status = QuickMode ? "Finalizada" : _newSale.Status;
+            if (QuickMode && !(_newSale.Notes?.Contains(QuickSaleMarker, StringComparison.OrdinalIgnoreCase) ?? false))
+            {
+                _newSale.Notes = string.IsNullOrWhiteSpace(_newSale.Notes)
+                    ? QuickSaleMarker
+                    : $"{_newSale.Notes} {QuickSaleMarker}";
+            }
             
             var result = await ApiService.PostAsync<SaleDto>("/api/vendas", _newSale);
             
