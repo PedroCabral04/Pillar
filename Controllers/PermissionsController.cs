@@ -14,6 +14,7 @@ namespace erp.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/permissoes")]
+[Route("api/permissions")]
 [Authorize(Roles = "Administrador")]
 public class PermissionsController : ControllerBase
 {
@@ -48,7 +49,21 @@ public class PermissionsController : ControllerBase
                 Description = m.Description,
                 Icon = m.Icon,
                 DisplayOrder = m.DisplayOrder,
-                IsActive = m.IsActive
+                IsActive = m.IsActive,
+                Actions = m.Actions
+                    .Where(a => a.IsActive)
+                    .OrderBy(a => a.DisplayOrder)
+                    .Select(a => new ModuleActionPermissionDto
+                    {
+                        Id = a.Id,
+                        ModulePermissionId = a.ModulePermissionId,
+                        ActionKey = a.ActionKey,
+                        DisplayName = a.DisplayName,
+                        Description = a.Description,
+                        DisplayOrder = a.DisplayOrder,
+                        IsActive = a.IsActive
+                    })
+                    .ToList()
             })
             .ToListAsync();
             
@@ -64,6 +79,8 @@ public class PermissionsController : ControllerBase
         var roles = await _context.Set<ApplicationRole>()
             .Include(r => r.ModulePermissions)
                 .ThenInclude(rmp => rmp.ModulePermission)
+            .Include(r => r.ModuleActionPermissions)
+                .ThenInclude(rmap => rmap.ModuleActionPermission)
             .OrderBy(r => r.Name)
             .Select(r => new RolePermissionsDto
             {
@@ -80,11 +97,15 @@ public class PermissionsController : ControllerBase
                         Id = rmp.ModulePermission.Id,
                         ModuleKey = rmp.ModulePermission.ModuleKey,
                         DisplayName = rmp.ModulePermission.DisplayName,
-                        Description = rmp.ModulePermission.Description,
-                        Icon = rmp.ModulePermission.Icon,
-                        DisplayOrder = rmp.ModulePermission.DisplayOrder,
-                        IsActive = rmp.ModulePermission.IsActive
-                    })
+                            Description = rmp.ModulePermission.Description,
+                            Icon = rmp.ModulePermission.Icon,
+                            DisplayOrder = rmp.ModulePermission.DisplayOrder,
+                            IsActive = rmp.ModulePermission.IsActive
+                        })
+                    .ToList(),
+                GrantedModuleActionIds = r.ModuleActionPermissions
+                    .Where(rmap => rmap.ModuleActionPermission.IsActive)
+                    .Select(rmap => rmap.ModuleActionPermissionId)
                     .ToList()
             })
             .ToListAsync();
@@ -101,6 +122,8 @@ public class PermissionsController : ControllerBase
         var role = await _context.Set<ApplicationRole>()
             .Include(r => r.ModulePermissions)
                 .ThenInclude(rmp => rmp.ModulePermission)
+            .Include(r => r.ModuleActionPermissions)
+                .ThenInclude(rmap => rmap.ModuleActionPermission)
             .FirstOrDefaultAsync(r => r.Id == roleId);
             
         if (role == null)
@@ -126,6 +149,10 @@ public class PermissionsController : ControllerBase
                     DisplayOrder = rmp.ModulePermission.DisplayOrder,
                     IsActive = rmp.ModulePermission.IsActive
                 })
+                .ToList(),
+            GrantedModuleActionIds = role.ModuleActionPermissions
+                .Where(rmap => rmap.ModuleActionPermission.IsActive)
+                .Select(rmap => rmap.ModuleActionPermissionId)
                 .ToList()
         };
         
@@ -157,6 +184,19 @@ public class PermissionsController : ControllerBase
         try
         {
             await _permissionService.UpdateRoleModulesAsync(roleId, dto.ModulePermissionIds, grantedByUserId);
+
+            // Keep action assignments scoped to selected modules only.
+            var allowedActionIds = await _context.ModuleActionPermissions
+                .Where(a => dto.ModulePermissionIds.Contains(a.ModulePermissionId) && a.IsActive)
+                .Select(a => a.Id)
+                .ToListAsync();
+
+            var validActionIds = dto.ModuleActionPermissionIds
+                .Where(id => allowedActionIds.Contains(id))
+                .Distinct()
+                .ToList();
+
+            await _permissionService.UpdateRoleModuleActionsAsync(roleId, validActionIds, grantedByUserId);
             
             _logger.LogInformation(
                 "User {UserId} updated modules for role {RoleId} ({RoleName}): {Modules}",
@@ -216,6 +256,17 @@ public class PermissionsController : ControllerBase
     public async Task<ActionResult<bool>> CheckModuleAccess(string moduleKey)
     {
         var hasAccess = await _permissionService.HasModuleAccessAsync(User, moduleKey);
+        return Ok(hasAccess);
+    }
+
+    /// <summary>
+    /// Verifica se o usuário atual tem acesso a uma ação específica dentro de um módulo.
+    /// </summary>
+    [HttpGet("check/{moduleKey}/{actionKey}")]
+    [Authorize]
+    public async Task<ActionResult<bool>> CheckModuleActionAccess(string moduleKey, string actionKey)
+    {
+        var hasAccess = await _permissionService.HasModuleActionAccessAsync(User, moduleKey, actionKey);
         return Ok(hasAccess);
     }
 }

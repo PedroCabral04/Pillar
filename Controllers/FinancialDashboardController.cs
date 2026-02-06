@@ -22,6 +22,7 @@ public class FinancialDashboardController : ControllerBase
     }
 
     [HttpGet]
+    [HttpGet("/api/financial-dashboard")]
     public async Task<ActionResult<FinancialDashboardDto>> GetDashboardData([FromQuery] decimal initialBalance = 0)
     {
         try

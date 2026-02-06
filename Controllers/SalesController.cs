@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using erp.DTOs.Sales;
+using erp.Models.Identity;
 using erp.Services.Sales;
+using erp.Services.Authorization;
 using erp.Services.Reports;
 using erp.Models.Audit;
 
@@ -19,6 +21,7 @@ public class SalesController : ControllerBase
     private readonly ICustomerService _customerService;
     private readonly IPdfExportService _pdfExportService;
     private readonly IWebHostEnvironment _webHostEnvironment;
+    private readonly IPermissionService _permissionService;
     private readonly ILogger<SalesController> _logger;
 
     public SalesController(
@@ -26,12 +29,14 @@ public class SalesController : ControllerBase
         ICustomerService customerService,
         IPdfExportService pdfExportService,
         IWebHostEnvironment webHostEnvironment,
+        IPermissionService permissionService,
         ILogger<SalesController> logger)
     {
         _salesService = salesService;
         _customerService = customerService;
         _pdfExportService = pdfExportService;
         _webHostEnvironment = webHostEnvironment;
+        _permissionService = permissionService;
         _logger = logger;
     }
 
@@ -70,6 +75,10 @@ public class SalesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<CustomerDto>> CreateCustomer([FromBody] CreateCustomerDto dto)
     {
+        var denied = await EnsureSalesActionAsync(ModuleActionKeys.Sales.ManageCustomers, "Você não tem permissão para gerenciar clientes.");
+        if (denied != null)
+            return denied;
+
         try
         {
             if (!ModelState.IsValid)
@@ -112,6 +121,10 @@ public class SalesController : ControllerBase
     [AuditRead("Customer", DataSensitivity.High, Description = "Visualização de dados do cliente (CPF/CNPJ, contatos)")]
     public async Task<ActionResult<CustomerDto>> GetCustomerById(int id)
     {
+        var denied = await EnsureSalesActionAsync(ModuleActionKeys.Sales.ManageCustomers, "Você não tem permissão para visualizar clientes.");
+        if (denied != null)
+            return denied;
+
         try
         {
             var customer = await _customerService.GetByIdAsync(id);
@@ -156,6 +169,10 @@ public class SalesController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10)
     {
+        var denied = await EnsureSalesActionAsync(ModuleActionKeys.Sales.ManageCustomers, "Você não tem permissão para visualizar clientes.");
+        if (denied != null)
+            return denied;
+
         try
         {
             var (items, total) = await _customerService.SearchAsync(search, isActive, page, pageSize);
@@ -187,6 +204,10 @@ public class SalesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<CustomerDto>> UpdateCustomer(int id, [FromBody] UpdateCustomerDto dto)
     {
+        var denied = await EnsureSalesActionAsync(ModuleActionKeys.Sales.ManageCustomers, "Você não tem permissão para editar clientes.");
+        if (denied != null)
+            return denied;
+
         try
         {
             if (!ModelState.IsValid)
@@ -228,6 +249,10 @@ public class SalesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> DeleteCustomer(int id)
     {
+        var denied = await EnsureSalesActionAsync(ModuleActionKeys.Sales.ManageCustomers, "Você não tem permissão para remover clientes.");
+        if (denied != null)
+            return denied;
+
         try
         {
             var result = await _customerService.DeleteAsync(id);
@@ -286,6 +311,10 @@ public class SalesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<SaleDto>> CreateSale([FromBody] CreateSaleDto dto)
     {
+        var denied = await EnsureSalesActionAsync(ModuleActionKeys.Common.Create, "Você não tem permissão para criar vendas.");
+        if (denied != null)
+            return denied;
+
         try
         {
             if (!ModelState.IsValid)
@@ -334,6 +363,10 @@ public class SalesController : ControllerBase
     [AuditRead("Sale", DataSensitivity.Medium, Description = "Visualização de dados da venda (valores, cliente)")]
     public async Task<ActionResult<SaleDto>> GetSaleById(int id)
     {
+        var denied = await EnsureSalesActionAsync(ModuleActionKeys.Sales.ViewHistory, "Você não tem permissão para visualizar histórico de vendas.");
+        if (denied != null)
+            return denied;
+
         try
         {
             var sale = await _salesService.GetByIdAsync(id);
@@ -341,6 +374,13 @@ public class SalesController : ControllerBase
             {
                 return NotFound(new { message = $"Venda com ID {id} não encontrada" });
             }
+
+            var canViewValues = await HasSalesActionAsync(ModuleActionKeys.Sales.ViewValues);
+            if (!canViewValues)
+            {
+                RedactSensitiveValues(sale);
+            }
+
             return Ok(sale);
         }
         catch (Exception ex)
@@ -373,6 +413,10 @@ public class SalesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> ExportSaleToPdf(int id)
     {
+        var denied = await EnsureSalesActionAsync(ModuleActionKeys.Sales.ExportPdf, "Você não tem permissão para exportar vendas em PDF.");
+        if (denied != null)
+            return denied;
+
         try
         {
             var sale = await _salesService.GetByIdAsync(id);
@@ -439,10 +483,24 @@ public class SalesController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10)
     {
+        var denied = await EnsureSalesActionAsync(ModuleActionKeys.Sales.ViewHistory, "Você não tem permissão para visualizar histórico de vendas.");
+        if (denied != null)
+            return denied;
+
         try
         {
             var (items, total) = await _salesService.SearchAsync(
                 search, status, startDate, endDate, customerId, page, pageSize);
+
+            var canViewValues = await HasSalesActionAsync(ModuleActionKeys.Sales.ViewValues);
+            if (!canViewValues)
+            {
+                foreach (var sale in items)
+                {
+                    RedactSensitiveValues(sale);
+                }
+            }
+
             return Ok(new { items, total, page, pageSize });
         }
         catch (Exception ex)
@@ -476,6 +534,10 @@ public class SalesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<SaleDto>> UpdateSale(int id, [FromBody] UpdateSaleDto dto)
     {
+        var denied = await EnsureSalesActionAsync(ModuleActionKeys.Common.Update, "Você não tem permissão para editar vendas.");
+        if (denied != null)
+            return denied;
+
         try
         {
             if (!ModelState.IsValid)
@@ -524,6 +586,10 @@ public class SalesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> CancelSale(int id)
     {
+        var denied = await EnsureSalesActionAsync(ModuleActionKeys.Sales.Cancel, "Você não tem permissão para cancelar vendas.");
+        if (denied != null)
+            return denied;
+
         try
         {
             var result = await _salesService.CancelAsync(id);
@@ -567,6 +633,10 @@ public class SalesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<SaleDto>> FinalizeSale(int id)
     {
+        var denied = await EnsureSalesActionAsync(ModuleActionKeys.Sales.Finalize, "Você não tem permissão para finalizar vendas.");
+        if (denied != null)
+            return denied;
+
         try
         {
             var sale = await _salesService.FinalizeAsync(id);
@@ -588,4 +658,35 @@ public class SalesController : ControllerBase
     }
 
     #endregion
+
+    private async Task<ActionResult?> EnsureSalesActionAsync(string actionKey, string message)
+    {
+        var hasAccess = await HasSalesActionAsync(actionKey);
+        if (hasAccess)
+            return null;
+
+        return StatusCode(StatusCodes.Status403Forbidden, new { message });
+    }
+
+    private async Task<bool> HasSalesActionAsync(string actionKey)
+    {
+        return await _permissionService.HasModuleActionAccessAsync(User, ModuleKeys.Sales, actionKey);
+    }
+
+    private static void RedactSensitiveValues(SaleDto sale)
+    {
+        sale.TotalAmount = 0;
+        sale.DiscountAmount = 0;
+        sale.NetAmount = 0;
+
+        if (sale.Items.Count == 0)
+            return;
+
+        foreach (var item in sale.Items)
+        {
+            item.UnitPrice = 0;
+            item.Discount = 0;
+            item.Total = 0;
+        }
+    }
 }

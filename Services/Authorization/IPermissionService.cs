@@ -46,4 +46,24 @@ public interface IPermissionService
     /// Remove all module assignments from a role and reassign the provided ones
     /// </summary>
     Task UpdateRoleModulesAsync(int roleId, IEnumerable<int> modulePermissionIds, int? grantedByUserId = null);
+
+    /// <summary>
+    /// Check if a user has access to a specific action inside a module
+    /// </summary>
+    Task<bool> HasModuleActionAccessAsync(int userId, string moduleKey, string actionKey);
+
+    /// <summary>
+    /// Check if a user has access to a specific action inside a module (by claims principal)
+    /// </summary>
+    Task<bool> HasModuleActionAccessAsync(System.Security.Claims.ClaimsPrincipal user, string moduleKey, string actionKey);
+
+    /// <summary>
+    /// Get all module action IDs assigned to a role
+    /// </summary>
+    Task<IReadOnlyList<int>> GetRoleModuleActionIdsAsync(int roleId);
+
+    /// <summary>
+    /// Remove all action assignments from a role and reassign the provided ones
+    /// </summary>
+    Task UpdateRoleModuleActionsAsync(int roleId, IEnumerable<int> moduleActionPermissionIds, int? grantedByUserId = null);
 }

@@ -54,28 +54,74 @@ else
                     </MudCardHeader>
                     <MudDivider />
                     <MudCardContent Class="pa-4">
-                        <MudStack Spacing="2">
+                        <MudExpansionPanels MultiExpansion="true" Dense="true">
                             @foreach (var module in _allModules)
                             {
                                 var isChecked = _roleModules.TryGetValue(role.RoleId, out var modules) && 
                                                modules.Contains(module.Id);
                                 var isAdmin = role.RoleName == "Administrador";
-                                
-                                <MudCheckBox T="bool" 
-                                             Value="@isChecked"
-                                             ValueChanged="@(v => OnModuleToggled(role.RoleId, module.Id, v))"
-                                             Dense="true"
-                                             Disabled="@isAdmin"
-                                             Color="MudBlazor.Color.Primary">
-                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                        <MudIcon Icon="@GetModuleIcon(module.Icon)" Size="MudBlazor.Size.Small" 
-                                                 Color="@(isChecked ? MudBlazor.Color.Primary : MudBlazor.Color.Default)" />
-                                        <MudText Typo="Typo.body2">@module.DisplayName</MudText>
-                                    </MudStack>
-                                </MudCheckBox>
+                                var actionsCount = GetSelectedActionsCount(role.RoleId, module.Id);
+
+                                <MudExpansionPanel Dense="true" Class="module-panel">
+                                    <TitleContent>
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="w-100 pr-2">
+                                            <MudCheckBox T="bool"
+                                                         Value="@isChecked"
+                                                         ValueChanged="@(v => OnModuleToggled(role.RoleId, module.Id, v))"
+                                                         Dense="true"
+                                                         Disabled="@isAdmin"
+                                                         Color="MudBlazor.Color.Primary">
+                                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                                    <MudIcon Icon="@GetModuleIcon(module.Icon)" Size="MudBlazor.Size.Small"
+                                                             Color="@(isChecked ? MudBlazor.Color.Primary : MudBlazor.Color.Default)" />
+                                                    <MudText Typo="Typo.body2">@module.DisplayName</MudText>
+                                                </MudStack>
+                                            </MudCheckBox>
+
+                                            @if (module.Actions.Any())
+                                            {
+                                                <MudChip T="string" Size="MudBlazor.Size.Small" Variant="Variant.Outlined" Color="MudBlazor.Color.Info">
+                                                    @actionsCount / @module.Actions.Count ação(ões)
+                                                </MudChip>
+                                            }
+                                        </MudStack>
+                                    </TitleContent>
+                                    <ChildContent>
+                                        @if (module.Actions.Any())
+                                        {
+                                            <MudPaper Elevation="0" Class="pa-2 module-actions-panel">
+                                                <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary" Class="mb-2">
+                                                    Ações disponíveis neste módulo
+                                                </MudText>
+                                                <MudGrid Spacing="1">
+                                                    @foreach (var action in module.Actions)
+                                                    {
+                                                        var actionChecked = IsActionChecked(role.RoleId, action.Id);
+                                                        <MudItem xs="12" sm="6">
+                                                            <MudCheckBox T="bool"
+                                                                         Value="@actionChecked"
+                                                                         ValueChanged="@(v => OnModuleActionToggled(role.RoleId, module.Id, action.Id, v))"
+                                                                         Dense="true"
+                                                                         Disabled="@(!isChecked || isAdmin)"
+                                                                         Color="MudBlazor.Color.Secondary">
+                                                                <MudText Typo="Typo.body2">@action.DisplayName</MudText>
+                                                            </MudCheckBox>
+                                                        </MudItem>
+                                                    }
+                                                </MudGrid>
+                                            </MudPaper>
+                                        }
+                                        else
+                                        {
+                                            <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">
+                                                Sem ações granulares cadastradas para este módulo.
+                                            </MudText>
+                                        }
+                                    </ChildContent>
+                                </MudExpansionPanel>
                             }
-                        </MudStack>
-                        
+                        </MudExpansionPanels>
+                         
                         @if (role.RoleName == "Administrador")
                         {
                             <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3" Icon="@Icons.Material.Filled.Info">
@@ -117,6 +163,7 @@ else
     private List<RolePermissionsDto> _roles = new();
     private List<ModulePermissionDto> _allModules = new();
     private Dictionary<int, HashSet<int>> _roleModules = new();
+    private Dictionary<int, HashSet<int>> _roleModuleActions = new();
     private bool _loading = true;
     private string? _error;
     private int? _savingRole;
@@ -151,6 +198,11 @@ else
                     r => r.RoleId,
                     r => r.Modules.Select(m => m.Id).ToHashSet()
                 );
+
+                _roleModuleActions = _roles.ToDictionary(
+                    r => r.RoleId,
+                    r => r.GrantedModuleActionIds.ToHashSet()
+                );
             }
             else
             {
@@ -182,6 +234,37 @@ else
         else
         {
             _roleModules[roleId].Remove(moduleId);
+
+            if (_roleModuleActions.TryGetValue(roleId, out var actions))
+            {
+                var moduleActionIds = _allModules
+                    .Where(m => m.Id == moduleId)
+                    .SelectMany(m => m.Actions)
+                    .Select(a => a.Id)
+                    .ToHashSet();
+
+                actions.RemoveWhere(id => moduleActionIds.Contains(id));
+            }
+        }
+    }
+
+    private void OnModuleActionToggled(int roleId, int moduleId, int actionId, bool isChecked)
+    {
+        if (!_roleModules.TryGetValue(roleId, out var modules) || !modules.Contains(moduleId))
+            return;
+
+        if (!_roleModuleActions.ContainsKey(roleId))
+        {
+            _roleModuleActions[roleId] = new HashSet<int>();
+        }
+
+        if (isChecked)
+        {
+            _roleModuleActions[roleId].Add(actionId);
+        }
+        else
+        {
+            _roleModuleActions[roleId].Remove(actionId);
         }
     }
 
@@ -197,6 +280,9 @@ else
                 RoleId = roleId,
                 ModulePermissionIds = _roleModules.TryGetValue(roleId, out var modules) 
                     ? modules.ToList() 
+                    : new List<int>(),
+                ModuleActionPermissionIds = _roleModuleActions.TryGetValue(roleId, out var actions)
+                    ? actions.ToList()
                     : new List<int>()
             };
             
@@ -227,6 +313,25 @@ else
     private int GetSelectedModulesCount(int roleId)
     {
         return _roleModules.TryGetValue(roleId, out var modules) ? modules.Count : 0;
+    }
+
+    private int GetSelectedActionsCount(int roleId, int moduleId)
+    {
+        if (!_roleModuleActions.TryGetValue(roleId, out var actions))
+            return 0;
+
+        var moduleActionIds = _allModules
+            .Where(m => m.Id == moduleId)
+            .SelectMany(m => m.Actions)
+            .Select(a => a.Id)
+            .ToHashSet();
+
+        return actions.Count(moduleActionIds.Contains);
+    }
+
+    private bool IsActionChecked(int roleId, int actionId)
+    {
+        return _roleModuleActions.TryGetValue(roleId, out var actions) && actions.Contains(actionId);
     }
 
     private MudBlazor.Color GetRoleColor(string roleName) => roleName switch
@@ -286,5 +391,15 @@ else
     
     .role-permission-card .mud-card-content {
         flex: 1;
+    }
+
+    .module-panel {
+        border: 1px solid var(--mud-palette-lines-default);
+        border-radius: 8px;
+    }
+
+    .module-actions-panel {
+        background: var(--mud-palette-surface);
+        border-radius: 8px;
     }
 </style>

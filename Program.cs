@@ -944,6 +944,139 @@ static async Task SeedModulePermissionsAsync(ApplicationDbContext db, RoleManage
         // Reload modules from DB to get IDs
         var dbModules = await db.ModulePermissions.ToDictionaryAsync(m => m.ModuleKey, m => m.Id);
 
+        // Define available actions by module
+        var moduleActions = new Dictionary<string, (string ActionKey, string DisplayName, string? Description, int DisplayOrder)[]>
+        {
+            [ModuleKeys.Dashboard] =
+            [
+                (ModuleActionKeys.Common.ViewPage, "Visualizar página", "Acessar o dashboard", 1),
+                (ModuleActionKeys.Dashboard.ViewWidgets, "Visualizar widgets", "Visualizar widgets do painel", 2),
+                (ModuleActionKeys.Dashboard.ViewSensitiveWidgets, "Visualizar indicadores sensíveis", "Visualizar widgets com valores sensíveis", 3)
+            ],
+            [ModuleKeys.Sales] =
+            [
+                (ModuleActionKeys.Common.ViewPage, "Visualizar página", "Acessar módulo de vendas", 1),
+                (ModuleActionKeys.Common.Create, "Criar vendas", "Registrar nova venda", 2),
+                (ModuleActionKeys.Common.Update, "Editar vendas", "Alterar dados de venda", 3),
+                (ModuleActionKeys.Sales.Finalize, "Finalizar vendas", "Marcar vendas como finalizadas", 4),
+                (ModuleActionKeys.Sales.Cancel, "Cancelar vendas", "Cancelar vendas pendentes", 5),
+                (ModuleActionKeys.Sales.ViewHistory, "Ver histórico", "Visualizar listagem/histórico de vendas", 6),
+                (ModuleActionKeys.Sales.ViewValues, "Ver valores", "Visualizar valores e totais de venda", 7),
+                (ModuleActionKeys.Sales.ManageCustomers, "Gerenciar clientes", "Criar/editar clientes do módulo", 8),
+                (ModuleActionKeys.Sales.ExportPdf, "Exportar PDF", "Exportar venda para PDF", 9)
+            ],
+            [ModuleKeys.ServiceOrder] =
+            [
+                (ModuleActionKeys.Common.ViewPage, "Visualizar página", "Acessar ordens de serviço", 1),
+                (ModuleActionKeys.Common.Create, "Criar ordens", "Criar novas ordens de serviço", 2),
+                (ModuleActionKeys.Common.Update, "Editar ordens", "Editar ordens existentes", 3),
+                (ModuleActionKeys.ServiceOrder.Finalize, "Finalizar ordens", "Finalizar ordens de serviço", 4),
+                (ModuleActionKeys.ServiceOrder.Reopen, "Reabrir ordens", "Reabrir ordens finalizadas", 5),
+                (ModuleActionKeys.ServiceOrder.Cancel, "Cancelar ordens", "Cancelar ordens em andamento", 6),
+                (ModuleActionKeys.ServiceOrder.ViewCosts, "Ver custos", "Visualizar custos e margens", 7)
+            ],
+            [ModuleKeys.Inventory] =
+            [
+                (ModuleActionKeys.Common.ViewPage, "Visualizar página", "Acessar estoque", 1),
+                (ModuleActionKeys.Common.Create, "Cadastrar produtos", "Criar produtos e itens", 2),
+                (ModuleActionKeys.Common.Update, "Editar produtos", "Editar produtos e itens", 3),
+                (ModuleActionKeys.Common.Delete, "Excluir produtos", "Excluir produtos e itens", 4),
+                (ModuleActionKeys.Inventory.AdjustStock, "Ajustar estoque", "Executar ajustes de estoque", 5),
+                (ModuleActionKeys.Inventory.ViewCosts, "Ver custos", "Visualizar custo dos produtos", 6),
+                (ModuleActionKeys.Inventory.ManageCategories, "Gerenciar categorias", "Gerenciar categorias do estoque", 7)
+            ],
+            [ModuleKeys.Financial] =
+            [
+                (ModuleActionKeys.Common.ViewPage, "Visualizar página", "Acessar financeiro", 1),
+                (ModuleActionKeys.Common.Create, "Criar lançamentos", "Criar contas e lançamentos", 2),
+                (ModuleActionKeys.Common.Update, "Editar lançamentos", "Editar contas e lançamentos", 3),
+                (ModuleActionKeys.Common.Delete, "Excluir lançamentos", "Excluir contas e lançamentos", 4),
+                (ModuleActionKeys.Financial.Approve, "Aprovar lançamentos", "Aprovar operações financeiras", 5),
+                (ModuleActionKeys.Financial.ViewBalances, "Ver saldos", "Visualizar saldos e fechamento", 6),
+                (ModuleActionKeys.Financial.ManageSuppliers, "Gerenciar fornecedores", "Gerenciar cadastro de fornecedores", 7),
+                (ModuleActionKeys.Financial.ManageCostCenters, "Gerenciar centros de custo", "Gerenciar centros de custo", 8)
+            ],
+            [ModuleKeys.HR] =
+            [
+                (ModuleActionKeys.Common.ViewPage, "Visualizar página", "Acessar RH", 1),
+                (ModuleActionKeys.Common.Create, "Criar registros", "Criar registros de RH", 2),
+                (ModuleActionKeys.Common.Update, "Editar registros", "Editar registros de RH", 3),
+                (ModuleActionKeys.Common.Delete, "Excluir registros", "Excluir registros de RH", 4),
+                (ModuleActionKeys.HR.ManageAttendance, "Gerenciar ponto", "Gerenciar apontamentos e presença", 5),
+                (ModuleActionKeys.HR.ManagePayroll, "Gerenciar folha", "Gerenciar folha de pagamento", 6),
+                (ModuleActionKeys.HR.ViewSalaryData, "Ver dados salariais", "Visualizar valores salariais", 7)
+            ],
+            [ModuleKeys.Assets] =
+            [
+                (ModuleActionKeys.Common.ViewPage, "Visualizar página", "Acessar ativos", 1),
+                (ModuleActionKeys.Common.Create, "Cadastrar ativos", "Cadastrar novos ativos", 2),
+                (ModuleActionKeys.Common.Update, "Editar ativos", "Editar ativos existentes", 3),
+                (ModuleActionKeys.Common.Delete, "Excluir ativos", "Excluir ativos", 4),
+                (ModuleActionKeys.Assets.Transfer, "Transferir ativos", "Transferir ativo entre locais", 5),
+                (ModuleActionKeys.Assets.Depreciation, "Gerenciar depreciação", "Gerenciar depreciação de ativos", 6)
+            ],
+            [ModuleKeys.Kanban] =
+            [
+                (ModuleActionKeys.Common.ViewPage, "Visualizar página", "Acessar quadros kanban", 1),
+                (ModuleActionKeys.Common.Create, "Criar cartões", "Criar cards e tarefas", 2),
+                (ModuleActionKeys.Common.Update, "Editar cartões", "Editar cards e tarefas", 3),
+                (ModuleActionKeys.Common.Delete, "Excluir cartões", "Excluir cards e tarefas", 4),
+                (ModuleActionKeys.Kanban.ManageBoards, "Gerenciar quadros", "Gerenciar quadros e colunas", 5),
+                (ModuleActionKeys.Kanban.ManageMembers, "Gerenciar membros", "Gerenciar membros dos quadros", 6)
+            ],
+            [ModuleKeys.Reports] =
+            [
+                (ModuleActionKeys.Common.ViewPage, "Visualizar página", "Acessar relatórios", 1),
+                (ModuleActionKeys.Reports.Sales, "Relatórios de vendas", "Acessar relatórios de vendas", 2),
+                (ModuleActionKeys.Reports.Financial, "Relatórios financeiros", "Acessar relatórios financeiros", 3),
+                (ModuleActionKeys.Reports.Inventory, "Relatórios de estoque", "Acessar relatórios de estoque", 4),
+                (ModuleActionKeys.Reports.HR, "Relatórios de RH", "Acessar relatórios de RH", 5),
+                (ModuleActionKeys.Common.Export, "Exportar relatórios", "Exportar relatórios", 6)
+            ],
+            [ModuleKeys.Admin] =
+            [
+                (ModuleActionKeys.Common.ViewPage, "Visualizar página", "Acessar administração", 1),
+                (ModuleActionKeys.Admin.ManageRoles, "Gerenciar permissões", "Gerenciar papéis e permissões", 2),
+                (ModuleActionKeys.Admin.ManageTenants, "Gerenciar tenants", "Gerenciar tenants e configurações", 3),
+                (ModuleActionKeys.Admin.ViewAudit, "Ver auditoria", "Visualizar logs de auditoria", 4),
+                (ModuleActionKeys.Admin.ViewLgpd, "Ver acessos LGPD", "Visualizar relatório LGPD", 5)
+            ]
+        };
+
+        // Seed module action definitions
+        foreach (var (moduleKey, actions) in moduleActions)
+        {
+            if (!dbModules.TryGetValue(moduleKey, out var moduleId))
+                continue;
+
+            foreach (var action in actions)
+            {
+                var exists = await db.ModuleActionPermissions.AnyAsync(a =>
+                    a.ModulePermissionId == moduleId &&
+                    a.ActionKey == action.ActionKey);
+
+                if (!exists)
+                {
+                    db.ModuleActionPermissions.Add(new ModuleActionPermission
+                    {
+                        ModulePermissionId = moduleId,
+                        ActionKey = action.ActionKey,
+                        DisplayName = action.DisplayName,
+                        Description = action.Description,
+                        DisplayOrder = action.DisplayOrder,
+                        IsActive = true
+                    });
+                }
+            }
+        }
+
+        await db.SaveChangesAsync();
+
+        var moduleActionIdsByModule = await db.ModuleActionPermissions
+            .Where(a => a.IsActive)
+            .GroupBy(a => a.ModulePermissionId)
+            .ToDictionaryAsync(g => g.Key, g => g.Select(a => a.Id).ToList());
+
         // Define role-module mappings
         var roleModules = new Dictionary<string, string[]>
         {
@@ -987,6 +1120,25 @@ static async Task SeedModulePermissionsAsync(ApplicationDbContext db, RoleManage
                         ModulePermissionId = moduleId,
                         GrantedAt = DateTime.UtcNow
                     });
+                }
+
+                if (!moduleActionIdsByModule.TryGetValue(moduleId, out var actionIds))
+                    continue;
+
+                foreach (var actionId in actionIds)
+                {
+                    var actionExists = await db.RoleModuleActionPermissions
+                        .AnyAsync(rmap => rmap.RoleId == role.Id && rmap.ModuleActionPermissionId == actionId);
+
+                    if (!actionExists)
+                    {
+                        db.RoleModuleActionPermissions.Add(new RoleModuleActionPermission
+                        {
+                            RoleId = role.Id,
+                            ModuleActionPermissionId = actionId,
+                            GrantedAt = DateTime.UtcNow
+                        });
+                    }
                 }
             }
         }

@@ -2,6 +2,7 @@
 @using erp.DTOs.Sales
 @using erp.Services
 @using erp.Services.Authorization
+@using erp.Models.Identity
 @using erp.DTOs.Inventory
 @using erp.Components.Shared.Dialogs
 @using erp.Components.Shared.Dialogs.Sales
@@ -24,20 +25,23 @@
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
         <MudText Typo="Typo.h4">Gerenciar Vendas</MudText>
-        <MudStack Row="true" Spacing="2">
-            <MudButton Color="Color.Secondary"
-                    Variant="Variant.Filled"
-                    StartIcon="@Icons.Material.Filled.FlashOn"
-                    OnClick="OpenQuickSaleDialog">
-                Venda Rápida
-            </MudButton>
-            <MudButton Color="Color.Primary" 
-                    Variant="Variant.Filled" 
-                    StartIcon="@Icons.Material.Filled.Add"
-                    OnClick="OpenCreateSaleDialog">
-                Nova Venda
-            </MudButton>
-        </MudStack>
+        @if (_canCreateSale)
+        {
+            <MudStack Row="true" Spacing="2">
+                <MudButton Color="Color.Secondary"
+                        Variant="Variant.Filled"
+                        StartIcon="@Icons.Material.Filled.FlashOn"
+                        OnClick="OpenQuickSaleDialog">
+                    Venda Rápida
+                </MudButton>
+                <MudButton Color="Color.Primary" 
+                        Variant="Variant.Filled" 
+                        StartIcon="@Icons.Material.Filled.Add"
+                        OnClick="OpenCreateSaleDialog">
+                    Nova Venda
+                </MudButton>
+            </MudStack>
+        }
     </MudStack>
 
     @if (_loadError != null)
@@ -45,7 +49,15 @@
         <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
     }
 
-    <MudTable T="SaleDto" ServerData="ServerReload" 
+    @if (!_canViewHistory)
+    {
+        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+            Você não tem permissão para visualizar histórico de vendas.
+        </MudAlert>
+    }
+    else
+    {
+    <MudTable T="SaleDto" ServerData="ServerReload"
             Dense="false" Hover="true" Elevation="2" @ref="_table" Striped="true" Loading="@_loading" RowsPerPage="@_defaultPageSize">
         <ToolBarContent>
             <MudText Typo="Typo.h5">Vendas Registradas</MudText>
@@ -85,8 +97,11 @@
             <MudTh>Data</MudTh>
             <MudTh>Cliente</MudTh>
             <MudTh>Vendedor</MudTh>
-            <MudTh Style="text-align: right">Valor Total</MudTh>
-            <MudTh Style="text-align: right">Valor Líquido</MudTh>
+            @if (_canViewValues)
+            {
+                <MudTh Style="text-align: right">Valor Total</MudTh>
+                <MudTh Style="text-align: right">Valor Líquido</MudTh>
+            }
             <MudTh>Status</MudTh>
             <MudTh Style="text-align: center">Ações</MudTh>
         </HeaderContent>
@@ -105,10 +120,13 @@
             <MudTd DataLabel="Data">@context.SaleDate.ToString("dd/MM/yyyy")</MudTd>
             <MudTd DataLabel="Cliente">@(context.CustomerName ?? "Cliente não informado")</MudTd>
             <MudTd DataLabel="Vendedor">@context.UserName</MudTd>
-            <MudTd DataLabel="Total" Style="text-align: right">@Currency.Format(context.TotalAmount)</MudTd>
-            <MudTd DataLabel="Líquido" Style="text-align: right">
-                <MudText Typo="Typo.body2" Style="font-weight: 600">@Currency.Format(context.NetAmount)</MudText>
-            </MudTd>
+            @if (_canViewValues)
+            {
+                <MudTd DataLabel="Total" Style="text-align: right">@Currency.Format(context.TotalAmount)</MudTd>
+                <MudTd DataLabel="Líquido" Style="text-align: right">
+                    <MudText Typo="Typo.body2" Style="font-weight: 600">@Currency.Format(context.NetAmount)</MudText>
+                </MudTd>
+            }
             <MudTd DataLabel="Status">
                 <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">@context.Status</MudChip>
             </MudTd>
@@ -121,20 +139,26 @@
                 </MudTooltip>
                 @if (context.Status == "Pendente")
                 {
-                    <MudTooltip Text="Finalizar venda">
-                        <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" 
-                                    Size="Size.Small"
-                                    Color="Color.Success"
-                                    OnClick="@(() => FinalizeSale(context))"
-                                    aria-label="@($"Finalizar venda {context.SaleNumber}")" />
-                    </MudTooltip>
-                    <MudTooltip Text="Cancelar venda">
-                        <MudIconButton Icon="@Icons.Material.Filled.Cancel" 
-                                    Size="Size.Small" 
-                                    Color="Color.Error"
-                                    OnClick="@(() => CancelSale(context))"
-                                    aria-label="@($"Cancelar venda {context.SaleNumber}")" />
-                    </MudTooltip>
+                    @if (_canFinalize)
+                    {
+                        <MudTooltip Text="Finalizar venda">
+                            <MudIconButton Icon="@Icons.Material.Filled.CheckCircle"
+                                        Size="Size.Small"
+                                        Color="Color.Success"
+                                        OnClick="@(() => FinalizeSale(context))"
+                                        aria-label="@($"Finalizar venda {context.SaleNumber}")" />
+                        </MudTooltip>
+                    }
+                    @if (_canCancel)
+                    {
+                        <MudTooltip Text="Cancelar venda">
+                            <MudIconButton Icon="@Icons.Material.Filled.Cancel"
+                                        Size="Size.Small"
+                                        Color="Color.Error"
+                                        OnClick="@(() => CancelSale(context))"
+                                        aria-label="@($"Cancelar venda {context.SaleNumber}")" />
+                        </MudTooltip>
+                    }
                 }
             </MudTd>
         </RowTemplate>
@@ -152,6 +176,7 @@
             <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
         </PagerContent>
     </MudTable>
+    }
 </MudContainer>
 
 @code {
@@ -162,13 +187,18 @@
     private DateTime? _startDate;
     private DateTime? _endDate;
     private bool _loading = false;
+    private bool _canViewHistory = true;
+    private bool _canViewValues = true;
+    private bool _canCreateSale = true;
+    private bool _canFinalize = true;
+    private bool _canCancel = true;
     
     // Table preferences
     private string? _currentSortLabel;
     private bool _sortDescending;
     private int _defaultPageSize = 25;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         _defaultPageSize = TablePreferences.GetPageSize();
         var defaultSort = TablePreferences.GetDefaultSort("Vendas");
@@ -176,6 +206,29 @@
         {
             _currentSortLabel = defaultSort.Value.field;
             _sortDescending = defaultSort.Value.descending;
+        }
+
+        await LoadActionPermissionsAsync();
+    }
+
+    private async Task LoadActionPermissionsAsync()
+    {
+        try
+        {
+            _canViewHistory = await ApiService.GetAsync<bool>($"/api/permissions/check/{ModuleKeys.Sales}/{ModuleActionKeys.Sales.ViewHistory}");
+            _canViewValues = await ApiService.GetAsync<bool>($"/api/permissions/check/{ModuleKeys.Sales}/{ModuleActionKeys.Sales.ViewValues}");
+            _canCreateSale = await ApiService.GetAsync<bool>($"/api/permissions/check/{ModuleKeys.Sales}/{ModuleActionKeys.Common.Create}");
+            _canFinalize = await ApiService.GetAsync<bool>($"/api/permissions/check/{ModuleKeys.Sales}/{ModuleActionKeys.Sales.Finalize}");
+            _canCancel = await ApiService.GetAsync<bool>($"/api/permissions/check/{ModuleKeys.Sales}/{ModuleActionKeys.Sales.Cancel}");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Não foi possível carregar permissões de ação de vendas. Aplicando fallback por módulo.");
+            _canViewHistory = true;
+            _canViewValues = true;
+            _canCreateSale = true;
+            _canFinalize = true;
+            _canCancel = true;
         }
     }
 

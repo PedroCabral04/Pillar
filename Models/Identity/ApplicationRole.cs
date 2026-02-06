@@ -21,4 +21,9 @@ public class ApplicationRole : IdentityRole<int>
     /// Module permissions assigned to this role
     /// </summary>
     public ICollection<RoleModulePermission> ModulePermissions { get; set; } = new List<RoleModulePermission>();
+
+    /// <summary>
+    /// Action-level permissions assigned to this role.
+    /// </summary>
+    public ICollection<RoleModuleActionPermission> ModuleActionPermissions { get; set; } = new List<RoleModuleActionPermission>();
 }

@@ -21,6 +21,7 @@ public class PermissionService : IPermissionService
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
     private const string UserModulesCacheKeyPrefix = "user_modules_";
     private const string RoleModulesCacheKeyPrefix = "role_modules_";
+    private const string RoleModuleActionsCacheKeyPrefix = "role_module_actions_";
     private const string AllModulesCacheKey = "all_modules";
     
     public PermissionService(
@@ -220,12 +221,107 @@ public class PermissionService : IPermissionService
         await context.SaveChangesAsync();
         
         InvalidateRoleCache(roleId);
+        InvalidateRoleActionCache(roleId);
+        InvalidateAllUserCaches();
+    }
+
+    public async Task<bool> HasModuleActionAccessAsync(int userId, string moduleKey, string actionKey)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null)
+            return false;
+
+        var roleNames = await _userManager.GetRolesAsync(user);
+        if (roleNames.Contains("Administrador"))
+            return true;
+
+        await using var context = await _contextFactory.CreateDbContextAsync();
+
+        var actionExists = await context.ModuleActionPermissions
+            .AnyAsync(a =>
+                a.IsActive &&
+                a.ActionKey == actionKey &&
+                a.ModulePermission.ModuleKey == moduleKey);
+
+        // Backward-compatible fallback for modules/actions not configured yet.
+        if (!actionExists)
+            return await HasModuleAccessAsync(userId, moduleKey);
+
+        var roleIds = await context.Set<ApplicationRole>()
+            .Where(r => roleNames.Contains(r.Name!))
+            .Select(r => r.Id)
+            .ToListAsync();
+
+        return await context.RoleModuleActionPermissions
+            .AnyAsync(p =>
+                roleIds.Contains(p.RoleId) &&
+                p.ModuleActionPermission.IsActive &&
+                p.ModuleActionPermission.ActionKey == actionKey &&
+                p.ModuleActionPermission.ModulePermission.ModuleKey == moduleKey);
+    }
+
+    public async Task<bool> HasModuleActionAccessAsync(ClaimsPrincipal user, string moduleKey, string actionKey)
+    {
+        if (user.IsInRole("Administrador"))
+            return true;
+
+        var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var userId))
+            return false;
+
+        return await HasModuleActionAccessAsync(userId, moduleKey, actionKey);
+    }
+
+    public async Task<IReadOnlyList<int>> GetRoleModuleActionIdsAsync(int roleId)
+    {
+        var cacheKey = $"{RoleModuleActionsCacheKeyPrefix}{roleId}";
+        if (_cache.TryGetValue(cacheKey, out IReadOnlyList<int>? cached) && cached != null)
+            return cached;
+
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var actionIds = await context.RoleModuleActionPermissions
+            .Where(x => x.RoleId == roleId)
+            .Select(x => x.ModuleActionPermissionId)
+            .ToListAsync();
+
+        _cache.Set(cacheKey, (IReadOnlyList<int>)actionIds, CacheDuration);
+        return actionIds;
+    }
+
+    public async Task UpdateRoleModuleActionsAsync(int roleId, IEnumerable<int> moduleActionPermissionIds, int? grantedByUserId = null)
+    {
+        await using var context = await _contextFactory.CreateDbContextAsync();
+
+        var existingAssignments = await context.RoleModuleActionPermissions
+            .Where(x => x.RoleId == roleId)
+            .ToListAsync();
+
+        context.RoleModuleActionPermissions.RemoveRange(existingAssignments);
+
+        var ids = moduleActionPermissionIds.Distinct().ToList();
+        var newAssignments = ids.Select(actionId => new RoleModuleActionPermission
+        {
+            RoleId = roleId,
+            ModuleActionPermissionId = actionId,
+            GrantedAt = DateTime.UtcNow,
+            GrantedByUserId = grantedByUserId
+        });
+
+        await context.RoleModuleActionPermissions.AddRangeAsync(newAssignments);
+        await context.SaveChangesAsync();
+
+        InvalidateRoleActionCache(roleId);
         InvalidateAllUserCaches();
     }
     
     private void InvalidateRoleCache(int roleId)
     {
         _cache.Remove($"{RoleModulesCacheKeyPrefix}{roleId}");
+    }
+
+    private void InvalidateRoleActionCache(int roleId)
+    {
+        _cache.Remove($"{RoleModuleActionsCacheKeyPrefix}{roleId}");
     }
     
     private void InvalidateAllUserCaches()

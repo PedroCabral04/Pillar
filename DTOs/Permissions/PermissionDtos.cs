@@ -12,6 +12,21 @@ public class ModulePermissionDto
     public string? Icon { get; set; }
     public int DisplayOrder { get; set; }
     public bool IsActive { get; set; }
+    public List<ModuleActionPermissionDto> Actions { get; set; } = new();
+}
+
+/// <summary>
+/// DTO for a module action definition
+/// </summary>
+public class ModuleActionPermissionDto
+{
+    public int Id { get; set; }
+    public int ModulePermissionId { get; set; }
+    public required string ActionKey { get; set; }
+    public required string DisplayName { get; set; }
+    public string? Description { get; set; }
+    public int DisplayOrder { get; set; }
+    public bool IsActive { get; set; }
 }
 
 /// <summary>
@@ -25,6 +40,7 @@ public class RolePermissionsDto
     public string? Description { get; set; }
     public string? Icon { get; set; }
     public List<ModulePermissionDto> Modules { get; set; } = new();
+    public List<int> GrantedModuleActionIds { get; set; } = new();
 }
 
 /// <summary>
@@ -34,6 +50,7 @@ public class UpdateRoleModulesDto
 {
     public int RoleId { get; set; }
     public List<int> ModulePermissionIds { get; set; } = new();
+    public List<int> ModuleActionPermissionIds { get; set; } = new();
 }
 
 /// <summary>

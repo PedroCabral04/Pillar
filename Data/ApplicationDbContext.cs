@@ -105,6 +105,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     // Module Permissions
     public DbSet<ModulePermission> ModulePermissions { get; set; } = null!;
     public DbSet<RoleModulePermission> RoleModulePermissions { get; set; } = null!;
+    public DbSet<ModuleActionPermission> ModuleActionPermissions { get; set; } = null!;
+    public DbSet<RoleModuleActionPermission> RoleModuleActionPermissions { get; set; } = null!;
     
     // Serviços injetados para auditoria
     private readonly IHttpContextAccessor? _httpContextAccessor;
@@ -2372,6 +2374,51 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .OnDelete(DeleteBehavior.Cascade);
                 
             rmp.HasOne(x => x.GrantedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.GrantedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // ModuleActionPermission
+        modelBuilder.Entity<ModuleActionPermission>(map =>
+        {
+            map.ToTable("ModuleActionPermissions");
+            map.HasKey(x => x.Id);
+
+            map.Property(x => x.ActionKey).HasMaxLength(100).IsRequired();
+            map.Property(x => x.DisplayName).HasMaxLength(150).IsRequired();
+            map.Property(x => x.Description).HasMaxLength(500);
+            map.Property(x => x.DisplayOrder).HasDefaultValue(0);
+            map.Property(x => x.IsActive).HasDefaultValue(true);
+
+            map.HasIndex(x => new { x.ModulePermissionId, x.ActionKey }).IsUnique();
+            map.HasIndex(x => new { x.ModulePermissionId, x.DisplayOrder });
+
+            map.HasOne(x => x.ModulePermission)
+                .WithMany(m => m.Actions)
+                .HasForeignKey(x => x.ModulePermissionId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // RoleModuleActionPermission (junction table)
+        modelBuilder.Entity<RoleModuleActionPermission>(rmap =>
+        {
+            rmap.ToTable("RoleModuleActionPermissions");
+            rmap.HasKey(x => x.Id);
+
+            rmap.HasIndex(x => new { x.RoleId, x.ModuleActionPermissionId }).IsUnique();
+
+            rmap.HasOne(x => x.Role)
+                .WithMany(r => r.ModuleActionPermissions)
+                .HasForeignKey(x => x.RoleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            rmap.HasOne(x => x.ModuleActionPermission)
+                .WithMany(a => a.RolePermissions)
+                .HasForeignKey(x => x.ModuleActionPermissionId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            rmap.HasOne(x => x.GrantedByUser)
                 .WithMany()
                 .HasForeignKey(x => x.GrantedByUserId)
                 .OnDelete(DeleteBehavior.SetNull);
