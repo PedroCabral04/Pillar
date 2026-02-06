@@ -36,14 +36,26 @@
                                       Variant="Variant.Outlined" />
                     </MudItem>
                     <MudItem xs="12" md="6">
-                        <MudTextField @bind-Value="_model.Slug"
+                        <MudTextField T="string" Value="@_model.Slug"
+                                      ValueChanged="@(value => OnSlugChanged(value ?? string.Empty))"
                                       Label="Slug (subdomínio)"
                                       For="() => _model.Slug"
                                       Required="true"
+                                      Immediate="true"
                                       Disabled="@IsEdit"
+                                      Error="@(!string.IsNullOrWhiteSpace(_slugError))"
+                                      ErrorText="@_slugError"
                                       HelperText="Usado em links como {slug}.pillar.local"
                                       MaxLength="64"
                                       Variant="Variant.Outlined" />
+                        @if (!IsEdit && _slugChecking)
+                        {
+                            <MudText Typo="Typo.caption" Color="MudBlazor.Color.Info">Validando disponibilidade...</MudText>
+                        }
+                        @if (!IsEdit && !_slugChecking && _slugAvailable == true)
+                        {
+                            <MudText Typo="Typo.caption" Color="MudBlazor.Color.Success">Slug disponivel.</MudText>
+                        }
                     </MudItem>
                     <MudItem xs="12" md="6">
                         <MudTextField @bind-Value="_model.DocumentNumber"
@@ -280,6 +292,9 @@
     private readonly TenantFormModel _model = new();
     private bool _saving;
     private string? _errorMessage;
+    private string? _slugError;
+    private bool _slugChecking;
+    private bool? _slugAvailable;
 
     // File upload state
     private bool _uploadingLogo;
@@ -474,6 +489,15 @@
 
     private async Task HandleValidSubmit()
     {
+        if (!IsEdit && !string.IsNullOrWhiteSpace(_model.Slug))
+        {
+            await ValidateSlugAsync(_model.Slug);
+            if (_slugAvailable == false)
+            {
+                return;
+            }
+        }
+
         _errorMessage = null;
         _saving = true;
         try
@@ -615,6 +639,47 @@
     }
 
     private void Cancel() => MudDialog.Cancel();
+
+    private async Task OnSlugChanged(string slug)
+    {
+        _model.Slug = slug.Trim().ToLowerInvariant();
+        _slugAvailable = null;
+        _slugError = null;
+
+        if (IsEdit || string.IsNullOrWhiteSpace(_model.Slug) || _model.Slug.Length < 3)
+        {
+            return;
+        }
+
+        await ValidateSlugAsync(_model.Slug);
+    }
+
+    private async Task ValidateSlugAsync(string slug)
+    {
+        _slugChecking = true;
+        try
+        {
+            var result = await ApiService.GetAsync<SlugValidationDto>($"api/tenants/slug/{slug}/exists");
+            var exists = result?.exists ?? false;
+            _slugAvailable = !exists;
+            _slugError = exists ? "Este slug ja esta em uso." : null;
+        }
+        catch
+        {
+            _slugAvailable = null;
+            _slugError = "Nao foi possivel validar o slug agora.";
+        }
+        finally
+        {
+            _slugChecking = false;
+        }
+    }
+
+    private sealed class SlugValidationDto
+    {
+        public string slug { get; set; } = string.Empty;
+        public bool exists { get; set; }
+    }
 
     private static string GetStatusLabel(TenantStatus status) => status switch
     {

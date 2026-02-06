@@ -14,8 +14,8 @@
 <MudDialog>
     <TitleContent>
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Color="Color.Primary" Size="Size.Large" />
-            <MudText Typo="Typo.h6">Novo Cliente</MudText>
+            <MudIcon Icon="@(QuickMode ? Icons.Material.Filled.FlashOn : Icons.Material.Filled.PersonAdd)" Color="Color.Primary" Size="Size.Large" />
+            <MudText Typo="Typo.h6">@(QuickMode ? "Cliente Rápido" : "Novo Cliente")</MudText>
         </MudStack>
     </TitleContent>
     <DialogContent>
@@ -42,6 +42,7 @@
                                Value="_model.Type"
                                ValueChanged="@OnTypeChanged"
                                Label="Tipo"
+                               Dense="@QuickMode"
                                Variant="Variant.Outlined"
                                AnchorOrigin="Origin.BottomCenter">
                         <MudSelectItem Value="CustomerType.Individual">Pessoa Física</MudSelectItem>
@@ -52,6 +53,7 @@
                     <MudTextField @bind-Value="_model.Document"
                                   Label="@_documentLabel"
                                   Required="true"
+                                  Dense="@QuickMode"
                                   Variant="Variant.Outlined"
                                   Mask="@_documentMask"
                                   Placeholder="@_documentPlaceholder"
@@ -62,6 +64,7 @@
                     <MudTextField @bind-Value="_model.Name" 
                                   Label="@_nameLabel" 
                                   Required="true"
+                                  Dense="@QuickMode"
                                   Immediate="true"
                                   Variant="Variant.Outlined"
                                   Adornment="Adornment.Start"
@@ -70,10 +73,25 @@
                 <MudItem xs="12" md="3">
                     <MudTextField @bind-Value="_model.TradeName" 
                                   Label="Nome Fantasia"
+                                  Dense="@QuickMode"
                                   Variant="Variant.Outlined"
                                   Adornment="Adornment.Start"
                                   AdornmentIcon="@Icons.Material.Filled.Store"/>
                 </MudItem>
+                @if (QuickMode)
+                {
+                    <MudItem xs="12" md="12">
+                        <MudTextField @bind-Value="_model.Mobile"
+                                      Label="Celular"
+                                      Dense="true"
+                                      Variant="Variant.Outlined"
+                                      Placeholder="(00) 00000-0000"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.PhoneAndroid"/>
+                    </MudItem>
+                }
+                else
+                {
                 <MudItem xs="12" md="4">
                     <MudTextField @bind-Value="_model.StateRegistration" 
                                   Label="Inscrição Estadual"
@@ -88,8 +106,11 @@
                                   Adornment="Adornment.Start"
                                   AdornmentIcon="@Icons.Material.Filled.Description"/>
                 </MudItem>
+                }
             </MudGrid>
 
+            @if (!QuickMode)
+            {
             <MudDivider Class="my-4" />
             
             <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-3">
@@ -253,6 +274,7 @@
                                   Lines="3"/>
                 </MudItem>
             </MudGrid>
+            }
         </MudForm>
     </DialogContent>
     <DialogActions>
@@ -265,8 +287,8 @@
             }
             else
             {
-                <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-1"/>
-                <text>Salvar Cliente</text>
+                <MudIcon Icon="@(QuickMode ? Icons.Material.Filled.FlashOn : Icons.Material.Filled.Save)" Class="mr-1"/>
+                <text>@(QuickMode ? "Criar Rápido" : "Salvar Cliente")</text>
             }
         </MudButton>
     </DialogActions>
@@ -274,6 +296,9 @@
 
 @code {
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public bool QuickMode { get; set; }
 
     private MudForm? _form;
     private CreateCustomerDto _model = new();

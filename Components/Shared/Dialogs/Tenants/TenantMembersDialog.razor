@@ -1,0 +1,147 @@
+@using erp.DTOs.Tenancy
+@using erp.DTOs.User
+@using erp.Services
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.subtitle1">Gerenciar membros do tenant</MudText>
+
+            <MudStack Row="true" Spacing="2" AlignItems="AlignItems.End">
+                <MudSelect T="int" Label="Usuario" Variant="Variant.Outlined" @bind-Value="_selectedUserId" Class="flex-grow-1">
+                    @foreach (var user in _availableUsers)
+                    {
+                        <MudSelectItem Value="@user.Id">@(string.IsNullOrWhiteSpace(user.FullName) ? user.Username : $"{user.FullName} ({user.Username})")</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudButton Variant="Variant.Filled" Color="MudBlazor.Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd" Disabled="@(_selectedUserId <= 0 || _saving)" OnClick="AssignUser">
+                    Vincular
+                </MudButton>
+            </MudStack>
+
+            <MudTable Items="_members" Dense="true" Hover="true">
+                <HeaderContent>
+                    <MudTh>Usuario</MudTh>
+                    <MudTh>Email</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh Align="Align.Right">Acao</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Usuario">@context.DisplayName</MudTd>
+                    <MudTd DataLabel="Email">@context.Email</MudTd>
+                    <MudTd DataLabel="Status">
+                        @if (context.RevokedAt.HasValue)
+                        {
+                            <MudChip T="string" Color="MudBlazor.Color.Secondary" Size="MudBlazor.Size.Small">Revogado</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Color="MudBlazor.Color.Success" Size="MudBlazor.Size.Small">Ativo</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd Align="Align.Right">
+                        @if (!context.RevokedAt.HasValue)
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.PersonRemove" Color="MudBlazor.Color.Warning" OnClick="@(() => RevokeUser(context.UserId))" Title="Revogar" />
+                        }
+                        else
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.PersonAddAlt" Color="MudBlazor.Color.Success" OnClick="@(() => ReassignUser(context.UserId))" Title="Reativar" />
+                        }
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Close">Fechar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public TenantDto Tenant { get; set; } = null!;
+
+    private readonly List<TenantMemberViewModel> _members = new();
+    private readonly List<UserDto> _availableUsers = new();
+    private int _selectedUserId;
+    private bool _saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var members = await ApiService.GetAsync<List<TenantMemberDto>>($"api/tenants/{Tenant.Id}/members") ?? new();
+        var users = await ApiService.GetAsync<List<UserDto>>("api/usuarios") ?? new();
+
+        _members.Clear();
+        _members.AddRange(members.Select(m => new TenantMemberViewModel
+        {
+            UserId = m.UserId,
+            DisplayName = string.IsNullOrWhiteSpace(m.FullName) ? m.Username : m.FullName,
+            Email = m.Email,
+            RevokedAt = m.RevokedAt
+        }).OrderBy(x => x.RevokedAt.HasValue).ThenBy(x => x.DisplayName));
+
+        _availableUsers.Clear();
+        _availableUsers.AddRange(users.OrderBy(u => u.FullName ?? u.Username));
+    }
+
+    private async Task AssignUser()
+    {
+        if (_selectedUserId <= 0)
+        {
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var response = await ApiService.PostAsync($"api/tenants/{Tenant.Id}/members/{_selectedUserId}", data: null);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Usuario vinculado ao tenant.", Severity.Success);
+                await LoadAsync();
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task RevokeUser(int userId)
+    {
+        var response = await ApiService.DeleteAsync($"api/tenants/{Tenant.Id}/members/{userId}");
+        if (response.IsSuccessStatusCode)
+        {
+            Snackbar.Add("Acesso revogado.", Severity.Info);
+            await LoadAsync();
+        }
+    }
+
+    private async Task ReassignUser(int userId)
+    {
+        var response = await ApiService.PostAsync($"api/tenants/{Tenant.Id}/members/{userId}", data: null);
+        if (response.IsSuccessStatusCode)
+        {
+            Snackbar.Add("Acesso reativado.", Severity.Success);
+            await LoadAsync();
+        }
+    }
+
+    private void Close() => MudDialog.Close();
+
+    private sealed class TenantMemberViewModel
+    {
+        public int UserId { get; set; }
+        public string DisplayName { get; set; } = string.Empty;
+        public string? Email { get; set; }
+        public DateTime? RevokedAt { get; set; }
+    }
+}

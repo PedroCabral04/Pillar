@@ -173,6 +173,35 @@ public class TenantsController : ControllerBase
         return NoContent();
     }
 
+    [HttpGet("{id:int}/members")]
+    public async Task<ActionResult<IEnumerable<TenantMemberDto>>> GetMembersAsync(int id, CancellationToken cancellationToken)
+    {
+        var members = await _tenantService.GetMembersAsync(id, cancellationToken);
+        return Ok(members);
+    }
+
+    [HttpPost("{id:int}/members/{userId:int}")]
+    public async Task<ActionResult<TenantMemberDto>> AssignMemberAsync(int id, int userId, CancellationToken cancellationToken)
+    {
+        var assignedBy = User.Identity?.Name;
+        try
+        {
+            var member = await _tenantService.AssignMemberAsync(id, userId, assignedBy, cancellationToken);
+            return Ok(member);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
+    [HttpDelete("{id:int}/members/{userId:int}")]
+    public async Task<IActionResult> RevokeMemberAsync(int id, int userId, CancellationToken cancellationToken)
+    {
+        await _tenantService.RevokeMemberAsync(id, userId, cancellationToken);
+        return NoContent();
+    }
+
     /// <summary>
     /// Upload a branding image (logo or favicon) for a tenant.
     /// Images exceeding maximum dimensions will be auto-resized.

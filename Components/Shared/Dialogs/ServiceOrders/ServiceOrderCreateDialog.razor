@@ -3,6 +3,7 @@
 @using erp.DTOs.Inventory
 @using erp.Services
 @using erp.Components.Shared.Dialogs.Inventory
+@using erp.Components.Shared.Dialogs.Sales
 @using erp.Components.Shared
 @using MudBlazor
 @using Size = MudBlazor.Size
@@ -41,18 +42,26 @@
                     </MudItem>
 
                     <MudItem xs="12" md="6">
-                        <MudAutocomplete T="CustomerDto"
-                                        Label="Cliente"
-                                        Placeholder="Pesquisar cliente..."
-                                        @bind-Value="_selectedCustomer"
-                                        SearchFunc="SearchCustomers"
-                                        ToStringFunc="@(c => c != null ? $"{c.Name} - {c.Document}" : "")"
-                                        Variant="Variant.Outlined"
-                                        Required="true"
-                                        Clearable="true"
-                                        Adornment="Adornment.Start"
-                                        AdornmentIcon="@Icons.Material.Filled.Person"
-                                        DebounceInterval="300"/>
+                        <MudStack Spacing="1">
+                            <MudAutocomplete T="CustomerDto"
+                                            Label="Cliente (opcional)"
+                                            Placeholder="Pesquisar cliente..."
+                                            @bind-Value="_selectedCustomer"
+                                            SearchFunc="SearchCustomers"
+                                            ToStringFunc="@(c => c != null ? $"{c.Name} - {c.Document}" : "")"
+                                            Variant="Variant.Outlined"
+                                            Required="false"
+                                            Clearable="true"
+                                            Adornment="Adornment.Start"
+                                            AdornmentIcon="@Icons.Material.Filled.Person"
+                                            DebounceInterval="300"/>
+                            <MudButton Variant="Variant.Text"
+                                       Size="Size.Small"
+                                       StartIcon="@Icons.Material.Filled.FlashOn"
+                                       OnClick="OpenQuickCustomerDialog">
+                                Cliente nao encontrado? Criar rapido
+                            </MudButton>
+                        </MudStack>
                     </MudItem>
 
                     <MudItem xs="12" md="6">
@@ -385,6 +394,31 @@
             });
 
             Snackbar.Add($"Produto {createdProduct.Sku} criado e adicionado como item da OS.", Severity.Success);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenQuickCustomerDialog()
+    {
+        var options = new DialogOptions
+        {
+            CloseOnEscapeKey = true,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true
+        };
+
+        var parameters = new DialogParameters
+        {
+            { nameof(CustomerCreateDialog.QuickMode), true }
+        };
+
+        var dialog = await DialogService.ShowAsync<CustomerCreateDialog>("Cliente Rapido", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled && result.Data is CustomerDto createdCustomer)
+        {
+            _selectedCustomer = createdCustomer;
+            Snackbar.Add($"Cliente {createdCustomer.Name} criado e selecionado na OS.", Severity.Success);
             StateHasChanged();
         }
     }

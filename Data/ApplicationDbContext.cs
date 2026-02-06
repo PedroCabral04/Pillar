@@ -834,11 +834,13 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         // Ensure all DateTime values are UTC when writing to PostgreSQL
         // PostgreSQL 'timestamp with time zone' requires DateTime.Kind == UTC
         var dateTimeConverter = new ValueConverter<DateTime, DateTime>(
-            v => v.Kind == DateTimeKind.Local ? v.ToUniversalTime() : v,
+            v => v.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v, DateTimeKind.Utc) :
+                v.Kind == DateTimeKind.Local ? v.ToUniversalTime() : v,
             v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
 
         var nullableDateTimeConverter = new ValueConverter<DateTime?, DateTime?>(
-            v => v.HasValue && v.Value.Kind == DateTimeKind.Local ? v.Value.ToUniversalTime() : v,
+            v => v.HasValue && v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) :
+                v.HasValue && v.Value.Kind == DateTimeKind.Local ? v.Value.ToUniversalTime() : v,
             v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : null);
 
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
@@ -2554,7 +2556,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
 public class DateTimeToUtcConverter : ValueConverter<DateTime, DateTime>
 {
     public DateTimeToUtcConverter() : base(
-        v => v.ToUniversalTime(),
+        v => v.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : v.ToUniversalTime(),
         v => DateTime.SpecifyKind(v, DateTimeKind.Utc))
     { }
 }
@@ -2562,7 +2564,8 @@ public class DateTimeToUtcConverter : ValueConverter<DateTime, DateTime>
 public class NullableDateTimeToUtcConverter : ValueConverter<DateTime?, DateTime?>
 {
     public NullableDateTimeToUtcConverter() : base(
-        v => v.HasValue ? v.Value.ToUniversalTime() : v,
+        v => v.HasValue && v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) :
+            v.HasValue ? v.Value.ToUniversalTime() : v,
         v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v)
     { }
 }

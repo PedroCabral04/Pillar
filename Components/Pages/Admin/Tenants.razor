@@ -22,6 +22,33 @@
             </MudButton>
         </MudStack>
 
+        <MudGrid>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                    <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">Total</MudText>
+                    <MudText Typo="Typo.h5">@_tenants.Count</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                    <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">Ativos</MudText>
+                    <MudText Typo="Typo.h5">@_tenants.Count(t => t.Status == TenantStatus.Active)</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                    <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">Suspensos</MudText>
+                    <MudText Typo="Typo.h5">@_tenants.Count(t => t.Status == TenantStatus.Suspended)</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                    <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">Arquivados</MudText>
+                    <MudText Typo="Typo.h5">@_tenants.Count(t => t.Status == TenantStatus.Archived)</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
         @if (!string.IsNullOrWhiteSpace(_loadError))
         {
             <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
@@ -29,13 +56,27 @@
 
         <MudPaper Elevation="1" Class="pa-4">
             <MudStack Spacing="2">
-                <MudTextField @bind-Value="_search" Placeholder="Filtrar por nome, slug, região ou contato" Variant="Variant.Outlined" Immediate="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" />
-                <MudTable Items="@FilteredTenants" Hover="true" Dense="true">
+                <MudGrid>
+                    <MudItem xs="12" md="8">
+                        <MudTextField @bind-Value="_search" Placeholder="Filtrar por nome, slug, região ou contato" Variant="Variant.Outlined" Immediate="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" />
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudSelect T="TenantStatus?" @bind-Value="_statusFilter" Variant="Variant.Outlined" Label="Status">
+                            <MudSelectItem T="TenantStatus?" Value="@(null)">Todos</MudSelectItem>
+                            @foreach (var status in Enum.GetValues<TenantStatus>())
+                            {
+                                <MudSelectItem T="TenantStatus?" Value="@status">@GetStatusLabel(status)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                </MudGrid>
+                <MudTable Items="@FilteredTenants" Hover="true" Dense="true" SortLabel="Ordenar" RowsPerPage="10">
                     <HeaderContent>
-                        <MudTh>Empresa</MudTh>
-                        <MudTh>Status</MudTh>
+                        <MudTh><MudTableSortLabel T="TenantDto" SortBy="@(x => x.Name)">Empresa</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel T="TenantDto" SortBy="@(x => x.Status)">Status</MudTableSortLabel></MudTh>
                         <MudTh>Contato</MudTh>
-                        <MudTh>Região</MudTh>
+                        <MudTh><MudTableSortLabel T="TenantDto" SortBy="@(x => x.Region)">Região</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel T="TenantDto" SortBy="@(x => x.CreatedAt)">Criado em</MudTableSortLabel></MudTh>
                         <MudTh Align="Align.Right">Ações</MudTh>
                     </HeaderContent>
                     <RowTemplate>
@@ -58,16 +99,31 @@
                             <MudText Typo="Typo.caption">@context.PrimaryContactPhone</MudText>
                         </MudTd>
                         <MudTd DataLabel="Região">@context.Region</MudTd>
+                        <MudTd DataLabel="Criado em">
+                            <MudText Typo="Typo.body2">@context.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy")</MudText>
+                            <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">@GetRelativeTime(context.CreatedAt)</MudText>
+                        </MudTd>
                         <MudTd Align="Align.Right">
                             <MudButtonGroup Variant="Variant.Text" Dense="true">
+                                <MudIconButton Icon="@Icons.Material.Filled.Group" Color="MudBlazor.Color.Primary" Title="Gerenciar membros" OnClick="@(() => ManageMembers(context))" />
                                 <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="MudBlazor.Color.Info" Title="Editar" OnClick="@(() => EditTenant(context))" />
-                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="MudBlazor.Color.Error" Title="Excluir" Disabled="true" />
+                                @if (context.Status == TenantStatus.Archived)
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.Unarchive" Color="MudBlazor.Color.Success" Title="Reativar" OnClick="@(() => ReactivateTenant(context))" />
+                                }
+                                else
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.Archive" Color="MudBlazor.Color.Warning" Title="Arquivar" OnClick="@(() => ArchiveTenant(context))" />
+                                }
                             </MudButtonGroup>
                         </MudTd>
                     </RowTemplate>
                     <NoRecordsContent>
                         <MudText>Nenhum tenant encontrado.</MudText>
                     </NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager />
+                    </PagerContent>
                 </MudTable>
             </MudStack>
         </MudPaper>
@@ -78,6 +134,7 @@
     private List<TenantDto> _tenants = new();
     private string? _loadError;
     private string _search = string.Empty;
+    private TenantStatus? _statusFilter;
 
     protected override async Task OnInitializedAsync()
     {
@@ -89,7 +146,8 @@
         || t.Name.Contains(_search, StringComparison.OrdinalIgnoreCase)
         || t.Slug.Contains(_search, StringComparison.OrdinalIgnoreCase)
         || (t.Region?.Contains(_search, StringComparison.OrdinalIgnoreCase) ?? false)
-        || (t.PrimaryContactName?.Contains(_search, StringComparison.OrdinalIgnoreCase) ?? false));
+        || (t.PrimaryContactName?.Contains(_search, StringComparison.OrdinalIgnoreCase) ?? false))
+        .Where(t => !_statusFilter.HasValue || t.Status == _statusFilter.Value);
 
     private async Task LoadTenantsAsync()
     {
@@ -130,6 +188,78 @@
         {
             await LoadTenantsAsync();
         }
+    }
+
+    private async Task ArchiveTenant(TenantDto tenant)
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Arquivar tenant",
+            $"Deseja arquivar o tenant '{tenant.Name}'? Ele deixara de aparecer como ativo.",
+            yesText: "Arquivar",
+            cancelText: "Cancelar");
+
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        var response = await ApiService.DeleteAsync($"api/tenants/{tenant.Id}");
+        if (response.IsSuccessStatusCode)
+        {
+            Snackbar.Add("Tenant arquivado com sucesso.", Severity.Success);
+            await LoadTenantsAsync();
+            return;
+        }
+
+        Snackbar.Add("Nao foi possivel arquivar o tenant.", Severity.Error);
+    }
+
+    private async Task ReactivateTenant(TenantDto tenant)
+    {
+        var dto = new UpdateTenantDto
+        {
+            Name = tenant.Name,
+            DocumentNumber = tenant.DocumentNumber,
+            PrimaryContactName = tenant.PrimaryContactName,
+            PrimaryContactEmail = tenant.PrimaryContactEmail,
+            PrimaryContactPhone = tenant.PrimaryContactPhone,
+            Region = tenant.Region,
+            IsDemo = tenant.IsDemo,
+            Status = TenantStatus.Active,
+            Notes = tenant.Notes,
+            Branding = tenant.Branding
+        };
+
+        await ApiService.PutAsync<TenantDto>($"api/tenants/{tenant.Id}", dto);
+        Snackbar.Add("Tenant reativado com sucesso.", Severity.Success);
+        await LoadTenantsAsync();
+    }
+
+    private async Task ManageMembers(TenantDto tenant)
+    {
+        var parameters = new DialogParameters<TenantMembersDialog>
+        {
+            { x => x.Tenant, tenant }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<TenantMembersDialog>($"Membros - {tenant.Name}", parameters, options);
+        await dialog.Result;
+    }
+
+    private static string GetRelativeTime(DateTime value)
+    {
+        var delta = DateTime.UtcNow - value;
+        if (delta.TotalDays >= 1)
+        {
+            return $"ha {(int)delta.TotalDays} dia(s)";
+        }
+
+        if (delta.TotalHours >= 1)
+        {
+            return $"ha {(int)delta.TotalHours} hora(s)";
+        }
+
+        return "agora";
     }
 
     private MudBlazor.Color GetStatusColor(TenantStatus status) => status switch

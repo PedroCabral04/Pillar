@@ -175,4 +175,90 @@ public class TenantService : ITenantService
             && t.Status != TenantStatus.Archived
             && (!ignoreTenantId.HasValue || t.Id != ignoreTenantId), cancellationToken);
     }
+
+    public async Task<IEnumerable<TenantMemberDto>> GetMembersAsync(int tenantId, CancellationToken cancellationToken = default)
+    {
+        var members = await _db.TenantMemberships
+            .AsNoTracking()
+            .Where(m => m.TenantId == tenantId)
+            .Include(m => m.User)
+            .OrderBy(m => m.RevokedAt.HasValue)
+            .ThenBy(m => m.User.FullName ?? m.User.UserName)
+            .Select(m => new TenantMemberDto(
+                m.UserId,
+                m.User.UserName ?? string.Empty,
+                m.User.FullName,
+                m.User.Email,
+                m.IsDefault,
+                m.CreatedAt,
+                m.RevokedAt))
+            .ToListAsync(cancellationToken);
+
+        return members;
+    }
+
+    public async Task<TenantMemberDto> AssignMemberAsync(int tenantId, int userId, string? assignedBy, CancellationToken cancellationToken = default)
+    {
+        var tenantExists = await _db.Tenants.AnyAsync(t => t.Id == tenantId, cancellationToken);
+        if (!tenantExists)
+        {
+            throw new KeyNotFoundException($"Tenant {tenantId} nao encontrado.");
+        }
+
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken)
+            ?? throw new KeyNotFoundException($"Usuario {userId} nao encontrado.");
+
+        var membership = await _db.TenantMemberships
+            .FirstOrDefaultAsync(m => m.TenantId == tenantId && m.UserId == userId, cancellationToken);
+
+        if (membership is null)
+        {
+            membership = new TenantMembership
+            {
+                TenantId = tenantId,
+                UserId = userId,
+                AssignedBy = assignedBy,
+                CreatedAt = DateTime.UtcNow,
+                IsDefault = false
+            };
+
+            _db.TenantMemberships.Add(membership);
+        }
+        else
+        {
+            membership.RevokedAt = null;
+            membership.AssignedBy = assignedBy;
+        }
+
+        if (user.TenantId != tenantId)
+        {
+            user.TenantId = tenantId;
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return new TenantMemberDto(
+            user.Id,
+            user.UserName ?? string.Empty,
+            user.FullName,
+            user.Email,
+            membership.IsDefault,
+            membership.CreatedAt,
+            membership.RevokedAt);
+    }
+
+    public async Task RevokeMemberAsync(int tenantId, int userId, CancellationToken cancellationToken = default)
+    {
+        var membership = await _db.TenantMemberships
+            .FirstOrDefaultAsync(m => m.TenantId == tenantId && m.UserId == userId, cancellationToken);
+
+        if (membership is null)
+        {
+            return;
+        }
+
+        membership.RevokedAt = DateTime.UtcNow;
+        membership.IsDefault = false;
+        await _db.SaveChangesAsync(cancellationToken);
+    }
 }
