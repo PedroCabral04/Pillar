@@ -19,7 +19,7 @@
 <PageTitle>Ordens de Serviço - Pillar ERP</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4 erp-page-header">
         <MudText Typo="Typo.h4">Ordens de Serviço</MudText>
         <MudButton Color="Color.Primary"
                 Variant="Variant.Filled"
@@ -34,44 +34,46 @@
         <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
     }
 
-    <MudTable T="ServiceOrderDto" ServerData="ServerReload"
-            Dense="false" Hover="true" Elevation="2" @ref="_table" Striped="true" Loading="@_loading">
+    <MudPaper Elevation="0" Class="mb-3 pa-3 mobile-filter-panel">
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="erp-toolbar-filters">
+            <MudTextField T="string" ValueChanged="OnSearch" Immediate="false" Placeholder="Procurar OS, cliente, aparelho..."
+                        Variant="Variant.Outlined" Margin="Margin.Dense"
+                        Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                        Clearable="true" Style="min-width: 200px;"/>
+            <MudSelect T="string"
+                    Value="_statusFilter"
+                    ValueChanged="OnStatusFilterChanged"
+                    Label="Status"
+                    Variant="Variant.Outlined"
+                    Margin="Margin.Dense"
+                    Clearable="true"
+                    Style="min-width: 150px;">
+                <MudSelectItem T="string" Value="@("Open")">Aberto</MudSelectItem>
+                <MudSelectItem T="string" Value="@("InProgress")">Em Andamento</MudSelectItem>
+                <MudSelectItem T="string" Value="@("WaitingCustomer")">Aguardando Cliente</MudSelectItem>
+                <MudSelectItem T="string" Value="@("WaitingParts")">Aguardando Peças</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Completed")">Concluído</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Delivered")">Entregue</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Cancelled")">Cancelado</MudSelectItem>
+            </MudSelect>
+            <DatePicker Label="Data Inicial"
+                        @bind-Date="_startDate"
+                        Margin="Margin.Dense"
+                        Clearable="true"/>
+            <DatePicker Label="Data Final"
+                        @bind-Date="_endDate"
+                        Margin="Margin.Dense"
+                        Clearable="true"/>
+            <MudIconButton Icon="@Icons.Material.Filled.FilterAlt"
+                        Color="Color.Primary"
+                        OnClick="ApplyFilters"/>
+        </MudStack>
+    </MudPaper>
+
+    <MudTable T="ServiceOrderDto" ServerData="ServerReload" Class="mobile-cards-table mobile-cards-table--service-orders"
+            Dense="false" Hover="true" Elevation="2" @ref="_table" Striped="true" Loading="@_loading" Breakpoint="Breakpoint.Md">
         <ToolBarContent>
             <MudText Typo="Typo.h5">Ordens Registradas</MudText>
-            <MudSpacer/>
-            <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
-                <MudTextField T="string" ValueChanged="OnSearch" Immediate="false" Placeholder="Procurar OS, cliente, aparelho..."
-                            Variant="Variant.Outlined" Margin="Margin.Dense"
-                            Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
-                            Clearable="true" Style="min-width: 200px;"/>
-                <MudSelect T="string"
-                        Value="_statusFilter"
-                        ValueChanged="OnStatusFilterChanged"
-                        Label="Status"
-                        Variant="Variant.Outlined"
-                        Margin="Margin.Dense"
-                        Clearable="true"
-                        Style="min-width: 150px;">
-                    <MudSelectItem T="string" Value="@("Open")">Aberto</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("InProgress")">Em Andamento</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("WaitingCustomer")">Aguardando Cliente</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("WaitingParts")">Aguardando Peças</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Completed")">Concluído</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Delivered")">Entregue</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Cancelled")">Cancelado</MudSelectItem>
-                </MudSelect>
-                <DatePicker Label="Data Inicial"
-                            @bind-Date="_startDate"
-                            Margin="Margin.Dense"
-                            Clearable="true"/>
-                <DatePicker Label="Data Final"
-                            @bind-Date="_endDate"
-                            Margin="Margin.Dense"
-                            Clearable="true"/>
-                <MudIconButton Icon="@Icons.Material.Filled.FilterAlt"
-                            Color="Color.Primary"
-                            OnClick="ApplyFilters"/>
-            </MudStack>
         </ToolBarContent>
         <HeaderContent>
             <MudTh>Número</MudTh>
@@ -83,12 +85,12 @@
             <MudTh Style="text-align: center">Ações</MudTh>
         </HeaderContent>
         <RowTemplate>
-            <MudTd DataLabel="Número">
+            <MudTd DataLabel="Número" Class="mobile-cell-primary">
                 <MudText Typo="Typo.body2" Style="font-family: monospace">@context.OrderNumber</MudText>
             </MudTd>
-            <MudTd DataLabel="Data">@context.EntryDate.ToString("dd/MM/yyyy")</MudTd>
-            <MudTd DataLabel="Cliente">@(context.Customer?.Name ?? "Não informado")</MudTd>
-            <MudTd DataLabel="Aparelho">
+            <MudTd DataLabel="Data" Class="mobile-cell-meta">@context.EntryDate.ToString("dd/MM/yyyy")</MudTd>
+            <MudTd DataLabel="Cliente" Class="mobile-cell-secondary">@(context.Customer?.Name ?? "Não informado")</MudTd>
+            <MudTd DataLabel="Aparelho" Class="mobile-cell-hide">
                 @if (!string.IsNullOrEmpty(context.DeviceBrand) || !string.IsNullOrEmpty(context.DeviceModel))
                 {
                     <MudText Typo="Typo.body2">@context.DeviceBrand @context.DeviceModel</MudText>
@@ -98,13 +100,13 @@
                     <MudText Typo="Typo.body2" Color="Color.Default">-</MudText>
                 }
             </MudTd>
-            <MudTd DataLabel="Valor" Style="text-align: right">
+            <MudTd DataLabel="Valor" Style="text-align: right" Class="mobile-cell-meta">
                 <MudText Typo="Typo.body2" Style="font-weight: 600">@Currency.Format(context.NetAmount)</MudText>
             </MudTd>
-            <MudTd DataLabel="Status">
+            <MudTd DataLabel="Status" Class="mobile-cell-status">
                 <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">@context.StatusDisplay</MudChip>
             </MudTd>
-            <MudTd DataLabel="Ações" Style="text-align: center">
+            <MudTd DataLabel="Ações" Style="text-align: center" Class="mobile-cell-actions">
                 <MudTooltip Text="Ver detalhes">
                     <MudIconButton Icon="@Icons.Material.Filled.Visibility"
                                 Size="Size.Small"

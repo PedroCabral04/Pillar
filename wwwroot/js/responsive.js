@@ -1,207 +1,254 @@
 // Responsive utilities for Pillar ERP
-window.erpResponsive = {
-    // Check if current viewport is mobile
-    isMobile: function() {
-        return window.innerWidth < 960;
-    },
-    
-    // Check if current viewport is tablet
-    isTablet: function() {
-        return window.innerWidth >= 600 && window.innerWidth < 960;
-    },
-    
-    // Check if current viewport is desktop
-    isDesktop: function() {
-        return window.innerWidth >= 960;
-    },
-    
-    // Get current breakpoint
-    getBreakpoint: function() {
+(function (window) {
+    'use strict';
+
+    const responsive = window.erpResponsive = window.erpResponsive || {};
+
+    const isTouchDevice = () => ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+
+    const getBreakpoint = () => {
         const width = window.innerWidth;
         if (width < 600) return 'xs';
         if (width < 960) return 'sm';
         if (width < 1280) return 'md';
         if (width < 1920) return 'lg';
         return 'xl';
-    },
-    
-    // Setup resize listener with debounce
-    onResize: function(dotNetHelper, method, delay = 250) {
+    };
+
+    const getDeviceInfo = () => {
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+
+        return {
+            width,
+            height,
+            isIOS: /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream,
+            isAndroid: /android/i.test(userAgent),
+            isMobile: width < 960,
+            isTablet: width >= 600 && width < 960,
+            isDesktop: width >= 960,
+            isTouchDevice: isTouchDevice(),
+            isStandalone: window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true,
+            breakpoint: getBreakpoint(),
+            orientation: width > height ? 'landscape' : 'portrait'
+        };
+    };
+
+    responsive.isMobile = responsive.isMobile || function () {
+        return window.innerWidth < 960;
+    };
+
+    responsive.isTablet = responsive.isTablet || function () {
+        return window.innerWidth >= 600 && window.innerWidth < 960;
+    };
+
+    responsive.isDesktop = responsive.isDesktop || function () {
+        return window.innerWidth >= 960;
+    };
+
+    responsive.getBreakpoint = getBreakpoint;
+    responsive.getDeviceInfo = getDeviceInfo;
+
+    responsive.onResize = function (dotNetHelper, method, delay = 250) {
         let timeoutId;
         const resizeHandler = () => {
             clearTimeout(timeoutId);
             timeoutId = setTimeout(() => {
-                const breakpoint = this.getBreakpoint();
-                const isMobile = this.isMobile();
-                dotNetHelper.invokeMethodAsync(method, breakpoint, isMobile);
+                dotNetHelper.invokeMethodAsync(method, getBreakpoint(), responsive.isMobile());
             }, delay);
         };
-        
+
         window.addEventListener('resize', resizeHandler);
-        
-        // Return cleanup function
+
         return () => {
             window.removeEventListener('resize', resizeHandler);
         };
-    },
-    
-    // Close drawer on mobile when clicking outside
-    setupDrawerClickOutside: function(drawerId, closeCallback) {
+    };
+
+    responsive.setupDrawerClickOutside = function (drawerId, closeCallback) {
         const drawer = document.getElementById(drawerId);
-        if (!drawer) return;
-        
-        const clickHandler = (e) => {
-            if (!this.isMobile()) return;
-            
-            // Check if click is outside drawer
-            if (!drawer.contains(e.target) && drawer.classList.contains('mud-drawer--open')) {
+        if (!drawer) return null;
+
+        const clickHandler = (event) => {
+            if (!responsive.isMobile()) return;
+            if (!drawer.contains(event.target) && drawer.classList.contains('mud-drawer--open')) {
                 closeCallback();
             }
         };
-        
+
         document.addEventListener('click', clickHandler);
-        
+
         return () => {
             document.removeEventListener('click', clickHandler);
         };
-    },
-    
-    // Enable swipe to close drawer on mobile
-    enableSwipeToClose: function(drawerId, closeCallback) {
-        if (!this.isMobile()) return () => {};
-        
+    };
+
+    responsive.enableSwipeToClose = function (drawerId, closeCallback) {
+        if (!responsive.isMobile()) return () => {};
+
         const drawer = document.getElementById(drawerId);
         if (!drawer) return () => {};
-        
+
         let touchStartX = 0;
-        let touchEndX = 0;
         let touchStartY = 0;
-        let touchEndY = 0;
         let isDragging = false;
-        
-        const handleSwipe = () => {
+
+        const touchStart = (event) => {
+            touchStartX = event.changedTouches[0].screenX;
+            touchStartY = event.changedTouches[0].screenY;
+            isDragging = true;
+        };
+
+        const touchMove = (event) => {
+            if (!isDragging) return;
+            const currentX = event.changedTouches[0].screenX;
+            const deltaX = touchStartX - currentX;
+
+            if (deltaX > 0) {
+                drawer.style.transform = `translateX(-${Math.min(deltaX, 280)}px)`;
+            }
+        };
+
+        const touchEnd = (event) => {
+            if (!isDragging) return;
+            isDragging = false;
+
+            const touchEndX = event.changedTouches[0].screenX;
+            const touchEndY = event.changedTouches[0].screenY;
             const swipeDistance = touchStartX - touchEndX;
             const verticalDistance = Math.abs(touchStartY - touchEndY);
-            
-            // Swipe left to close (threshold: 50px), ignore if vertical swipe
+
+            drawer.style.transform = '';
+
             if (swipeDistance > 50 && verticalDistance < 50) {
                 if (typeof closeCallback === 'function') {
                     closeCallback();
-                } else {
-                    DotNet.invokeMethodAsync('erp', closeCallback);
                 }
             }
         };
-        
-        const touchStart = (e) => {
-            touchStartX = e.changedTouches[0].screenX;
-            touchStartY = e.changedTouches[0].screenY;
-            isDragging = true;
-        };
-        
-        const touchMove = (e) => {
-            if (!isDragging) return;
-            const currentX = e.changedTouches[0].screenX;
-            const diff = touchStartX - currentX;
-            
-            // Visual feedback during swipe
-            if (diff > 0) {
-                drawer.style.transform = `translateX(-${Math.min(diff, 280)}px)`;
-            }
-        };
-        
-        const touchEnd = (e) => {
-            if (!isDragging) return;
-            isDragging = false;
-            touchEndX = e.changedTouches[0].screenX;
-            touchEndY = e.changedTouches[0].screenY;
-            
-            // Reset transform
-            drawer.style.transform = '';
-            
-            handleSwipe();
-        };
-        
+
         drawer.addEventListener('touchstart', touchStart, { passive: true });
         drawer.addEventListener('touchmove', touchMove, { passive: true });
         drawer.addEventListener('touchend', touchEnd, { passive: true });
-        
+
         return () => {
             drawer.removeEventListener('touchstart', touchStart);
             drawer.removeEventListener('touchmove', touchMove);
             drawer.removeEventListener('touchend', touchEnd);
         };
-    },
-    
-    // Adjust viewport height for mobile browsers (addresses URL bar)
-    setMobileViewportHeight: function() {
-        if (!this.isMobile()) return;
-        
+    };
+
+    responsive.setMobileViewportHeight = responsive.setMobileViewportHeight || function () {
         const setVH = () => {
             const vh = window.innerHeight * 0.01;
             document.documentElement.style.setProperty('--vh', `${vh}px`);
         };
-        
+
         setVH();
         window.addEventListener('resize', setVH);
         window.addEventListener('orientationchange', setVH);
-    },
-    
-    // Lock body scroll (useful when drawer is open on mobile)
-    lockScroll: function() {
+    };
+
+    responsive.lockScroll = responsive.lockScroll || function () {
         document.body.style.overflow = 'hidden';
         document.body.style.position = 'fixed';
         document.body.style.width = '100%';
-    },
-    
-    // Unlock body scroll
-    unlockScroll: function() {
+    };
+
+    responsive.unlockScroll = responsive.unlockScroll || function () {
         document.body.style.overflow = '';
         document.body.style.position = '';
         document.body.style.width = '';
-    },
-    
-    // Smooth scroll to element
-    scrollToElement: function(elementId, offset = 0) {
+    };
+
+    responsive.scrollToElement = function (elementId, offset = 0) {
         const element = document.getElementById(elementId);
         if (!element) return;
-        
+
         const y = element.getBoundingClientRect().top + window.pageYOffset + offset;
         window.scrollTo({ top: y, behavior: 'smooth' });
-    },
-    
-    // Check if device supports touch
-    isTouchDevice: function() {
-        return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-    },
-    
-    // Get safe area insets (for notch devices)
-    getSafeAreaInsets: function() {
+    };
+
+    responsive.isTouchDevice = responsive.isTouchDevice || isTouchDevice;
+
+    responsive.getSafeAreaInsets = responsive.getSafeAreaInsets || function () {
         const style = getComputedStyle(document.documentElement);
         return {
-            top: parseInt(style.getPropertyValue('--sat') || 0),
-            right: parseInt(style.getPropertyValue('--sar') || 0),
-            bottom: parseInt(style.getPropertyValue('--sab') || 0),
-            left: parseInt(style.getPropertyValue('--sal') || 0)
+            top: parseInt(style.getPropertyValue('--sai-top') || '0', 10),
+            right: parseInt(style.getPropertyValue('--sai-right') || '0', 10),
+            bottom: parseInt(style.getPropertyValue('--sai-bottom') || '0', 10),
+            left: parseInt(style.getPropertyValue('--sai-left') || '0', 10)
         };
-    },
-    
-    // Initialize responsive features
-    initialize: function() {
-        this.setMobileViewportHeight();
-        
-        // Add touch class to body if touch device
-        if (this.isTouchDevice()) {
+    };
+
+    responsive.initHapticFeedback = responsive.initHapticFeedback || function () {
+        if (!responsive.isTouchDevice() || !('vibrate' in navigator)) return;
+
+        document.addEventListener('touchstart', (event) => {
+            const target = event.target.closest('.mud-button-root, .mud-icon-button, .bottom-nav-item');
+            if (target) {
+                navigator.vibrate(10);
+            }
+        }, { passive: true });
+    };
+
+    responsive.preventOverscroll = function (element) {
+        if (!element) return;
+
+        let startY = 0;
+        element.addEventListener('touchstart', (event) => {
+            startY = event.touches[0].pageY;
+        }, { passive: true });
+
+        element.addEventListener('touchmove', (event) => {
+            const y = event.touches[0].pageY;
+            const scrollTop = element.scrollTop;
+            const scrollHeight = element.scrollHeight;
+            const offsetHeight = element.offsetHeight;
+
+            const atTop = scrollTop <= 0;
+            const atBottom = scrollTop + offsetHeight >= scrollHeight;
+
+            if ((atTop && y > startY) || (atBottom && y < startY)) {
+                event.preventDefault();
+            }
+        }, { passive: false });
+    };
+
+    responsive.setFontSizeClass = function (fontSize) {
+        document.body.classList.remove('font-size-base', 'font-size-large', 'font-size-small');
+
+        if (fontSize === 'large') {
+            document.body.classList.add('font-size-large');
+        } else if (fontSize === 'small') {
+            document.body.classList.add('font-size-small');
+        } else {
+            document.body.classList.add('font-size-base');
+        }
+
+        document.body.offsetHeight;
+    };
+
+    responsive.initialize = responsive.initialize || function () {
+        responsive.setMobileViewportHeight();
+
+        if (responsive.isTouchDevice()) {
             document.body.classList.add('touch-device');
         }
-        
-        // Add breakpoint class to body
+
         const updateBreakpointClass = () => {
-            document.body.className = document.body.className.replace(/breakpoint-\w+/g, '');
-            document.body.classList.add(`breakpoint-${this.getBreakpoint()}`);
-            
-            // Add mobile/desktop class
-            if (this.isMobile()) {
+            const classesToRemove = [];
+            document.body.classList.forEach((className) => {
+                if (className.startsWith('breakpoint-')) {
+                    classesToRemove.push(className);
+                }
+            });
+
+            classesToRemove.forEach((className) => document.body.classList.remove(className));
+            document.body.classList.add(`breakpoint-${getBreakpoint()}`);
+
+            if (responsive.isMobile()) {
                 document.body.classList.add('is-mobile');
                 document.body.classList.remove('is-desktop');
             } else {
@@ -209,80 +256,19 @@ window.erpResponsive = {
                 document.body.classList.remove('is-mobile');
             }
         };
-        
+
         updateBreakpointClass();
         window.addEventListener('resize', updateBreakpointClass);
-        
-        // Haptic feedback for touch devices
-        this.initHapticFeedback();
-    },
-    
-    // Haptic feedback for buttons
-    initHapticFeedback: function() {
-        if (!this.isTouchDevice() || !('vibrate' in navigator)) return;
-        
-        document.addEventListener('touchstart', (e) => {
-            const target = e.target.closest('.mud-button-root, .mud-icon-button, .bottom-nav-item');
-            if (target) {
-                navigator.vibrate(10); // Light vibration
-            }
-        }, { passive: true });
-    },
-    
-    // Prevent overscroll (rubber band effect)
-    preventOverscroll: function(element) {
-        if (!element) return;
-        
-        let startY = 0;
-        
-        element.addEventListener('touchstart', (e) => {
-            startY = e.touches[0].pageY;
-        }, { passive: true });
-        
-        element.addEventListener('touchmove', (e) => {
-            const y = e.touches[0].pageY;
-            const scrollTop = element.scrollTop;
-            const scrollHeight = element.scrollHeight;
-            const offsetHeight = element.offsetHeight;
-            
-            const isAtTop = scrollTop <= 0;
-            const isAtBottom = scrollTop + offsetHeight >= scrollHeight;
-            
-            if ((isAtTop && y > startY) || (isAtBottom && y < startY)) {
-                e.preventDefault();
-            }
-        }, { passive: false });
-    },
-    
-    // Set font size preference class on body
-    setFontSizeClass: function(fontSize) {
-        console.log('[ERP] Setting font size class:', fontSize);
-        
-        // Remove existing font size classes
-        document.body.classList.remove('font-size-base', 'font-size-large', 'font-size-small');
-        
-        // Add the appropriate class
-        if (fontSize === 'large') {
-            document.body.classList.add('font-size-large');
-            console.log('[ERP] Added font-size-large class to body');
-        } else if (fontSize === 'small') {
-            document.body.classList.add('font-size-small');
-        } else {
-            document.body.classList.add('font-size-base');
-        }
-        
-        // Force a reflow to ensure styles are applied
-        document.body.offsetHeight;
-        
-        console.log('[ERP] Body classes:', document.body.className);
-    }
-};
 
-// Auto-initialize on load
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        window.erpResponsive.initialize();
-    });
-} else {
-    window.erpResponsive.initialize();
-}
+        responsive.initHapticFeedback();
+    };
+
+    if (!responsive._responsiveInitialized) {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => responsive.initialize());
+        } else {
+            responsive.initialize();
+        }
+        responsive._responsiveInitialized = true;
+    }
+})(window);

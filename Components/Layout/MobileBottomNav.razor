@@ -4,79 +4,33 @@
 
 <nav class="mobile-bottom-nav" role="navigation" aria-label="Navegação principal">
     <a href="/" class="bottom-nav-item @GetActiveClass("/")" @onclick="@(() => NavigateTo("/"))" @onclick:preventDefault>
-        <MudIcon Icon="@Icons.Material.Filled.Dashboard" Class="bottom-nav-item__icon"/>
+        <MudIcon Icon="@Icons.Material.Filled.Home" Class="bottom-nav-item__icon" />
+        <span class="bottom-nav-item__label">Inicio</span>
+    </a>
+
+    <a href="/dashboard" class="bottom-nav-item @GetActiveClass("/dashboard")" @onclick="@(() => NavigateTo("/dashboard"))" @onclick:preventDefault>
+        <MudIcon Icon="@Icons.Material.Filled.Dashboard" Class="bottom-nav-item__icon" />
         <span class="bottom-nav-item__label">Dashboard</span>
     </a>
-    
+
     <a href="/sales" class="bottom-nav-item @GetActiveClass("/sales")" @onclick="@(() => NavigateTo("/sales"))" @onclick:preventDefault>
-        <MudIcon Icon="@Icons.Material.Filled.ShoppingCart" Class="bottom-nav-item__icon"/>
+        <MudIcon Icon="@Icons.Material.Filled.ShoppingCart" Class="bottom-nav-item__icon" />
         <span class="bottom-nav-item__label">Vendas</span>
     </a>
-    
+
     <a href="/inventory/products" class="bottom-nav-item @GetActiveClass("/inventory")" @onclick="@(() => NavigateTo("/inventory/products"))" @onclick:preventDefault>
-        <MudIcon Icon="@Icons.Material.Filled.Inventory" Class="bottom-nav-item__icon"/>
+        <MudIcon Icon="@Icons.Material.Filled.Inventory" Class="bottom-nav-item__icon" />
         <span class="bottom-nav-item__label">Estoque</span>
     </a>
-    
+
     <a href="/financial/dashboard" class="bottom-nav-item @GetActiveClass("/financial")" @onclick="@(() => NavigateTo("/financial/dashboard"))" @onclick:preventDefault>
-        <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Class="bottom-nav-item__icon"/>
+        <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Class="bottom-nav-item__icon" />
         <span class="bottom-nav-item__label">Financeiro</span>
-    </a>
-    
-    <a href="#" class="bottom-nav-item" @onclick="@OnMoreClick" @onclick:preventDefault>
-        <MudIcon Icon="@Icons.Material.Filled.MoreHoriz" Class="bottom-nav-item__icon"/>
-        <span class="bottom-nav-item__label">Mais</span>
     </a>
 </nav>
 
-<MudMenu @bind-Open="_moreMenuOpen" AnchorOrigin="Origin.TopCenter" TransformOrigin="Origin.BottomCenter" PositionAtCursor="false">
-    <ActivatorContent>
-        <!-- Hidden activator, controlled programmatically -->
-    </ActivatorContent>
-    <ChildContent>
-        <MudMenuItem OnClick="@(() => NavigateTo("/service-orders"))">
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <MudIcon Icon="@Icons.Material.Filled.Build" Size="MudBlazor.Size.Small"/>
-                <span>Ordens de Serviço</span>
-            </div>
-        </MudMenuItem>
-        <MudMenuItem OnClick="@(() => NavigateTo("/hr"))">
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <MudIcon Icon="@Icons.Material.Filled.People" Size="MudBlazor.Size.Small"/>
-                <span>Recursos Humanos</span>
-            </div>
-        </MudMenuItem>
-        <MudMenuItem OnClick="@(() => NavigateTo("/assets"))">
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <MudIcon Icon="@Icons.Material.Filled.BusinessCenter" Size="MudBlazor.Size.Small"/>
-                <span>Ativos</span>
-            </div>
-        </MudMenuItem>
-        <!-- <MudMenuItem OnClick="@(() => NavigateTo("/reports"))">
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <MudIcon Icon="@Icons.Material.Filled.Assessment" Size="MudBlazor.Size.Small"/>
-                <span>Relatórios</span>
-            </div>
-        </MudMenuItem> -->
-        <MudMenuItem OnClick="@(() => NavigateTo("/kanban"))">
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <MudIcon Icon="@Icons.Material.Filled.ViewKanban" Size="MudBlazor.Size.Small"/>
-                <span>Kanban</span>
-            </div>
-        </MudMenuItem>
-        <MudDivider/>
-        <MudMenuItem OnClick="@(() => NavigateTo("/admin/users"))">
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <MudIcon Icon="@Icons.Material.Filled.AdminPanelSettings" Size="MudBlazor.Size.Small"/>
-                <span>Administração</span>
-            </div>
-        </MudMenuItem>
-    </ChildContent>
-</MudMenu>
-
 @code {
-    private string _currentPath = "";
-    private bool _moreMenuOpen = false;
+    private string _currentPath = string.Empty;
 
     protected override void OnInitialized()
     {
@@ -84,36 +38,28 @@
         Navigation.LocationChanged += OnLocationChanged;
     }
 
-    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
     {
-        _currentPath = Navigation.ToBaseRelativePath(e.Location);
+        _currentPath = Navigation.ToBaseRelativePath(args.Location);
         StateHasChanged();
     }
 
     private string GetActiveClass(string path)
     {
-        // Remove leading slash for comparison
         var currentPath = _currentPath.TrimStart('/');
         var targetPath = path.TrimStart('/');
-        
-        // Exact match for home
+
         if (string.IsNullOrEmpty(targetPath))
         {
-            return string.IsNullOrEmpty(currentPath) || currentPath == "dashboard" ? "active" : "";
+            return string.IsNullOrEmpty(currentPath) ? "active" : string.Empty;
         }
-        
-        // Starts with match for other routes
-        return currentPath.StartsWith(targetPath, StringComparison.OrdinalIgnoreCase) ? "active" : "";
+
+        return currentPath.StartsWith(targetPath, StringComparison.OrdinalIgnoreCase) ? "active" : string.Empty;
     }
 
     private void NavigateTo(string path)
     {
         Navigation.NavigateTo(path);
-    }
-
-    private void OnMoreClick()
-    {
-        _moreMenuOpen = !_moreMenuOpen;
     }
 
     public void Dispose()

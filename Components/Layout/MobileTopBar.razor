@@ -1,15 +1,13 @@
-@using erp.Services
 @using MudBlazor
 @inject NavigationManager Navigation
-@inject IApiService ApiService
-@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IJSRuntime JsRuntime
 
 <div class="mobile-topbar">
     <div class="mobile-topbar__left">
         <MudIconButton Icon="@Icons.Material.Filled.Menu" 
                        Color="MudBlazor.Color.Inherit" 
                        Edge="Edge.Start"
-                       OnClick="@OnMenuClick"
+                       OnClick="HandleMenuClick"
                        Class="mobile-topbar__icon-btn"
                        aria-label="Menu"/>
         <h1 class="mobile-topbar__title">@Title</h1>
@@ -20,7 +18,7 @@
             <MudBadge Content="@UnreadNotifications" Color="MudBlazor.Color.Error" Overlap="true" Class="mx-1">
                 <MudIconButton Icon="@Icons.Material.Filled.Notifications" 
                                Color="MudBlazor.Color.Inherit"
-                               OnClick="@OnNotificationsClick"
+                               OnClick="HandleNotificationsClick"
                                Class="mobile-topbar__icon-btn"
                                aria-label="Notificações"/>
             </MudBadge>
@@ -29,7 +27,7 @@
         {
             <MudIconButton Icon="@Icons.Material.Filled.Notifications" 
                            Color="MudBlazor.Color.Inherit"
-                           OnClick="@OnNotificationsClick"
+                           OnClick="HandleNotificationsClick"
                            Class="mobile-topbar__icon-btn"
                            aria-label="Notificações"/>
         }
@@ -39,16 +37,10 @@
                  AnchorOrigin="Origin.BottomRight"
                  TransformOrigin="Origin.TopRight"
                  Class="mobile-topbar__icon-btn">
-            <MudMenuItem OnClick="@NavigateToProfile">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <MudIcon Icon="@Icons.Material.Filled.Person" Size="MudBlazor.Size.Small"/>
-                    <span>Meu Perfil</span>
-                </div>
-            </MudMenuItem>
-            <MudMenuItem OnClick="@NavigateToPreferences">
+            <MudMenuItem OnClick="@NavigateToSettings">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <MudIcon Icon="@Icons.Material.Filled.Settings" Size="MudBlazor.Size.Small"/>
-                    <span>Preferências</span>
+                    <span>Configurações</span>
                 </div>
             </MudMenuItem>
             <MudDivider/>
@@ -75,26 +67,30 @@
     [Parameter]
     public int UnreadNotifications { get; set; }
 
-    private void NavigateToProfile()
+    private async Task HandleMenuClick()
     {
-        Navigation.NavigateTo("/profile");
+        await OnMenuClick.InvokeAsync();
     }
 
-    private void NavigateToPreferences()
+    private async Task HandleNotificationsClick()
     {
-        Navigation.NavigateTo("/preferences");
+        await OnNotificationsClick.InvokeAsync();
+    }
+
+    private void NavigateToSettings()
+    {
+        Navigation.NavigateTo("/settings");
     }
 
     private async Task Logout()
     {
         try
         {
-            await ApiService.PostAsync<object>("/api/auth/logout", null);
+            await JsRuntime.InvokeVoidAsync("erpAuth.logout");
             Navigation.NavigateTo("/login", forceLoad: true);
         }
-        catch (Exception ex)
+        catch
         {
-            Console.WriteLine($"Erro ao fazer logout: {ex.Message}");
             Navigation.NavigateTo("/login", forceLoad: true);
         }
     }

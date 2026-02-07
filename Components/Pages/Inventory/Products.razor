@@ -19,11 +19,11 @@
 <PageTitle>Produtos - Pillar ERP</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4 erp-page-header">
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
             <MudText Typo="Typo.h4">Gerenciar Produtos</MudText>
         </MudStack>
-        <MudStack Row="true" Spacing="2">
+        <MudStack Row="true" Spacing="2" Class="erp-page-actions">
             <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small">
                 <MudButton StartIcon="@Icons.Material.Filled.FileDownload" 
                            OnClick="ExportProducts"
@@ -211,7 +211,7 @@
 
     <!-- Products Table -->
     <MudPaper Elevation="2" Class="pa-4">
-        <MudTable T="ProductDto" 
+        <MudTable T="ProductDto" Class="mobile-cards-table mobile-cards-table--products"
                   ServerData="ServerReload" 
                   @ref="_table"
                   Dense="true" 
@@ -219,7 +219,8 @@
                   Striped="true" 
                   Loading="@_loading"
                   LoadingProgressColor="Color.Primary"
-                  RowsPerPage="@_defaultPageSize">
+                  RowsPerPage="@_defaultPageSize"
+                  Breakpoint="Breakpoint.Md">
             <ToolBarContent>
                 <MudText Typo="Typo.h6">
                     <MudIcon Icon="@Icons.Material.Filled.ViewList" Class="mr-2"/>
@@ -243,10 +244,10 @@
                 <MudTh Style="text-align: center; width: 140px;">Ações</MudTh>
             </HeaderContent>
             <RowTemplate>
-                <MudTd DataLabel="SKU">
+                <MudTd DataLabel="SKU" Class="mobile-cell-secondary">
                     <MudText Typo="Typo.body2" Style="font-family: 'Roboto Mono', monospace; font-weight: 500;">@context.Sku</MudText>
                 </MudTd>
-                <MudTd DataLabel="Nome">
+                <MudTd DataLabel="Nome" Class="mobile-cell-primary">
                     <MudStack Spacing="0">
                         <MudText Typo="Typo.body2" Style="font-weight: 500;">@context.Name</MudText>
                         @if (!string.IsNullOrEmpty(context.Barcode))
@@ -258,19 +259,19 @@
                         }
                     </MudStack>
                 </MudTd>
-                <MudTd DataLabel="Categoria">
+                <MudTd DataLabel="Categoria" Class="mobile-cell-hide">
                     <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Default">
                         @context.CategoryName
                     </MudChip>
                 </MudTd>
-                <MudTd DataLabel="Estoque" Style="text-align: right">
+                <MudTd DataLabel="Estoque" Style="text-align: right" Class="mobile-cell-meta">
                     <MudTooltip Text="@GetStockTooltip(context)">
                         <MudChip T="string" Size="Size.Small" Color="@GetStockColor(context)" Variant="Variant.Filled">
                             @context.CurrentStock.ToString("N0") @context.Unit
                         </MudChip>
                     </MudTooltip>
                 </MudTd>
-                <MudTd DataLabel="Preço" Style="text-align: right">
+                <MudTd DataLabel="Preço" Style="text-align: right" Class="mobile-cell-meta">
                     <MudText Typo="Typo.body2" Style="font-weight: 500;">@Currency.Format(context.SalePrice)</MudText>
                     @if (context.ProfitMargin > 0)
                     {
@@ -279,12 +280,12 @@
                         </MudText>
                     }
                 </MudTd>
-                <MudTd DataLabel="Status">
+                <MudTd DataLabel="Status" Class="mobile-cell-status">
                     <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)" Variant="Variant.Filled">
                         @GetStatusText(context.Status)
                     </MudChip>
                 </MudTd>
-                <MudTd DataLabel="Ações" Style="text-align: center">
+                <MudTd DataLabel="Ações" Style="text-align: center" Class="mobile-cell-actions">
                     <MudTooltip Text="Ver detalhes">
                         <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
                                        Size="Size.Small" 

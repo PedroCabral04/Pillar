@@ -129,15 +129,20 @@
     
     <!-- Mobile: Adaptive Navigation with Drawer + Bottom Nav -->
     <MudHidden Breakpoint="Breakpoint.SmAndDown" Invert="true">
+        <MobileTopBar Title="@GetMobilePageTitle()"
+                      OnMenuClick="OpenMobileDrawerAsync"
+                      OnNotificationsClick="OpenNotificationsAsync"
+                      UnreadNotifications="@_unreadNotifications" />
+
         @if (_mobileDrawerOpen)
         {
-            <div class="mobile-drawer-backdrop" @onclick="@CloseMobileDrawer"></div>
+            <div class="mobile-drawer-backdrop" @onclick="CloseMobileDrawerAsync"></div>
             <div class="mobile-drawer @(_mobileDrawerOpen ? "open" : string.Empty)">
-                <erp.Components.Shared.Sidebar IsOpen="true" OnToggleDrawer="@CloseMobileDrawer" IsMobile="true" />
+                <erp.Components.Shared.Sidebar IsOpen="true" OnToggleDrawer="CloseMobileDrawerAsync" IsMobile="true" />
             </div>
         }
-        
-        <MudMainContent Class="mobile-content-no-topbar">
+
+        <MudMainContent Class="mobile-content">
             @Body
         </MudMainContent>
         
@@ -161,7 +166,6 @@
 </MudLayout>
 
 @code {
-    private bool _drawerOpen = true; // Kept for mobile drawer logic if needed, but desktop uses _isSidebarLocked
     private bool _isSidebarLocked = true;
     private bool _isMouseOver = false;
     private System.Threading.CancellationTokenSource? _closeCts;
@@ -176,7 +180,6 @@
     private string? _currentUrl;
     private bool _isMobileView;
     private bool _brandingInitialized;
-    private string? _searchString;
 
     private TenantBrandingTheme _branding = TenantBrandingTheme.Default;
 
@@ -188,6 +191,8 @@
     protected override void OnInitialized()
     {
         ApplyTenantBranding();
+        _currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        NavigationManager.LocationChanged += OnLocationChanged;
         // Subscribe to branding changes
         BrandingProvider.BrandingChanged += OnBrandingChanged;
         // Subscribe to resume requests
@@ -219,7 +224,6 @@
                 // Fecha o drawer por padrão no mobile
                 if (_isMobileView)
                 {
-                    _drawerOpen = false;
                     _isSidebarLocked = false;
                 }
 
@@ -263,6 +267,7 @@
     public async ValueTask DisposeAsync()
     {
         PreferenceService.OnPreferenceChanged -= OnPreferenceChanged;
+        NavigationManager.LocationChanged -= OnLocationChanged;
         BrandingProvider.BrandingChanged -= OnBrandingChanged;
         _closeCts?.Cancel();
         _closeCts?.Dispose();
@@ -307,22 +312,6 @@
 
     private void ToggleDrawer()
     {
-        if (_isMobileView)
-        {
-            _drawerOpen = !_drawerOpen; // Mobile logic uses _drawerOpen? Wait, mobile uses _mobileDrawerOpen in markup
-            // Actually mobile drawer uses _mobileDrawerOpen in markup:
-            // <div class="mobile-drawer @(_mobileDrawerOpen ? "open" : string.Empty)">
-            // But the toggle button in AppBar calls ToggleDrawer.
-            // Let's check AppBar logic.
-            // AppBar is hidden on mobile? No.
-            // MudHidden Breakpoint="Breakpoint.SmAndDown" Invert="false" wraps the Sidebar Navigation (AppBar + Drawer).
-            // So on mobile, this AppBar is HIDDEN.
-            // Mobile has its own navigation?
-            // "Mobile: Adaptive Navigation with Drawer + Bottom Nav"
-            // <MudHidden Breakpoint="Breakpoint.SmAndDown" Invert="true"> ... <MobileBottomNav /> ... </MudHidden>
-            // So ToggleDrawer is only called on Desktop.
-        }
-        
         _isSidebarLocked = !_isSidebarLocked;
         if (_isSidebarLocked)
         {
@@ -361,10 +350,43 @@
         }
     }
 
-    private void CloseMobileDrawer()
+    private async Task OpenMobileDrawerAsync()
     {
+        if (_mobileDrawerOpen)
+        {
+            return;
+        }
+
+        _mobileDrawerOpen = true;
+        await BrowserService.LockScrollAsync();
+    }
+
+    private async Task CloseMobileDrawerAsync()
+    {
+        if (!_mobileDrawerOpen)
+        {
+            return;
+        }
+
         _mobileDrawerOpen = false;
-        _ = BrowserService.UnlockScrollAsync();
+        await BrowserService.UnlockScrollAsync();
+    }
+
+    private Task OpenNotificationsAsync()
+    {
+        NavigationManager.NavigateTo("/settings");
+        return Task.CompletedTask;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        _currentUrl = NavigationManager.ToBaseRelativePath(args.Location);
+        if (_mobileDrawerOpen)
+        {
+            _ = CloseMobileDrawerAsync();
+        }
+
+        InvokeAsync(StateHasChanged);
     }
 
     private async Task LogoutAsync()
@@ -597,5 +619,28 @@
             style += "font-size: 1.1rem;";
         }
         return style;
+    }
+
+    private string GetMobilePageTitle()
+    {
+        var route = _currentUrl?.Trim('/').ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(route))
+        {
+            return "Inicio";
+        }
+
+        if (route.StartsWith("dashboard")) return "Dashboard";
+        if (route.StartsWith("sales")) return "Vendas";
+        if (route.StartsWith("service-orders")) return "Servicos";
+        if (route.StartsWith("inventory")) return "Estoque";
+        if (route.StartsWith("financial")) return "Financeiro";
+        if (route.StartsWith("time-tracking")) return "Ponto";
+        if (route.StartsWith("assets")) return "Ativos";
+        if (route.StartsWith("kanban")) return "Kanban";
+        if (route.StartsWith("reports")) return "Relatorios";
+        if (route.StartsWith("settings")) return "Configuracoes";
+        if (route.StartsWith("admin")) return "Administracao";
+
+        return "Pillar ERP";
     }
 }

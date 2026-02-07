@@ -912,7 +912,7 @@
 /* Responsividade */
 @@media(max-width: 600px) {
     .chatbot-widget {
-        bottom: 16px;
+        bottom: calc(var(--mobile-bottomnav-height) + var(--safe-area-bottom) + 12px);
         right: 16px;
     }
 
@@ -923,9 +923,9 @@
 
     .chatbot-window {
         width: calc(100vw - 32px);
-        height: calc(100vh - 120px);
-        max-height: calc(100vh - 120px);
-        bottom: 88px;
+        height: calc((var(--vh, 1vh) * 100) - 132px);
+        max-height: calc((var(--vh, 1vh) * 100) - 132px);
+        bottom: calc(var(--mobile-bottomnav-height) + var(--safe-area-bottom) + 72px);
         right: 16px;
         border-radius: 16px;
     }
@@ -934,9 +934,9 @@
 @@media(max-width: 400px) {
     .chatbot-window {
         width: 100%;
-        height: calc(100vh - 80px);
-        max-height: calc(100vh - 80px);
-        bottom: 80px;
+        height: calc((var(--vh, 1vh) * 100) - 96px);
+        max-height: calc((var(--vh, 1vh) * 100) - 96px);
+        bottom: calc(var(--mobile-bottomnav-height) + var(--safe-area-bottom));
         right: 0;
         border-radius: 16px 16px 0 0;
     }

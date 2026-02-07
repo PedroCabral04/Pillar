@@ -18,7 +18,7 @@
 <PageTitle>Clientes - Pillar ERP</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4 erp-page-header">
         <MudText Typo="Typo.h4">Gerenciar Clientes</MudText>
         <MudButton Color="Color.Primary" 
                 Variant="Variant.Filled" 
@@ -33,28 +33,30 @@
         <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
     }
 
-    <MudTable T="CustomerDto" ServerData="ServerReload" 
-            Dense="false" Hover="true" Elevation="2" @ref="_table" Striped="true" Loading="@_loading" RowsPerPage="@_defaultPageSize">
+    <MudPaper Elevation="0" Class="mb-3 pa-3 mobile-filter-panel">
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="erp-toolbar-filters">
+            <MudTextField T="string" ValueChanged="OnSearch" Immediate="false" Placeholder="Procurar cliente" 
+                        Variant="Variant.Outlined" Margin="Margin.Dense"
+                        Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
+                        Clearable="true" Style="min-width: 250px;"/>
+            <MudSelect T="string" 
+                    Value="_statusFilter" 
+                    ValueChanged="OnStatusFilterChanged"
+                    Label="Status" 
+                    Variant="Variant.Outlined" 
+                    Margin="Margin.Dense"
+                    Clearable="true"
+                    Style="min-width: 120px;">
+                <MudSelectItem T="string" Value="@("true")">Ativo</MudSelectItem>
+                <MudSelectItem T="string" Value="@("false")">Inativo</MudSelectItem>
+            </MudSelect>
+        </MudStack>
+    </MudPaper>
+
+    <MudTable T="CustomerDto" ServerData="ServerReload" Class="mobile-cards-table mobile-cards-table--customers"
+            Dense="false" Hover="true" Elevation="2" @ref="_table" Striped="true" Loading="@_loading" RowsPerPage="@_defaultPageSize" Breakpoint="Breakpoint.Md">
         <ToolBarContent>
             <MudText Typo="Typo.h5">Clientes Cadastrados</MudText>
-            <MudSpacer/>
-            <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
-                <MudTextField T="string" ValueChanged="OnSearch" Immediate="false" Placeholder="Procurar cliente" 
-                            Variant="Variant.Outlined" Margin="Margin.Dense"
-                            Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
-                            Clearable="true" Style="min-width: 250px;"/>
-                <MudSelect T="string" 
-                        Value="_statusFilter" 
-                        ValueChanged="OnStatusFilterChanged"
-                        Label="Status" 
-                        Variant="Variant.Outlined" 
-                        Margin="Margin.Dense"
-                        Clearable="true"
-                        Style="min-width: 120px;">
-                    <MudSelectItem T="string" Value="@("true")">Ativo</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("false")">Inativo</MudSelectItem>
-                </MudSelect>
-            </MudStack>
         </ToolBarContent>
         <HeaderContent>
             <MudTh>Documento</MudTh>
@@ -66,19 +68,19 @@
             <MudTh Style="text-align: center">Ações</MudTh>
         </HeaderContent>
         <RowTemplate>
-            <MudTd DataLabel="Documento">
+            <MudTd DataLabel="Documento" Class="mobile-cell-secondary">
                 <MudText Typo="Typo.body2" Style="font-family: monospace">@FormatDocument(context.Document)</MudText>
             </MudTd>
-            <MudTd DataLabel="Nome">@context.Name</MudTd>
-            <MudTd DataLabel="E-mail">@context.Email</MudTd>
-            <MudTd DataLabel="Telefone">@(context.Mobile ?? context.Phone)</MudTd>
-            <MudTd DataLabel="Cidade">@context.City, @context.State</MudTd>
-            <MudTd DataLabel="Status">
+            <MudTd DataLabel="Nome" Class="mobile-cell-primary">@context.Name</MudTd>
+            <MudTd DataLabel="E-mail" Class="mobile-cell-hide">@context.Email</MudTd>
+            <MudTd DataLabel="Telefone" Class="mobile-cell-meta">@(context.Mobile ?? context.Phone)</MudTd>
+            <MudTd DataLabel="Cidade" Class="mobile-cell-hide">@context.City, @context.State</MudTd>
+            <MudTd DataLabel="Status" Class="mobile-cell-status">
                 <MudChip T="string" Size="Size.Small" Color="@(context.IsActive ? MudBlazor.Color.Success : MudBlazor.Color.Default)">
                     @(context.IsActive ? "Ativo" : "Inativo")
                 </MudChip>
             </MudTd>
-            <MudTd DataLabel="Ações" Style="text-align: center">
+            <MudTd DataLabel="Ações" Style="text-align: center" Class="mobile-cell-actions">
                 <MudTooltip Text="Editar cliente">
                     <MudIconButton Icon="@Icons.Material.Filled.Edit" 
                                 Size="Size.Small"
