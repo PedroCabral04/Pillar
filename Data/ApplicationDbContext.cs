@@ -65,6 +65,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<FinancialCategory> FinancialCategories { get; set; } = null!;
     public DbSet<CostCenter> CostCenters { get; set; } = null!;
     public DbSet<Commission> Commissions { get; set; } = null!;
+    public DbSet<SalesGoal> SalesGoals { get; set; } = null!;
+    public DbSet<VendorPerformance> VendorPerformances { get; set; } = null!;
+    public DbSet<ServiceOrderCommission> ServiceOrderCommissions { get; set; } = null!;
     
     // HR Management
     public DbSet<Department> Departments { get; set; } = null!;

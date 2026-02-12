@@ -1,0 +1,371 @@
+@page "/financial/commissions"
+@using erp.DTOs.Financial
+@using erp.Models.Financial
+@using erp.Services.Authorization
+@using erp.Components.Shared
+@using MudBlazor
+@attribute [Authorize(Policy = ModulePolicies.Financial)]
+
+<PageTitle>Comissões - Pillar ERP</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudText Typo="Typo.h4">
+            <MudIcon Icon="@Icons.Material.Filled.Payments" Class="mr-2" Color="Color.Primary" />
+            Comissões
+        </MudText>
+        <MudButton Variant="Variant.Outlined" Color="Color.Secondary"
+                   StartIcon="@Icons.Material.Filled.Refresh"
+                   OnClick="RefreshData">
+            Atualizar
+        </MudButton>
+    </MudStack>
+
+    <!-- Filtros -->
+    <MudCard Elevation="2" Class="mb-4">
+        <MudCardContent>
+            <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="mb-3">
+                <MudText Typo="Typo.subtitle1">
+                    <MudIcon Icon="@Icons.Material.Filled.FilterList" Size="Size.Small" Class="mr-1" />
+                    Filtros
+                </MudText>
+                <MudSpacer />
+            </MudStack>
+
+            <MudGrid Spacing="2">
+                <MudItem xs="12" sm="6" md="2">
+                    <MudSelect T="int?" Label="Vendedor" Value="_selectedUserId"
+                               ValueChanged="v => { _selectedUserId = v; OnFilterChanged(); }"
+                               Variant="Variant.Outlined" Clearable="true">
+                        @if (_users != null)
+                        {
+                            @foreach (var user in _users)
+                            {
+                                <MudSelectItem T="int?" Value="@((int?)user.Id)">@user.Name</MudSelectItem>
+                            }
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="2">
+                    <MudSelect T="string" Label="Status" Value="_selectedStatusFilter"
+                               ValueChanged="v => { _selectedStatusFilter = v; UpdateStatusFromFilter(); }"
+                               Variant="Variant.Outlined" Clearable="true" Strict="true">
+                        <MudSelectItem Value="@("Pendente")">Pendente</MudSelectItem>
+                        <MudSelectItem Value="@("Aprovada")">Aprovada</MudSelectItem>
+                        <MudSelectItem Value="@("Paga")">Paga</MudSelectItem>
+                        <MudSelectItem Value="@("Cancelada")">Cancelada</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="2">
+                    <MudSelect T="int?" Label="Ano" Value="_selectedYear"
+                               ValueChanged="v => { _selectedYear = v; OnFilterChanged(); }"
+                               Variant="Variant.Outlined">
+                        @for (int y = DateTime.Now.Year - 2; y <= DateTime.Now.Year + 1; y++)
+                        {
+                            var year = y;
+                            <MudSelectItem T="int?" Value="@((int?)year)">@year</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="2">
+                    <MudSelect T="int?" Label="Mês" Value="_selectedMonth"
+                               ValueChanged="v => { _selectedMonth = v; OnFilterChanged(); }"
+                               Variant="Variant.Outlined" Clearable="true">
+                        @for (int m = 1; m <= 12; m++)
+                        {
+                            var month = m;
+                            var monthName = new DateTime(DateTime.Now.Year, month, 1).ToString("MMMM", new System.Globalization.CultureInfo("pt-BR"));
+                            <MudSelectItem T="int?" Value="@((int?)month)">@(char.ToUpper(monthName[0]) + monthName.Substring(1))</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="4" Class="d-flex align-center">
+                    <MudTextField T="string" @bind-Value="_searchText"
+                                  Label="Buscar"
+                                  Placeholder="Vendedor, produto..."
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Search"
+                                  Clearable="true"
+                                  OnClear="OnFilterChanged"
+                                  OnKeyPress="OnSearchKeyPress" />
+                </MudItem>
+            </MudGrid>
+        </MudCardContent>
+    </MudCard>
+
+    <!-- Cards de Resumo -->
+    <MudGrid Spacing="3" Class="mb-4">
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="3">
+                <MudCardContent>
+                    <MudStack Spacing="1" AlignItems="AlignItems.Start">
+                        <MudText Typo="Typo.overline" Color="Color.Secondary">Total de Comissões</MudText>
+                        <MudText Typo="Typo.h5" Color="Color.Primary">@Currency.Format(_summary.TotalCommission)</MudText>
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="3">
+                <MudCardContent>
+                    <MudStack Spacing="1" AlignItems="AlignItems.Start">
+                        <MudText Typo="Typo.overline" Color="Color.Secondary">Pagas</MudText>
+                        <MudText Typo="Typo.h5" Color="Color.Success">@Currency.Format(_summary.PaidCommission)</MudText>
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="3">
+                <MudCardContent>
+                    <MudStack Spacing="1" AlignItems="AlignItems.Start">
+                        <MudText Typo="Typo.overline" Color="Color.Secondary">Pendentes</MudText>
+                        <MudText Typo="Typo.h5" Color="Color.Warning">@Currency.Format(_summary.PendingCommission)</MudText>
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="3">
+                <MudCardContent>
+                    <MudStack Spacing="1" AlignItems="AlignItems.Start">
+                        <MudText Typo="Typo.overline" Color="Color.Secondary">Vendas</MudText>
+                        <MudText Typo="Typo.h5">@_summary.TotalSales</MudText>
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Tabela de Comissões -->
+    <MudCard Elevation="3">
+        <MudCardContent Class="pa-0">
+            @if (_loading)
+            {
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+                <MudPaper Class="pa-8 text-center">
+                    <MudText Typo="Typo.body1">Carregando comissões...</MudText>
+                </MudPaper>
+            }
+            else if (_commissions != null && _commissions.Any())
+            {
+                <MudTable Items="@_filteredCommissions" Hover="true" Striped="true" Elevation="0"
+                          Dense="true" Breakpoint="Breakpoint.Md">
+                    <HeaderContent>
+                        <MudTh>Data</MudTh>
+                        <MudTh>Vendedor</MudTh>
+                        <MudTh>Produto</MudTh>
+                        <MudTh Class="text-right">Lucro</MudTh>
+                        <MudTh Class="text-right">%</MudTh>
+                        <MudTh Class="text-right">Comissão</MudTh>
+                        <MudTh Class="text-center">Status</MudTh>
+                        <MudTh Class="text-center">Ações</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Data">
+                            <MudText Typo="Typo.body2">@context.CreatedAt.ToString("dd/MM/yyyy")</MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Vendedor">
+                            <MudText Typo="Typo.body2">@context.UserName</MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Produto">
+                            <MudText Typo="Typo.body2">@context.ProductName</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Venda #@context.SaleId</MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Lucro" Class="text-right">
+                            <MudText Typo="Typo.body2">@Currency.Format(context.ProfitAmount)</MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Percentual" Class="text-right">
+                            <MudText Typo="Typo.body2">@context.CommissionPercent.ToString("F1")%</MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Comissão" Class="text-right">
+                            <MudText Typo="Typo.body2" Style="font-weight: 600">@Currency.Format(context.CommissionAmount)</MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Status" Class="text-center">
+                            @switch (context.Status)
+                            {
+                                case CommissionStatus.Paid:
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Success">Paga</MudChip>
+                                    break;
+                                case CommissionStatus.Approved:
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Info">Aprovada</MudChip>
+                                    break;
+                                case CommissionStatus.Pending:
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Warning">Pendente</MudChip>
+                                    break;
+                                case CommissionStatus.Cancelled:
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Error">Cancelada</MudChip>
+                                    break;
+                            }
+                        </MudTd>
+                        <MudTd DataLabel="Ações" Class="text-center">
+                            <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                                           Size="Size.Small"
+                                           OnClick="@(() => ViewDetails(context))" />
+                        </MudTd>
+                    </RowTemplate>
+                    <PagerContent>
+                        <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+                    </PagerContent>
+                </MudTable>
+            }
+            else if (!_loading)
+            {
+                <MudPaper Class="pa-8 text-center">
+                    <MudIcon Icon="@Icons.Material.Filled.ReceiptLong" Size="Size.Large" Color="Color.Default" />
+                    <MudText Typo="Typo.h6" Class="mt-2">Nenhuma comissão encontrada</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Ajuste os filtros ou altere o período</MudText>
+                </MudPaper>
+            }
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+@code {
+    private List<CommissionDto> _commissions = new();
+    private List<CommissionDto> _filteredCommissions = new();
+    private bool _loading = false;
+
+    // Filtros
+    private int? _selectedUserId = null;
+    private string _selectedStatusFilter = string.Empty;
+    private CommissionStatus? _selectedStatus = null;
+    private int? _selectedYear = DateTime.Now.Year;
+    private int? _selectedMonth = DateTime.Now.Month;
+    private string _searchText = string.Empty;
+
+    // Resumo
+    private CommissionSummary _summary = new();
+
+    // Lista de usuários
+    private List<VendorUserInfo> _users = new();
+
+    // DI
+    [Inject] private IApiService ApiService { get; set; } = null!;
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
+    [Inject] private CurrencyFormatService Currency { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        try
+        {
+            // Carregar comissões
+            var query = new List<string>();
+            if (_selectedUserId.HasValue) query.Add($"userId={_selectedUserId.Value}");
+            if (_selectedStatus.HasValue) query.Add($"status={(int)_selectedStatus.Value}");
+            if (_selectedYear.HasValue) query.Add($"year={_selectedYear.Value}");
+            if (_selectedMonth.HasValue) query.Add($"month={_selectedMonth.Value}");
+
+            var queryString = query.Any() ? "?" + string.Join("&", query) : "";
+
+            var commissions = await ApiService.GetAsync<IEnumerable<CommissionDto>>($"api/comissoes{queryString}");
+            _commissions = commissions?.ToList() ?? new List<CommissionDto>();
+
+            // Carregar usuários (simulado - você pode ter um endpoint real)
+            _users = _commissions
+                .GroupBy(c => c.UserId)
+                .Select(g => new VendorUserInfo { Id = g.Key, Name = g.First().UserName })
+                .OrderBy(u => u.Name)
+                .ToList();
+
+            ApplyFilters();
+            CalculateSummary();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar comissões: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void ApplyFilters()
+    {
+        if (!string.IsNullOrWhiteSpace(_searchText))
+        {
+            _filteredCommissions = _commissions
+                .Where(c => c.UserName.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
+                           c.ProductName.Contains(_searchText, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+        else
+        {
+            _filteredCommissions = _commissions.ToList();
+        }
+    }
+
+    private void CalculateSummary()
+    {
+        _summary = new CommissionSummary
+        {
+            TotalCommission = _commissions.Sum(c => c.CommissionAmount),
+            PaidCommission = _commissions.Where(c => c.Status == CommissionStatus.Paid).Sum(c => c.CommissionAmount),
+            PendingCommission = _commissions.Where(c => c.Status == CommissionStatus.Pending).Sum(c => c.CommissionAmount),
+            TotalSales = _commissions.Select(c => c.SaleId).Distinct().Count()
+        };
+    }
+
+    private void OnFilterChanged()
+    {
+        // Recarregar dados quando filtros mudarem
+        _ = LoadData();
+    }
+
+    private void UpdateStatusFromFilter()
+    {
+        _selectedStatus = _selectedStatusFilter switch
+        {
+            "Pendente" => CommissionStatus.Pending,
+            "Aprovada" => CommissionStatus.Approved,
+            "Paga" => CommissionStatus.Paid,
+            "Cancelada" => CommissionStatus.Cancelled,
+            _ => null
+        };
+        OnFilterChanged();
+    }
+
+    private void OnSearchKeyPress(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            ApplyFilters();
+            StateHasChanged();
+        }
+    }
+
+    private async Task RefreshData()
+    {
+        await LoadData();
+        Snackbar.Add("Dados atualizados", Severity.Success);
+    }
+
+    private void ViewDetails(CommissionDto commission)
+    {
+        // TODO: Abrir diálogo de detalhes
+        Snackbar.Add("Detalhes da comissão em desenvolvimento", Severity.Info);
+    }
+
+    // Classes auxiliares
+    private class VendorUserInfo
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+    }
+
+    private class CommissionSummary
+    {
+        public decimal TotalCommission { get; set; }
+        public decimal PaidCommission { get; set; }
+        public decimal PendingCommission { get; set; }
+        public int TotalSales { get; set; }
+    }
+}

@@ -40,6 +40,18 @@ public class ServiceOrderItem : IAuditable, IMustHaveTenant
     [MaxLength(2000)]
     public string? TechnicalDetails { get; set; }
 
+    /// <summary>
+    /// Cost price at the time of service, used for commission calculation
+    /// </summary>
+    [Precision(18, 2)]
+    public decimal CostPrice { get; set; }
+
+    /// <summary>
+    /// Commission percent applied to this service item
+    /// </summary>
+    [Precision(5, 2)]
+    public decimal CommissionPercent { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public DateTime? UpdatedAt { get; set; }

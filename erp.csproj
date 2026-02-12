@@ -19,9 +19,9 @@
             CS8604: Possible null reference argument
             CS8625: Cannot convert null literal to non-nullable reference type
             CS1998: Async method lacks await operators
-            Note: 1591 (Missing XML comment) is intentionally NOT suppressed to encourage documentation
+            CS1591: Missing XML comment for publicly visible type or member
         -->
-        <NoWarn>$(NoWarn);CS0618;CS8981;CS0169;CS0649;MUD0002;CS8602;CS8600;CS8618;CS8603;CS8604;CS8625;CS1998</NoWarn>
+        <NoWarn>$(NoWarn);CS0618;CS8981;CS0169;CS0649;MUD0002;CS8602;CS8600;CS8618;CS8603;CS8604;CS8625;CS1998;CS1591</NoWarn>
     </PropertyGroup>
 
 

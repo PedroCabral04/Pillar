@@ -4,6 +4,7 @@ using erp.DTOs.Financial;
 using erp.Models.Financial;
 using erp.Models.Identity;
 using erp.Models.Sales;
+using erp.Models.ServiceOrders;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -201,6 +202,120 @@ public class CommissionService : ICommissionService
         }
 
         _logger.LogInformation("Cancelled {Count} commissions for sale {SaleId}", commissions.Count, saleId);
+    }
+
+    public async Task CalculateCommissionsForServiceOrderAsync(int serviceOrderId)
+    {
+        var order = await _context.ServiceOrders
+            .Include(o => o.Items)
+            .Include(o => o.User)
+            .FirstOrDefaultAsync(o => o.Id == serviceOrderId);
+
+        if (order == null)
+        {
+            _logger.LogWarning("ServiceOrder {OrderId} not found for commission calculation", serviceOrderId);
+            return;
+        }
+
+        if (order.Status != "Concluído" && order.Status != "Entregue")
+        {
+            _logger.LogInformation("ServiceOrder {OrderId} is not completed (status: {Status}), skipping commission calculation", serviceOrderId, order.Status);
+            return;
+        }
+
+        if (order.UserId == 0)
+        {
+            _logger.LogWarning("ServiceOrder {OrderId} has no associated user, skipping commission calculation", serviceOrderId);
+            return;
+        }
+
+        // Get TenantId from the order user
+        var tenantId = order.User?.TenantId ?? 0;
+        if (tenantId == 0)
+        {
+            _logger.LogWarning("ServiceOrder {OrderId} has user with invalid TenantId (0)", serviceOrderId);
+        }
+
+        var commissionsToAdd = new List<ServiceOrderCommission>();
+
+        foreach (var item in order.Items)
+        {
+            // Skip if item has no commission
+            if (item.CommissionPercent <= 0)
+                continue;
+
+            // Calculate profit: Price - CostPrice
+            var profit = item.Price - item.CostPrice;
+            if (profit <= 0)
+                continue;
+
+            // Calculate commission: Profit * CommissionPercent / 100
+            var commissionAmount = profit * (item.CommissionPercent / 100m);
+
+            // Check if commission already exists
+            var existing = await _context.ServiceOrderCommissions
+                .FirstOrDefaultAsync(c => c.ServiceOrderItemId == item.Id);
+
+            if (existing != null)
+            {
+                existing.ProfitAmount = profit;
+                existing.CommissionPercent = item.CommissionPercent;
+                existing.CommissionAmount = commissionAmount;
+                existing.UpdatedAt = DateTime.UtcNow;
+                _context.ServiceOrderCommissions.Update(existing);
+            }
+            else
+            {
+                var commission = new ServiceOrderCommission
+                {
+                    TenantId = tenantId,
+                    ServiceOrderId = order.Id,
+                    ServiceOrderItemId = item.Id,
+                    UserId = order.UserId,
+                    ProfitAmount = profit,
+                    CommissionPercent = item.CommissionPercent,
+                    CommissionAmount = commissionAmount,
+                    Status = CommissionStatus.Pending,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedByUserId = order.UserId
+                };
+
+                commissionsToAdd.Add(commission);
+            }
+
+            _logger.LogInformation(
+                "Commission calculated for ServiceOrder {OrderId}, Item {Description}: Profit={Profit}, Percent={Percent}%, Amount={Amount}",
+                serviceOrderId, item.Description, profit, item.CommissionPercent, commissionAmount);
+        }
+
+        if (commissionsToAdd.Count > 0)
+        {
+            _context.ServiceOrderCommissions.AddRange(commissionsToAdd);
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task CancelCommissionsForServiceOrderAsync(int serviceOrderId)
+    {
+        var commissions = await _context.ServiceOrderCommissions
+            .Where(c => c.ServiceOrderId == serviceOrderId)
+            .ToListAsync();
+
+        foreach (var commission in commissions)
+        {
+            if (commission.Status == CommissionStatus.Paid)
+            {
+                _logger.LogWarning("Cannot cancel paid commission {CommissionId}", commission.Id);
+                continue;
+            }
+
+            commission.Status = CommissionStatus.Cancelled;
+            commission.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await _context.SaveChangesAsync();
+        _logger.LogInformation("Cancelled {Count} commissions for service order {OrderId}", commissions.Count, serviceOrderId);
     }
 
     private static CommissionDto MapToDto(Commission commission)

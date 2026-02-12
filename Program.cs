@@ -506,6 +506,8 @@ builder.Services.AddScoped<erp.Services.Financial.IAccountReceivableService, erp
 builder.Services.AddScoped<erp.Services.Financial.IAccountPayableService, erp.Services.Financial.AccountPayableService>();
 builder.Services.AddScoped<erp.Services.Financial.IFinancialDashboardService, erp.Services.Financial.FinancialDashboardService>();
 builder.Services.AddScoped<erp.Services.Financial.ICommissionService, erp.Services.Financial.CommissionService>();
+builder.Services.AddScoped<erp.Services.Financial.ISalesGoalService, erp.Services.Financial.SalesGoalService>();
+builder.Services.AddScoped<erp.Services.Financial.IVendorPerformanceService, erp.Services.Financial.VendorPerformanceService>();
 
 // Financial DAOs
 builder.Services.AddScoped<erp.DAOs.Financial.ISupplierDao, erp.DAOs.Financial.SupplierDao>();
@@ -514,6 +516,8 @@ builder.Services.AddScoped<erp.DAOs.Financial.ICostCenterDao, erp.DAOs.Financial
 builder.Services.AddScoped<erp.DAOs.Financial.IAccountReceivableDao, erp.DAOs.Financial.AccountReceivableDao>();
 builder.Services.AddScoped<erp.DAOs.Financial.IAccountPayableDao, erp.DAOs.Financial.AccountPayableDao>();
 builder.Services.AddScoped<erp.DAOs.Financial.ICommissionDao, erp.DAOs.Financial.CommissionDao>();
+builder.Services.AddScoped<erp.DAOs.Financial.ISalesGoalDao, erp.DAOs.Financial.SalesGoalDao>();
+builder.Services.AddScoped<erp.DAOs.Financial.IVendorPerformanceDao, erp.DAOs.Financial.VendorPerformanceDao>();
 
 // Financial validation services (BrazilianDocumentValidator is static, no DI needed)
 builder.Services.AddHttpClient<erp.Services.Financial.Validation.IViaCepService, erp.Services.Financial.Validation.ViaCepService>();

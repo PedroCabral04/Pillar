@@ -1,0 +1,344 @@
+@page "/vendor-performance"
+@using erp.DTOs.Financial
+@using erp.DTOs.User
+@using erp.Services
+@using erp.Services.Authorization
+@using erp.Components.Shared
+@using erp.Components.Shared.Dialogs.Financial
+@attribute [Authorize(Policy = ModulePolicies.Financial)]
+
+<PageTitle>Performance de Vendedores - Pillar ERP</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudText Typo="Typo.h4">
+            <MudIcon Icon="@Icons.Material.Filled.People" Class="mr-2" />
+            Performance de Vendedores
+        </MudText>
+        <MudStack Row="true" Spacing="2">
+            <MudButton Color="Color.Secondary" Variant="Variant.Outlined"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       OnClick="RecalculateAll">
+                Recalcular Período
+            </MudButton>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenCreateGoalDialog">
+                Nova Meta
+            </MudButton>
+        </MudStack>
+    </MudStack>
+
+    <!-- Filters -->
+    <MudCard Elevation="2" Class="mb-4">
+        <MudCardContent>
+            <MudGrid>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudSelect T="int" Label="Mês" @bind-Value="_selectedMonth" Style="min-width: 100px;">
+                        @for (int m = 1; m <= 12; m++)
+                        {
+                            var monthName = new DateTime(2025, m, 1).ToString("MMMM", new System.Globalization.CultureInfo("pt-BR"));
+                            <MudSelectItem Value="@(m)">@(char.ToUpper(monthName[0]) + monthName.Substring(1))</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudSelect T="int" Label="Ano" @bind-Value="_selectedYear" Style="min-width: 120px;">
+                        @foreach (var year in _availableYears)
+                        {
+                            <MudSelectItem Value="@year">@year</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="12" md="6" Class="d-flex align-center">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadPerformance" StartIcon="@Icons.Material.Filled.Search" Class="mr-2">
+                        Carregar Dados
+                    </MudButton>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        @(_monthName) @_selectedYear
+                    </MudText>
+                </MudItem>
+            </MudGrid>
+        </MudCardContent>
+    </MudCard>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+    }
+
+    @if (_performances != null && _performances.Any())
+    {
+        <!-- Top Performers Card -->
+        <MudCard Elevation="3" Class="mb-4">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">
+                        <MudIcon Icon="@Icons.Material.Filled.EmojiEvents" Class="mr-2" Color="Color.Warning" />
+                        Top Performers - @(_monthName) @_selectedYear
+                    </MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudTable Items="@_performances.Take(5).ToList()" Hover="true" Elevation="0" Dense="true">
+                    <HeaderContent>
+                        <MudTh>Vendedor</MudTh>
+                        <MudTh Class="text-right">Vendas</MudTh>
+                        <MudTh Class="text-right">Lucro</MudTh>
+                        <MudTh Class="text-right">Comissão</MudTh>
+                        <MudTh Class="text-center">Meta</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.UserName</MudTd>
+                        <MudTd Class="text-right">@Currency.Format(context.TotalSalesAmount)</MudTd>
+                        <MudTd Class="text-right">@Currency.Format(context.TotalProfitAmount)</MudTd>
+                        <MudTd Class="text-right">
+                            <MudText Typo="Typo.body2" Style="font-weight: 600">@Currency.Format(context.TotalCommissionEarned)</MudText>
+                        </MudTd>
+                        <MudTd Class="text-center">
+                            @if (context.SalesGoalTarget.HasValue)
+                            {
+                                <MudChip T="string" Size="Size.Small"
+                                        Color="@(context.SalesGoalAchieved ? Color.Success : Color.Warning)">
+                                    @(context.SalesGoalAchievementPercent?.ToString("F1"))%
+                                </MudChip>
+                            }
+                            else
+                            {
+                                <MudText Typo="Typo.caption">N/A</MudText>
+                            }
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </MudCardContent>
+        </MudCard>
+
+        <!-- Full Performance Table -->
+        <MudCard Elevation="3">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Detalhamento Completo</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudTable Items="@_performances" Hover="true" Striped="true" Elevation="0"
+                          ServerData="@ServerReload" Breakpoint="Breakpoint.Md">
+                    <HeaderContent>
+                        <MudTh>Vendedor</MudTh>
+                        <MudTh Class="text-right">Qtd. Vendas</MudTh>
+                        <MudTh Class="text-right">Total Vendas</MudTh>
+                        <MudTh Class="text-right">Lucro</MudTh>
+                        <MudTh Class="text-right">Comissão Total</MudTh>
+                        <MudTh Class="text-right">Paga</MudTh>
+                        <MudTh Class="text-right">Pendente</MudTh>
+                        <MudTh Class="text-center">Meta Atingida</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Vendedor">
+                            <MudText Typo="Typo.body1">@context.UserName</MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Qtd" Class="text-right">@context.TotalSalesCount</MudTd>
+                        <MudTd DataLabel="Total" Class="text-right">@Currency.Format(context.TotalSalesAmount)</MudTd>
+                        <MudTd DataLabel="Lucro" Class="text-right">@Currency.Format(context.TotalProfitAmount)</MudTd>
+                        <MudTd DataLabel="Comissão" Class="text-right">
+                            <MudText Typo="Typo.body2" Style="font-weight: 700">@Currency.Format(context.TotalCommissionEarned)</MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Paga" Class="text-right">
+                            <MudText Typo="Typo.body2" Color="Color.Success">@Currency.Format(context.TotalCommissionPaid)</MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Pendente" Class="text-right">
+                            <MudText Typo="Typo.body2" Color="Color.Warning">@Currency.Format(context.TotalCommissionPending)</MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Meta" Class="text-center">
+                            @if (context.SalesGoalTarget.HasValue)
+                            {
+                                <MudChip T="string" Size="Size.Small"
+                                        Color="@(context.SalesGoalAchieved ? Color.Success : Color.Warning)"
+                                        Variant="@(context.SalesGoalAchieved ? Variant.Filled : Variant.Outlined)">
+                                    @(context.SalesGoalAchievementPercent?.ToString("F1"))%
+                                </MudChip>
+                                <MudText Typo="Typo.caption" Class="d-block mt-1">
+                                    @Currency.Format(context.SalesGoalTarget.Value)
+                                </MudText>
+                            }
+                            else
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Default">Sem meta</MudText>
+                            }
+                        </MudTd>
+                    </RowTemplate>
+                    <PagerContent>
+                        <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+                    </PagerContent>
+                </MudTable>
+            </MudCardContent>
+        </MudCard>
+    }
+    else if (!_loading)
+    {
+        <MudPaper Class="pa-8 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.PersonOutline" Size="Size.Large" Color="Color.Default" />
+            <MudText Typo="Typo.h6" Class="mt-2">Nenhuma performance encontrada</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Selecione um período para carregar os dados</MudText>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    private List<VendorPerformanceDto> _performances = new();
+    private List<UserDto> _users = new();
+    private bool _loading = false;
+    private int _selectedMonth = DateTime.Now.Month;
+    private int _selectedYear = DateTime.Now.Year;
+    private string _monthName = "";
+    private int[] _availableYears = { 2024, 2025, 2026, 2027, 2028 };
+    private int _currentTenantId = 1; // TODO: Get from user context
+
+    [Inject] private IApiService ApiService { get; set; } = null!;
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
+    [Inject] private IDialogService DialogService { get; set; } = null!;
+    [Inject] private NavigationManager Navigation { get; set; } = null!;
+    [Inject] private CurrencyFormatService Currency { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _monthName = new DateTime(_selectedYear, _selectedMonth, 1).ToString("MMMM", new System.Globalization.CultureInfo("pt-BR"));
+        _monthName = char.ToUpper(_monthName[0]) + _monthName.Substring(1);
+        await LoadUsers();
+        await LoadPerformance();
+    }
+
+    private async Task LoadUsers()
+    {
+        try
+        {
+            _users = await ApiService.GetAsync<List<UserDto>>("/api/users") ?? new List<UserDto>();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar usuários: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadPerformance()
+    {
+        _loading = true;
+        try
+        {
+            _monthName = new DateTime(_selectedYear, _selectedMonth, 1).ToString("MMMM", new System.Globalization.CultureInfo("pt-BR"));
+            _monthName = char.ToUpper(_monthName[0]) + _monthName.Substring(1);
+
+            // TODO: Get tenantId from current user context
+            var tenantId = 1; // Placeholder - should be from user context
+
+            _performances = await ApiService.GetAsync<List<VendorPerformanceDto>>(
+                $"/api/vendor-performance/tenant/{tenantId}/period?year={_selectedYear}&month={_selectedMonth}")
+                ?? new List<VendorPerformanceDto>();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar performance: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task RecalculateAll()
+    {
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small };
+        var parameters = new DialogParameters
+        {
+            { "ContentText", $"Deseja recalcular a performance de todos os vendedores para {_monthName} {_selectedYear}?" },
+            { "ButtonText", "Recalcular" },
+            { "Color", Color.Primary }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Recalcular Performance", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            try
+            {
+                // TODO: Get tenantId from current user context
+                var tenantId = 1; // Placeholder
+
+                await ApiService.PostAsync<object>(
+                    $"/api/vendor-performance/tenant/{tenantId}/recalculate-period?year={_selectedYear}&month={_selectedMonth}",
+                    null);
+
+                Snackbar.Add("Performance recalculada com sucesso", Severity.Success);
+                await LoadPerformance();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao recalcular: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task OpenCreateGoalDialog()
+    {
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium };
+        var parameters = new DialogParameters
+        {
+            { "Model", new CreateSalesGoalDto
+                {
+                    TenantId = _currentTenantId,
+                    Year = _selectedYear,
+                    Month = _selectedMonth,
+                    TargetSalesAmount = 0,
+                    TargetProfitAmount = 0,
+                    TargetSalesCount = 1,
+                    BonusCommissionPercent = 0
+                }
+            },
+            { "IsEditing", false },
+            { "Users", _users },
+            { "AvailableYears", _availableYears }
+        };
+
+        var dialog = await DialogService.ShowAsync<CreateSalesGoalDialog>("Nova Meta de Vendas", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled && result.Data != null)
+        {
+            try
+            {
+                var goalData = (CreateSalesGoalDto)result.Data;
+
+                // Get current user ID from auth context
+                var userIdClaim = await GetCurrentUserId();
+                goalData.CreatedByUserId = userIdClaim;
+
+                await ApiService.PostAsync<SalesGoalDto>("/api/sales-goals", goalData);
+                Snackbar.Add("Meta criada com sucesso!", Severity.Success);
+                await LoadPerformance();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao criar meta: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task<int> GetCurrentUserId()
+    {
+        // TODO: Get from actual authentication context
+        // For now, returning a placeholder
+        return 1;
+    }
+
+    private async Task<TableData<VendorPerformanceDto>> ServerReload(TableState state, CancellationToken token)
+    {
+        // For now, return all data sorted
+        var sortedData = _performances.OrderByDescending(p => p.TotalCommissionEarned).ToList();
+        return await Task.FromResult(new TableData<VendorPerformanceDto>
+        {
+            TotalItems = sortedData.Count,
+            Items = sortedData
+        });
+    }
+}

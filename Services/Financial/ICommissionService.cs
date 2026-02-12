@@ -29,4 +29,14 @@ public interface ICommissionService
     /// Cancels commissions for a cancelled sale
     /// </summary>
     Task CancelCommissionsForSaleAsync(int saleId);
+
+    /// <summary>
+    /// Calculates and creates commissions for a completed service order
+    /// </summary>
+    Task CalculateCommissionsForServiceOrderAsync(int serviceOrderId);
+
+    /// <summary>
+    /// Cancels commissions for a cancelled service order
+    /// </summary>
+    Task CancelCommissionsForServiceOrderAsync(int serviceOrderId);
 }

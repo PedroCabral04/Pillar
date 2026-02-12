@@ -50,6 +50,19 @@
                                         AdornmentIcon="@Icons.Material.Filled.Person"
                                         DebounceInterval="300"/>
                     </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudAutocomplete T="VendorUserInfo"
+                                        Label="Vendedor (opcional)"
+                                        @bind-Value="_selectedVendor"
+                                        SearchFunc="SearchVendors"
+                                        ToStringFunc="@(v => v?.Name ?? "")"
+                                        Variant="Variant.Outlined"
+                                        Clearable="true"
+                                        Adornment="Adornment.Start"
+                                        AdornmentIcon="@Icons.Material.Filled.Badge"
+                                        DebounceInterval="300"/>
+                    </MudItem>
                     
                     @if (!QuickMode)
                     {
@@ -286,6 +299,7 @@
     private bool _loading = false;
     private CreateSaleDto _newSale = new();
     private CustomerDto? _selectedCustomer;
+    private VendorUserInfo? _selectedVendor;
     private Dictionary<int, ProductDto?> _selectedProducts = new();
     private DateTime? _saleDate = DateTime.Now;
     
@@ -352,7 +366,26 @@
             return Array.Empty<ProductDto>();
         }
     }
-    
+
+    private async Task<IEnumerable<VendorUserInfo>> SearchVendors(string value, CancellationToken ct)
+    {
+        try
+        {
+            var url = string.IsNullOrWhiteSpace(value)
+                ? "/api/users?pageSize=20&isActive=true"
+                : $"/api/users?search={Uri.EscapeDataString(value)}&pageSize=20&isActive=true";
+
+            var response = await ApiService.GetAsync<PaginatedUsersResponse>(url);
+            return response?.Items?.Select(u => new VendorUserInfo { Id = u.Id, Name = u.FullName ?? u.UserName ?? "" })
+                   ?? new List<VendorUserInfo>();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao buscar vendedores");
+            return Array.Empty<VendorUserInfo>();
+        }
+    }
+
     private void AddItem()
     {
         _newSale.Items.Add(new CreateSaleItemDto
@@ -468,6 +501,7 @@
         try
         {
             _newSale.CustomerId = _selectedCustomer?.Id;
+            _newSale.UserId = _selectedVendor?.Id;
             _newSale.SaleDate = _saleDate ?? DateTime.Now;
             _newSale.Status = QuickMode ? "Finalizada" : _newSale.Status;
             if (QuickMode && !(_newSale.Notes?.Contains(QuickSaleMarker, StringComparison.OrdinalIgnoreCase) ?? false))
@@ -498,5 +532,24 @@
         {
             _loading = false;
         }
+    }
+
+    // Classes auxiliares
+    private class VendorUserInfo
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+    }
+
+    private class PaginatedUsersResponse
+    {
+        public List<UserDto> Items { get; set; } = new();
+    }
+
+    private class UserDto
+    {
+        public int Id { get; set; }
+        public string? UserName { get; set; }
+        public string? FullName { get; set; }
     }
 }

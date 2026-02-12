@@ -1,0 +1,225 @@
+@using erp.DTOs.Financial
+@using erp.DTOs.User
+
+<MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Flag" Color="MudBlazor.Color.Primary" Size="MudBlazor.Size.Large" />
+            <MudText Typo="Typo.h6">@(_isEditing ? "Editar Meta" : "Nova Meta de Vendas")</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="form" @bind-IsValid="@success" Class="pa-2">
+            <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Person" Size="MudBlazor.Size.Small" Class="mr-1" />
+                Vendedor
+            </MudText>
+            <MudGrid Spacing="3">
+                <MudItem xs="12">
+                    <MudSelect T="int"
+                               Label="Vendedor"
+                               @bind-Value="_model.UserId"
+                               Required="true"
+                               RequiredError="Vendedor é obrigatório"
+                               Variant="Variant.Outlined"
+                               Disabled="_isEditing"
+                               Adornment="Adornment.Start"
+                               AdornmentIcon="@Icons.Material.Filled.Person"
+                               HelperText="Selecione o vendedor">
+                        @foreach (var user in Users.Where(u => u.IsActive))
+                        {
+                            <MudSelectItem T="int" Value="@user.Id">@user.FullName (@user.Username)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+
+            <MudDivider Class="my-4" />
+
+            <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.CalendarMonth" Size="MudBlazor.Size.Small" Class="mr-1" />
+                Período
+            </MudText>
+            <MudGrid Spacing="3">
+                <MudItem xs="6" sm="3">
+                    <MudSelect T="int"
+                               Label="Mês"
+                               @bind-Value="_model.Month"
+                               Required="true"
+                               RequiredError="Mês é obrigatório"
+                               Variant="Variant.Outlined"
+                               Disabled="_isEditing">
+                        @for (int m = 1; m <= 12; m++)
+                        {
+                            var monthName = new DateTime(2025, m, 1).ToString("MMMM", new System.Globalization.CultureInfo("pt-BR"));
+                            <MudSelectItem T="int" Value="@(m)">@(char.ToUpper(monthName[0]) + monthName.Substring(1))</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="6" sm="3">
+                    <MudSelect T="int"
+                               Label="Ano"
+                               @bind-Value="_model.Year"
+                               Required="true"
+                               RequiredError="Ano é obrigatório"
+                               Variant="Variant.Outlined">
+                        @foreach (var year in AvailableYears)
+                        {
+                            <MudSelectItem T="int" Value="@year">@year</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+
+            <MudDivider Class="my-4" />
+
+            <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.EmojiEvents" Size="MudBlazor.Size.Small" Class="mr-1" />
+                Metas
+            </MudText>
+            <MudGrid Spacing="3">
+                <MudItem xs="12" sm="6" md="4">
+                    <MudNumericField @bind-Value="_model.TargetSalesAmount"
+                                     T="decimal"
+                                     Label="Meta de Vendas (R$)"
+                                     Format="C2"
+                                     Min="0.01m"
+                                     DecimalsPrecision="2"
+                                     Required="true"
+                                     RequiredError="Meta de vendas é obrigatória"
+                                     Variant="Variant.Outlined"
+                                     Adornment="Adornment.Start"
+                                     AdornmentIcon="@Icons.Material.Filled.AttachMoney"
+                                     HelperText="Valor total de vendas"/>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="4">
+                    <MudNumericField @bind-Value="_model.TargetProfitAmount"
+                                     T="decimal"
+                                     Label="Meta de Lucro (R$)"
+                                     Format="C2"
+                                     Min="0m"
+                                     DecimalsPrecision="2"
+                                     Variant="Variant.Outlined"
+                                     Adornment="Adornment.Start"
+                                     AdornmentIcon="@Icons.Material.Filled.TrendingUp"
+                                     HelperText="Lucro esperado"/>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="4">
+                    <MudNumericField @bind-Value="_model.TargetSalesCount"
+                                     T="int"
+                                     Label="Qtd. de Vendas"
+                                     Min="1"
+                                     Required="true"
+                                     RequiredError="Quantidade mínima é 1"
+                                     Variant="Variant.Outlined"
+                                     Adornment="Adornment.Start"
+                                     AdornmentIcon="@Icons.Material.Filled.ShoppingCart"
+                                     HelperText="Número de vendas"/>
+                </MudItem>
+            </MudGrid>
+
+            <MudDivider Class="my-4" />
+
+            <MudText Typo="Typo.subtitle2" Color="MudBlazor.Color.Primary" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Percent" Size="MudBlazor.Size.Small" Class="mr-1" />
+                Bônus por Atingimento
+            </MudText>
+            <MudGrid Spacing="3">
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string"
+                                  @bind-Value="_bonusPercentString"
+                                  Label="Bônus de Comissão (%)"
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Stars"
+                                  HelperText="Percentual extra se meta for atingida (0-100)"/>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_model.Notes"
+                                  Label="Observações"
+                                  Lines="2"
+                                  MaxLength="500"
+                                  Counter="500"
+                                  Variant="Variant.Outlined"
+                                  HelperText="Informações adicionais sobre a meta"/>
+                </MudItem>
+            </MudGrid>
+
+            <MudDivider Class="my-4" />
+
+            <MudItem xs="12">
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
+                    <MudText Typo="Typo.body2">
+                        <strong>Informações:</strong><br/>
+                        • Meta de Vendas: valor total que o vendedor deve atingir no mês<br/>
+                        • Meta de Lucro: lucro esperado sobre as vendas<br/>
+                        • Qtd. de Vendas: número mínimo de transações<br/>
+                        • Bônus: percentual adicional de comissão se todas as metas forem atingidas
+                    </MudText>
+                </MudAlert>
+            </MudItem>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Outlined">Cancelar</MudButton>
+        <MudButton Color="MudBlazor.Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@_saving">
+            <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-1"/>
+            @(_saving ? "Salvando..." : "Salvar Meta")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public CreateSalesGoalDto Model { get; set; } = new();
+    [Parameter] public bool IsEditing { get; set; } = false;
+    [Parameter] public List<UserDto> Users { get; set; } = new();
+    [Parameter] public int[] AvailableYears { get; set; } = new[] { 2024, 2025, 2026, 2027, 2028 };
+
+    private MudForm form = null!;
+    private bool success;
+    private bool _saving;
+    private bool _isEditing => IsEditing;
+    private CreateSalesGoalDto _model => Model;
+    private string _bonusPercentString = "0";
+
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
+        _bonusPercentString = _model.BonusCommissionPercent.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+        if (_model.Year == 0)
+        {
+            _model.Year = DateTime.Now.Year;
+        }
+        if (_model.Month == 0)
+        {
+            _model.Month = DateTime.Now.Month;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await form.Validate();
+        if (success)
+        {
+            // Update the model with the bonus percent
+            if (decimal.TryParse(_bonusPercentString, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var bonusPercent))
+            {
+                _model.BonusCommissionPercent = bonusPercent;
+            }
+
+            _saving = true;
+            try
+            {
+                await Task.Delay(100); // Small delay for UX
+                MudDialog.Close(DialogResult.Ok(Model));
+            }
+            finally
+            {
+                _saving = false;
+            }
+        }
+    }
+}

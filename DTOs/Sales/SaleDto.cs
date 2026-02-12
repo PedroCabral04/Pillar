@@ -36,7 +36,12 @@ public class SaleItemDto
 public class CreateSaleDto
 {
     public int? CustomerId { get; set; }
-    
+
+    /// <summary>
+    /// Vendedor responsável pela venda (opcional - se não informado, usa o usuário logado)
+    /// </summary>
+    public int? UserId { get; set; }
+
     [Required(ErrorMessage = "Data da venda é obrigatória")]
     public DateTime SaleDate { get; set; } = DateTime.Now;
     

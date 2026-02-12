@@ -505,34 +505,45 @@
 
     private async Task CheckOnboardingAsync()
     {
-        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-        var user = authState.User;
-
-        if (user.Identity?.IsAuthenticated == true)
+        try
         {
-            var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            if (!string.IsNullOrEmpty(userId))
-            {
-                var hasCompleted = await OnboardingService.HasCompletedOnboardingAsync(userId);
-                if (!hasCompleted)
-                {
-                    var options = new DialogOptions 
-                    { 
-                        CloseOnEscapeKey = false,
-                        BackdropClick = false,
-                        MaxWidth = MaxWidth.Medium,
-                        FullWidth = false
-                    };
-                    
-                    var parameters = new DialogParameters
-                    {
-                        { "UserId", userId },
-                        { "TourId", "getting-started" }
-                    };
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
 
-                    await DialogService.ShowAsync<erp.Components.Shared.OnboardingWizard>("Bem-vindo", parameters, options);
+            if (user.Identity?.IsAuthenticated == true)
+            {
+                var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                if (!string.IsNullOrEmpty(userId))
+                {
+                    var hasCompleted = await OnboardingService.HasCompletedOnboardingAsync(userId);
+                    if (!hasCompleted)
+                    {
+                        var options = new DialogOptions
+                        {
+                            CloseOnEscapeKey = false,
+                            BackdropClick = false,
+                            MaxWidth = MaxWidth.Medium,
+                            FullWidth = false
+                        };
+
+                        var parameters = new DialogParameters
+                        {
+                            { "UserId", userId },
+                            { "TourId", "getting-started" }
+                        };
+
+                        await DialogService.ShowAsync<erp.Components.Shared.OnboardingWizard>("Bem-vindo", parameters, options);
+                    }
                 }
             }
+        }
+        catch (ObjectDisposedException)
+        {
+            // Ignore - circuit was disposed
+        }
+        catch (InvalidOperationException)
+        {
+            // Ignore - circuit was disposed
         }
     }
 
