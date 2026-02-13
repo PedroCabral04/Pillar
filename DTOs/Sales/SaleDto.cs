@@ -29,6 +29,7 @@ public class SaleItemDto
     public string ProductSku { get; set; } = string.Empty;
     public decimal Quantity { get; set; }
     public decimal UnitPrice { get; set; }
+    public decimal CostPrice { get; set; }
     public decimal Discount { get; set; }
     public decimal Total { get; set; }
 }

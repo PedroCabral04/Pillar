@@ -6,6 +6,7 @@ using MudBlazor.Services;
 using erp.Components;
 using erp.DAOs;
 using erp.Data;
+using erp.Extensions;
 using erp.Mappings;
 using erp.Services;
 using Blazored.LocalStorage;
@@ -358,74 +359,35 @@ builder.Services.AddAntiforgery(o =>
     // HeaderName can be customized if you post forms via JS: o.HeaderName = "X-CSRF-TOKEN";
 });
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
                     ?? builder.Configuration["DbContextSettings:ConnectionString"];
 
 // SECURITY: Valida que connection string está configurada em produção
 if (builder.Environment.IsProduction() && string.IsNullOrWhiteSpace(connectionString))
 {
     throw new InvalidOperationException(
-        "Database connection string not configured. Please set ConnectionStrings__DefaultConnection or DbContextSettings__ConnectionString environment variable.");
+        "Database connection string not configured. Please set ConnectionStrings__DefaultConnection environment variable.");
 }
+
+// SECURITY: Validate admin password is configured in production
+var adminPassword = builder.Configuration["Security:DefaultAdminPassword"];
+if (builder.Environment.IsProduction() && string.IsNullOrWhiteSpace(adminPassword))
+{
+    throw new InvalidOperationException(
+        "Default admin password not configured. Please set Security__DefaultAdminPassword environment variable.");
+}
+
+// Use extension methods to validate and configure database
+builder.Services.ValidateConnectionString(connectionString, builder.Environment);
 
 builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =>
 {
-    // SECURITY: Verifica se a connection string padrão foi deixada
-    if (connectionString != null)
-    {
-        // Check for common/default passwords patterns
-        var passwordMatch = System.Text.RegularExpressions.Regex.Match(
-            connectionString,
-            @"Password=(?:123|password|Password123|admin|root|postgres|test|demo)",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-
-        if (passwordMatch.Success)
-        {
-            // SECURITY: Block weak passwords in production
-            if (builder.Environment.IsProduction())
-            {
-                throw new InvalidOperationException(
-                    "Weak database password detected. The connection string contains a common/default password. " +
-                    "Please use a strong, unique password for your database.");
-            }
-            // Log warning in development - would need ILogger here but not available at this stage
-            // The warning will be visible in the exception above if run in production
-        }
-    }
-
-    options.UseNpgsql(
-        connectionString ?? "Host=localhost;Database=erp;Username=postgres",
-        npgsql => npgsql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)
-    );
+    options.UseNpgsqlWithMigrations(connectionString, typeof(ApplicationDbContext).Assembly);
 });
 
 builder.Services.AddDbContextFactory<ApplicationDbContext>((serviceProvider, options) =>
 {
-    // SECURITY: Verifica se a connection string padrão foi deixada
-    if (connectionString != null)
-    {
-        // Check for common/default passwords patterns
-        var passwordMatch = System.Text.RegularExpressions.Regex.Match(
-            connectionString,
-            @"Password=(?:123|password|Password123|admin|root|postgres|test|demo)",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-
-        if (passwordMatch.Success)
-        {
-            // SECURITY: Block weak passwords in production
-            if (builder.Environment.IsProduction())
-            {
-                throw new InvalidOperationException(
-                    "Weak database password detected. The connection string contains a common/default password. " +
-                    "Please use a strong, unique password for your database.");
-            }
-        }
-    }
-
-    options.UseNpgsql(
-        connectionString ?? "Host=localhost;Database=erp;Username=postgres",
-        npgsql => npgsql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)
-    );
+    options.UseNpgsqlWithMigrations(connectionString, typeof(ApplicationDbContext).Assembly);
 }, ServiceLifetime.Scoped);
 
 // Registra DAOs e Serviços

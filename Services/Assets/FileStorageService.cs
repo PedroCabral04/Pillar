@@ -4,6 +4,7 @@ public interface IFileStorageService
 {
     Task<string> SaveFileAsync(Stream fileStream, string fileName, string? subfolder = null);
     Task<Stream> GetFileAsync(string filePath);
+    Task<byte[]> GetFileBytesAsync(string filePath);
     Task DeleteFileAsync(string filePath);
     Task<bool> FileExistsAsync(string filePath);
     string GetFileUrl(string filePath);
@@ -63,23 +64,41 @@ public class LocalFileStorageService : IFileStorageService
     /// <summary>
     /// Obtém um arquivo do sistema de arquivos
     /// </summary>
-    public async Task<Stream> GetFileAsync(string filePath)
+    public Task<Stream> GetFileAsync(string filePath)
     {
         var fullPath = Path.Combine(_basePath, filePath);
-        
+
         if (!File.Exists(fullPath))
         {
             throw new FileNotFoundException("Arquivo não encontrado", filePath);
         }
-        
-        var memoryStream = new MemoryStream();
-        using (var fileStream = new FileStream(fullPath, FileMode.Open, FileAccess.Read))
+
+        // Return FileStream directly - caller must dispose using 'await using'
+        var fileStream = new FileStream(
+            fullPath,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            bufferSize: 81920, // 80KB buffer for better performance
+            options: FileOptions.SequentialScan | FileOptions.Asynchronous
+        );
+
+        return Task.FromResult<Stream>(fileStream);
+    }
+
+    /// <summary>
+    /// Obtém um arquivo como bytes (para operações na memória)
+    /// </summary>
+    public async Task<byte[]> GetFileBytesAsync(string filePath)
+    {
+        var fullPath = Path.Combine(_basePath, filePath);
+
+        if (!File.Exists(fullPath))
         {
-            await fileStream.CopyToAsync(memoryStream);
+            throw new FileNotFoundException("Arquivo não encontrado", filePath);
         }
-        memoryStream.Position = 0;
-        
-        return memoryStream;
+
+        return await File.ReadAllBytesAsync(fullPath);
     }
     
     /// <summary>

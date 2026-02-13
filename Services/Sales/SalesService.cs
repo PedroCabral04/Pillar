@@ -27,7 +27,7 @@ public class SalesService : ISalesService
         _commissionService = commissionService;
     }
 
-    public async Task<SaleDto> CreateAsync(CreateSaleDto dto, int userId)
+    public async Task<SaleDto> CreateAsync(CreateSaleDto dto, int userId, CancellationToken ct = default)
     {
         if (!dto.Items.Any())
         {
@@ -62,14 +62,17 @@ public class SalesService : ISalesService
 
                 foreach (var itemDto in dto.Items)
                 {
-                    var product = await _context.Products.FindAsync(itemDto.ProductId);
+                    var product = await _context.Products
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(p => p.Id == itemDto.ProductId, ct);
+
                     if (product == null)
                     {
                         throw new InvalidOperationException($"Produto com ID {itemDto.ProductId} não encontrado");
                     }
 
                     // Se a venda estiver sendo criada já como FINALIZADA, damos baixa no estoque
-                    if (sale.Status.ToUpper() == "FINALIZADA")
+                    if (SaleStatus.IsFinalized(sale.Status))
                     {
                         if (product.CurrentStock < itemDto.Quantity && !product.AllowNegativeStock)
                         {
@@ -126,7 +129,7 @@ public class SalesService : ISalesService
                 await transaction.CommitAsync();
 
                 // Calcular comissões se finalizada
-                if (_commissionService != null && sale.Status.ToUpper() == "FINALIZADA")
+                if (_commissionService != null && SaleStatus.IsFinalized(sale.Status))
                 {
                     try { await _commissionService.CalculateCommissionsForSaleAsync(sale.Id); }
                     catch (Exception ex) { _logger.LogError(ex, "Erro ao calcular comissões para venda {SaleId}", sale.Id); }
@@ -154,14 +157,15 @@ public class SalesService : ISalesService
         }
     }
 
-    public async Task<SaleDto?> GetByIdAsync(int id)
+    public async Task<SaleDto?> GetByIdAsync(int id, CancellationToken ct = default)
     {
         var sale = await _context.Sales
             .Include(s => s.Customer)
             .Include(s => s.User)
             .Include(s => s.Items)
                 .ThenInclude(i => i.Product)
-            .FirstOrDefaultAsync(s => s.Id == id);
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == id, ct);
 
         if (sale == null)
         {
@@ -170,7 +174,7 @@ public class SalesService : ISalesService
 
         var dto = _mapper.ToDtoWithRelations(sale);
         dto.Items = sale.Items.Select(i => _mapper.ToDtoWithProduct(i)).ToList();
-        
+
         return dto;
     }
 
@@ -181,7 +185,8 @@ public class SalesService : ISalesService
         DateTime? endDate,
         int? customerId,
         int page,
-        int pageSize)
+        int pageSize,
+        CancellationToken ct = default)
     {
         var query = _context.Sales
             .Include(s => s.Customer)
@@ -197,7 +202,7 @@ public class SalesService : ISalesService
 
         if (!string.IsNullOrWhiteSpace(status))
         {
-            query = query.Where(s => s.Status.ToUpper() == status.ToUpper());
+            query = query.Where(s => s.Status == status);
         }
 
         if (startDate.HasValue)
@@ -215,33 +220,35 @@ public class SalesService : ISalesService
             query = query.Where(s => s.CustomerId == customerId.Value);
         }
 
-        var total = await query.CountAsync();
+        var total = await query.CountAsync(ct);
 
         var sales = await query
             .OrderByDescending(s => s.SaleDate)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .ToListAsync();
+            .ToListAsync(ct);
 
         var dtos = sales.Select(s => _mapper.ToDtoWithRelations(s)).ToList();
         
         return (dtos, total);
     }
 
-    public async Task<SaleDto> UpdateAsync(int id, UpdateSaleDto dto)
+    public async Task<SaleDto> UpdateAsync(int id, UpdateSaleDto dto, CancellationToken ct = default)
     {
-        var sale = await _context.Sales.FindAsync(id);
+        var sale = await _context.Sales
+            .FirstOrDefaultAsync(s => s.Id == id, ct);
+
         if (sale == null)
         {
             throw new KeyNotFoundException($"Venda com ID {id} não encontrada");
         }
 
-        if (sale.Status.ToUpper() == "FINALIZADA")
+        if (SaleStatus.IsFinalized(sale.Status))
         {
             throw new InvalidOperationException("Não é possível editar uma venda finalizada");
         }
 
-        if (sale.Status.ToUpper() == "CANCELADA")
+        if (SaleStatus.IsCancelled(sale.Status))
         {
             throw new InvalidOperationException("Não é possível editar uma venda cancelada");
         }
@@ -254,11 +261,11 @@ public class SalesService : ISalesService
         sale.NetAmount = sale.TotalAmount - sale.DiscountAmount;
         sale.UpdatedAt = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync();
-        return await GetByIdAsync(id) ?? throw new InvalidOperationException("Erro ao recuperar venda atualizada");
+        await _context.SaveChangesAsync(ct);
+        return await GetByIdAsync(id, ct) ?? throw new InvalidOperationException("Erro ao recuperar venda atualizada");
     }
 
-    public async Task<bool> CancelAsync(int id)
+    public async Task<bool> CancelAsync(int id, CancellationToken ct = default)
     {
         using var transaction = await _context.Database.BeginTransactionAsync();
         
@@ -274,12 +281,12 @@ public class SalesService : ISalesService
                 return false;
             }
 
-            if (sale.Status.ToUpper() == "CANCELADA")
+            if (SaleStatus.IsCancelled(sale.Status))
             {
                 throw new InvalidOperationException("Venda já está cancelada");
             }
 
-            var wasFinalized = sale.Status.ToUpper() == "FINALIZADA";
+            var wasFinalized = SaleStatus.IsFinalized(sale.Status);
 
             // Se a venda estava finalizada, devolver o estoque
             if (wasFinalized)
@@ -349,7 +356,7 @@ public class SalesService : ISalesService
         }
     }
 
-    public async Task<SaleDto> FinalizeAsync(int id)
+    public async Task<SaleDto> FinalizeAsync(int id, CancellationToken ct = default)
     {
         using var transaction = await _context.Database.BeginTransactionAsync();
         
@@ -365,12 +372,12 @@ public class SalesService : ISalesService
                 throw new KeyNotFoundException($"Venda com ID {id} não encontrada");
             }
 
-            if (sale.Status.ToUpper() == "FINALIZADA")
+            if (SaleStatus.IsFinalized(sale.Status))
             {
                 throw new InvalidOperationException("Venda já está finalizada");
             }
 
-            if (sale.Status.ToUpper() == "CANCELADA")
+            if (SaleStatus.IsCancelled(sale.Status))
             {
                 throw new InvalidOperationException("Não é possível finalizar uma venda cancelada");
             }
@@ -448,32 +455,34 @@ public class SalesService : ISalesService
         }
     }
 
-    public async Task<decimal> GetTotalSalesAsync(DateTime startDate, DateTime endDate)
+    public async Task<decimal> GetTotalSalesAsync(DateTime startDate, DateTime endDate, CancellationToken ct = default)
     {
         return await _context.Sales
-            .Where(s => s.Status.ToUpper() == "FINALIZADA" && 
-                       s.SaleDate >= startDate && 
+            .AsNoTracking()
+            .Where(s => SaleStatus.IsFinalized(s.Status) &&
+                       s.SaleDate >= startDate &&
                        s.SaleDate <= endDate)
-            .SumAsync(s => s.NetAmount);
+            .SumAsync(s => s.NetAmount, ct);
     }
 
     public async Task<List<(string productName, decimal quantity)>> GetTopProductsAsync(
-        int topN, 
-        DateTime startDate, 
-        DateTime endDate)
+        int topN,
+        DateTime startDate,
+        DateTime endDate,
+        CancellationToken ct = default)
     {
         return await _context.SaleItems
             .Include(i => i.Sale)
             .Include(i => i.Product)
-            .Where(i => i.Sale.Status.ToUpper() == "FINALIZADA" && 
-                       i.Sale.SaleDate >= startDate && 
+            .Where(i => SaleStatus.IsFinalized(i.Sale.Status) &&
+                       i.Sale.SaleDate >= startDate &&
                        i.Sale.SaleDate <= endDate)
             .GroupBy(i => new { i.Product.Name })
             .Select(g => new { ProductName = g.Key.Name, Quantity = g.Sum(i => i.Quantity) })
             .OrderByDescending(x => x.Quantity)
             .Take(topN)
             .Select(x => ValueTuple.Create(x.ProductName, x.Quantity))
-            .ToListAsync();
+            .ToListAsync(ct);
     }
 
     private async Task<string> GenerateSaleNumberAsync()
