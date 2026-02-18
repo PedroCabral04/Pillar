@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using Moq;
 using Xunit;
 using FluentAssertions;
@@ -291,6 +292,119 @@ public class AuthControllerTests
         // Assert
         result.Should().BeOfType<OkObjectResult>();
         _mockSignInManager.Verify(x => x.SignOutAsync(), Times.Once);
+    }
+
+    #endregion
+
+    #region Change Password Tests
+
+    [Fact]
+    public async Task ChangePassword_WithUnauthenticatedUser_ReturnsUnauthorized()
+    {
+        // Arrange
+        var request = new ChangePasswordRequest
+        {
+            CurrentPassword = "Admin@123!",
+            NewPassword = "NewAdmin@123!",
+            ConfirmPassword = "NewAdmin@123!"
+        };
+
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity())
+            }
+        };
+
+        // Act
+        var result = await _controller.ChangePassword(request);
+
+        // Assert
+        result.Should().BeOfType<UnauthorizedObjectResult>();
+    }
+
+    [Fact]
+    public async Task ChangePassword_WithValidData_ReturnsOk()
+    {
+        // Arrange
+        var request = new ChangePasswordRequest
+        {
+            CurrentPassword = "Admin@123!",
+            NewPassword = "NewAdmin@123!",
+            ConfirmPassword = "NewAdmin@123!"
+        };
+
+        var user = new ApplicationUser
+        {
+            Id = 1,
+            Email = "admin@erp.local",
+            UserName = "admin"
+        };
+
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, "1")
+                }, "TestAuth"))
+            }
+        };
+
+        _mockUserManager.Setup(x => x.FindByIdAsync("1"))
+            .ReturnsAsync(user);
+        _mockUserManager.Setup(x => x.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword))
+            .ReturnsAsync(IdentityResult.Success);
+
+        // Act
+        var result = await _controller.ChangePassword(request);
+
+        // Assert
+        result.Should().BeOfType<OkObjectResult>();
+        _mockUserManager.Verify(x => x.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword), Times.Once);
+    }
+
+    [Fact]
+    public async Task ChangePassword_WithInvalidCurrentPassword_ReturnsBadRequest()
+    {
+        // Arrange
+        var request = new ChangePasswordRequest
+        {
+            CurrentPassword = "Wrong@123!",
+            NewPassword = "NewAdmin@123!",
+            ConfirmPassword = "NewAdmin@123!"
+        };
+
+        var user = new ApplicationUser
+        {
+            Id = 1,
+            Email = "admin@erp.local",
+            UserName = "admin"
+        };
+
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, "1")
+                }, "TestAuth"))
+            }
+        };
+
+        _mockUserManager.Setup(x => x.FindByIdAsync("1"))
+            .ReturnsAsync(user);
+        _mockUserManager.Setup(x => x.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword))
+            .ReturnsAsync(IdentityResult.Failed(new IdentityError { Description = "Senha atual incorreta." }));
+
+        // Act
+        var result = await _controller.ChangePassword(request);
+
+        // Assert
+        result.Should().BeOfType<BadRequestObjectResult>();
     }
 
     #endregion

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Web;
 using erp.DTOs.Auth;
 using erp.Services.Email;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
@@ -194,6 +195,45 @@ public class AuthController(
     {
         await signInManager.SignOutAsync();
         return Ok(new { message = "Desconectado" });
+    }
+
+    /// <summary>
+    /// Altera a senha do usuário autenticado
+    /// </summary>
+    /// <param name="request">Senha atual e nova senha</param>
+    /// <returns>Confirmação de alteração ou erros de validação</returns>
+    /// <response code="200">Senha alterada com sucesso</response>
+    /// <response code="400">Senha atual inválida ou nova senha não atende aos requisitos</response>
+    /// <response code="401">Usuário não autenticado</response>
+    [Authorize]
+    [HttpPost("change-password")]
+    [IgnoreAntiforgeryToken]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId))
+            return Unauthorized(new { message = "Usuário não autenticado." });
+
+        var user = await userManager.FindByIdAsync(userId);
+        if (user is null)
+            return Unauthorized(new { message = "Usuário não encontrado." });
+
+        var result = await userManager.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
+        if (!result.Succeeded)
+        {
+            var errors = result.Errors.Select(e => e.Description).ToList();
+            logger.LogWarning("Change password failed for user {UserId}: {Errors}", userId, string.Join(", ", errors));
+            return BadRequest(new { message = "Erro ao alterar senha.", errors });
+        }
+
+        logger.LogInformation("Password changed successfully for user {UserId}", userId);
+        return Ok(new { message = "Senha alterada com sucesso." });
     }
 
     /// <summary>

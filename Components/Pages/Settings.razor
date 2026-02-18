@@ -5,6 +5,7 @@
 @using MudBlazor
 @using System
 @using System.Linq
+@using erp.DTOs.Auth
 @using erp.DTOs.Preferences
 @using Color = MudBlazor.Color
 @using Size = MudBlazor.Size
@@ -14,6 +15,7 @@
 @inject IDashboardService DashboardService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IJSRuntime JsRuntime
+@inject IApiService ApiService
 
 <PageTitle>Configurações - Pillar ERP</PageTitle>
 
@@ -65,11 +67,81 @@
                 </MudGrid>
             </MudPaper>
 
-            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
-                <MudText Typo="Typo.body2">
-                    Para alterar sua senha ou informações pessoais, entre em contato com o administrador do sistema.
+            <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid var(--mud-palette-divider);">
+                <MudText Typo="Typo.h6" Class="mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.LockReset" Class="mr-2" />
+                    Alterar Senha
                 </MudText>
-            </MudAlert>
+
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                    Informe sua senha atual para definir uma nova senha de acesso.
+                </MudText>
+
+                @if (_passwordChangeErrors.Count > 0)
+                {
+                    <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Class="mb-4">
+                        @foreach (var error in _passwordChangeErrors)
+                        {
+                            <MudText Typo="Typo.body2">@error</MudText>
+                        }
+                    </MudAlert>
+                }
+
+                <EditForm Model="@_changePasswordModel" OnValidSubmit="HandleChangePasswordAsync">
+                    <DataAnnotationsValidator />
+
+                    <MudTextField @bind-Value="_changePasswordModel.CurrentPassword"
+                                  Label="Senha Atual"
+                                  Variant="Variant.Outlined"
+                                  InputType="@_currentPasswordInput"
+                                  For="@(() => _changePasswordModel.CurrentPassword)"
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@_currentPasswordIcon"
+                                  OnAdornmentClick="ToggleCurrentPasswordVisibility"
+                                  Class="mb-3" />
+
+                    <MudTextField @bind-Value="_changePasswordModel.NewPassword"
+                                  Label="Nova Senha"
+                                  Variant="Variant.Outlined"
+                                  InputType="@_newPasswordInput"
+                                  For="@(() => _changePasswordModel.NewPassword)"
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@_newPasswordIcon"
+                                  OnAdornmentClick="ToggleNewPasswordVisibility"
+                                  Class="mb-3" />
+
+                    <MudTextField @bind-Value="_changePasswordModel.ConfirmPassword"
+                                  Label="Confirmar Nova Senha"
+                                  Variant="Variant.Outlined"
+                                  InputType="@_confirmPasswordInput"
+                                  For="@(() => _changePasswordModel.ConfirmPassword)"
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@_confirmPasswordIcon"
+                                  OnAdornmentClick="ToggleConfirmPasswordVisibility"
+                                  Class="mb-2" />
+
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-4 d-block">
+                        Mínimo de 8 caracteres, com letra maiúscula, minúscula, número e caractere especial.
+                    </MudText>
+
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               ButtonType="ButtonType.Submit"
+                               Disabled="@_isChangingPassword"
+                               StartIcon="@Icons.Material.Filled.Save"
+                               Class="mb-2">
+                        @if (_isChangingPassword)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                            <text>Alterando...</text>
+                        }
+                        else
+                        {
+                            <text>Alterar Senha</text>
+                        }
+                    </MudButton>
+                </EditForm>
+            </MudPaper>
         </MudStack>
     </MudTabPanel>
 
@@ -598,6 +670,20 @@
     private string _userEmail = "";
     private List<string> _userRoles = new();
 
+    // Change password
+    private ChangePasswordRequest _changePasswordModel = new();
+    private bool _isChangingPassword = false;
+    private bool _showCurrentPassword = false;
+    private bool _showNewPassword = false;
+    private bool _showConfirmPassword = false;
+    private InputType _currentPasswordInput = InputType.Password;
+    private InputType _newPasswordInput = InputType.Password;
+    private InputType _confirmPasswordInput = InputType.Password;
+    private string _currentPasswordIcon = Icons.Material.Filled.VisibilityOff;
+    private string _newPasswordIcon = Icons.Material.Filled.VisibilityOff;
+    private string _confirmPasswordIcon = Icons.Material.Filled.VisibilityOff;
+    private List<string> _passwordChangeErrors = new();
+
     // Helpers to edit dictionary preferences in a simple list form
     private List<DefaultSortRow> DefaultSortRows = new();
     private List<VisibleColumnsRow> VisibleColumnsRows = new();
@@ -728,6 +814,77 @@
                 Snackbar.Add("Não foi possível reproduzir o som de teste", Severity.Warning);
             }
         }
+    }
+
+    private async Task HandleChangePasswordAsync()
+    {
+        _isChangingPassword = true;
+        _passwordChangeErrors.Clear();
+
+        try
+        {
+            var response = await ApiService.PostAsync<object>("/api/auth/change-password", _changePasswordModel);
+            if (response != null)
+            {
+                _changePasswordModel = new ChangePasswordRequest();
+                Snackbar.Add("Senha alterada com sucesso.", Severity.Success);
+            }
+            else
+            {
+                _passwordChangeErrors = new List<string>
+                {
+                    "Não foi possível alterar a senha. Verifique os dados e tente novamente."
+                };
+                Snackbar.Add("Não foi possível alterar a senha. Verifique os dados e tente novamente.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            _passwordChangeErrors = ParseErrorMessages(ex.Message);
+            if (_passwordChangeErrors.Count == 0)
+            {
+                _passwordChangeErrors.Add("Não foi possível alterar a senha. Tente novamente.");
+            }
+            Snackbar.Add($"Erro ao alterar senha: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isChangingPassword = false;
+        }
+    }
+
+    private static List<string> ParseErrorMessages(string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+            return new List<string>();
+
+        return message
+            .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(m => m.Trim())
+            .Where(m => !string.IsNullOrWhiteSpace(m))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private void ToggleCurrentPasswordVisibility()
+    {
+        _showCurrentPassword = !_showCurrentPassword;
+        _currentPasswordInput = _showCurrentPassword ? InputType.Text : InputType.Password;
+        _currentPasswordIcon = _showCurrentPassword ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff;
+    }
+
+    private void ToggleNewPasswordVisibility()
+    {
+        _showNewPassword = !_showNewPassword;
+        _newPasswordInput = _showNewPassword ? InputType.Text : InputType.Password;
+        _newPasswordIcon = _showNewPassword ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff;
+    }
+
+    private void ToggleConfirmPasswordVisibility()
+    {
+        _showConfirmPassword = !_showConfirmPassword;
+        _confirmPasswordInput = _showConfirmPassword ? InputType.Text : InputType.Password;
+        _confirmPasswordIcon = _showConfirmPassword ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff;
     }
 
     // Tables helpers (DefaultSortPerModule)
