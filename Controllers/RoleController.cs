@@ -16,6 +16,7 @@ namespace erp.Controllers
     /// </summary>
     [ApiController]
     [Route("api/papeis")]
+    [Route("api/roles")]
     public class RoleController(RoleManager<ApplicationRole> roleManager, ITenantContextAccessor tenantContextAccessor) : ControllerBase {
 
         private readonly RoleManager<ApplicationRole> _roleManager = roleManager;

@@ -68,7 +68,7 @@ public class TenantsController : ControllerBase
     /// <param name="id">Identificador do tenant.</param>
     /// <param name="cancellationToken">Token para cancelamento da operação.</param>
     /// <returns>O <see cref="TenantDto"/> correspondente ou 404 se não encontrado.</returns>
-    [HttpGet("{id:int}")]
+    [HttpGet("{id:int}", Name = "GetTenantById")]
     public async Task<ActionResult<TenantDto>> GetByIdAsync(int id, CancellationToken cancellationToken)
     {
         var tenant = await _tenantService.GetByIdAsync(id, cancellationToken);
@@ -148,7 +148,7 @@ public class TenantsController : ControllerBase
 
         var userId = GetCurrentUserId();
         var created = await _tenantService.CreateAsync(dto, userId, cancellationToken);
-        return CreatedAtAction(nameof(GetByIdAsync), new { id = created.Id }, created);
+        return CreatedAtRoute("GetTenantById", new { id = created.Id }, created);
     }
 
     /// <summary>
