@@ -105,7 +105,7 @@
                         </MudTd>
                         <MudTd Align="Align.Right">
                             <MudButtonGroup Variant="Variant.Text" Dense="true">
-                                <MudIconButton Icon="@Icons.Material.Filled.Group" Color="MudBlazor.Color.Primary" Title="Gerenciar membros" OnClick="@(() => ManageMembers(context))" />
+                                <MudIconButton Icon="@Icons.Material.Filled.People" Color="MudBlazor.Color.Primary" Title="Gerenciar usuários" OnClick="@(() => ManageUsers(context))" />
                                 <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="MudBlazor.Color.Info" Title="Editar" OnClick="@(() => EditTenant(context))" />
                                 @if (context.Status == TenantStatus.Archived)
                                 {
@@ -235,15 +235,19 @@
         await LoadTenantsAsync();
     }
 
-    private async Task ManageMembers(TenantDto tenant)
+    private async Task ManageUsers(TenantDto tenant)
     {
-        var parameters = new DialogParameters<TenantMembersDialog>
+        var parameters = new DialogParameters<TenantUsersDialog>
         {
             { x => x.Tenant, tenant }
         };
-        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
-        var dialog = await DialogService.ShowAsync<TenantMembersDialog>($"Membros - {tenant.Name}", parameters, options);
-        await dialog.Result;
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraLarge, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<TenantUsersDialog>($"Usuários - {tenant.Name}", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            await LoadTenantsAsync(); // Recarrega para atualizar contadores
+        }
     }
 
     private static string GetRelativeTime(DateTime value)

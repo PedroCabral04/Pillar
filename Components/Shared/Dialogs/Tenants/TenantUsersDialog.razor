@@ -1,0 +1,324 @@
+@using erp.DTOs.Tenancy
+@using erp.DTOs.User
+@using erp.DTOs.Role
+@using erp.Services
+@using Color = MudBlazor.Color
+@using Size = MudBlazor.Size
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <MudText Typo="Typo.subtitle1">Usuários do Tenant: @Tenant.Name</MudText>
+                <MudButton Variant="Variant.Filled" Color="MudBlazor.Color.Primary"
+                           StartIcon="@Icons.Material.Filled.PersonAdd"
+                           Size="MudBlazor.Size.Small"
+                           Disabled="@_loading"
+                           OnClick="ShowCreateUserDialog">
+                    Novo Usuário
+                </MudButton>
+            </MudStack>
+
+            @if (_loadError != null)
+            {
+                <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
+            }
+
+            <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                <MudTextField T="string" Value="_search" ValueChanged="OnSearch"
+                             Placeholder="Buscar por nome ou email"
+                             Variant="Variant.Outlined"
+                             Immediate="true"
+                             Adornment="Adornment.Start"
+                             AdornmentIcon="@Icons.Material.Filled.Search"
+                             Clearable="true"
+                             Style="min-width: 250px;" />
+                <MudSelect T="string?" Label="Status"
+                           Value="_statusFilter" ValueChanged="OnStatusFilterChanged"
+                           Variant="Variant.Outlined"
+                           Clearable="true"
+                           Style="min-width: 150px;">
+                    <MudSelectItem T="string?" Value="@(null)">Todos</MudSelectItem>
+                    <MudSelectItem T="string?" Value="@("active")">Ativos</MudSelectItem>
+                    <MudSelectItem T="string?" Value="@("inactive")">Inativos</MudSelectItem>
+                </MudSelect>
+            </MudStack>
+
+            @if (_loading)
+            {
+                <MudProgressCircular Color="Color.Primary" Indeterminate="true" Class="ma-auto" />
+            }
+            else if (_users.Count == 0)
+            {
+                <MudPaper Class="pa-8" Elevation="0">
+                    <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.PersonOff" Size="Size.Large" Color="Color.Default" Class="mb-2" />
+                        <MudText Typo="Typo.h6" Color="Color.Default">Nenhum usuário encontrado</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Este tenant ainda não possui usuários cadastrados.</MudText>
+                    </MudStack>
+                </MudPaper>
+            }
+            else
+            {
+                <MudTable Items="@FilteredUsers" Hover="true" Dense="true"
+                          Elevation="0" class="border rounded">
+                    <HeaderContent>
+                        <MudTh>Nome</MudTh>
+                        <MudTh>Email</MudTh>
+                        <MudTh>Roles</MudTh>
+                        <MudTh>Status</MudTh>
+                        <MudTh Align="Align.Right">Ações</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Nome">
+                            <MudText Typo="Typo.body2">@context.Username</MudText>
+                            @if (!string.IsNullOrWhiteSpace(context.FullName))
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@context.FullName</MudText>
+                            }
+                        </MudTd>
+                        <MudTd DataLabel="Email">@context.Email</MudTd>
+                        <MudTd DataLabel="Roles">
+                            @if (context.RoleNames != null && context.RoleNames.Count > 0)
+                            {
+                                <MudText Typo="Typo.caption">@string.Join(", ", context.RoleNames)</MudText>
+                            }
+                            else
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Warning">Sem roles</MudText>
+                            }
+                        </MudTd>
+                        <MudTd DataLabel="Status">
+                            <MudChip T="string"
+                                     Size="Size.Small"
+                                     Color="@(context.IsActive ? Color.Success : Color.Default)"
+                                     Variant="Variant.Filled">
+                                @(context.IsActive ? "Ativo" : "Inativo")
+                            </MudChip>
+                        </MudTd>
+                        <MudTd Align="Align.Right">
+                            <MudButtonGroup Variant="Variant.Text" Dense="true">
+                                <MudTooltip Text="Gerenciar roles">
+                                    <MudIconButton Icon="@Icons.Material.Filled.AdminPanelSettings"
+                                                   Color="Color.Info"
+                                                   OnClick="@(() => ManageRoles(context))"
+                                                   Title="Gerenciar roles" />
+                                </MudTooltip>
+                                <MudTooltip Text="Editar usuário">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                                   Color="Color.Primary"
+                                                   OnClick="@(() => EditUser(context))"
+                                                   Title="Editar" />
+                                </MudTooltip>
+                                <MudTooltip Text="@(context.IsActive ? "Desativar" : "Ativar")">
+                                    <MudIconButton Icon="@(context.IsActive ? Icons.Material.Filled.PersonOff : Icons.Material.Filled.PersonAdd)"
+                                                   Color="@(context.IsActive ? Color.Warning : Color.Success)"
+                                                   OnClick="@(() => ToggleUserStatus(context))"
+                                                   Title="@(context.IsActive ? "Desativar" : "Ativar")" />
+                                </MudTooltip>
+                            </MudButtonGroup>
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                Total: @_users.Count usuário(s) |
+                Ativos: @_users.Count(u => u.IsActive) |
+                Inativos: @_users.Count(u => !u.IsActive)
+            </MudText>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Close" Disabled="@_saving">Fechar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public TenantDto Tenant { get; set; } = null!;
+
+    private readonly List<UserDto> _users = new();
+    private string? _loadError;
+    private bool _loading;
+    private bool _saving;
+    private string _search = string.Empty;
+    private string? _statusFilter;
+
+    private IEnumerable<UserDto> FilteredUsers => _users
+        .Where(u => string.IsNullOrWhiteSpace(_search)
+            || u.Username.Contains(_search, StringComparison.OrdinalIgnoreCase)
+            || (u.Email?.Contains(_search, StringComparison.OrdinalIgnoreCase) ?? false)
+            || (u.FullName?.Contains(_search, StringComparison.OrdinalIgnoreCase) ?? false))
+        .Where(u => string.IsNullOrWhiteSpace(_statusFilter)
+            || (_statusFilter == "active" && u.IsActive)
+            || (_statusFilter == "inactive" && !u.IsActive));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsersAsync();
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        _loading = true;
+        _loadError = null;
+        try
+        {
+            var response = await ApiService.GetAsync<List<UserDto>>($"api/tenants/{Tenant.Id}/users");
+            if (response == null)
+            {
+                _users.Clear();
+                _loadError = "Não foi possível carregar os usuários.";
+                return;
+            }
+
+            _users.Clear();
+            _users.AddRange(response.OrderBy(u => u.Username));
+        }
+        catch (Exception)
+        {
+            _loadError = "Erro ao carregar usuários.";
+            Snackbar.Add(_loadError, Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OnSearch(string search)
+    {
+        _search = search;
+    }
+
+    private void OnStatusFilterChanged(string? status)
+    {
+        _statusFilter = status;
+    }
+
+    private async Task ShowCreateUserDialog()
+    {
+        var parameters = new DialogParameters<TenantUserFormDialog>
+        {
+            { x => x.Tenant, Tenant },
+            { x => x.IsEdit, false }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Large, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<TenantUserFormDialog>("Novo Usuário", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            await LoadUsersAsync();
+            Snackbar.Add("Usuário criado com sucesso.", Severity.Success);
+        }
+    }
+
+    private async Task EditUser(UserDto user)
+    {
+        var parameters = new DialogParameters<TenantUserFormDialog>
+        {
+            { x => x.Tenant, Tenant },
+            { x => x.User, user },
+            { x => x.IsEdit, true }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Large, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<TenantUserFormDialog>($"Editar {user.Username}", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            await LoadUsersAsync();
+            Snackbar.Add("Usuário atualizado com sucesso.", Severity.Success);
+        }
+    }
+
+    private async Task ManageRoles(UserDto user)
+    {
+        var parameters = new DialogParameters<TenantUserRoleDialog>
+        {
+            { x => x.Tenant, Tenant },
+            { x => x.User, user }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = false };
+        var dialog = await DialogService.ShowAsync<TenantUserRoleDialog>($"Roles - {user.Username}", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            await LoadUsersAsync();
+            Snackbar.Add("Roles atualizadas com sucesso.", Severity.Success);
+        }
+    }
+
+    private async Task ToggleUserStatus(UserDto user)
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            user.IsActive ? "Desativar Usuário" : "Ativar Usuário",
+            $"Deseja {(user.IsActive ? "desativar" : "ativar")} o usuário '{user.Username}'?",
+            yesText: "Confirmar",
+            cancelText: "Cancelar");
+
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var roleIds = await ResolveRoleIdsAsync(user);
+            if (roleIds.Count == 0)
+            {
+                Snackbar.Add("Não foi possível alterar o status sem roles válidas para o usuário.", Severity.Warning);
+                return;
+            }
+
+            var updateDto = new UpdateUserDto
+            {
+                Username = user.Username,
+                Email = user.Email,
+                Phone = user.Phone,
+                IsActive = !user.IsActive,
+                RoleIds = roleIds,
+                FullName = user.FullName,
+                Cpf = user.Cpf,
+                DepartmentId = user.DepartmentId,
+                PositionId = user.PositionId
+            };
+
+            var response = await ApiService.PutAsync($"api/tenants/{Tenant.Id}/users/{user.Id}", updateDto);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add($"Usuário {(user.IsActive ? "desativado" : "ativado")} com sucesso.", Severity.Success);
+                await LoadUsersAsync();
+            }
+            else
+            {
+                Snackbar.Add("Não foi possível alterar o status do usuário.", Severity.Error);
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task<List<int>> ResolveRoleIdsAsync(UserDto user)
+    {
+        var roles = await ApiService.GetAsync<List<RoleDto>>("api/roles") ?? new List<RoleDto>();
+        if (user.RoleNames is null || user.RoleNames.Count == 0)
+        {
+            return new List<int>();
+        }
+
+        return roles
+            .Where(role => user.RoleNames.Contains(role.Name, StringComparer.OrdinalIgnoreCase))
+            .Select(role => role.Id)
+            .Distinct()
+            .ToList();
+    }
+
+    private void Close() => MudDialog.Close(DialogResult.Ok(true));
+}

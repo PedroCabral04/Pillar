@@ -1,0 +1,407 @@
+@using erp.DTOs.Tenancy
+@using erp.DTOs.User
+@using erp.DTOs.Role
+@using erp.Services
+@using Color = MudBlazor.Color
+@using Size = MudBlazor.Size
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+@inject ILogger<TenantUserFormDialog> Logger
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(IsEdit ? $"Editar {User?.Username}" : "Novo Usuário")</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_loading)
+        {
+            <MudStack AlignItems="AlignItems.Center" Spacing="3" Class="pa-6">
+                <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+                <MudText Typo="Typo.body1" Color="Color.Secondary">Carregando...</MudText>
+            </MudStack>
+        }
+        else if (_loadError != null)
+        {
+            <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
+        }
+        else
+        {
+            <MudForm @ref="_form" Model="@_userDto">
+                <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-3">
+                    Informações Básicas
+                </MudText>
+
+                <MudGrid Spacing="3">
+                    <MudItem xs="12" md="6">
+                        <MudTextField T="string"
+                                      Label="Nome de Usuário"
+                                      Variant="Variant.Outlined"
+                                      @bind-Value="_userDto.Username"
+                                      Required="true"
+                                      RequiredError="Nome de usuário é obrigatório"
+                                      HelperText="Usado para login no sistema" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudTextField T="string"
+                                      Label="Nome Completo"
+                                      Variant="Variant.Outlined"
+                                      @bind-Value="_userDto.FullName"
+                                      HelperText="Nome completo para exibição" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudTextField T="string"
+                                      Label="Email"
+                                      Variant="Variant.Outlined"
+                                      InputType="InputType.Email"
+                                      @bind-Value="_userDto.Email"
+                                      Required="true"
+                                      RequiredError="Email é obrigatório"
+                                      Validation="@(new Func<string, string?>(ValidateEmail))" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudTextField T="string"
+                                      Label="Telefone"
+                                      Variant="Variant.Outlined"
+                                      InputType="InputType.Telephone"
+                                      Placeholder="(00) 00000-0000"
+                                      Mask="@(new PatternMask("(00) 00000-0000"))"
+                                      @bind-Value="_userDto.Phone"
+                                      Required="true"
+                                      RequiredError="Telefone é obrigatório" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudTextField T="string"
+                                      Label="CPF"
+                                      Variant="Variant.Outlined"
+                                      Placeholder="000.000.000-00"
+                                      Mask="@(new PatternMask("000.000.000-00"))"
+                                      @bind-Value="_userDto.Cpf"
+                                      HelperText="Opcional" />
+                    </MudItem>
+
+                    @if (!IsEdit)
+                    {
+                        <MudItem xs="12" md="6">
+                            <MudTextField T="string"
+                                          Label="Senha (opcional)"
+                                          Variant="Variant.Outlined"
+                                          InputType="InputType.Password"
+                                          @bind-Value="_userDto.Password"
+                                          HelperText="Deixe em branco para gerar senha automática"
+                                          Adornment="Adornment.End"
+                                          AdornmentIcon="@Icons.Material.Filled.Info"
+                                          AdornmentColor="Color.Info" />
+                        </MudItem>
+                    }
+                </MudGrid>
+
+                <MudDivider Class="my-4" />
+
+                <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-3">
+                    Informações Profissionais (Opcional)
+                </MudText>
+
+                <MudGrid Spacing="3">
+                    <MudItem xs="12" md="6">
+                        <MudSelect T="int?"
+                                   @bind-Value="_userDto.DepartmentId"
+                                   Label="Departamento"
+                                   Variant="Variant.Outlined"
+                                   Clearable="true">
+                            @if (_departments != null)
+                            {
+                                @foreach (var dept in _departments)
+                                {
+                                    <MudSelectItem T="int?" Value="@dept.Id">@dept.Name</MudSelectItem>
+                                }
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudSelect T="int?"
+                                   @bind-Value="_userDto.PositionId"
+                                   Label="Cargo"
+                                   Variant="Variant.Outlined"
+                                   Clearable="true">
+                            @if (_positions != null)
+                            {
+                                @foreach (var pos in _positions)
+                                {
+                                    <MudSelectItem T="int?" Value="@pos.Id">@pos.Title</MudSelectItem>
+                                }
+                            }
+                        </MudSelect>
+                    </MudItem>
+                </MudGrid>
+
+                <MudDivider Class="my-4" />
+
+                <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-3">
+                    Roles e Permissões
+                </MudText>
+
+                <MudSelect T="int"
+                           SelectedValues="@_selectedRoleIds"
+                           SelectedValuesChanged="OnSelectedRolesChanged"
+                           Label="Roles"
+                           MultiSelection="true"
+                           Variant="Variant.Outlined"
+                           Required="true"
+                           RequiredError="Selecione pelo menos uma role"
+                           SelectAll="true"
+                           SelectAllText="Selecionar Todas"
+                           HelperText="Roles do tenant ou globais">
+                    @if (_roles != null)
+                    {
+                        @foreach (var role in _roles)
+                        {
+                            <MudSelectItem T="int" Value="@role.Id">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                    <MudText Typo="Typo.body2">@role.Name</MudText>
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">@role.Abbreviation</MudChip>
+                                </MudStack>
+                            </MudSelectItem>
+                        }
+                    }
+                </MudSelect>
+
+                @if (IsEdit)
+                {
+                    <MudCheckBox T="bool"
+                                 Label="Usuário Ativo"
+                                 @bind-Checked="_isActive"
+                                 Color="Color.Success"
+                                 Class="mt-4" />
+                }
+            </MudForm>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="Submit"
+                   Disabled="@_saving">
+            @(_saving ? "Salvando..." : (IsEdit ? "Salvar" : "Criar"))
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public TenantDto Tenant { get; set; } = null!;
+    [Parameter] public UserDto? User { get; set; }
+    [Parameter] public bool IsEdit { get; set; }
+
+    private MudForm? _form;
+    private readonly CreateUserDto _userDto = new() { RoleIds = new List<int>() };
+    private readonly List<DepartmentDto> _departments = new();
+    private readonly List<PositionDto> _positions = new();
+    private readonly List<RoleDto> _roles = new();
+    private HashSet<int> _selectedRoleIds = new();
+    private bool _loading;
+    private bool _saving;
+    private bool _isActive = true;
+    private string? _loadError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+        try
+        {
+            // Carregar departamentos, cargos e roles em paralelo
+            var tasks = new List<Task>
+            {
+                LoadDepartmentsAsync(),
+                LoadPositionsAsync(),
+                LoadRolesAsync()
+            };
+
+            await Task.WhenAll(tasks);
+
+            // Se for edição, preencher o formulário
+            if (IsEdit && User != null)
+            {
+                _userDto.Username = User.Username;
+                _userDto.FullName = User.FullName;
+                _userDto.Email = User.Email;
+                _userDto.Phone = User.Phone;
+                _userDto.Cpf = User.Cpf;
+                _userDto.DepartmentId = User.DepartmentId;
+                _userDto.PositionId = User.PositionId;
+                _isActive = User.IsActive;
+
+                // Carregar roles atuais do usuário
+                if (User.RoleNames != null)
+                {
+                    _selectedRoleIds = _roles
+                        .Where(r => User.RoleNames.Contains(r.Name, StringComparer.OrdinalIgnoreCase))
+                        .Select(r => r.Id)
+                        .ToHashSet();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _loadError = "Erro ao carregar dados necessários.";
+            Logger.LogError(ex, "Erro ao carregar dados");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadDepartmentsAsync()
+    {
+        try
+        {
+            var depts = await ApiService.GetAsync<List<DepartmentDto>>("api/departments");
+            if (depts != null)
+            {
+                _departments.AddRange(depts.OrderBy(d => d.Name));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar departamentos");
+        }
+    }
+
+    private async Task LoadPositionsAsync()
+    {
+        try
+        {
+            var positions = await ApiService.GetAsync<List<PositionDto>>("api/positions");
+            if (positions != null)
+            {
+                _positions.AddRange(positions.OrderBy(p => p.Title));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar cargos");
+        }
+    }
+
+    private async Task LoadRolesAsync()
+    {
+        try
+        {
+            // Carregar todas as roles (filtro será feito no backend)
+            var allRoles = await ApiService.GetAsync<List<RoleDto>>("api/roles");
+            if (allRoles != null)
+            {
+                _roles.AddRange(allRoles.OrderBy(r => r.Name));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar roles");
+        }
+    }
+
+    private string? ValidateEmail(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            return null;
+
+        if (!email.Contains('@'))
+            return "Email inválido";
+
+        return null;
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private async Task Submit()
+    {
+        if (_form == null)
+            return;
+
+        await _form.Validate();
+
+        if (!_form.IsValid)
+        {
+            return;
+        }
+
+        if (_selectedRoleIds.Count == 0)
+        {
+            Snackbar.Add("Selecione pelo menos uma role.", Severity.Error);
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            HttpResponseMessage response;
+
+            if (IsEdit && User != null)
+            {
+                var dto = new UpdateUserDto
+                {
+                    Username = _userDto.Username,
+                    Email = _userDto.Email,
+                    Phone = _userDto.Phone,
+                    FullName = _userDto.FullName,
+                    Cpf = _userDto.Cpf,
+                    DepartmentId = _userDto.DepartmentId,
+                    PositionId = _userDto.PositionId,
+                    IsActive = _isActive,
+                    RoleIds = _selectedRoleIds.ToList()
+                };
+
+                response = await ApiService.PutAsync($"api/tenants/{Tenant.Id}/users/{User.Id}", dto);
+            }
+            else
+            {
+                var dto = new CreateUserDto
+                {
+                    Username = _userDto.Username,
+                    Email = _userDto.Email,
+                    Phone = _userDto.Phone,
+                    FullName = _userDto.FullName,
+                    Cpf = _userDto.Cpf,
+                    DepartmentId = _userDto.DepartmentId,
+                    PositionId = _userDto.PositionId,
+                    Password = _userDto.Password,
+                    RoleIds = _selectedRoleIds.ToList()
+                };
+
+                response = await ApiService.PostAsync($"api/tenants/{Tenant.Id}/users", dto);
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Add("Erro ao salvar usuário.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao salvar usuário");
+            Snackbar.Add("Erro ao salvar usuário.", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private Task OnSelectedRolesChanged(IEnumerable<int> roleIds)
+    {
+        _selectedRoleIds = roleIds.ToHashSet();
+        return Task.CompletedTask;
+    }
+}

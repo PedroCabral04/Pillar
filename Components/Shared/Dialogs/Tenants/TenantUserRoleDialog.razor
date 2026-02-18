@@ -1,0 +1,247 @@
+@using erp.DTOs.Tenancy
+@using erp.DTOs.User
+@using erp.DTOs.Role
+@using erp.Services
+@using Color = MudBlazor.Color
+@using Size = MudBlazor.Size
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+@inject ILogger<TenantUserRoleDialog> Logger
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Gerenciar Roles - @User?.Username</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_loading)
+        {
+            <MudStack AlignItems="AlignItems.Center" Spacing="3" Class="pa-6">
+                <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+                <MudText Typo="Typo.body1" Color="Color.Secondary">Carregando roles...</MudText>
+            </MudStack>
+        }
+        else if (_loadError != null)
+        {
+            <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
+        }
+        else
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                Selecione as roles que devem ser atribuídas ao usuário.
+            </MudText>
+
+            @if (_allRoles.Count == 0)
+            {
+                <MudPaper Class="pa-4" Elevation="0">
+                    <MudStack AlignItems="AlignItems.Center" Spacing="2">
+                        <MudIcon Icon="@Icons.Material.Filled.Info" Color="Color.Info" />
+                        <MudText Typo="Typo.body2">Nenhuma role disponível para este tenant.</MudText>
+                    </MudStack>
+                </MudPaper>
+            }
+            else
+            {
+                <MudTable Items="@_allRoles" Hover="true" Dense="true" Elevation="0">
+                    <HeaderContent>
+                        <MudTh>
+                            <MudCheckBox T="bool"
+                                         Color="Color.Primary"
+                                         Checked="@_allSelected"
+                                         CheckedChanged="ToggleAllRoles" />
+                        </MudTh>
+                        <MudTh>Role</MudTh>
+                        <MudTh>Abreviação</MudTh>
+                        <MudTh>Status</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Selecionar">
+                            <MudCheckBox T="bool"
+                                         Color="Color.Primary"
+                                         Checked="@context.IsSelected"
+                                         CheckedChanged="@((bool value) => ToggleRole(context, value))" />
+                        </MudTd>
+                        <MudTd DataLabel="Role">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                <MudText Typo="Typo.body2">@context.Role.Name</MudText>
+                                @if (context.IsCurrent)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">Atual</MudChip>
+                                }
+                            </MudStack>
+                        </MudTd>
+                        <MudTd DataLabel="Abreviação">
+                            <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Filled">@context.Role.Abbreviation</MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Status">
+                            @if (context.IsCurrent)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">Atual</MudChip>
+                            }
+                            else
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">Novo</MudChip>
+                            }
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-3">
+                    @_selectedCount role(s) selecionada(s)
+                </MudText>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="Cancel" Disabled="@_saving">
+            Cancelar
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="Submit"
+                   Disabled="@(!_canSave)">
+            @(_saving ? "Salvando..." : "Salvar Alterações")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public TenantDto Tenant { get; set; } = null!;
+    [Parameter] public UserDto User { get; set; } = null!;
+
+    private class RoleSelectionItem
+    {
+        public required RoleDto Role { get; set; }
+        public bool IsSelected { get; set; }
+        public bool IsCurrent { get; set; }
+    }
+
+    private readonly List<RoleSelectionItem> _allRoles = new();
+    private bool _loading;
+    private bool _saving;
+    private string? _loadError;
+    private bool _allSelected;
+    private int _selectedCount => _allRoles.Count(r => r.IsSelected);
+    private bool _canSave => !_saving && _allRoles.Count > 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+        try
+        {
+            await LoadRolesAsync();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadRolesAsync()
+    {
+        try
+        {
+            // Carregar todas as roles
+            var allRoles = await ApiService.GetAsync<List<RoleDto>>("api/roles");
+            if (allRoles == null)
+            {
+                _loadError = "Não foi possível carregar as roles.";
+                return;
+            }
+
+            var filteredRoles = allRoles.OrderBy(r => r.Name);
+
+            // Obter roles atuais do usuário
+            var currentRoles = User.RoleNames ?? new List<string>();
+
+            _allRoles.Clear();
+            foreach (var role in filteredRoles)
+            {
+                var isCurrent = currentRoles.Contains(role.Name);
+                _allRoles.Add(new RoleSelectionItem
+                {
+                    Role = role,
+                    IsSelected = isCurrent,
+                    IsCurrent = isCurrent
+                });
+            }
+
+            UpdateAllSelectedState();
+        }
+        catch (Exception ex)
+        {
+            _loadError = "Erro ao carregar roles.";
+            Logger.LogError(ex, "Erro ao carregar roles");
+        }
+    }
+
+    private void ToggleAllRoles(bool selected)
+    {
+        foreach (var item in _allRoles)
+        {
+            item.IsSelected = selected;
+        }
+
+        UpdateAllSelectedState();
+    }
+
+    private void ToggleRole(RoleSelectionItem item, bool selected)
+    {
+        item.IsSelected = selected;
+        UpdateAllSelectedState();
+    }
+
+    private void UpdateAllSelectedState()
+    {
+        _allSelected = _allRoles.Count > 0 && _allRoles.All(r => r.IsSelected);
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private async Task Submit()
+    {
+        _saving = true;
+        try
+        {
+            // Coletar IDs das roles selecionadas
+            var selectedRoleIds = _allRoles
+                .Where(r => r.IsSelected)
+                .Select(r => r.Role.Id)
+                .ToList();
+
+            if (selectedRoleIds.Count == 0)
+            {
+                Snackbar.Add("Selecione pelo menos uma role.", Severity.Error);
+                return;
+            }
+
+            var dto = new UpdateUserRolesDto
+            {
+                RoleIds = selectedRoleIds
+            };
+
+            var response = await ApiService.PutAsync($"api/tenants/{Tenant.Id}/users/{User.Id}/roles", dto);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Roles atualizadas com sucesso.", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Add("Erro ao atualizar roles.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao atualizar roles");
+            Snackbar.Add("Erro ao atualizar roles.", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

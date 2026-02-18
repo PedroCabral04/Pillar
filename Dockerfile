@@ -1,16 +1,29 @@
-# Build and run Pillar ERP (.NET 9 Blazor Server) in a container
-# ---------- Build stage ----------
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+# Build and run Pillar ERP (.NET 9 Blazor Server)
+
+# ---------- Restore stage (best cache hit rate) ----------
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS restore
 WORKDIR /src
 
-# copy csproj and restore as distinct layers
+# Keep restore in its own layer so source-only changes do not invalidate NuGet cache
 COPY erp.csproj ./
 RUN dotnet restore "erp.csproj"
 
+# ---------- Publish stage ----------
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS publish
+WORKDIR /src
 
-# copy everything else and build
+# Reuse restored packages and assets from previous stage
+COPY --from=restore /root/.nuget /root/.nuget
+COPY --from=restore /src .
+
+# Copy source after restore to avoid re-restoring on each code change
 COPY . .
-RUN dotnet publish "erp.csproj" -c Release -o /app/publish --no-restore
+
+RUN dotnet publish "erp.csproj" \
+    -c Release \
+    -o /app/publish \
+    --no-restore \
+    /p:UseAppHost=false
 
 # ---------- Runtime stage ----------
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
@@ -30,8 +43,6 @@ ENV TZ=America/Sao_Paulo \
 EXPOSE 8080
 
 # Copy published output
-COPY --from=build /app/publish .
-
-# Health probe (Coolify uses this for container health monitoring)
+COPY --from=publish /app/publish .
 
 ENTRYPOINT ["dotnet", "erp.dll"]
