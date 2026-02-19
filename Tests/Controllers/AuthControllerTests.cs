@@ -1,6 +1,7 @@
 using erp.Controllers;
 using erp.DTOs.Auth;
 using erp.Models.Identity;
+using erp.Security;
 using erp.Services.Email;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
@@ -292,6 +293,169 @@ public class AuthControllerTests
         // Assert
         result.Should().BeOfType<OkObjectResult>();
         _mockSignInManager.Verify(x => x.SignOutAsync(), Times.Once);
+    }
+
+    #endregion
+
+    #region Impersonation Tests
+
+    [Fact]
+    public async Task ImpersonateUser_WithSuperAdmin_ReturnsOk()
+    {
+        // Arrange
+        var superAdmin = new ApplicationUser
+        {
+            Id = 1,
+            UserName = "superadmin",
+            Email = "superadmin@erp.local"
+        };
+
+        var targetUser = new ApplicationUser
+        {
+            Id = 2,
+            UserName = "target.user",
+            Email = "target@tenant.local",
+            IsActive = true,
+            TenantId = 77
+        };
+
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, "1"),
+                    new Claim(ClaimTypes.Role, RoleNames.SuperAdmin)
+                }, "TestAuth"))
+            }
+        };
+
+        _mockUserManager.Setup(x => x.FindByIdAsync("1"))
+            .ReturnsAsync(superAdmin);
+        _mockUserManager.Setup(x => x.IsInRoleAsync(superAdmin, RoleNames.SuperAdmin))
+            .ReturnsAsync(true);
+        _mockUserManager.Setup(x => x.FindByIdAsync("2"))
+            .ReturnsAsync(targetUser);
+        _mockSignInManager.Setup(x => x.SignOutAsync())
+            .Returns(Task.CompletedTask);
+        _mockSignInManager.Setup(x => x.SignInWithClaimsAsync(
+                targetUser,
+                false,
+                It.IsAny<IEnumerable<Claim>>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _controller.ImpersonateUser(2);
+
+        // Assert
+        result.Should().BeOfType<OkObjectResult>();
+        _mockSignInManager.Verify(x => x.SignInWithClaimsAsync(
+            targetUser,
+            false,
+            It.Is<IEnumerable<Claim>>(claims =>
+                claims.Any(c => c.Type == ImpersonationClaimTypes.IsImpersonating && c.Value == "true") &&
+                claims.Any(c => c.Type == ImpersonationClaimTypes.ImpersonatorUserId && c.Value == "1"))), Times.Once);
+    }
+
+    [Fact]
+    public async Task ImpersonateUser_WithMissingTarget_ReturnsNotFound()
+    {
+        // Arrange
+        var superAdmin = new ApplicationUser
+        {
+            Id = 1,
+            UserName = "superadmin",
+            Email = "superadmin@erp.local"
+        };
+
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, "1"),
+                    new Claim(ClaimTypes.Role, RoleNames.SuperAdmin)
+                }, "TestAuth"))
+            }
+        };
+
+        _mockUserManager.Setup(x => x.FindByIdAsync("1"))
+            .ReturnsAsync(superAdmin);
+        _mockUserManager.Setup(x => x.IsInRoleAsync(superAdmin, RoleNames.SuperAdmin))
+            .ReturnsAsync(true);
+        _mockUserManager.Setup(x => x.FindByIdAsync("99"))
+            .ReturnsAsync((ApplicationUser?)null);
+
+        // Act
+        var result = await _controller.ImpersonateUser(99);
+
+        // Assert
+        result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task StopImpersonation_WithImpersonationClaim_ReturnsOk()
+    {
+        // Arrange
+        var superAdmin = new ApplicationUser
+        {
+            Id = 1,
+            UserName = "superadmin",
+            Email = "superadmin@erp.local"
+        };
+
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, "2"),
+                    new Claim(ImpersonationClaimTypes.IsImpersonating, "true"),
+                    new Claim(ImpersonationClaimTypes.ImpersonatorUserId, "1")
+                }, "TestAuth"))
+            }
+        };
+
+        _mockUserManager.Setup(x => x.FindByIdAsync("1"))
+            .ReturnsAsync(superAdmin);
+        _mockUserManager.Setup(x => x.IsInRoleAsync(superAdmin, RoleNames.SuperAdmin))
+            .ReturnsAsync(true);
+        _mockSignInManager.Setup(x => x.SignOutAsync())
+            .Returns(Task.CompletedTask);
+        _mockSignInManager.Setup(x => x.SignInAsync(superAdmin, false, null))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _controller.StopImpersonation();
+
+        // Assert
+        result.Should().BeOfType<OkObjectResult>();
+        _mockSignInManager.Verify(x => x.SignInAsync(superAdmin, false, null), Times.Once);
+    }
+
+    [Fact]
+    public async Task StopImpersonation_WithoutImpersonationClaim_ReturnsBadRequest()
+    {
+        // Arrange
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, "1")
+                }, "TestAuth"))
+            }
+        };
+
+        // Act
+        var result = await _controller.StopImpersonation();
+
+        // Assert
+        result.Should().BeOfType<BadRequestObjectResult>();
     }
 
     #endregion

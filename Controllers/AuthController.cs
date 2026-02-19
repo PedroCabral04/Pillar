@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Web;
 using erp.DTOs.Auth;
+using erp.Security;
 using erp.Services.Email;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication;
@@ -195,6 +196,108 @@ public class AuthController(
     {
         await signInManager.SignOutAsync();
         return Ok(new { message = "Desconectado" });
+    }
+
+    [Authorize(Roles = RoleNames.SuperAdmin)]
+    [HttpPost("impersonate/{userId:int}")]
+    [IgnoreAntiforgeryToken]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ImpersonateUser([FromRoute] int userId)
+    {
+        if (User.HasClaim(c => c.Type == ImpersonationClaimTypes.IsImpersonating &&
+                               string.Equals(c.Value, "true", StringComparison.OrdinalIgnoreCase)))
+        {
+            return BadRequest(new { message = "Finalize a impersonação atual antes de iniciar outra." });
+        }
+
+        var superAdminIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(superAdminIdClaim, out var superAdminId))
+        {
+            return Unauthorized(new { message = "Usuário autenticado inválido." });
+        }
+
+        if (superAdminId == userId)
+        {
+            return BadRequest(new { message = "Você já está autenticado como este usuário." });
+        }
+
+        var superAdmin = await userManager.FindByIdAsync(superAdminId.ToString());
+        if (superAdmin is null)
+        {
+            return Unauthorized(new { message = "Usuário autenticado não encontrado." });
+        }
+
+        if (!await userManager.IsInRoleAsync(superAdmin, RoleNames.SuperAdmin))
+        {
+            return Forbid();
+        }
+
+        var targetUser = await userManager.FindByIdAsync(userId.ToString());
+        if (targetUser is null)
+        {
+            return NotFound(new { message = "Usuário de destino não encontrado." });
+        }
+
+        if (!targetUser.IsActive)
+        {
+            return BadRequest(new { message = "Não é possível impersonar um usuário inativo." });
+        }
+
+        var impersonatorName = superAdmin.UserName ?? superAdmin.Email ?? $"user-{superAdmin.Id}";
+        var additionalClaims = new[]
+        {
+            new Claim(ImpersonationClaimTypes.IsImpersonating, "true"),
+            new Claim(ImpersonationClaimTypes.ImpersonatorUserId, superAdmin.Id.ToString()),
+            new Claim(ImpersonationClaimTypes.ImpersonatorUserName, impersonatorName)
+        };
+
+        await signInManager.SignOutAsync();
+        await signInManager.SignInWithClaimsAsync(targetUser, isPersistent: false, additionalClaims);
+
+        logger.LogWarning("SuperAdmin {SuperAdminId} iniciou impersonação do usuário {TargetUserId}", superAdmin.Id, targetUser.Id);
+
+        return Ok(new
+        {
+            message = "Impersonação iniciada com sucesso.",
+            user = new { targetUser.Id, targetUser.UserName, targetUser.Email, targetUser.TenantId }
+        });
+    }
+
+    [Authorize]
+    [HttpPost("stop-impersonation")]
+    [IgnoreAntiforgeryToken]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> StopImpersonation()
+    {
+        var originalUserIdClaim = User.FindFirstValue(ImpersonationClaimTypes.ImpersonatorUserId);
+        if (!int.TryParse(originalUserIdClaim, out var originalUserId))
+        {
+            return BadRequest(new { message = "A sessão atual não está em modo de impersonação." });
+        }
+
+        var originalUser = await userManager.FindByIdAsync(originalUserId.ToString());
+        if (originalUser is null)
+        {
+            return NotFound(new { message = "Usuário original da sessão não foi encontrado." });
+        }
+
+        if (!await userManager.IsInRoleAsync(originalUser, RoleNames.SuperAdmin))
+        {
+            return Forbid();
+        }
+
+        await signInManager.SignOutAsync();
+        await signInManager.SignInAsync(originalUser, isPersistent: false);
+
+        logger.LogInformation("Impersonação encerrada. Sessão restaurada para SuperAdmin {SuperAdminId}", originalUser.Id);
+
+        return Ok(new { message = "Impersonação encerrada com sucesso." });
     }
 
     /// <summary>
