@@ -292,7 +292,7 @@ public class TenantsController : ControllerBase
     /// <param name="id">ID do tenant.</param>
     /// <param name="cancellationToken">Token para cancelamento da operação.</param>
     /// <returns>Lista de usuários do tenant com suas roles.</returns>
-    [HttpGet("{id:int}/users")]
+    [HttpGet("{id:int}/users", Name = "GetTenantUsers")]
     public async Task<ActionResult<IEnumerable<UserDto>>> GetTenantUsersAsync(int id, CancellationToken cancellationToken)
     {
         // Verifica se o tenant existe
@@ -463,7 +463,7 @@ public class TenantsController : ControllerBase
             FullName = user.FullName
         };
 
-        return CreatedAtAction(nameof(GetTenantUsersAsync), new { id }, userDto);
+        return CreatedAtRoute("GetTenantUsers", new { id }, userDto);
     }
 
     /// <summary>
