@@ -54,6 +54,8 @@ public class ChatConversationService : IChatConversationService
             CreatedAt = conversation.CreatedAt,
             LastMessageAt = conversation.LastMessageAt,
             IsArchived = conversation.IsArchived,
+            OperationMode = NormalizeOperationMode(conversation.DefaultOperationMode),
+            ResponseStyle = NormalizeResponseStyle(conversation.DefaultResponseStyle),
             IsAtMessageLimit = conversation.Messages.Count >= ChatConversation.MaxMessages,
             Messages = conversation.Messages.Select(m => new ChatMessageDto
             {
@@ -72,7 +74,9 @@ public class ChatConversationService : IChatConversationService
         {
             UserId = userId,
             Title = "Nova conversa",
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            DefaultOperationMode = (int)request.OperationMode,
+            DefaultResponseStyle = (int)request.ResponseStyle
         };
         
         conversation = await _conversationDao.CreateConversationAsync(conversation);
@@ -80,7 +84,12 @@ public class ChatConversationService : IChatConversationService
         // If there's an initial message, send it
         if (!string.IsNullOrWhiteSpace(request.InitialMessage))
         {
-            await SendMessageAsync(userId, conversation.Id, request.InitialMessage);
+            await SendMessageAsync(
+                userId,
+                conversation.Id,
+                request.InitialMessage,
+                request.OperationMode,
+                request.ResponseStyle);
             
             // Reload to get messages
             var updated = await _conversationDao.GetConversationWithMessagesAsync(conversation.Id);
@@ -93,6 +102,8 @@ public class ChatConversationService : IChatConversationService
                     CreatedAt = updated.CreatedAt,
                     LastMessageAt = updated.LastMessageAt,
                     IsArchived = updated.IsArchived,
+                    OperationMode = NormalizeOperationMode(updated.DefaultOperationMode),
+                    ResponseStyle = NormalizeResponseStyle(updated.DefaultResponseStyle),
                     IsAtMessageLimit = updated.Messages.Count >= ChatConversation.MaxMessages,
                     Messages = updated.Messages.Select(m => new ChatMessageDto
                     {
@@ -113,12 +124,19 @@ public class ChatConversationService : IChatConversationService
             CreatedAt = conversation.CreatedAt,
             LastMessageAt = conversation.LastMessageAt,
             IsArchived = conversation.IsArchived,
+            OperationMode = NormalizeOperationMode(conversation.DefaultOperationMode),
+            ResponseStyle = NormalizeResponseStyle(conversation.DefaultResponseStyle),
             IsAtMessageLimit = false,
             Messages = new List<ChatMessageDto>()
         };
     }
 
-    public async Task<ConversationMessageResponseDto> SendMessageAsync(int userId, int conversationId, string message)
+    public async Task<ConversationMessageResponseDto> SendMessageAsync(
+        int userId,
+        int conversationId,
+        string message,
+        ChatOperationMode operationMode = ChatOperationMode.ProposeAction,
+        ChatResponseStyle responseStyle = ChatResponseStyle.Executive)
     {
         var conversation = await _conversationDao.GetConversationWithMessagesAsync(conversationId);
         
@@ -128,7 +146,8 @@ public class ChatConversationService : IChatConversationService
             return new ConversationMessageResponseDto
             {
                 Success = false,
-                Error = "Conversa não encontrada"
+                Error = "Conversa não encontrada",
+                OperationMode = operationMode
             };
         }
         
@@ -140,12 +159,24 @@ public class ChatConversationService : IChatConversationService
             {
                 Success = false,
                 Error = "Esta conversa atingiu o limite de 20 mensagens. Inicie uma nova conversa para continuar.",
-                IsAtMessageLimit = true
+                IsAtMessageLimit = true,
+                OperationMode = operationMode
             };
         }
         
         var now = DateTime.UtcNow;
         var nextOrder = await _conversationDao.GetNextMessageOrderAsync(conversationId);
+
+        var normalizedOperationMode = NormalizeOperationMode((int)operationMode);
+        var normalizedResponseStyle = NormalizeResponseStyle((int)responseStyle);
+
+        if (conversation.DefaultOperationMode != (int)normalizedOperationMode
+            || conversation.DefaultResponseStyle != (int)normalizedResponseStyle)
+        {
+            conversation.DefaultOperationMode = (int)normalizedOperationMode;
+            conversation.DefaultResponseStyle = (int)normalizedResponseStyle;
+            await _conversationDao.UpdateConversationAsync(conversation);
+        }
         
         // Create user message
         var userMessage = new ChatMessage
@@ -185,7 +216,8 @@ public class ChatConversationService : IChatConversationService
                     IsError = userMessage.IsError
                 },
                 IsAtMessageLimit = true,
-                Error = "Limite de mensagens atingido. Esta foi a última mensagem permitida nesta conversa."
+                Error = "Limite de mensagens atingido. Esta foi a última mensagem permitida nesta conversa.",
+                OperationMode = operationMode
             };
         }
         
@@ -214,7 +246,15 @@ public class ChatConversationService : IChatConversationService
         
         try
         {
-            var response = await _chatbotService.ProcessMessageAsync(message, history);
+            var response = await _chatbotService.ProcessMessageAsync(
+                message,
+                history,
+                userId,
+                normalizedOperationMode,
+                normalizedResponseStyle,
+                false,
+                conversationId,
+                "conversation");
             
             // Create assistant message
             var assistantMessage = new ChatMessage
@@ -251,6 +291,10 @@ public class ChatConversationService : IChatConversationService
                     IsError = assistantMessage.IsError
                 },
                 SuggestedActions = response.SuggestedActions,
+                OperationMode = response.OperationMode,
+                RequiresConfirmation = response.RequiresConfirmation,
+                ConfirmationPrompt = response.ConfirmationPrompt,
+                EvidenceSources = response.EvidenceSources,
                 IsAtMessageLimit = currentCount >= ChatConversation.MaxMessages
             };
         }
@@ -292,6 +336,7 @@ public class ChatConversationService : IChatConversationService
                     Timestamp = errorMessage.Timestamp,
                     IsError = errorMessage.IsError
                 },
+                OperationMode = operationMode,
                 IsAtMessageLimit = currentCount >= ChatConversation.MaxMessages
             };
         }
@@ -316,6 +361,16 @@ public class ChatConversationService : IChatConversationService
         if (request.IsArchived.HasValue)
         {
             conversation.IsArchived = request.IsArchived.Value;
+        }
+
+        if (request.OperationMode.HasValue)
+        {
+            conversation.DefaultOperationMode = (int)NormalizeOperationMode((int)request.OperationMode.Value);
+        }
+
+        if (request.ResponseStyle.HasValue)
+        {
+            conversation.DefaultResponseStyle = (int)NormalizeResponseStyle((int)request.ResponseStyle.Value);
         }
         
         await _conversationDao.UpdateConversationAsync(conversation);
@@ -375,5 +430,19 @@ public class ChatConversationService : IChatConversationService
         }
         
         return truncated + "...";
+    }
+
+    private static ChatOperationMode NormalizeOperationMode(int mode)
+    {
+        return Enum.IsDefined(typeof(ChatOperationMode), mode)
+            ? (ChatOperationMode)mode
+            : ChatOperationMode.ProposeAction;
+    }
+
+    private static ChatResponseStyle NormalizeResponseStyle(int style)
+    {
+        return Enum.IsDefined(typeof(ChatResponseStyle), style)
+            ? (ChatResponseStyle)style
+            : ChatResponseStyle.Executive;
     }
 }

@@ -510,9 +510,12 @@ builder.Services.AddScoped<IPermissionService, PermissionService>();
 
 // Chatbot services
 builder.Services.AddSingleton<erp.Services.Chatbot.IChatbotCacheService, erp.Services.Chatbot.ChatbotCacheService>();
+builder.Services.AddSingleton<erp.Services.Chatbot.IChatbotConfirmationService, erp.Services.Chatbot.ChatbotConfirmationService>();
 builder.Services.AddScoped<erp.Services.Chatbot.IChatbotService, erp.Services.Chatbot.ChatbotService>();
+builder.Services.AddScoped<erp.Services.Chatbot.IChatbotAuditService, erp.Services.Chatbot.ChatbotAuditService>();
 builder.Services.AddScoped<erp.Services.Chatbot.IChatConversationService, erp.Services.Chatbot.ChatConversationService>();
 builder.Services.AddScoped<erp.DAOs.Chatbot.IChatConversationDao, erp.DAOs.Chatbot.ChatConversationDao>();
+builder.Services.AddScoped<erp.DAOs.Chatbot.IChatbotAuditDao, erp.DAOs.Chatbot.ChatbotAuditDao>();
 builder.Services.AddScoped<erp.Services.Chatbot.IChatbotUserContext, erp.Services.Chatbot.ChatbotUserContext>();
 
 // Browser Service (Mobile/Responsive)

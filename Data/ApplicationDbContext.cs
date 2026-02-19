@@ -104,6 +104,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     // Chatbot Conversations
     public DbSet<ChatConversation> ChatConversations { get; set; } = null!;
     public DbSet<ChatMessage> ChatMessages { get; set; } = null!;
+    public DbSet<ChatbotAuditEntry> ChatbotAuditEntries { get; set; } = null!;
     
     // Module Permissions
     public DbSet<ModulePermission> ModulePermissions { get; set; } = null!;
@@ -2447,6 +2448,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             
             c.Property(x => x.Title).HasMaxLength(200).IsRequired();
             c.Property(x => x.CreatedAt).IsRequired();
+            c.Property(x => x.DefaultOperationMode).HasDefaultValue(1).IsRequired();
+            c.Property(x => x.DefaultResponseStyle).HasDefaultValue(0).IsRequired();
             
             c.HasIndex(x => x.UserId);
             c.HasIndex(x => x.TenantId);
@@ -2484,6 +2487,27 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .WithMany(x => x.Messages)
                 .HasForeignKey(x => x.ConversationId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ChatbotAuditEntry>(a =>
+        {
+            a.ToTable("ChatbotAuditEntries");
+            a.HasKey(x => x.Id);
+
+            a.Property(x => x.CreatedAt).IsRequired();
+            a.Property(x => x.Source).HasMaxLength(30).IsRequired();
+            a.Property(x => x.Outcome).HasMaxLength(60).IsRequired();
+            a.Property(x => x.RequestMessage).HasMaxLength(4000).IsRequired();
+            a.Property(x => x.EffectiveMessage).HasMaxLength(4000).IsRequired();
+            a.Property(x => x.ResponseMessage).HasMaxLength(8000);
+            a.Property(x => x.Error).HasMaxLength(1000);
+            a.Property(x => x.AiProvider).HasMaxLength(30);
+
+            a.HasIndex(x => x.CreatedAt);
+            a.HasIndex(x => x.UserId);
+            a.HasIndex(x => x.ConversationId);
+            a.HasIndex(x => x.TenantId);
+            a.HasIndex(x => new { x.UserId, x.CreatedAt });
         });
     }
 

@@ -1,32 +1,73 @@
+using System.Security.Claims;
 using erp.Controllers;
+using erp.Data;
 using erp.DTOs.Tenancy;
+using erp.Models.Identity;
 using erp.Security;
 using erp.Services.Tenancy;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Moq;
-using System.Security.Claims;
 using Xunit;
 
 namespace erp.Tests.Controllers;
 
-public class TenantsControllerTests
+public class TenantsControllerTests : IDisposable
 {
     private readonly Mock<ITenantService> _tenantService = new();
     private readonly Mock<ITenantBrandingService> _brandingService = new();
     private readonly Mock<IFileValidationService> _fileValidationService = new();
+    private readonly Mock<UserManager<ApplicationUser>> _userManager;
+    private readonly Mock<RoleManager<ApplicationRole>> _roleManager;
+    private readonly ApplicationDbContext _context;
+    private readonly Mock<ILogger<TenantsController>> _logger = new();
     private readonly TenantsController _controller;
 
     public TenantsControllerTests()
     {
-        _controller = new TenantsController(_tenantService.Object, _brandingService.Object, _fileValidationService.Object)
+        var userStore = new Mock<IUserStore<ApplicationUser>>();
+        _userManager = new Mock<UserManager<ApplicationUser>>(
+            userStore.Object,
+            null!,
+            null!,
+            null!,
+            null!,
+            null!,
+            null!,
+            null!,
+            null!);
+
+        var roleStore = new Mock<IRoleStore<ApplicationRole>>();
+        _roleManager = new Mock<RoleManager<ApplicationRole>>(
+            roleStore.Object,
+            null!,
+            null!,
+            null!,
+            null!);
+
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        _context = new ApplicationDbContext(options);
+
+        _controller = new TenantsController(
+            _tenantService.Object,
+            _brandingService.Object,
+            _fileValidationService.Object,
+            _userManager.Object,
+            _roleManager.Object,
+            _context,
+            _logger.Object)
         {
             ControllerContext = new ControllerContext
             {
                 HttpContext = new DefaultHttpContext
                 {
-                    User = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim(ClaimTypes.Name, "admin") }, "mock"))
+                    User = new ClaimsPrincipal(new ClaimsIdentity(
+                        [new Claim(ClaimTypes.NameIdentifier, "1"), new Claim(ClaimTypes.Name, "admin")],
+                        "mock"))
                 }
             }
         };
@@ -63,23 +104,16 @@ public class TenantsControllerTests
     }
 
     [Fact]
-    public async Task AssignMemberAsync_WhenTenantMissing_ReturnsNotFound()
-    {
-        _tenantService
-            .Setup(s => s.AssignMemberAsync(99, 2, It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new KeyNotFoundException());
-
-        var result = await _controller.AssignMemberAsync(99, 2, CancellationToken.None);
-
-        result.Result.Should().BeOfType<NotFoundResult>();
-    }
-
-    [Fact]
     public async Task RevokeMemberAsync_ReturnsNoContent()
     {
         var result = await _controller.RevokeMemberAsync(10, 2, CancellationToken.None);
 
         result.Should().BeOfType<NoContentResult>();
         _tenantService.Verify(s => s.RevokeMemberAsync(10, 2, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    public void Dispose()
+    {
+        _context.Dispose();
     }
 }

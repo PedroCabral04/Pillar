@@ -23,6 +23,8 @@ public class ChatConversationDto
     public DateTime CreatedAt { get; set; }
     public DateTime? LastMessageAt { get; set; }
     public bool IsArchived { get; set; }
+    public ChatOperationMode OperationMode { get; set; } = ChatOperationMode.ProposeAction;
+    public ChatResponseStyle ResponseStyle { get; set; } = ChatResponseStyle.Executive;
     public List<ChatMessageDto> Messages { get; set; } = new();
     public bool IsAtMessageLimit { get; set; }
 }
@@ -36,6 +38,8 @@ public class CreateConversationDto
     /// Optional: First message to send. If provided, conversation title is auto-generated.
     /// </summary>
     public string? InitialMessage { get; set; }
+    public ChatOperationMode OperationMode { get; set; } = ChatOperationMode.ProposeAction;
+    public ChatResponseStyle ResponseStyle { get; set; } = ChatResponseStyle.Executive;
 }
 
 /// <summary>
@@ -44,6 +48,8 @@ public class CreateConversationDto
 public class SendMessageToConversationDto
 {
     public string Message { get; set; } = string.Empty;
+    public ChatOperationMode OperationMode { get; set; } = ChatOperationMode.ProposeAction;
+    public ChatResponseStyle ResponseStyle { get; set; } = ChatResponseStyle.Executive;
 }
 
 /// <summary>
@@ -56,6 +62,10 @@ public class ConversationMessageResponseDto
     public ChatMessageDto? UserMessage { get; set; }
     public ChatMessageDto? AssistantMessage { get; set; }
     public List<string>? SuggestedActions { get; set; }
+    public ChatOperationMode OperationMode { get; set; } = ChatOperationMode.ProposeAction;
+    public bool RequiresConfirmation { get; set; }
+    public string? ConfirmationPrompt { get; set; }
+    public List<ChatEvidenceSourceDto>? EvidenceSources { get; set; }
     public bool IsAtMessageLimit { get; set; }
 }
 
@@ -66,4 +76,6 @@ public class UpdateConversationDto
 {
     public string? Title { get; set; }
     public bool? IsArchived { get; set; }
+    public ChatOperationMode? OperationMode { get; set; }
+    public ChatResponseStyle? ResponseStyle { get; set; }
 }

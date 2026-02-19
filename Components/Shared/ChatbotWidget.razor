@@ -154,24 +154,53 @@
                 </div>
             }
 
+            @if (_latestEvidenceSources.Any() && !_isProcessing)
+            {
+                <div class="evidence-sources">
+                    @foreach (var evidence in _latestEvidenceSources.Take(2))
+                    {
+                        <MudChip T="string"
+                                 Size="MudBlazor.Size.Small"
+                                 Color="MudBlazor.Color.Info"
+                                 Variant="Variant.Text">
+                            Fonte: @evidence.Source
+                        </MudChip>
+                    }
+                </div>
+            }
+
             <div class="chat-input-area">
-                <MudTextField @bind-Value="_currentMessage"
-                              Placeholder="Digite sua mensagem..."
-                              Variant="Variant.Outlined"
-                              Margin="Margin.Dense"
-                              OnKeyDown="HandleKeyDown"
-                              Disabled="_isProcessing"
-                              Immediate="true"
-                              FullWidth="true"
-                              Adornment="Adornment.None"
-                              Style="flex: 1;"/>
-                <MudIconButton Icon="@Icons.Material.Filled.Send" 
-                               Color="MudBlazor.Color.Primary" 
-                               Variant="Variant.Filled"
-                               Class="send-button"
-                               OnClick="SendMessage"
-                               Disabled="@(string.IsNullOrWhiteSpace(_currentMessage) || _isProcessing)"
-                               aria-label="Enviar mensagem"/>
+                <div class="chat-controls">
+                    <MudSelect T="ChatOperationMode"
+                               Label="Modo"
+                               Margin="Margin.Dense"
+                               Variant="Variant.Outlined"
+                               Dense="true"
+                               @bind-Value="_operationMode">
+                        <MudSelectItem Value="@ChatOperationMode.ReadOnly">Somente leitura</MudSelectItem>
+                        <MudSelectItem Value="@ChatOperationMode.ProposeAction">Propor ação</MudSelectItem>
+                        <MudSelectItem Value="@ChatOperationMode.ExecuteWithConfirmation">Executar com confirmação</MudSelectItem>
+                    </MudSelect>
+                </div>
+                <div class="chat-input-row">
+                    <MudTextField @bind-Value="_currentMessage"
+                                  Placeholder="Digite sua mensagem..."
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  OnKeyDown="HandleKeyDown"
+                                  Disabled="_isProcessing"
+                                  Immediate="true"
+                                  FullWidth="true"
+                                  Adornment="Adornment.None"
+                                  Style="flex: 1;"/>
+                    <MudIconButton Icon="@Icons.Material.Filled.Send" 
+                                   Color="MudBlazor.Color.Primary" 
+                                   Variant="Variant.Filled"
+                                   Class="send-button"
+                                   OnClick="SendMessage"
+                                   Disabled="@(string.IsNullOrWhiteSpace(_currentMessage) || _isProcessing)"
+                                   aria-label="Enviar mensagem"/>
+                </div>
             </div>
         </div>
     }
@@ -197,6 +226,8 @@
     private string _currentMessage = string.Empty;
     private List<ChatMessageDto> _messages = new();
     private List<string> _suggestedActions = new();
+    private List<ChatEvidenceSourceDto> _latestEvidenceSources = new();
+    private ChatOperationMode _operationMode = ChatOperationMode.ProposeAction;
     private ElementReference _messagesContainer;
     private HashSet<string> _expandedMessages = new();
 
@@ -281,7 +312,9 @@
             var firstUserMessage = _messages.FirstOrDefault(m => m.Role == "user")?.Content;
             var createRequest = new CreateConversationDto 
             { 
-                InitialMessage = null // We'll add messages manually
+                InitialMessage = null, // We'll add messages manually
+                OperationMode = _operationMode,
+                ResponseStyle = ChatResponseStyle.Executive
             };
             
             var newConversation = await ApiService.PostAsync<ChatConversationDto>("api/chatbot/conversations", createRequest);
@@ -291,7 +324,12 @@
                 // Send each message pair to the conversation
                 foreach (var message in _messages.Where(m => m.Role == "user" && !m.IsError))
                 {
-                    var request = new SendMessageToConversationDto { Message = message.Content };
+                    var request = new SendMessageToConversationDto
+                    {
+                        Message = message.Content,
+                        OperationMode = _operationMode,
+                        ResponseStyle = ChatResponseStyle.Executive
+                    };
                     await ApiService.PostAsync<ConversationMessageResponseDto>(
                         $"api/chatbot/conversations/{newConversation.Id}/messages", 
                         request);
@@ -344,6 +382,7 @@
             "O que você pode fazer?",
             "Listar produtos",
         };
+        _latestEvidenceSources.Clear();
     }
 
     private async Task HandleKeyDown(KeyboardEventArgs e)
@@ -362,6 +401,7 @@
         var userMessage = _currentMessage.Trim();
         _currentMessage = string.Empty;
         _suggestedActions.Clear();
+        _latestEvidenceSources.Clear();
 
         _messages.Add(new ChatMessageDto
         {
@@ -378,7 +418,9 @@
             var request = new ChatRequestDto
             {
                 Message = userMessage,
-                ConversationHistory = _messages.Where(m => !m.IsError).ToList()
+                ConversationHistory = _messages.Where(m => !m.IsError).ToList(),
+                OperationMode = _operationMode,
+                ResponseStyle = ChatResponseStyle.Executive
             };
 
             var response = await ApiService.PostAsync<ChatResponseDto>("api/chatbot/message", request);
@@ -395,6 +437,16 @@
                 if (response.SuggestedActions?.Any() == true)
                 {
                     _suggestedActions = response.SuggestedActions;
+                }
+
+                _latestEvidenceSources = response.EvidenceSources ?? new List<ChatEvidenceSourceDto>();
+
+                if (response.RequiresConfirmation && !string.IsNullOrWhiteSpace(response.ConfirmationPrompt))
+                {
+                    if (!_suggestedActions.Contains(response.ConfirmationPrompt))
+                    {
+                        _suggestedActions.Insert(0, response.ConfirmationPrompt);
+                    }
                 }
             }
             else
@@ -793,9 +845,29 @@
     background-color: var(--mud-palette-surface);
     border-top: 1px solid var(--mud-palette-lines-default);
     display: flex;
+    flex-direction: column;
     align-items: flex-end;
     gap: 8px;
     flex-shrink: 0;
+}
+
+.chat-controls {
+    width: 100%;
+}
+
+.chat-controls ::deep .mud-input-control {
+    margin: 0;
+}
+
+.chat-controls ::deep .mud-input {
+    font-size: 0.8rem;
+}
+
+.chat-input-row {
+    width: 100%;
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
 }
 
 .chat-input-area ::deep .mud-input-control {
@@ -816,6 +888,20 @@
     border-top: 1px solid var(--mud-palette-lines-default);
     scrollbar-width: none;
     flex-shrink: 0;
+}
+
+.evidence-sources {
+    display: flex;
+    gap: 6px;
+    padding: 8px 16px 0;
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: none;
+    flex-shrink: 0;
+}
+
+.evidence-sources::-webkit-scrollbar {
+    display: none;
 }
 
 .suggested-actions ::deep .mud-chip {

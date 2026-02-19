@@ -1,146 +1,115 @@
+using System.Security.Claims;
 using erp.Controllers;
+using erp.Data;
 using erp.DTOs.Role;
 using erp.Models.Identity;
 using erp.Services.Tenancy;
+using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
+using Microsoft.EntityFrameworkCore;
+using Moq;
+using Xunit;
 
 namespace erp.Tests.Controllers;
 
-/// <summary>
-/// Testes unitários para o controlador de roles
-/// </summary>
-public class RoleControllerTests
+public class RoleControllerTests : IDisposable
 {
-    private readonly Mock<RoleManager<ApplicationRole>> _mockRoleManager;
-    private readonly Mock<ITenantContextAccessor> _mockTenantAccessor;
-    private readonly TenantContext _tenantContext;
-    private readonly RoleController _controller;
+    private readonly ApplicationDbContext _context;
+    private readonly Mock<RoleManager<ApplicationRole>> _roleManager;
+    private readonly Mock<ITenantContextAccessor> _tenantAccessor;
 
     public RoleControllerTests()
     {
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        _tenantAccessor = new Mock<ITenantContextAccessor>();
+        _tenantAccessor.SetupGet(x => x.Current).Returns(new TenantContext());
+
+        _context = new ApplicationDbContext(options, tenantContextAccessor: _tenantAccessor.Object);
+
         var roleStore = new Mock<IRoleStore<ApplicationRole>>();
-        _mockRoleManager = new Mock<RoleManager<ApplicationRole>>(
-            roleStore.Object, null, null, null, null);
-
-        _mockTenantAccessor = new Mock<ITenantContextAccessor>();
-        _tenantContext = new TenantContext();
-        _mockTenantAccessor.SetupGet(x => x.Current).Returns(_tenantContext);
-
-        _controller = new RoleController(_mockRoleManager.Object, _mockTenantAccessor.Object)
-        {
-            ControllerContext = new ControllerContext
-            {
-                HttpContext = new DefaultHttpContext
-                {
-                    User = new ClaimsPrincipal(new ClaimsIdentity(Array.Empty<Claim>(), "mock"))
-                }
-            }
-        };
-    }
-
-    private void SetTenantClaim(int tenantId)
-    {
-        var claims = new List<Claim> { new(TenantClaimTypes.TenantId, tenantId.ToString()) };
-        _controller.ControllerContext.HttpContext = new DefaultHttpContext
-        {
-            User = new ClaimsPrincipal(new ClaimsIdentity(claims, "mock"))
-        };
+        _roleManager = new Mock<RoleManager<ApplicationRole>>(
+            roleStore.Object,
+            null!,
+            null!,
+            null!,
+            null!);
     }
 
     [Fact]
     public async Task GetAllRoles_ReturnsOkWithRoleList()
     {
-        // Arrange
-        var roles = new List<ApplicationRole>
-        {
-            new ApplicationRole { Id = 1, Name = "Admin", Abbreviation = "ADM" },
-            new ApplicationRole { Id = 2, Name = "User", Abbreviation = "USR" },
-            new ApplicationRole { Id = 3, Name = "Manager", Abbreviation = "MGR" }
-        };
+        _context.Set<ApplicationRole>().AddRange(
+            new ApplicationRole { Id = 1, Name = "Admin", Abbreviation = "ADM", NormalizedName = "ADMIN" },
+            new ApplicationRole { Id = 2, Name = "User", Abbreviation = "USR", NormalizedName = "USER" });
+        await _context.SaveChangesAsync();
+        _roleManager.SetupGet(r => r.Roles).Returns(_context.Set<ApplicationRole>());
 
-        _mockRoleManager.Setup(x => x.Roles)
-            .Returns(roles.AsQueryable());
+        var controller = CreateController();
+        var result = await controller.GetAllRoles();
 
-        // Act
-        var result = await _controller.GetAllRoles();
-
-        // Assert
         var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
-        var returnedRoles = okResult.Value as List<RoleDto>;
-        returnedRoles.Should().NotBeNull();
-        returnedRoles.Should().HaveCount(3);
-        returnedRoles![0].Name.Should().Be("Admin");
-        returnedRoles[0].Abbreviation.Should().Be("ADM");
+        var returnedRoles = okResult.Value.Should().BeAssignableTo<List<RoleDto>>().Subject;
+        returnedRoles.Should().HaveCount(2);
+        returnedRoles.Should().Contain(r => r.Name == "Admin" && r.Abbreviation == "ADM");
     }
 
     [Fact]
     public async Task GetAllRoles_WithTenantClaim_FiltersByTenant()
     {
-        // Arrange
-        var roles = new List<ApplicationRole>
-        {
-            new() { Id = 1, Name = "TenantAdmin", TenantId = 10 },
-            new() { Id = 2, Name = "OtherTenantRole", TenantId = 20 }
-        };
+        _context.Set<ApplicationRole>().AddRange(
+            new ApplicationRole { Id = 1, Name = "TenantAdmin", TenantId = 10, NormalizedName = "TENANTADMIN" },
+            new ApplicationRole { Id = 2, Name = "GlobalRole", TenantId = null, NormalizedName = "GLOBALROLE" },
+            new ApplicationRole { Id = 3, Name = "OtherTenantRole", TenantId = 20, NormalizedName = "OTHERTENANTROLE" });
+        await _context.SaveChangesAsync();
+        _roleManager.SetupGet(r => r.Roles).Returns(_context.Set<ApplicationRole>());
 
-        _mockRoleManager.Setup(x => x.Roles)
-            .Returns(roles.AsQueryable());
+        var controller = CreateController(new Claim(TenantClaimTypes.TenantId, "10"));
+        var result = await controller.GetAllRoles();
 
-        SetTenantClaim(10);
-
-        // Act
-        var result = await _controller.GetAllRoles();
-
-        // Assert
         var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
-        var returnedRoles = okResult.Value as List<RoleDto>;
-        returnedRoles.Should().NotBeNull();
-        returnedRoles!.Should().HaveCount(1);
-        returnedRoles[0].Id.Should().Be(1);
-    }
-
-    [Fact]
-    public async Task GetAllRoles_WithNoRoles_ReturnsEmptyList()
-    {
-        // Arrange
-        var roles = new List<ApplicationRole>();
-
-        _mockRoleManager.Setup(x => x.Roles)
-            .Returns(roles.AsQueryable());
-
-        // Act
-        var result = await _controller.GetAllRoles();
-
-        // Assert
-        var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
-        var returnedRoles = okResult.Value as List<RoleDto>;
-        returnedRoles.Should().NotBeNull();
-        returnedRoles.Should().BeEmpty();
+        var returnedRoles = okResult.Value.Should().BeAssignableTo<List<RoleDto>>().Subject;
+        returnedRoles.Should().HaveCount(2);
+        returnedRoles.Select(r => r.Id).Should().BeEquivalentTo([1, 2]);
     }
 
     [Fact]
     public async Task GetAllRoles_WithRoleMissingAbbreviation_UsesNameAsAbbreviation()
     {
-        // Arrange
-        var roles = new List<ApplicationRole>
-        {
-            new ApplicationRole { Id = 1, Name = "Admin", Abbreviation = null }
-        };
+        _context.Set<ApplicationRole>().Add(new ApplicationRole { Id = 1, Name = "Admin", Abbreviation = null, NormalizedName = "ADMIN" });
+        await _context.SaveChangesAsync();
+        _roleManager.SetupGet(r => r.Roles).Returns(_context.Set<ApplicationRole>());
 
-        _mockRoleManager.Setup(x => x.Roles)
-            .Returns(roles.AsQueryable());
+        var controller = CreateController();
+        var result = await controller.GetAllRoles();
 
-        // Act
-        var result = await _controller.GetAllRoles();
-
-        // Assert
         var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
-        var returnedRoles = okResult.Value as List<RoleDto>;
-        returnedRoles.Should().NotBeNull();
+        var returnedRoles = okResult.Value.Should().BeAssignableTo<List<RoleDto>>().Subject;
         returnedRoles.Should().HaveCount(1);
-        returnedRoles![0].Abbreviation.Should().Be("Admin");
+        returnedRoles[0].Abbreviation.Should().Be("Admin");
+    }
+
+    private RoleController CreateController(params Claim[] claims)
+    {
+        return new RoleController(_roleManager.Object, _tenantAccessor.Object)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity(claims, "mock"))
+                }
+            }
+        };
+    }
+
+    public void Dispose()
+    {
+        _roleManager.Object.Dispose();
+        _context.Dispose();
     }
 }

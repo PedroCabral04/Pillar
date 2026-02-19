@@ -23,7 +23,12 @@ public interface IChatConversationService
     /// Send a message in a conversation and get AI response.
     /// Enforces the 20 message limit.
     /// </summary>
-    Task<ConversationMessageResponseDto> SendMessageAsync(int userId, int conversationId, string message);
+    Task<ConversationMessageResponseDto> SendMessageAsync(
+        int userId,
+        int conversationId,
+        string message,
+        ChatOperationMode operationMode = ChatOperationMode.ProposeAction,
+        ChatResponseStyle responseStyle = ChatResponseStyle.Executive);
     
     /// <summary>
     /// Update conversation title or archive status.

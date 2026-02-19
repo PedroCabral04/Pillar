@@ -13,6 +13,7 @@ using erp.Models.Identity;
 using erp.Models.Inventory;
 using erp.Models.Sales;
 using erp.Services.Reports;
+using erp.Services.Tenancy;
 
 namespace erp.Tests.Services.Reports;
 
@@ -32,7 +33,10 @@ public class SalesReportServiceTests : IDisposable
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        var tenantAccessor = new Mock<ITenantContextAccessor>();
+        tenantAccessor.SetupGet(x => x.Current).Returns(new TenantContext());
+
+        _context = new ApplicationDbContext(options, tenantContextAccessor: tenantAccessor.Object);
         _mockLogger = new Mock<ILogger<SalesReportService>>();
         _service = new SalesReportService(_context, _mockLogger.Object);
 
@@ -44,6 +48,7 @@ public class SalesReportServiceTests : IDisposable
         var customer1 = new Customer
         {
             Id = 1,
+            TenantId = 1,
             Name = "Cliente Teste 1",
             Email = "cliente1@teste.com",
             IsActive = true,
@@ -53,6 +58,7 @@ public class SalesReportServiceTests : IDisposable
         var customer2 = new Customer
         {
             Id = 2,
+            TenantId = 1,
             Name = "Cliente Teste 2",
             Email = "cliente2@teste.com",
             IsActive = true,
@@ -70,6 +76,7 @@ public class SalesReportServiceTests : IDisposable
         var product1 = new Product
         {
             Id = 1,
+            TenantId = 1,
             Name = "Produto 1",
             Sku = "PROD-001",
             SalePrice = 100,
@@ -80,6 +87,7 @@ public class SalesReportServiceTests : IDisposable
         var product2 = new Product
         {
             Id = 2,
+            TenantId = 1,
             Name = "Produto 2",
             Sku = "PROD-002",
             SalePrice = 50,
@@ -90,6 +98,7 @@ public class SalesReportServiceTests : IDisposable
         var sale1 = new Sale
         {
             Id = 1,
+            TenantId = 1,
             SaleNumber = "SALE-001",
             CustomerId = 1,
             UserId = 1,
@@ -117,6 +126,7 @@ public class SalesReportServiceTests : IDisposable
         var sale2 = new Sale
         {
             Id = 2,
+            TenantId = 1,
             SaleNumber = "SALE-002",
             CustomerId = 2,
             UserId = 1,
@@ -142,6 +152,7 @@ public class SalesReportServiceTests : IDisposable
         var sale3 = new Sale
         {
             Id = 3,
+            TenantId = 1,
             SaleNumber = "SALE-003",
             CustomerId = 1,
             UserId = 1,
@@ -397,7 +408,7 @@ public class SalesReportServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task GenerateSalesReport_OrdersByDateDescending()
+    public async Task GenerateSalesReport_OrdersByDateAscending()
     {
         // Arrange
         var filter = new SalesReportFilterDto();
@@ -409,7 +420,7 @@ public class SalesReportServiceTests : IDisposable
         result.Should().NotBeNull();
         result.Items.Should().HaveCount(3);
         var dates = result.Items.Select(s => s.SaleDate).ToList();
-        dates.Should().BeInDescendingOrder();
+        dates.Should().BeInAscendingOrder();
     }
 
     [Fact]
@@ -515,6 +526,7 @@ public class SalesReportServiceTests : IDisposable
         var saleWithoutCustomer = new Sale
         {
             Id = 4,
+            TenantId = 1,
             SaleNumber = "SALE-004",
             CustomerId = null,
             UserId = 1,

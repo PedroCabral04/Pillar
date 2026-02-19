@@ -40,6 +40,18 @@ public class ChatConversation : IAuditable, IMustHaveTenant
     /// Soft archive flag.
     /// </summary>
     public bool IsArchived { get; set; }
+
+    /// <summary>
+    /// Preferred operation mode for this conversation (read-only, propose, execute-with-confirmation).
+    /// Stored as int to keep domain layer decoupled from DTOs.
+    /// </summary>
+    public int DefaultOperationMode { get; set; } = 1;
+
+    /// <summary>
+    /// Preferred response style for this conversation (executive/specialist).
+    /// Stored as int to keep domain layer decoupled from DTOs.
+    /// </summary>
+    public int DefaultResponseStyle { get; set; } = 0;
     
     /// <summary>
     /// Maximum number of messages allowed in this conversation.
