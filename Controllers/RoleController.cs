@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
 using erp.Models.Identity;
 using erp.Services.Tenancy;
+using erp.Security;
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 
@@ -37,7 +38,18 @@ namespace erp.Controllers
         private IQueryable<ApplicationRole> ApplyTenantScope(IQueryable<ApplicationRole> query)
         {
             var tenantId = GetScopedTenantId();
-            return tenantId.HasValue ? query.Where(role => role.TenantId == tenantId.Value || role.TenantId == null) : query;
+            var scopedQuery = tenantId.HasValue
+                ? query.Where(role => role.TenantId == tenantId.Value || role.TenantId == null)
+                : query;
+
+            scopedQuery = scopedQuery.Where(role => role.Name != RoleNames.LegacyAdministrator);
+
+            if (!User.IsInRole(RoleNames.SuperAdmin))
+            {
+                scopedQuery = scopedQuery.Where(role => role.Name != RoleNames.SuperAdmin);
+            }
+
+            return scopedQuery;
         }
 
         /// <summary>
@@ -49,7 +61,7 @@ namespace erp.Controllers
         /// Exemplo de resposta:
         /// 
         ///     [
-        ///         { "id": 1, "name": "Administrador", "abbreviation": "Admin" },
+        ///         { "id": 1, "name": "AdminTenant", "abbreviation": "Admin" },
         ///         { "id": 2, "name": "Gerente", "abbreviation": "Ger" },
         ///         { "id": 3, "name": "Vendedor", "abbreviation": "Vend" }
         ///     ]

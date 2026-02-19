@@ -9,7 +9,7 @@
 @using MudBlazor
 @using Color = MudBlazor.Color
 @using Size = MudBlazor.Size
-@attribute [Authorize(Roles = "Administrador,Gerente,RH")]
+@attribute [Authorize(Roles = "AdminTenant,SuperAdmin,Gerente,RH")]
 
 @inject IApiService ApiService
 @inject ILogger<TimeTracking> Logger

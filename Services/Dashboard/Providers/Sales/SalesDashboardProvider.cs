@@ -31,7 +31,7 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Bar,
             Icon = "mdi-cash-register",
             Unit = "R$",
-            RequiredRoles = new[] { "Vendas", "Administrador" }
+            RequiredRoles = new[] { "Vendas", "AdminTenant", "SuperAdmin" }
         },
         new DashboardWidgetDefinition
         {
@@ -42,7 +42,7 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Bar,
             Icon = "mdi-chart-bar",
             Unit = "R$"
-            , RequiredRoles = new[] { "Vendas", "Administrador" }
+            , RequiredRoles = new[] { "Vendas", "AdminTenant", "SuperAdmin" }
         },
         new DashboardWidgetDefinition
         {
@@ -53,7 +53,7 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Pie,
             Icon = "mdi-star",
             Unit = "unidades"
-            , RequiredRoles = new[] { "Vendas", "Estoque", "Administrador" }
+            , RequiredRoles = new[] { "Vendas", "Estoque", "AdminTenant", "SuperAdmin" }
         },
         new DashboardWidgetDefinition
         {
@@ -64,7 +64,7 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Donut,
             Icon = "mdi-chart-donut",
             Unit = "vendas"
-            , RequiredRoles = new[] { "Vendas", "Administrador" }
+            , RequiredRoles = new[] { "Vendas", "AdminTenant", "SuperAdmin" }
         },
         new DashboardWidgetDefinition
         {
@@ -75,7 +75,7 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Bar,
             Icon = "mdi-clock-time-eight",
             Unit = "vendas"
-            , RequiredRoles = new[] { "Vendas", "Gerente", "Administrador" }
+            , RequiredRoles = new[] { "Vendas", "Gerente", "AdminTenant", "SuperAdmin" }
         }
     };
 

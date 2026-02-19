@@ -777,12 +777,63 @@ using (var scope = app.Services.CreateScope())
             }
         }
 
-        await EnsureRole("Administrador", "Acesso total ao sistema", "AdminPanelSettings");
+        async Task MigrateLegacyAdministratorRoleAsync(string bootstrapAdminEmail)
+        {
+            if (!await roleManager.RoleExistsAsync(RoleNames.LegacyAdministrator))
+            {
+                return;
+            }
+
+            var legacyAdmins = await userManager.GetUsersInRoleAsync(RoleNames.LegacyAdministrator);
+            foreach (var user in legacyAdmins)
+            {
+                var isBootstrapAdmin = string.Equals(user.Email, bootstrapAdminEmail, StringComparison.OrdinalIgnoreCase);
+
+                if (isBootstrapAdmin)
+                {
+                    if (!await userManager.IsInRoleAsync(user, RoleNames.SuperAdmin))
+                    {
+                        await userManager.AddToRoleAsync(user, RoleNames.SuperAdmin);
+                    }
+
+                    if (await userManager.IsInRoleAsync(user, RoleNames.AdminTenant))
+                    {
+                        await userManager.RemoveFromRoleAsync(user, RoleNames.AdminTenant);
+                    }
+                }
+                else
+                {
+                    if (!await userManager.IsInRoleAsync(user, RoleNames.AdminTenant))
+                    {
+                        await userManager.AddToRoleAsync(user, RoleNames.AdminTenant);
+                    }
+
+                    if (await userManager.IsInRoleAsync(user, RoleNames.SuperAdmin))
+                    {
+                        await userManager.RemoveFromRoleAsync(user, RoleNames.SuperAdmin);
+                    }
+                }
+
+                await userManager.RemoveFromRoleAsync(user, RoleNames.LegacyAdministrator);
+            }
+
+            var legacyRole = await roleManager.FindByNameAsync(RoleNames.LegacyAdministrator);
+            if (legacyRole is not null)
+            {
+                await roleManager.DeleteAsync(legacyRole);
+            }
+        }
+
+        await EnsureRole(RoleNames.AdminTenant, "Acesso total ao tenant atual", "AdminPanelSettings");
+        await EnsureRole(RoleNames.SuperAdmin, "Acesso total global a todos os tenants", "Shield");
         await EnsureRole("Gerente", "Gerenciar equipes e relatórios", "SupervisorAccount");
         await EnsureRole("Vendedor", "Registro de vendas e atendimento", "PointOfSale");
         await EnsureRole("Estoque", "Usuário comum de estoque", "Inventory");
         await EnsureRole("RH", "Recursos Humanos", "Badge");
         await EnsureRole("Financeiro", "Departamento Financeiro", "AccountBalance");
+
+        var adminEmail = "admin@erp.local";
+        await MigrateLegacyAdministratorRoleAsync(adminEmail);
 
         // Seed Module Permissions
         await SeedModulePermissionsAsync(db, roleManager, logger);
@@ -790,7 +841,6 @@ using (var scope = app.Services.CreateScope())
         // Ensure Admin Tenant exists
         var adminTenant = await EnsureTenant("admin", "Administração");
 
-        var adminEmail = "admin@erp.local";
         var admin = await userManager.FindByEmailAsync(adminEmail);
         if (admin is null)
         {
@@ -814,7 +864,7 @@ using (var scope = app.Services.CreateScope())
             var created = await userManager.CreateAsync(admin, defaultPassword);
             if (created.Succeeded)
             {
-                await userManager.AddToRoleAsync(admin, "Administrador");
+                await userManager.AddToRoleAsync(admin, RoleNames.SuperAdmin);
                 
                 // Add membership
                 db.TenantMemberships.Add(new TenantMembership 
@@ -827,11 +877,29 @@ using (var scope = app.Services.CreateScope())
                 await db.SaveChangesAsync();
             }
         }
-        else if (admin.TenantId == null)
+        else
         {
             // Update existing admin if it has no tenant
-            admin.TenantId = adminTenant.Id;
-            await userManager.UpdateAsync(admin);
+            if (admin.TenantId == null)
+            {
+                admin.TenantId = adminTenant.Id;
+                await userManager.UpdateAsync(admin);
+            }
+
+            if (!await userManager.IsInRoleAsync(admin, RoleNames.SuperAdmin))
+            {
+                await userManager.AddToRoleAsync(admin, RoleNames.SuperAdmin);
+            }
+
+            if (await userManager.IsInRoleAsync(admin, RoleNames.AdminTenant))
+            {
+                await userManager.RemoveFromRoleAsync(admin, RoleNames.AdminTenant);
+            }
+
+            if (await userManager.IsInRoleAsync(admin, RoleNames.LegacyAdministrator))
+            {
+                await userManager.RemoveFromRoleAsync(admin, RoleNames.LegacyAdministrator);
+            }
             
             // Ensure membership exists
             if (!await db.TenantMemberships.AnyAsync(m => m.TenantId == adminTenant.Id && m.UserId == admin.Id))
@@ -1046,8 +1114,9 @@ static async Task SeedModulePermissionsAsync(ApplicationDbContext db, RoleManage
         // Define role-module mappings
         var roleModules = new Dictionary<string, string[]>
         {
-            // Administrador gets all modules (handled in code, but seed anyway for completeness)
-            ["Administrador"] = new[] { ModuleKeys.Dashboard, ModuleKeys.Sales, ModuleKeys.ServiceOrder, ModuleKeys.Inventory, ModuleKeys.Financial, ModuleKeys.HR, ModuleKeys.Assets, ModuleKeys.Kanban, ModuleKeys.Reports, ModuleKeys.Admin },
+            // Admin roles get all modules (handled in code, but seed anyway for completeness)
+            [RoleNames.AdminTenant] = new[] { ModuleKeys.Dashboard, ModuleKeys.Sales, ModuleKeys.ServiceOrder, ModuleKeys.Inventory, ModuleKeys.Financial, ModuleKeys.HR, ModuleKeys.Assets, ModuleKeys.Kanban, ModuleKeys.Reports, ModuleKeys.Admin },
+            [RoleNames.SuperAdmin] = new[] { ModuleKeys.Dashboard, ModuleKeys.Sales, ModuleKeys.ServiceOrder, ModuleKeys.Inventory, ModuleKeys.Financial, ModuleKeys.HR, ModuleKeys.Assets, ModuleKeys.Kanban, ModuleKeys.Reports, ModuleKeys.Admin },
 
             // Gerente gets most modules except Admin
             ["Gerente"] = new[] { ModuleKeys.Dashboard, ModuleKeys.Sales, ModuleKeys.ServiceOrder, ModuleKeys.Inventory, ModuleKeys.Financial, ModuleKeys.HR, ModuleKeys.Assets, ModuleKeys.Kanban, ModuleKeys.Reports },

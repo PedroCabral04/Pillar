@@ -14,13 +14,13 @@ namespace erp.Controllers;
 
 [ApiController]
 [Route("api/tenants")]
-[Authorize(Roles = "Administrador")]
+[Authorize(Roles = RoleNames.SuperAdmin)]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 /// <summary>
 /// Controller responsável por gerenciar tenants (locatários) do sistema.
 /// Exponha endpoints de listagem, consulta por id/slug, criação, atualização,
 /// exclusão e operações de branding (logo/favicon).
-/// Requer autorização com a role "Administrador".
+/// Requer autorização com a role "SuperAdmin".
 /// </summary>
 public class TenantsController : ControllerBase
 {

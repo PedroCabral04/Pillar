@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using erp.DTOs.TimeTracking;
 using erp.Mappings;
 using erp.Services.TimeTracking;
+using erp.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,7 +14,7 @@ namespace erp.Controllers;
 
 [ApiController]
 [Route("api/apontamento")]
-[Authorize(Roles = "Administrador,Gerente")]
+[Authorize(Roles = RoleNames.AdminTenantSuperAdminOrManager)]
 [ResponseCache(NoStore = true)]
 public class TimeTrackingController : ControllerBase
 {

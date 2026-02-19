@@ -4,6 +4,7 @@ using erp.Mappings;
 using erp.Models.Payroll;
 using erp.Models.TimeTracking;
 using erp.Services.Payroll;
+using erp.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,7 +12,7 @@ namespace erp.Controllers;
 
 [ApiController]
 [Route("api/folha-pagamento")]
-[Authorize(Roles = "Administrador,Gerente,RH")]
+[Authorize(Roles = RoleNames.AdminTenantSuperAdminManagerOrHR)]
 [ResponseCache(NoStore = true)]
 public class PayrollController : ControllerBase
 {

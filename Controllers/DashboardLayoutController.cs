@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using erp.Services.DashboardCustomization;
+using erp.Security;
 using erp.DTOs.Dashboard;
 using System.Security.Claims;
 
@@ -91,13 +92,13 @@ public class LayoutController : ControllerBase
     }
 
     /// <summary>
-    /// Obtém as roles permitidas para um widget específico. Requer role 'Administrador'.
+    /// Obtém as roles permitidas para um widget específico. Requer role administrativa.
     /// </summary>
     /// <param name="providerKey">Chave do provedor do widget.</param>
     /// <param name="widgetKey">Chave do widget.</param>
     /// <returns>Array de roles (strings) ou vazio se não houver roles configuradas.</returns>
     [HttpGet("widgets/{providerKey}/{widgetKey}/roles")]
-    [Authorize(Roles = "Administrador")]
+    [Authorize(Roles = RoleNames.AdminTenantOrSuperAdmin)]
     public async Task<ActionResult<string[]?>> GetWidgetRoles(string providerKey, string widgetKey)
     {
         var roles = await _layoutService.GetWidgetRolesAsync(providerKey, widgetKey);
@@ -105,14 +106,14 @@ public class LayoutController : ControllerBase
     }
 
     /// <summary>
-    /// Define as roles que podem usar o widget especificado. Requer role 'Administrador'.
+    /// Define as roles que podem usar o widget especificado. Requer role administrativa.
     /// </summary>
     /// <param name="providerKey">Chave do provedor do widget.</param>
     /// <param name="widgetKey">Chave do widget.</param>
     /// <param name="roles">Array de roles a serem atribuídas (pode ser nulo para limpar).</param>
     /// <returns>Resposta HTTP 200 em caso de sucesso.</returns>
     [HttpPost("widgets/{providerKey}/{widgetKey}/roles")]
-    [Authorize(Roles = "Administrador")]
+    [Authorize(Roles = RoleNames.AdminTenantOrSuperAdmin)]
     public async Task<ActionResult> SetWidgetRoles(string providerKey, string widgetKey, [FromBody] string[]? roles)
     {
         await _layoutService.SetWidgetRolesAsync(providerKey, widgetKey, roles);

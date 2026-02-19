@@ -2,6 +2,7 @@ using erp.Data;
 using erp.DTOs.Permissions;
 using erp.Models.Identity;
 using erp.Services.Authorization;
+using erp.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -15,7 +16,7 @@ namespace erp.Controllers;
 [ApiController]
 [Route("api/permissoes")]
 [Route("api/permissions")]
-[Authorize(Roles = "Administrador")]
+[Authorize(Roles = RoleNames.AdminTenantOrSuperAdmin)]
 public class PermissionsController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
@@ -76,7 +77,17 @@ public class PermissionsController : ControllerBase
     [HttpGet("roles")]
     public async Task<ActionResult<List<RolePermissionsDto>>> GetAllRolesWithPermissions()
     {
-        var roles = await _context.Set<ApplicationRole>()
+        var isSuperAdmin = User.IsInRole(RoleNames.SuperAdmin);
+        var rolesQuery = _context.Set<ApplicationRole>()
+            .Where(r => r.Name != RoleNames.LegacyAdministrator)
+            .AsQueryable();
+
+        if (!isSuperAdmin)
+        {
+            rolesQuery = rolesQuery.Where(r => r.Name != RoleNames.SuperAdmin);
+        }
+
+        var roles = await rolesQuery
             .Include(r => r.ModulePermissions)
                 .ThenInclude(rmp => rmp.ModulePermission)
             .Include(r => r.ModuleActionPermissions)
@@ -119,15 +130,22 @@ public class PermissionsController : ControllerBase
     [HttpGet("roles/{roleId}")]
     public async Task<ActionResult<RolePermissionsDto>> GetRolePermissions(int roleId)
     {
+        var isSuperAdmin = User.IsInRole(RoleNames.SuperAdmin);
         var role = await _context.Set<ApplicationRole>()
             .Include(r => r.ModulePermissions)
                 .ThenInclude(rmp => rmp.ModulePermission)
             .Include(r => r.ModuleActionPermissions)
                 .ThenInclude(rmap => rmap.ModuleActionPermission)
             .FirstOrDefaultAsync(r => r.Id == roleId);
-            
+
         if (role == null)
             return NotFound("Role not found");
+
+        if (role.Name == RoleNames.LegacyAdministrator)
+            return NotFound("Role not found");
+
+        if (!isSuperAdmin && role.Name == RoleNames.SuperAdmin)
+            return Forbid();
             
         var dto = new RolePermissionsDto
         {
@@ -171,11 +189,20 @@ public class PermissionsController : ControllerBase
         var role = await _context.Set<ApplicationRole>().FindAsync(roleId);
         if (role == null)
             return NotFound("Função não encontrada");
+
+        if (role.Name == RoleNames.LegacyAdministrator)
+            return NotFound("Função não encontrada");
             
-        // Prevent removing all modules from Administrador role
-        if (role.Name == "Administrador" && dto.ModulePermissionIds.Count == 0)
+        var isSuperAdmin = User.IsInRole(RoleNames.SuperAdmin);
+        if (!isSuperAdmin && role.Name == RoleNames.SuperAdmin)
         {
-            return BadRequest("Não é possível remover todos os módulos da função Administrador");
+            return Forbid();
+        }
+
+        // Prevent removing all modules from system administrator roles
+        if (RoleNames.IsSystemAdministratorRole(role.Name) && dto.ModulePermissionIds.Count == 0)
+        {
+            return BadRequest("Não é possível remover todos os módulos das funções administrativas do sistema");
         }
         
         var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;

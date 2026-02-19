@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using erp.Services.Notifications;
+using erp.Security;
 using erp.DTOs.Notifications;
 using System.Security.Claims;
 
@@ -83,12 +84,12 @@ public class NotificationsController : ControllerBase
     }
 
     /// <summary>
-    /// Cria uma nova notificação. Apenas usuários com função "Admin" podem usar este endpoint.
+    /// Cria uma nova notificação. Apenas usuários administradores podem usar este endpoint.
     /// </summary>
     /// <param name="request">Dados para criação da notificação.</param>
     /// <returns>A notificação criada com código 201 e localização.</returns>
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = RoleNames.AdminTenantOrSuperAdmin)]
     public async Task<ActionResult<Notification>> CreateNotification([FromBody] CreateNotificationRequest request)
     {
         var notification = await _notificationService.CreateNotificationAsync(request);
@@ -101,7 +102,7 @@ public class NotificationsController : ControllerBase
     /// <param name="request">Dados do lote de notificações a serem enviadas.</param>
     /// <returns>Lista de notificações criadas.</returns>
     [HttpPost("bulk")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = RoleNames.AdminTenantOrSuperAdmin)]
     public async Task<ActionResult<List<Notification>>> CreateBulkNotifications([FromBody] BulkNotificationRequest request)
     {
         var notifications = await _notificationService.CreateBulkNotificationsAsync(request);

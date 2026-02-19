@@ -10,6 +10,7 @@ using erp.Models.Identity;
 using Microsoft.EntityFrameworkCore;
 using erp.Data;
 using erp.Models.Audit;
+using erp.Security;
 using erp.Services.Tenancy;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -121,6 +122,19 @@ namespace erp.Controllers
         {
             var tenantId = GetScopedTenantId();
             return tenantId.HasValue ? query.Where(r => r.TenantId == tenantId.Value || r.TenantId == null) : query;
+        }
+
+        private IQueryable<ApplicationRole> ApplyAssignableRoleScope(IQueryable<ApplicationRole> query)
+        {
+            var scopedQuery = ApplyTenantScope(query)
+                .Where(r => r.Name != RoleNames.LegacyAdministrator);
+
+            if (!User.IsInRole(RoleNames.SuperAdmin))
+            {
+                scopedQuery = scopedQuery.Where(r => r.Name != RoleNames.SuperAdmin);
+            }
+
+            return scopedQuery;
         }
 
         private bool UserVisible(ApplicationUser? user)
@@ -400,7 +414,7 @@ namespace erp.Controllers
             }
 
             // Atribuir roles por Id => precisamos dos nomes
-            var allRoles = ApplyTenantScope(_roles.Roles).ToList();
+            var allRoles = ApplyAssignableRoleScope(_roles.Roles).ToList();
             var toAssign = allRoles.Where(r => createUserDto.RoleIds.Contains(r.Id)).Select(r => r.Name!).ToList();
             if (toAssign.Count > 0)
             {
@@ -517,7 +531,7 @@ namespace erp.Controllers
 
             // Roles
             var currentRoles = await _users.GetRolesAsync(user);
-            var allRoles = ApplyTenantScope(_roles.Roles).ToList();
+            var allRoles = ApplyAssignableRoleScope(_roles.Roles).ToList();
             var desiredRoles = allRoles.Where(r => updateUserDto.RoleIds.Contains(r.Id)).Select(r => r.Name!).ToList();
             var toAdd = desiredRoles.Except(currentRoles).ToList();
             var toRemove = currentRoles.Except(desiredRoles).ToList();

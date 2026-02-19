@@ -9,7 +9,7 @@
 @inject IApiService ApiService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
-@attribute [Authorize(Roles = "Administrador")]
+@attribute [Authorize(Roles = "AdminTenant,SuperAdmin")]
 
 <PageTitle>Relatório de Acesso a Dados Sensíveis</PageTitle>
 
@@ -302,4 +302,3 @@ Descrição: {log.Description ?? "N/A"}";
         );
     }
 }
-
