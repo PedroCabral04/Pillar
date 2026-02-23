@@ -953,7 +953,7 @@ public class InventoryService : IInventoryService
 
         worksheet.Cells[3, 1].Value = "PROD-EXEMPLO";
         worksheet.Cells[3, 2].Value = "Produto com SKU manual";
-        worksheet.Cells[3, 3].Value = secondCategoryReference?.Id.ToString() ?? firstCategoryName;
+        worksheet.Cells[3, 3].Value = secondCategoryReference?.Code ?? firstCategoryName;
         worksheet.Cells[3, 4].Value = 89.90m;
         worksheet.Cells[3, 5].Value = 60.00m;
         worksheet.Cells[3, 6].Value = 5;
@@ -972,7 +972,7 @@ public class InventoryService : IInventoryService
         instructionsSheet.Cells[3, 1].Value = "1) Colunas obrigatorias: Nome, Categoria, Preco de Venda.";
         instructionsSheet.Cells[4, 1].Value = "2) SKU e opcional. Se vazio, sera gerado automaticamente.";
         instructionsSheet.Cells[5, 1].Value = "3) Se um SKU informado ja existir, a linha sera pulada e reportada.";
-        instructionsSheet.Cells[6, 1].Value = "4) Categoria aceita ID, Nome ou Codigo (veja aba Categorias).";
+        instructionsSheet.Cells[6, 1].Value = "4) Categoria aceita Nome ou Codigo (veja aba Categorias).";
         instructionsSheet.Cells[7, 1].Value = "5) Erros de uma linha nao interrompem o processamento das demais.";
 
         instructionsSheet.Cells[9, 1].Value = "Campo";
@@ -984,7 +984,7 @@ public class InventoryService : IInventoryService
         {
             new[] { "SKU", "Nao", "PRD-1001", "Se vazio, gera automaticamente" },
             new[] { "Nome", "Sim", "Mouse sem fio", "Maximo recomendado: 200 caracteres" },
-            new[] { "Categoria", "Sim", "Informatica ou 3", "Pode usar ID, Nome ou Codigo" },
+            new[] { "Categoria", "Sim", "Informatica ou INFO", "Pode usar Nome ou Codigo" },
             new[] { "Preco de Venda", "Sim", "199.90", "Maior que zero" },
             new[] { "Preco de Custo", "Nao", "150.00", "Se vazio, usa preco de venda" },
             new[] { "Estoque Inicial", "Nao", "10", "Se vazio, assume 0" },
@@ -1006,13 +1006,12 @@ public class InventoryService : IInventoryService
         instructionsSheet.Cells[9, 1, 9, 4].Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.LightGray);
         instructionsSheet.Cells[1, 1, 20, 4].AutoFitColumns();
 
-        categoriesSheet.Cells[1, 1].Value = "ID";
-        categoriesSheet.Cells[1, 2].Value = "Nome";
-        categoriesSheet.Cells[1, 3].Value = "Codigo";
-        categoriesSheet.Cells[1, 4].Value = "Ativa";
-        categoriesSheet.Cells[1, 1, 1, 4].Style.Font.Bold = true;
-        categoriesSheet.Cells[1, 1, 1, 4].Style.Fill.PatternType = OfficeOpenXml.Style.ExcelFillStyle.Solid;
-        categoriesSheet.Cells[1, 1, 1, 4].Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.LightGray);
+        categoriesSheet.Cells[1, 1].Value = "Nome";
+        categoriesSheet.Cells[1, 2].Value = "Codigo";
+        categoriesSheet.Cells[1, 3].Value = "Ativa";
+        categoriesSheet.Cells[1, 1, 1, 3].Style.Font.Bold = true;
+        categoriesSheet.Cells[1, 1, 1, 3].Style.Fill.PatternType = OfficeOpenXml.Style.ExcelFillStyle.Solid;
+        categoriesSheet.Cells[1, 1, 1, 3].Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.LightGray);
 
         if (categories.Count == 0)
         {
@@ -1023,14 +1022,13 @@ public class InventoryService : IInventoryService
             for (var i = 0; i < categories.Count; i++)
             {
                 var row = i + 2;
-                categoriesSheet.Cells[row, 1].Value = categories[i].Id;
-                categoriesSheet.Cells[row, 2].Value = categories[i].Name;
-                categoriesSheet.Cells[row, 3].Value = categories[i].Code;
-                categoriesSheet.Cells[row, 4].Value = categories[i].IsActive ? "Sim" : "Nao";
+                categoriesSheet.Cells[row, 1].Value = categories[i].Name;
+                categoriesSheet.Cells[row, 2].Value = categories[i].Code;
+                categoriesSheet.Cells[row, 3].Value = categories[i].IsActive ? "Sim" : "Nao";
             }
         }
 
-        categoriesSheet.Cells[1, 1, Math.Max(2, categories.Count + 1), 4].AutoFitColumns();
+        categoriesSheet.Cells[1, 1, Math.Max(2, categories.Count + 1), 3].AutoFitColumns();
         categoriesSheet.View.FreezePanes(2, 1);
 
         return package.GetAsByteArray();

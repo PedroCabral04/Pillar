@@ -83,7 +83,7 @@ public class ProductImportOptimizationTests
         await context.SaveChangesAsync();
 
         var service = new InventoryService(context, new ProductMapper());
-        await using var fileStream = BuildTemplateWithNewCategoryAndBlankAtiva();
+        await using var fileStream = BuildTemplateWithNewCategoryWithoutIdAndBlankAtiva();
 
         var result = await service.ImportProductsFromExcelAsync(fileStream, userId: 1, CancellationToken.None);
 
@@ -94,6 +94,7 @@ public class ProductImportOptimizationTests
             .AsNoTracking()
             .SingleAsync(c => c.Code == "NOVA-CAT");
 
+        importedCategory.Id.Should().BeGreaterThan(0);
         importedCategory.Name.Should().Be("Nova Categoria");
         importedCategory.IsActive.Should().BeTrue();
     }
@@ -132,7 +133,7 @@ public class ProductImportOptimizationTests
         return new MemoryStream(package.GetAsByteArray());
     }
 
-    private static MemoryStream BuildTemplateWithNewCategoryAndBlankAtiva()
+    private static MemoryStream BuildTemplateWithNewCategoryWithoutIdAndBlankAtiva()
     {
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
         using var package = new ExcelPackage();
@@ -149,15 +150,13 @@ public class ProductImportOptimizationTests
         productsSheet.Cells[2, 4].Value = "120.00";
 
         var categoriesSheet = package.Workbook.Worksheets.Add("Categorias");
-        categoriesSheet.Cells[1, 1].Value = "ID";
-        categoriesSheet.Cells[1, 2].Value = "Nome";
-        categoriesSheet.Cells[1, 3].Value = "Codigo";
-        categoriesSheet.Cells[1, 4].Value = "Ativa";
+        categoriesSheet.Cells[1, 1].Value = "Nome";
+        categoriesSheet.Cells[1, 2].Value = "Codigo";
+        categoriesSheet.Cells[1, 3].Value = "Ativa";
 
-        categoriesSheet.Cells[2, 1].Value = string.Empty;
-        categoriesSheet.Cells[2, 2].Value = "Nova Categoria";
-        categoriesSheet.Cells[2, 3].Value = "NOVA-CAT";
-        categoriesSheet.Cells[2, 4].Value = string.Empty;
+        categoriesSheet.Cells[2, 1].Value = "Nova Categoria";
+        categoriesSheet.Cells[2, 2].Value = "NOVA-CAT";
+        categoriesSheet.Cells[2, 3].Value = string.Empty;
 
         return new MemoryStream(package.GetAsByteArray());
     }
