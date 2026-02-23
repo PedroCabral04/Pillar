@@ -195,8 +195,17 @@ public class InventoryService : IInventoryService
             .Select(p => p.Sku)
             .ToListAsync(cancellationToken);
 
+        var existingBarcodeList = await _context.Products
+            .AsNoTracking()
+            .Where(p => p.Barcode != null && p.Barcode != string.Empty)
+            .Select(p => p.Barcode!)
+            .ToListAsync(cancellationToken);
+
         var existingSkus = new HashSet<string>(existingSkuList, StringComparer.OrdinalIgnoreCase);
+        var existingBarcodes = new HashSet<string>(existingBarcodeList, StringComparer.OrdinalIgnoreCase);
         var seenInputSkus = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var seenInputBarcodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var pendingProducts = new List<PendingImportProduct>(200);
 
         var result = new ProductImportResultDto();
         var firstRow = worksheet.Dimension.Start.Row;
@@ -288,16 +297,34 @@ public class InventoryService : IInventoryService
                 }
             }
 
+            var normalizedBarcode = string.IsNullOrWhiteSpace(barcodeRaw) ? null : barcodeRaw.Trim();
+            if (!string.IsNullOrWhiteSpace(normalizedBarcode))
+            {
+                if (!seenInputBarcodes.Add(normalizedBarcode))
+                {
+                    AddIssue(result, row, $"Codigo de barras '{normalizedBarcode}' duplicado na planilha.", normalizedInputSku, name, isSkipped: false);
+                    continue;
+                }
+
+                if (existingBarcodes.Contains(normalizedBarcode))
+                {
+                    AddIssue(result, row, $"Ja existe um produto com o codigo de barras '{normalizedBarcode}'.", normalizedInputSku, name, isSkipped: false);
+                    continue;
+                }
+            }
+
             var skuToCreate = normalizedInputSku;
             if (string.IsNullOrWhiteSpace(skuToCreate))
             {
                 skuToCreate = GenerateUniqueSku(existingSkus);
             }
 
+            existingSkus.Add(skuToCreate);
+
             var dto = new CreateProductDto
             {
                 Sku = skuToCreate,
-                Barcode = string.IsNullOrWhiteSpace(barcodeRaw) ? null : barcodeRaw.Trim(),
+                Barcode = normalizedBarcode,
                 Name = name.Trim(),
                 CategoryId = categoryId,
                 SalePrice = salePrice,
@@ -309,22 +336,33 @@ public class InventoryService : IInventoryService
                 Status = 0
             };
 
-            try
+            var product = _productMapper.CreateProductDtoToProduct(dto);
+            product.CreatedByUserId = userId;
+            product.CreatedAt = DateTime.UtcNow;
+
+            pendingProducts.Add(new PendingImportProduct
             {
-                await CreateProductAsync(dto, userId);
-                existingSkus.Add(dto.Sku);
-                result.ImportedCount++;
-            }
-            catch (InvalidOperationException ex)
+                RowNumber = row,
+                Product = product
+            });
+
+            if (pendingProducts.Count >= 200)
             {
-                var isSkuIssue = ex.Message.Contains("SKU", StringComparison.OrdinalIgnoreCase);
-                AddIssue(result, row, ex.Message, dto.Sku, dto.Name, isSkipped: isSkuIssue);
-            }
-            catch (Exception ex)
-            {
-                AddIssue(result, row, $"Falha inesperada: {ex.Message}", dto.Sku, dto.Name, isSkipped: false);
+                await FlushImportBatchAsync(
+                    pendingProducts,
+                    result,
+                    existingSkus,
+                    existingBarcodes,
+                    cancellationToken);
             }
         }
+
+        await FlushImportBatchAsync(
+            pendingProducts,
+            result,
+            existingSkus,
+            existingBarcodes,
+            cancellationToken);
 
         return result;
     }
@@ -1200,6 +1238,112 @@ public class InventoryService : IInventoryService
         }
 
         result.FailedCount++;
+    }
+
+    private async Task FlushImportBatchAsync(
+        List<PendingImportProduct> pendingProducts,
+        ProductImportResultDto result,
+        HashSet<string> existingSkus,
+        HashSet<string> existingBarcodes,
+        CancellationToken cancellationToken)
+    {
+        if (pendingProducts.Count == 0)
+        {
+            return;
+        }
+
+        _context.Products.AddRange(pendingProducts.Select(p => p.Product));
+
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+
+            foreach (var pending in pendingProducts)
+            {
+                result.ImportedCount++;
+                if (!string.IsNullOrWhiteSpace(pending.Product.Barcode))
+                {
+                    existingBarcodes.Add(pending.Product.Barcode);
+                }
+            }
+
+            pendingProducts.Clear();
+            return;
+        }
+        catch (DbUpdateException)
+        {
+            foreach (var entry in _context.ChangeTracker.Entries<Product>().Where(e => e.State == EntityState.Added).ToList())
+            {
+                entry.State = EntityState.Detached;
+            }
+        }
+
+        foreach (var pending in pendingProducts)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            _context.Products.Add(pending.Product);
+            try
+            {
+                await _context.SaveChangesAsync(cancellationToken);
+                result.ImportedCount++;
+
+                if (!string.IsNullOrWhiteSpace(pending.Product.Barcode))
+                {
+                    existingBarcodes.Add(pending.Product.Barcode);
+                }
+            }
+            catch (DbUpdateException ex)
+            {
+                if (_context.Entry(pending.Product).State != EntityState.Detached)
+                {
+                    _context.Entry(pending.Product).State = EntityState.Detached;
+                }
+
+                existingSkus.Remove(pending.Product.Sku);
+
+                var reason = BuildPersistenceErrorReason(ex, pending.Product);
+                var isSkipped = reason.Contains("SKU", StringComparison.OrdinalIgnoreCase);
+                AddIssue(result, pending.RowNumber, reason, pending.Product.Sku, pending.Product.Name, isSkipped);
+            }
+            catch (Exception ex)
+            {
+                if (_context.Entry(pending.Product).State != EntityState.Detached)
+                {
+                    _context.Entry(pending.Product).State = EntityState.Detached;
+                }
+
+                existingSkus.Remove(pending.Product.Sku);
+                AddIssue(result, pending.RowNumber, $"Falha inesperada: {ex.Message}", pending.Product.Sku, pending.Product.Name, isSkipped: false);
+            }
+        }
+
+        pendingProducts.Clear();
+    }
+
+    private static string BuildPersistenceErrorReason(DbUpdateException ex, Product product)
+    {
+        var message = ex.InnerException?.Message ?? ex.Message;
+
+        if (message.Contains("sku", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"SKU '{product.Sku}' ja existe no cadastro.";
+        }
+
+        if (!string.IsNullOrWhiteSpace(product.Barcode) &&
+            (message.Contains("barcode", StringComparison.OrdinalIgnoreCase)
+             || message.Contains("barra", StringComparison.OrdinalIgnoreCase)))
+        {
+            return $"Ja existe um produto com o codigo de barras '{product.Barcode}'.";
+        }
+
+        return "Falha ao salvar produto por conflito de dados.";
+    }
+
+    private sealed class PendingImportProduct
+    {
+        public int RowNumber { get; init; }
+        public Product Product { get; init; } = null!;
     }
 
     private byte[] GenerateCsv(List<ProductDto> products)

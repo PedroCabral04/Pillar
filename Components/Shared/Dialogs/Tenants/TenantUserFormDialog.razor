@@ -172,11 +172,32 @@
 
                 @if (IsEdit)
                 {
-                    <MudCheckBox T="bool"
-                                 Label="Usuário Ativo"
-                                 @bind-Checked="_isActive"
-                                 Color="Color.Success"
-                                 Class="mt-4" />
+                    <MudDivider Class="my-4" />
+
+                    <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-3">
+                        Segurança
+                    </MudText>
+
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="6">
+                            <MudTextField T="string"
+                                          Label="Nova Senha"
+                                          Variant="Variant.Outlined"
+                                          InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                                          @bind-Value="_newPassword"
+                                          HelperText="Deixe em branco para não alterar a senha"
+                                          Adornment="Adornment.End"
+                                          AdornmentIcon="@(_showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                          OnAdornmentClick="@(() => _showPassword = !_showPassword)"
+                                          AdornmentAriaLabel="Mostrar senha" />
+                        </MudItem>
+                        <MudItem xs="12" md="6" Class="d-flex align-center">
+                            <MudCheckBox T="bool"
+                                         Label="Usuário Ativo"
+                                         @bind-Value="_isActive"
+                                         Color="Color.Success" />
+                        </MudItem>
+                    </MudGrid>
                 }
             </MudForm>
         }
@@ -206,6 +227,8 @@
     private bool _loading;
     private bool _saving;
     private bool _isActive = true;
+    private string? _newPassword;
+    private bool _showPassword;
     private string? _loadError;
 
     protected override async Task OnInitializedAsync()
@@ -356,6 +379,7 @@
                     DepartmentId = _userDto.DepartmentId,
                     PositionId = _userDto.PositionId,
                     IsActive = _isActive,
+                    Password = string.IsNullOrWhiteSpace(_newPassword) ? null : _newPassword,
                     RoleIds = _selectedRoleIds.ToList()
                 };
 
