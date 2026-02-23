@@ -23,9 +23,10 @@ public class FinancialDashboardService : IFinancialDashboardService
 
     public async Task<FinancialDashboardDto> GetDashboardDataAsync(DateTime? startDate = null, DateTime? endDate = null, decimal initialBalance = 0)
     {
-        var allPayables = await _payableDao.GetAllAsync();
-        var allReceivables = await _receivableDao.GetAllAsync();
-        
+        // Use date-filtered queries to avoid loading all records into memory
+        var allPayables = await _payableDao.GetByDateRangeAsync(startDate, endDate);
+        var allReceivables = await _receivableDao.GetByDateRangeAsync(startDate, endDate);
+
         // Apply date filter if provided (using IssueDate for historical analysis)
         var payables = allPayables.AsEnumerable();
         var receivables = allReceivables.AsEnumerable();

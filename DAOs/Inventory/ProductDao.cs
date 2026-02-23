@@ -59,12 +59,13 @@ public class ProductDao : IProductDao
             .Include(p => p.Category)
             .Include(p => p.Brand)
             .Include(p => p.CreatedByUser)
+            .AsNoTracking()
             .AsQueryable();
 
         // Filtros
         if (!string.IsNullOrWhiteSpace(search.SearchTerm))
         {
-            var term = search.SearchTerm.ToLower();
+            var term = search.SearchTerm.ToLowerInvariant();
             query = query.Where(p =>
                 p.Name.ToLower().Contains(term) ||
                 p.Sku.ToLower().Contains(term) ||

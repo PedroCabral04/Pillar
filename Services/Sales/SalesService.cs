@@ -60,13 +60,16 @@ public class SalesService : ISalesService
 
                 decimal totalAmount = 0;
 
+                // Batch fetch all products to avoid N+1 query problem
+                var productIds = dto.Items.Select(i => i.ProductId).Distinct().ToList();
+                var products = await _context.Products
+                    .AsNoTracking()
+                    .Where(p => productIds.Contains(p.Id))
+                    .ToDictionaryAsync(p => p.Id, ct);
+
                 foreach (var itemDto in dto.Items)
                 {
-                    var product = await _context.Products
-                        .AsNoTracking()
-                        .FirstOrDefaultAsync(p => p.Id == itemDto.ProductId, ct);
-
-                    if (product == null)
+                    if (!products.TryGetValue(itemDto.ProductId, out var product))
                     {
                         throw new InvalidOperationException($"Produto com ID {itemDto.ProductId} não encontrado");
                     }

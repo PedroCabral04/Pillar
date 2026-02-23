@@ -33,7 +33,9 @@ public class AssetsController : ControllerBase
     private int GetCurrentUserId()
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-        return int.Parse(userIdClaim!.Value);
+        if (userIdClaim?.Value == null || !int.TryParse(userIdClaim.Value, out int userId))
+            throw new UnauthorizedAccessException("Usuário não autenticado");
+        return userId;
     }
 
     // ============= Asset Management =============

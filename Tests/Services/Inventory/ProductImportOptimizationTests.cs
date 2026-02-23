@@ -60,6 +60,44 @@ public class ProductImportOptimizationTests
         saveChangesCounter.Count.Should().Be(2);
     }
 
+    [Fact]
+    public async Task ImportProductsFromExcel_CreatesCategoryAsActive_WhenAtivaColumnIsBlank()
+    {
+        var tenantContext = BuildTenantContext(1);
+        var tenantAccessor = new Mock<ITenantContextAccessor>();
+        tenantAccessor.SetupGet(x => x.Current).Returns(tenantContext);
+
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        await using var context = new ApplicationDbContext(options, tenantContextAccessor: tenantAccessor.Object);
+
+        context.Users.Add(new ApplicationUser
+        {
+            Id = 1,
+            UserName = "import.tester",
+            Email = "import.tester@local"
+        });
+
+        await context.SaveChangesAsync();
+
+        var service = new InventoryService(context, new ProductMapper());
+        await using var fileStream = BuildTemplateWithNewCategoryAndBlankAtiva();
+
+        var result = await service.ImportProductsFromExcelAsync(fileStream, userId: 1, CancellationToken.None);
+
+        result.ImportedCount.Should().Be(1);
+        result.FailedCount.Should().Be(0);
+
+        var importedCategory = await context.ProductCategories
+            .AsNoTracking()
+            .SingleAsync(c => c.Code == "NOVA-CAT");
+
+        importedCategory.Name.Should().Be("Nova Categoria");
+        importedCategory.IsActive.Should().BeTrue();
+    }
+
     private static TenantContext BuildTenantContext(int tenantId)
     {
         var context = new TenantContext();
@@ -90,6 +128,36 @@ public class ProductImportOptimizationTests
         worksheet.Cells[3, 2].Value = "Teclado";
         worksheet.Cells[3, 3].Value = "Informatica";
         worksheet.Cells[3, 4].Value = "90.00";
+
+        return new MemoryStream(package.GetAsByteArray());
+    }
+
+    private static MemoryStream BuildTemplateWithNewCategoryAndBlankAtiva()
+    {
+        ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+        using var package = new ExcelPackage();
+
+        var productsSheet = package.Workbook.Worksheets.Add("Produtos");
+        productsSheet.Cells[1, 1].Value = "SKU";
+        productsSheet.Cells[1, 2].Value = "Nome";
+        productsSheet.Cells[1, 3].Value = "Categoria";
+        productsSheet.Cells[1, 4].Value = "Preco de Venda";
+
+        productsSheet.Cells[2, 1].Value = "PROD-001";
+        productsSheet.Cells[2, 2].Value = "Produto Nova Categoria";
+        productsSheet.Cells[2, 3].Value = "Nova Categoria";
+        productsSheet.Cells[2, 4].Value = "120.00";
+
+        var categoriesSheet = package.Workbook.Worksheets.Add("Categorias");
+        categoriesSheet.Cells[1, 1].Value = "ID";
+        categoriesSheet.Cells[1, 2].Value = "Nome";
+        categoriesSheet.Cells[1, 3].Value = "Codigo";
+        categoriesSheet.Cells[1, 4].Value = "Ativa";
+
+        categoriesSheet.Cells[2, 1].Value = string.Empty;
+        categoriesSheet.Cells[2, 2].Value = "Nova Categoria";
+        categoriesSheet.Cells[2, 3].Value = "NOVA-CAT";
+        categoriesSheet.Cells[2, 4].Value = string.Empty;
 
         return new MemoryStream(package.GetAsByteArray());
     }

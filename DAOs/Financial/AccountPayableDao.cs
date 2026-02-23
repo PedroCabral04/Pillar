@@ -9,6 +9,7 @@ public interface IAccountPayableDao
     Task<AccountPayable?> GetByIdAsync(int id);
     Task<AccountPayable?> GetByIdWithRelationsAsync(int id);
     Task<List<AccountPayable>> GetAllAsync();
+    Task<List<AccountPayable>> GetByDateRangeAsync(DateTime? startDate, DateTime? endDate, CancellationToken ct = default);
     Task<(List<AccountPayable> Items, int TotalCount)> GetPagedAsync(
         int page,
         int pageSize,
@@ -71,6 +72,22 @@ public class AccountPayableDao : IAccountPayableDao
             .Include(a => a.Supplier)
             .OrderByDescending(a => a.CreatedAt)
             .ToListAsync();
+    }
+
+    public async Task<List<AccountPayable>> GetByDateRangeAsync(DateTime? startDate, DateTime? endDate, CancellationToken ct = default)
+    {
+        var query = _context.AccountsPayable
+            .AsNoTracking()
+            .Include(a => a.Supplier)
+            .AsQueryable();
+
+        if (startDate.HasValue)
+            query = query.Where(x => x.IssueDate >= startDate.Value);
+
+        if (endDate.HasValue)
+            query = query.Where(x => x.IssueDate < endDate.Value.AddDays(1));
+
+        return await query.ToListAsync(ct);
     }
 
     public async Task<(List<AccountPayable> Items, int TotalCount)> GetPagedAsync(

@@ -190,6 +190,12 @@ public class InventoryService : IInventoryService
             categoryByNameOrCode[NormalizeKey(category.Code)] = category.Id;
         }
 
+        await ImportCategoriesFromTemplateAsync(
+            package,
+            categoryById,
+            categoryByNameOrCode,
+            cancellationToken);
+
         var existingSkuList = await _context.Products
             .AsNoTracking()
             .Select(p => p.Sku)
@@ -1099,6 +1105,141 @@ public class InventoryService : IInventoryService
         }
 
         return result;
+    }
+
+    private async Task ImportCategoriesFromTemplateAsync(
+        ExcelPackage package,
+        IDictionary<int, int> categoryById,
+        IDictionary<string, int> categoryByNameOrCode,
+        CancellationToken cancellationToken)
+    {
+        var categoriesSheet = package.Workbook.Worksheets.FirstOrDefault(w =>
+            NormalizeKey(w.Name) == "categorias");
+
+        if (categoriesSheet?.Dimension == null)
+        {
+            return;
+        }
+
+        var headerMap = BuildCategoryHeaderMap(categoriesSheet);
+        if (!headerMap.TryGetValue("nome", out var nameCol))
+        {
+            return;
+        }
+
+        headerMap.TryGetValue("codigo", out var codeCol);
+        headerMap.TryGetValue("ativa", out var activeCol);
+
+        var firstRow = categoriesSheet.Dimension.Start.Row;
+        var lastRow = categoriesSheet.Dimension.End.Row;
+        var newCategories = new List<ProductCategory>();
+
+        for (var row = firstRow + 1; row <= lastRow; row++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var name = GetCellText(categoriesSheet, row, nameCol)?.Trim();
+            var code = codeCol > 0 ? GetCellText(categoriesSheet, row, codeCol)?.Trim() : null;
+
+            if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(code))
+            {
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(name) || string.Equals(name, "Nenhuma categoria cadastrada no momento.", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var normalizedName = NormalizeKey(name);
+            var normalizedCode = NormalizeKey(code);
+
+            if (categoryByNameOrCode.ContainsKey(normalizedName) ||
+                (!string.IsNullOrWhiteSpace(normalizedCode) && categoryByNameOrCode.ContainsKey(normalizedCode)))
+            {
+                continue;
+            }
+
+            var category = new ProductCategory
+            {
+                Name = name,
+                Code = string.IsNullOrWhiteSpace(code) ? BuildCategoryCode(name) : code,
+                IsActive = ParseCategoryIsActive(activeCol > 0 ? GetCellText(categoriesSheet, row, activeCol) : null),
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.ProductCategories.Add(category);
+            newCategories.Add(category);
+        }
+
+        if (newCategories.Count == 0)
+        {
+            return;
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        foreach (var category in newCategories)
+        {
+            categoryById[category.Id] = category.Id;
+            categoryByNameOrCode[NormalizeKey(category.Name)] = category.Id;
+            categoryByNameOrCode[NormalizeKey(category.Code)] = category.Id;
+        }
+    }
+
+    private static Dictionary<string, int> BuildCategoryHeaderMap(ExcelWorksheet worksheet)
+    {
+        var result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var startCol = worksheet.Dimension!.Start.Column;
+        var endCol = worksheet.Dimension.End.Column;
+        var headerRow = worksheet.Dimension.Start.Row;
+
+        for (var col = startCol; col <= endCol; col++)
+        {
+            var raw = GetCellText(worksheet, headerRow, col);
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                continue;
+            }
+
+            var normalized = NormalizeKey(raw);
+            if (normalized is "nome" or "categoria")
+            {
+                result["nome"] = col;
+            }
+            else if (normalized is "codigo" or "categoriacodigo")
+            {
+                result["codigo"] = col;
+            }
+            else if (normalized is "ativa" or "ativo")
+            {
+                result["ativa"] = col;
+            }
+        }
+
+        return result;
+    }
+
+    private static bool ParseCategoryIsActive(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return true;
+        }
+
+        var normalized = NormalizeKey(raw);
+        return normalized is "sim" or "s" or "1" or "true" or "ativo" or "ativa";
+    }
+
+    private static string BuildCategoryCode(string name)
+    {
+        var cleaned = NormalizeKey(name).ToUpperInvariant();
+        if (string.IsNullOrWhiteSpace(cleaned))
+        {
+            return "CAT";
+        }
+
+        return cleaned.Length <= 20 ? cleaned : cleaned[..20];
     }
 
     private static bool TryResolveCategoryId(

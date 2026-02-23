@@ -16,13 +16,14 @@ public class ChatConversationDao : IChatConversationDao
     public async Task<List<ChatConversation>> GetUserConversationsAsync(int userId, bool includeArchived = false)
     {
         var query = _context.ChatConversations
+            .AsNoTracking()
             .Where(c => c.UserId == userId);
-        
+
         if (!includeArchived)
         {
             query = query.Where(c => !c.IsArchived);
         }
-        
+
         return await query
             .Include(c => c.Messages)
             .OrderByDescending(c => c.LastMessageAt ?? c.CreatedAt)
@@ -32,6 +33,7 @@ public class ChatConversationDao : IChatConversationDao
     public async Task<ChatConversation?> GetConversationWithMessagesAsync(int conversationId)
     {
         return await _context.ChatConversations
+            .AsNoTracking()
             .Include(c => c.Messages.OrderBy(m => m.Order))
             .FirstOrDefaultAsync(c => c.Id == conversationId);
     }

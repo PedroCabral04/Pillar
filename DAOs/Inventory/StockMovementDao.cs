@@ -16,6 +16,7 @@ public class StockMovementDao : IStockMovementDao
     public async Task<StockMovement?> GetByIdAsync(int id)
     {
         return await _context.StockMovements
+            .AsNoTracking()
             .Include(m => m.Product)
             .Include(m => m.Warehouse)
             .Include(m => m.CreatedByUser)
@@ -25,6 +26,7 @@ public class StockMovementDao : IStockMovementDao
     public async Task<List<StockMovement>> GetByProductAsync(int productId)
     {
         return await _context.StockMovements
+            .AsNoTracking()
             .Include(m => m.Warehouse)
             .Include(m => m.CreatedByUser)
             .Where(m => m.ProductId == productId)
@@ -35,6 +37,7 @@ public class StockMovementDao : IStockMovementDao
     public async Task<List<StockMovement>> GetByProductPagedAsync(int productId, int page, int pageSize)
     {
         return await _context.StockMovements
+            .AsNoTracking()
             .Include(m => m.Warehouse)
             .Include(m => m.CreatedByUser)
             .Where(m => m.ProductId == productId)

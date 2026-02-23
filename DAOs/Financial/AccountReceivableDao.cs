@@ -9,6 +9,7 @@ public interface IAccountReceivableDao
     Task<AccountReceivable?> GetByIdAsync(int id);
     Task<AccountReceivable?> GetByIdWithRelationsAsync(int id);
     Task<List<AccountReceivable>> GetAllAsync();
+    Task<List<AccountReceivable>> GetByDateRangeAsync(DateTime? startDate, DateTime? endDate, CancellationToken ct = default);
     Task<(List<AccountReceivable> Items, int TotalCount)> GetPagedAsync(
         int page,
         int pageSize,
@@ -67,6 +68,22 @@ public class AccountReceivableDao : IAccountReceivableDao
             .Include(a => a.Customer)
             .OrderByDescending(a => a.CreatedAt)
             .ToListAsync();
+    }
+
+    public async Task<List<AccountReceivable>> GetByDateRangeAsync(DateTime? startDate, DateTime? endDate, CancellationToken ct = default)
+    {
+        var query = _context.AccountsReceivable
+            .AsNoTracking()
+            .Include(a => a.Customer)
+            .AsQueryable();
+
+        if (startDate.HasValue)
+            query = query.Where(x => x.IssueDate >= startDate.Value);
+
+        if (endDate.HasValue)
+            query = query.Where(x => x.IssueDate < endDate.Value.AddDays(1));
+
+        return await query.ToListAsync(ct);
     }
 
     public async Task<(List<AccountReceivable> Items, int TotalCount)> GetPagedAsync(

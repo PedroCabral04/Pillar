@@ -84,7 +84,10 @@ builder.Services.AddAuthorization(options =>
 
 // Register authorization handler
 builder.Services.AddScoped<IAuthorizationHandler, ModuleAccessHandler>();
-builder.Services.AddMemoryCache();
+builder.Services.AddMemoryCache(options =>
+{
+    options.SizeLimit = 1024 * 1024 * 100; // 100 MB cache size limit
+});
 
 // CORS Configuration - Security: Restrict cross-origin requests
 var allowedOrigins = builder.Configuration["Security:CorsAllowedOrigins"];
@@ -308,7 +311,10 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddMemoryCache(); // Required for rate limiting in ApiKeyMiddleware
+builder.Services.AddMemoryCache(options =>
+{
+    options.SizeLimit = 1024 * 1024 * 100; // 100 MB cache size limit
+}); // Required for rate limiting in ApiKeyMiddleware
 builder.Services.Configure<DemoSeedOptions>(builder.Configuration.GetSection("DemoSeed"));
 builder.Services.Configure<SecurityOptions>(builder.Configuration.GetSection("Security"));
 builder.Services.AddScoped<DemoDataSeeder>();

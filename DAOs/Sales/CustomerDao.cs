@@ -43,6 +43,7 @@ public class CustomerDao : ICustomerDao
     public async Task<List<Customer>> GetAllAsync()
     {
         return await _context.Customers
+            .AsNoTracking()
             .Where(c => c.IsActive)
             .OrderBy(c => c.Name)
             .ToListAsync();
