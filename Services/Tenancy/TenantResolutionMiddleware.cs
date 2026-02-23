@@ -76,7 +76,7 @@ public class TenantResolutionMiddleware
             "/Onboarding"
         };
 
-        return publicPaths.Any(publicPath => path.StartsWithSegments(publicPath, StringComparison.OrdinalIgnoreCase));
+        return publicPaths.Any(publicPath => path.StartsWith(publicPath, StringComparison.OrdinalIgnoreCase));
     }
 
     private static void StampTenantContext(HttpContext context, ITenantContextAccessor accessor, Tenant tenant)

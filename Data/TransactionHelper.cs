@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Data;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
 namespace erp.Data;
