@@ -58,7 +58,7 @@ Veja [erp.csproj](erp.csproj) para a lista completa de pacotes.
 ## 🏢 Multi-Tenancy (Experimental)
 
 - Tenants e branding dedicados (`Models/Tenancy/*`, `Migrations/20251118103000_AddTenancyFoundation`)
-- API administrativa `/api/tenants` (CRUD, verificação de slug) protegida para `Administrador` via [`TenantsController`](Controllers/TenantsController.cs)
+- API administrativa `/api/tenants` (CRUD, verificação de slug) protegida para `SuperAdmin` via [`TenantsController`](Controllers/TenantsController.cs)
 - Serviço de domínio [`TenantService`](Services/Tenancy/TenantService.cs) + Mapperly (`Mappings/TenantMapper.cs`)
 - Resolução automática do tenant por subdomínio (`{tenant}.pillar.local`), header `X-Tenant` ou tenant padrão do usuário através do [`TenantResolutionMiddleware`](Services/Tenancy/TenantResolutionMiddleware.cs)
 - Contexto multi-tenant acessível por DI (`ITenantContextAccessor`) para que serviços/Blazor possam reagir a branding, `TenantId` e flags demo

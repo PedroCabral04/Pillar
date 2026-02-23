@@ -1,8 +1,10 @@
 @page "/admin/users"
 @using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
 @using erp.Components.Shared.Dialogs
 @using erp.DTOs.User
 @using erp.DTOs.Role
+@using erp.Security
 @using erp.Services
 @using erp.Services.Authorization
 @attribute [Authorize(Policy = ModulePolicies.HR)]
@@ -12,6 +14,9 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject ITablePreferenceService TablePreferences
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @implements IDisposable;
 
 <PageTitle>Gerenciar Usuários - Pillar ERP</PageTitle>
@@ -137,6 +142,15 @@
                                    OnClick="@(() => ToggleUserStatus(context))" 
                                    aria-label="@(context.IsActive ? $"Desativar usuário {context.Username}" : $"Ativar usuário {context.Username}")" />
                 </MudTooltip>
+                @if (_isSuperAdmin && _currentUserId != context.Id)
+                {
+                    <MudTooltip Text="Entrar como este usuário">
+                        <MudIconButton Icon="@Icons.Material.Filled.SwitchAccount"
+                                       Color="MudBlazor.Color.Secondary"
+                                       OnClick="@(() => ImpersonateUserAsync(context))"
+                                       aria-label="@($"Impersonar usuário {context.Username}")" />
+                    </MudTooltip>
+                }
             </MudButtonGroup>
         </MudTd>    
     </RowTemplate>
@@ -174,12 +188,16 @@
     private string? _currentSortLabel;
     private bool _sortDescending;
     private int _defaultPageSize = 25;
+    private bool _isSuperAdmin;
+    private int? _currentUserId;
 
     protected override async Task OnInitializedAsync()
     {
         _debounceTimer = new System.Timers.Timer(DebounceDelayMs);
         _debounceTimer.Elapsed += OnDebounceTimerElapsed;
         _debounceTimer.AutoReset = false;
+
+        await LoadCurrentPrincipalAsync();
         
         // Load table preferences
         _defaultPageSize = TablePreferences.GetPageSize();
@@ -203,6 +221,17 @@
         {
             Logger.LogError($"Erro ao carregar funções: {ex.Message}");
         }
+    }
+
+    private async Task LoadCurrentPrincipalAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var principal = authState.User;
+
+        _isSuperAdmin = principal.IsInRole(RoleNames.SuperAdmin);
+
+        var currentUserClaim = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        _currentUserId = int.TryParse(currentUserClaim, out var parsedUserId) ? parsedUserId : null;
     }
 
     private async Task<TableData<UserDto>> ServerReload(TableState state, CancellationToken token)
@@ -434,6 +463,52 @@
                 Snackbar.Add($"Erro ao {action} usuário. Tente novamente.", Severity.Error);
             }
         }
+    }
+
+    private async Task ImpersonateUserAsync(UserDto user)
+    {
+        var parameters = new DialogParameters
+        {
+            { "ContentText", $"Deseja entrar como o usuário '{user.Username}'? Você será redirecionado para o tenant desse usuário." },
+            { "ButtonText", "Entrar como usuário" },
+            { "Color", MudBlazor.Color.Warning }
+        };
+
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirmar impersonação", parameters, options);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled)
+        {
+            return;
+        }
+
+        try
+        {
+            var response = await JS.InvokeAsync<AuthActionResult>("erpAuth.impersonate", user.Id);
+            if (response.ok)
+            {
+                Snackbar.Add($"Agora você está autenticado como {user.Username}.", Severity.Success);
+                NavigationManager.NavigateTo("/", forceLoad: true);
+                return;
+            }
+
+            var errorMessage = string.IsNullOrWhiteSpace(response.text)
+                ? "Não foi possível iniciar a impersonação."
+                : response.text;
+            Snackbar.Add(errorMessage, Severity.Error);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Erro ao iniciar impersonação: {ex.Message}");
+            Snackbar.Add("Erro ao iniciar impersonação.", Severity.Error);
+        }
+    }
+
+    private class AuthActionResult
+    {
+        public bool ok { get; set; }
+        public int status { get; set; }
+        public string? text { get; set; }
     }
 
     public void Dispose()

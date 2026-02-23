@@ -385,7 +385,8 @@
             }
             else
             {
-                Snackbar.Add("Erro ao salvar usuário.", Severity.Error);
+                var errorMessage = await ExtractErrorMessageAsync(response);
+                Snackbar.Add($"Erro ao salvar usuário: {errorMessage}", Severity.Error);
             }
         }
         catch (Exception ex)
@@ -403,5 +404,22 @@
     {
         _selectedRoleIds = roleIds.ToHashSet();
         return Task.CompletedTask;
+    }
+
+    private static async Task<string> ExtractErrorMessageAsync(HttpResponseMessage response)
+    {
+        var content = await response.Content.ReadAsStringAsync();
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return "Falha na requisição.";
+        }
+
+        var trimmed = content.Trim();
+        if (trimmed.StartsWith('"') && trimmed.EndsWith('"') && trimmed.Length >= 2)
+        {
+            return trimmed[1..^1].Replace("\\\"", "\"");
+        }
+
+        return trimmed;
     }
 }

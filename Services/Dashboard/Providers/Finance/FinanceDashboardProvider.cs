@@ -25,7 +25,7 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Area,
             Icon = "mdi-cash",
             Unit = "R$",
-            RequiredRoles = new[] { "Financeiro", "Administrador" }
+            RequiredRoles = new[] { "Financeiro", "AdminTenant", "SuperAdmin" }
         },
         new DashboardWidgetDefinition
         {
@@ -36,7 +36,7 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Donut,
             Icon = "mdi-arrow-down-bold-circle",
             Unit = "R$",
-            RequiredRoles = new[] { "Financeiro", "Administrador" }
+            RequiredRoles = new[] { "Financeiro", "AdminTenant", "SuperAdmin" }
         },
         new DashboardWidgetDefinition
         {
@@ -47,7 +47,7 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Donut,
             Icon = "mdi-arrow-up-bold-circle",
             Unit = "R$",
-            RequiredRoles = new[] { "Financeiro", "Administrador" }
+            RequiredRoles = new[] { "Financeiro", "AdminTenant", "SuperAdmin" }
         },
         new DashboardWidgetDefinition
         {
@@ -58,7 +58,7 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Bar,
             Icon = "mdi-calendar-alert",
             Unit = "R$",
-            RequiredRoles = new[] { "Financeiro", "Administrador" }
+            RequiredRoles = new[] { "Financeiro", "AdminTenant", "SuperAdmin" }
         },
         new DashboardWidgetDefinition
         {
@@ -69,7 +69,7 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Bar,
             Icon = "mdi-truck",
             Unit = "R$",
-            RequiredRoles = new[] { "Financeiro", "Compras", "Administrador" }
+            RequiredRoles = new[] { "Financeiro", "Compras", "AdminTenant", "SuperAdmin" }
         },
         new DashboardWidgetDefinition
         {
@@ -80,7 +80,7 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Bar,
             Icon = "mdi-account-group",
             Unit = "R$",
-            RequiredRoles = new[] { "Financeiro", "Vendas", "Administrador" }
+            RequiredRoles = new[] { "Financeiro", "Vendas", "AdminTenant", "SuperAdmin" }
         },
         new DashboardWidgetDefinition
         {
@@ -91,7 +91,7 @@ public class FinanceDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Bar,
             Icon = "mdi-alert-circle",
             Unit = "R$",
-            RequiredRoles = new[] { "Financeiro", "Gerente", "Administrador" }
+            RequiredRoles = new[] { "Financeiro", "Gerente", "AdminTenant", "SuperAdmin" }
         }
     };
 

@@ -43,7 +43,7 @@ Scope: Only `/api/*` endpoints are checked. If the key is missing or invalid, th
   - Standalone login screen (no app shell) at `Components/Pages/Auth/Login.razor`.
   - Router sends unauthenticated users to login (`Components/Routes.razor`).
   - Admin/users/settings pages require `[Authorize]`.
-- Seed (Development): roles (Administrador, Gerente, Vendedor) and admin user (`admin@erp.local` / `Admin@123!`).
+- Seed (Development): roles (`AdminTenant`, `SuperAdmin`, `Gerente`, `Vendedor`) and admin user (`admin@erp.local` / `Admin@123!`).
 
 ## Cookie and CSRF hardening (already applied)
 - Auth cookie: HttpOnly, SameSite=Lax, Secure=Always, Path=/, IsEssential=true, sliding expiration.

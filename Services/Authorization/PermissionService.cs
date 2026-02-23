@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using erp.Data;
 using erp.Models.Identity;
+using erp.Security;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -45,7 +46,7 @@ public class PermissionService : IPermissionService
     public async Task<bool> HasModuleAccessAsync(ClaimsPrincipal user, string moduleKey)
     {
         // Admins always have access to everything
-        if (user.IsInRole("Administrador"))
+        if (RoleNames.IsAdminPrincipal(user))
             return true;
             
         var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -72,7 +73,7 @@ public class PermissionService : IPermissionService
         var roleNames = await _userManager.GetRolesAsync(user);
         
         // Admins get all modules - return hardcoded list to avoid DB dependency
-        if (roleNames.Contains("Administrador"))
+        if (RoleNames.IsAdminRoleCollection(roleNames))
         {
             _cache.Set(cacheKey, AllModuleKeys, CacheDuration);
             return AllModuleKeys;
@@ -104,7 +105,7 @@ public class PermissionService : IPermissionService
     public async Task<IReadOnlyList<string>> GetUserModulesAsync(ClaimsPrincipal user)
     {
         // Admins get all modules - return hardcoded list to avoid DB dependency
-        if (user.IsInRole("Administrador"))
+        if (RoleNames.IsAdminPrincipal(user))
         {
             return AllModuleKeys;
         }
@@ -232,7 +233,7 @@ public class PermissionService : IPermissionService
             return false;
 
         var roleNames = await _userManager.GetRolesAsync(user);
-        if (roleNames.Contains("Administrador"))
+        if (RoleNames.IsAdminRoleCollection(roleNames))
             return true;
 
         await using var context = await _contextFactory.CreateDbContextAsync();
@@ -262,7 +263,7 @@ public class PermissionService : IPermissionService
 
     public async Task<bool> HasModuleActionAccessAsync(ClaimsPrincipal user, string moduleKey, string actionKey)
     {
-        if (user.IsInRole("Administrador"))
+        if (RoleNames.IsAdminPrincipal(user))
             return true;
 
         var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;

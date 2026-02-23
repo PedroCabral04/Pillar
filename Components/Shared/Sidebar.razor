@@ -186,11 +186,15 @@
             <MudDivider Class="my-2 mx-3" DividerType="DividerType.Middle" />
 
             @* Administração (apenas para admins) *@
-            <AuthorizeView Roles="Administrador">
+            <AuthorizeView Roles="AdminTenant,SuperAdmin">
                 <Authorized>
                     <div class="sidebar-section admin-section">
                         <MudNavGroup Title="Administração" Icon="@Icons.Material.Filled.AdminPanelSettings" Class="nav-group admin-group" AriaLabel="Seção Administração">
-                            <MudNavLink Href="/admin/tenants" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Domain" Class="nav-subitem">Tenants</MudNavLink>
+                            <AuthorizeView Roles="SuperAdmin">
+                                <Authorized Context="superAdminContext">
+                                    <MudNavLink Href="/admin/tenants" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Domain" Class="nav-subitem">Tenants</MudNavLink>
+                                </Authorized>
+                            </AuthorizeView>
                             <MudNavLink Href="/admin/role-permissions" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Security" Class="nav-subitem">Permissões</MudNavLink>
                             @*<MudNavLink Href="/admin/widget-roles" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Widgets" Class="nav-subitem">Widgets / Papéis</MudNavLink> *@
                             <MudNavLink Href="/audit" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.History" Class="nav-subitem">Auditoria</MudNavLink>
@@ -284,15 +288,19 @@
                     </MudTooltip> *@
                 }
                 
-                <AuthorizeView Roles="Administrador">
+                <AuthorizeView Roles="AdminTenant,SuperAdmin">
                     <Authorized>
                         <MudDivider Class="my-1 mx-2" />
                         <MudTooltip Text="Administração" Placement="Placement.Right" Arrow="true" Duration="200">
                             <MudNavLink Href="/admin/role-permissions" Icon="@Icons.Material.Filled.AdminPanelSettings" Class="mini-nav-item" AriaLabel="Administração"/>
                         </MudTooltip>
-                        <MudTooltip Text="Tenants" Placement="Placement.Right" Arrow="true" Duration="200">
-                            <MudNavLink Href="/admin/tenants" Icon="@Icons.Material.Filled.Domain" Class="mini-nav-item" AriaLabel="Tenants"/>
-                        </MudTooltip>
+                        <AuthorizeView Roles="SuperAdmin">
+                            <Authorized Context="superAdminContext">
+                                <MudTooltip Text="Tenants" Placement="Placement.Right" Arrow="true" Duration="200">
+                                    <MudNavLink Href="/admin/tenants" Icon="@Icons.Material.Filled.Domain" Class="mini-nav-item" AriaLabel="Tenants"/>
+                                </MudTooltip>
+                            </Authorized>
+                        </AuthorizeView>
                     </Authorized>
                 </AuthorizeView>
                 
@@ -323,6 +331,7 @@
     private bool _renderMini = false;
     private IReadOnlyList<string> _userModules = Array.Empty<string>();
     private bool _permissionsLoaded = false;
+    private bool _isSuperAdmin = false;
 
     private record NavItem(string Title, string Href, string Icon, string? Category = null);
     
@@ -373,6 +382,7 @@
         : _allItems
             .Where(i => i.Title.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
                        (i.Category?.Contains(_search, StringComparison.OrdinalIgnoreCase) ?? false))
+            .Where(i => _isSuperAdmin || !string.Equals(i.Href, "/admin/tenants", StringComparison.OrdinalIgnoreCase))
             .Take(8) // Limita resultados para melhor UX
             .ToList();
 
@@ -395,6 +405,7 @@
             var authState = await AuthenticationStateTask;
             if (authState.User.Identity?.IsAuthenticated == true)
             {
+                _isSuperAdmin = authState.User.IsInRole("SuperAdmin");
                 _userModules = await PermissionService.GetUserModulesAsync(authState.User);
                 _permissionsLoaded = true;
                 await InvokeAsync(StateHasChanged);

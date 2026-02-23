@@ -107,7 +107,7 @@
     
     <MudSpacer />
     
-    <AuthorizeView Roles="Administrador">
+    <AuthorizeView Roles="AdminTenant,SuperAdmin">
         <Authorized>
             <MudMenu 
                      Label="Admin" 
@@ -118,7 +118,11 @@
                      StartIcon="@Icons.Material.Filled.ArrowDropDown"
                      EndIcon="">
                 <MudMenuItem Href="admin/users" Icon="@Icons.Material.Filled.People">Usuários</MudMenuItem>
-                <MudMenuItem Href="admin/tenants" Icon="@Icons.Material.Filled.Domain">Tenants</MudMenuItem>
+                <AuthorizeView Roles="SuperAdmin">
+                    <Authorized Context="superAdminContext">
+                        <MudMenuItem Href="admin/tenants" Icon="@Icons.Material.Filled.Domain">Tenants</MudMenuItem>
+                    </Authorized>
+                </AuthorizeView>
                 <MudMenuItem Href="admin/departments" Icon="@Icons.Material.Filled.BusinessCenter">Departamentos</MudMenuItem>
                 <MudMenuItem Href="admin/positions" Icon="@Icons.Material.Filled.WorkOutline">Cargos</MudMenuItem>
                 <MudMenuItem Href="admin/widget-roles" Icon="@Icons.Material.Filled.Widgets">Widgets / Papéis</MudMenuItem>

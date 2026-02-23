@@ -10,6 +10,8 @@ using erp.Models.ServiceOrders;
 using erp.Services.Reports;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
+using erp.Services.Tenancy;
 using Xunit;
 
 namespace erp.Tests.Services.Reports;
@@ -18,10 +20,13 @@ public class FinancialReportAccuracyTests
 {
     private static ApplicationDbContext CreateContext()
     {
+        var tenantAccessor = new Mock<ITenantContextAccessor>();
+        tenantAccessor.SetupGet(x => x.Current).Returns(new TenantContext());
+
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
-        return new ApplicationDbContext(options);
+        return new ApplicationDbContext(options, tenantContextAccessor: tenantAccessor.Object);
     }
 
     [Fact]
@@ -74,10 +79,10 @@ public class FinancialReportAccuracyTests
 
         result.Items.Should().HaveCount(1);
         result.Items[0].Category.Should().Be("Vendas");
-        result.Items[0].PaymentMethod.Should().Be("Pix");
+        result.Items[0].PaymentMethod.Should().Be("PIX");
         result.Summary.TotalRevenue.Should().Be(100m);
-        result.Summary.RevenueByPaymentMethod.Should().ContainKey("Pix");
-        result.Summary.RevenueByPaymentMethod["Pix"].Should().Be(100m);
+        result.Summary.RevenueByPaymentMethod.Should().ContainKey("PIX");
+        result.Summary.RevenueByPaymentMethod["PIX"].Should().Be(100m);
     }
 
     [Fact]

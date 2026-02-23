@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using erp.DTOs.Financial;
 using erp.Services.Financial;
 using erp.Models.Financial;
+using erp.Security;
 using System.Security.Claims;
 
 namespace erp.Controllers;
@@ -324,7 +325,7 @@ public class AccountsPayableController : ControllerBase
     /// Aprova uma conta a pagar
     /// </summary>
     [HttpPost("{id}/approve")]
-    [Authorize(Roles = "Administrador,Gerente")]
+    [Authorize(Roles = RoleNames.AdminTenantSuperAdminOrManager)]
     public async Task<ActionResult<AccountPayableDto>> Approve(
         int id,
         [FromBody] ApproveAccountPayableDto dto)

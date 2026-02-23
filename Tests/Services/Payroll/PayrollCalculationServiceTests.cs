@@ -41,7 +41,7 @@ public class PayrollCalculationServiceTests : IDisposable
         period.Status.Should().Be(PayrollPeriodStatus.Calculated);
         period.Results.Should().HaveCount(1);
 
-        var result = period.Results[0];
+        var result = period.Results.First();
         result.EmployeeNameSnapshot.Should().Be("Maria da Silva");
         result.TotalEarnings.Should().Be(5000m);
         result.TotalDeductions.Should().BeGreaterThan(0);
@@ -60,7 +60,7 @@ public class PayrollCalculationServiceTests : IDisposable
 
         // Act
         var period = await _service.CalculateAsync(1, requestedById: 99);
-        var result = period.Results[0];
+        var result = period.Results.First();
 
         // Assert
         result.TotalEarnings.Should().BeGreaterThan(5000m); // overtime added

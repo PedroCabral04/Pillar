@@ -1,5 +1,6 @@
 using erp.DTOs.Audit;
 using erp.Services.Audit;
+using erp.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using erp.Models.Audit;
@@ -177,7 +178,7 @@ public class AuditController : ControllerBase
     /// <param name="minSensitivity">Nível mínimo de sensibilidade (opcional)</param>
     [HttpGet("sensitive-data-access")]
     [ProducesResponseType(typeof(List<DataAccessReportDto>), 200)]
-    [Authorize(Roles = "Administrador")] // Apenas admins podem ver relatórios de acesso
+    [Authorize(Roles = RoleNames.AdminTenantOrSuperAdmin)] // Apenas admins podem ver relatórios de acesso
     public async Task<IActionResult> GetSensitiveDataAccessReport(
         [FromQuery] DateTime? startDate = null,
         [FromQuery] DateTime? endDate = null,

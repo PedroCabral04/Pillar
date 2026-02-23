@@ -135,7 +135,32 @@
                 </MudTooltip>
             </div>
         </div>
-        
+
+        <div class="chat-governance-bar">
+            <MudSelect T="ChatOperationMode"
+                       Label="Modo"
+                       Margin="Margin.Dense"
+                       Variant="Variant.Outlined"
+                       Dense="true"
+                       @bind-Value="_operationMode"
+                       @bind-Value:after="OnOperationModeChangedAsync">
+                <MudSelectItem Value="@ChatOperationMode.ReadOnly">Somente leitura</MudSelectItem>
+                <MudSelectItem Value="@ChatOperationMode.ProposeAction">Propor ação</MudSelectItem>
+                <MudSelectItem Value="@ChatOperationMode.ExecuteWithConfirmation">Executar com confirmação</MudSelectItem>
+            </MudSelect>
+
+            <MudSelect T="ChatResponseStyle"
+                       Label="Estilo"
+                       Margin="Margin.Dense"
+                       Variant="Variant.Outlined"
+                       Dense="true"
+                       @bind-Value="_responseStyle"
+                       @bind-Value:after="OnResponseStyleChangedAsync">
+                <MudSelectItem Value="@ChatResponseStyle.Executive">Executivo</MudSelectItem>
+                <MudSelectItem Value="@ChatResponseStyle.Specialist">Especialista</MudSelectItem>
+            </MudSelect>
+        </div>
+         
         <div class="chat-messages-area" id="chat-messages-fullpage" @ref="_messagesContainer">
             @if (_isLoadingMessages)
             {
@@ -232,6 +257,21 @@
                 }
             </div>
         }
+
+        @if (_latestEvidenceSources.Any() && !_isProcessing)
+        {
+            <div class="chat-evidence-area">
+                @foreach (var evidence in _latestEvidenceSources.Take(3))
+                {
+                    <MudChip T="string"
+                             Size="MudBlazor.Size.Small"
+                             Color="MudBlazor.Color.Info"
+                             Variant="Variant.Text">
+                        Fonte: @evidence.Source@(string.IsNullOrWhiteSpace(evidence.Period) ? string.Empty : $" ({evidence.Period})")
+                    </MudChip>
+                }
+            </div>
+        }
         
         <div class="chat-input-area">
             @if (_currentConversation?.IsAtMessageLimit == true)
@@ -278,6 +318,7 @@
     private ChatConversationDto? _currentConversation;
     private List<ChatMessageDto> _messages = new();
     private List<string> _suggestedActions = new();
+    private List<ChatEvidenceSourceDto> _latestEvidenceSources = new();
     private List<string> _defaultSuggestedActions = new()
     {
         "O que você pode fazer?",
@@ -292,6 +333,8 @@
     private bool _isLoadingMessages;
     private bool _isProcessing;
     private bool _sidebarCollapsed;
+    private ChatOperationMode _operationMode = ChatOperationMode.ProposeAction;
+    private ChatResponseStyle _responseStyle = ChatResponseStyle.Executive;
     private ElementReference _messagesContainer;
     
     protected override async Task OnInitializedAsync()
@@ -348,6 +391,7 @@
         _currentConversationId = conversationId;
         _messages.Clear();
         _suggestedActions.Clear();
+        _latestEvidenceSources.Clear();
         StateHasChanged();
         
         try
@@ -357,6 +401,9 @@
             {
                 _currentConversation = conversation;
                 _messages = conversation.Messages;
+                _latestEvidenceSources.Clear();
+                _operationMode = conversation.OperationMode;
+                _responseStyle = conversation.ResponseStyle;
                 
                 // Update URL without full navigation
                 NavigationManager.NavigateTo($"/chatbot/{conversationId}", replace: true);
@@ -384,6 +431,7 @@
         _currentConversation = null;
         _messages.Clear();
         _suggestedActions.Clear();
+        _latestEvidenceSources.Clear();
         _currentMessage = string.Empty;
         NavigationManager.NavigateTo("/chatbot", replace: true);
         StateHasChanged();
@@ -425,6 +473,7 @@
         var message = _currentMessage.Trim();
         _currentMessage = string.Empty;
         _suggestedActions.Clear();
+        _latestEvidenceSources.Clear();
         
         // Add user message immediately for visual feedback
         var tempUserMessage = new ChatMessageDto
@@ -444,11 +493,19 @@
             // If no current conversation, create one
             if (_currentConversationId == null)
             {
-                var newConv = await ApiService.PostAsync<ChatConversationDto>("api/chatbot/conversations", new CreateConversationDto());
+                var newConv = await ApiService.PostAsync<ChatConversationDto>(
+                    "api/chatbot/conversations",
+                    new CreateConversationDto
+                    {
+                        OperationMode = _operationMode,
+                        ResponseStyle = _responseStyle
+                    });
                 if (newConv != null)
                 {
                     _currentConversationId = newConv.Id;
                     _currentConversation = newConv;
+                    _operationMode = newConv.OperationMode;
+                    _responseStyle = newConv.ResponseStyle;
                     await LoadConversations(); // Refresh sidebar
                     NavigationManager.NavigateTo($"/chatbot/{newConv.Id}", replace: true);
                 }
@@ -463,7 +520,12 @@
             
             var response = await ApiService.PostAsync<ConversationMessageResponseDto>(
                 $"api/chatbot/conversations/{_currentConversationId}/messages",
-                new SendMessageToConversationDto { Message = message });
+                new SendMessageToConversationDto
+                {
+                    Message = message,
+                    OperationMode = _operationMode,
+                    ResponseStyle = _responseStyle
+                });
             
             if (response != null)
             {
@@ -482,6 +544,16 @@
                 if (response.SuggestedActions?.Any() == true)
                 {
                     _suggestedActions = response.SuggestedActions;
+                }
+
+                _latestEvidenceSources = response.EvidenceSources ?? new List<ChatEvidenceSourceDto>();
+
+                if (response.RequiresConfirmation && !string.IsNullOrWhiteSpace(response.ConfirmationPrompt))
+                {
+                    if (!_suggestedActions.Contains(response.ConfirmationPrompt))
+                    {
+                        _suggestedActions.Insert(0, response.ConfirmationPrompt);
+                    }
                 }
                 
                 if (_currentConversation != null)
@@ -565,6 +637,45 @@
     private void ToggleSidebar()
     {
         _sidebarCollapsed = !_sidebarCollapsed;
+    }
+
+    private async Task OnOperationModeChangedAsync()
+    {
+        await PersistConversationPreferencesAsync();
+    }
+
+    private async Task OnResponseStyleChangedAsync()
+    {
+        await PersistConversationPreferencesAsync();
+    }
+
+    private async Task PersistConversationPreferencesAsync()
+    {
+        if (_currentConversationId == null)
+        {
+            return;
+        }
+
+        try
+        {
+            await ApiService.PutAsync(
+                $"api/chatbot/conversations/{_currentConversationId}",
+                new UpdateConversationDto
+                {
+                    OperationMode = _operationMode,
+                    ResponseStyle = _responseStyle
+                });
+
+            if (_currentConversation != null)
+            {
+                _currentConversation.OperationMode = _operationMode;
+                _currentConversation.ResponseStyle = _responseStyle;
+            }
+        }
+        catch
+        {
+            Snackbar.Add("Não foi possível salvar preferências da conversa", Severity.Warning);
+        }
     }
     
     private MarkupString RenderMessage(string message)
@@ -759,6 +870,19 @@
     display: flex;
     align-items: center;
     gap: 4px;
+}
+
+.chat-governance-bar {
+    padding: 10px 24px;
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+    background: var(--mud-palette-surface);
+    display: flex;
+    gap: 12px;
+}
+
+.chat-governance-bar ::deep .mud-input-control {
+    margin: 0;
+    min-width: 220px;
 }
 
 .chat-messages-area {
@@ -960,6 +1084,16 @@
     width: 100%;
 }
 
+.chat-evidence-area {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0 24px 8px;
+    max-width: 800px;
+    margin: 0 auto;
+    width: 100%;
+}
+
 /* Input area */
 .chat-input-area {
     padding: 16px 24px 24px;
@@ -1017,6 +1151,16 @@
     
     .chat-messages-area {
         padding: 16px;
+    }
+
+    .chat-governance-bar {
+        padding: 10px 16px;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .chat-governance-bar ::deep .mud-input-control {
+        min-width: 0;
     }
     
     .chat-message {

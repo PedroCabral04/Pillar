@@ -10,6 +10,7 @@ using QRCoder;
 namespace erp.Controllers;
 
 [ApiController]
+[Route("api/two-factor")]
 [Route("api/dois-fatores")]
 [Authorize]
 public class TwoFactorController : ControllerBase

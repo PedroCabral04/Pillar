@@ -28,7 +28,7 @@ public class HRDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Donut,
             Icon = "mdi-account-group",
             Unit = "funcionários",
-            RequiredRoles = new[] { "RH", "Administrador" }
+            RequiredRoles = new[] { "RH", "AdminTenant", "SuperAdmin" }
         },
         new DashboardWidgetDefinition
         {
@@ -39,7 +39,7 @@ public class HRDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Bar,
             Icon = "mdi-domain",
             Unit = "funcionários",
-            RequiredRoles = new[] { "RH", "Administrador" }
+            RequiredRoles = new[] { "RH", "AdminTenant", "SuperAdmin" }
         },
         new DashboardWidgetDefinition
         {
@@ -50,7 +50,7 @@ public class HRDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Line,
             Icon = "mdi-account-plus",
             Unit = "contratações",
-            RequiredRoles = new[] { "RH", "Administrador" }
+            RequiredRoles = new[] { "RH", "AdminTenant", "SuperAdmin" }
         },
         new DashboardWidgetDefinition
         {
@@ -61,7 +61,7 @@ public class HRDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Bar,
             Icon = "mdi-cash-multiple",
             Unit = "R$",
-            RequiredRoles = new[] { "RH", "Financeiro", "Administrador" }
+            RequiredRoles = new[] { "RH", "Financeiro", "AdminTenant", "SuperAdmin" }
         },
         new DashboardWidgetDefinition
         {
@@ -72,7 +72,7 @@ public class HRDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Pie,
             Icon = "mdi-briefcase",
             Unit = "funcionários",
-            RequiredRoles = new[] { "RH", "Administrador" }
+            RequiredRoles = new[] { "RH", "AdminTenant", "SuperAdmin" }
         }
     };
 

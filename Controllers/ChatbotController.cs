@@ -13,17 +13,20 @@ public class ChatbotController : ControllerBase
 {
     private readonly IChatbotService _chatbotService;
     private readonly IChatConversationService _conversationService;
+    private readonly IChatbotAuditService _auditService;
     private readonly IChatbotCacheService _cacheService;
     private readonly ILogger<ChatbotController> _logger;
 
     public ChatbotController(
         IChatbotService chatbotService,
         IChatConversationService conversationService,
+        IChatbotAuditService auditService,
         IChatbotCacheService cacheService,
         ILogger<ChatbotController> logger)
     {
         _chatbotService = chatbotService;
         _conversationService = conversationService;
+        _auditService = auditService;
         _cacheService = cacheService;
         _logger = logger;
     }
@@ -58,7 +61,12 @@ public class ChatbotController : ControllerBase
             var response = await _chatbotService.ProcessMessageAsync(
                 request.Message,
                 request.ConversationHistory,
-                GetCurrentUserId());
+                GetCurrentUserId(),
+                request.OperationMode,
+                request.ResponseStyle,
+                false,
+                null,
+                "quick");
 
             return Ok(response);
         }
@@ -147,7 +155,12 @@ public class ChatbotController : ControllerBase
             });
         }
         
-        var response = await _conversationService.SendMessageAsync(userId.Value, id, request.Message);
+        var response = await _conversationService.SendMessageAsync(
+            userId.Value,
+            id,
+            request.Message,
+            request.OperationMode,
+            request.ResponseStyle);
         
         if (!response.Success && response.Error == "Conversa não encontrada")
         {
@@ -203,6 +216,23 @@ public class ChatbotController : ControllerBase
     public IActionResult Health()
     {
         return Ok(new { status = "healthy", service = "chatbot" });
+    }
+
+    /// <summary>
+    /// Obter trilha de auditoria recente do chatbot para o usuário atual.
+    /// </summary>
+    [HttpGet("audit/recent")]
+    public async Task<ActionResult<List<ChatbotAuditEntryDto>>> GetRecentAudit([FromQuery] int take = 30)
+    {
+        var userId = GetCurrentUserId();
+        if (!userId.HasValue)
+        {
+            return Unauthorized();
+        }
+
+        var normalizedTake = Math.Clamp(take, 1, 100);
+        var logs = await _auditService.GetRecentByUserAsync(userId.Value, normalizedTake);
+        return Ok(logs);
     }
 
     /// <summary>

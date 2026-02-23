@@ -103,6 +103,12 @@ public class PermissionsControllerTests
     {
         await using var context = CreateContext();
         var role = new ApplicationRole { Id = 3, Name = "Gerente", NormalizedName = "GERENTE" };
+        context.ModulePermissions.AddRange(
+            new ModulePermission { Id = 1, ModuleKey = ModuleKeys.Sales, DisplayName = "Vendas", DisplayOrder = 1, IsActive = true },
+            new ModulePermission { Id = 2, ModuleKey = ModuleKeys.Inventory, DisplayName = "Estoque", DisplayOrder = 2, IsActive = true });
+        context.ModuleActionPermissions.AddRange(
+            new ModuleActionPermission { Id = 100, ModulePermissionId = 1, ActionKey = "a100", DisplayName = "A100", DisplayOrder = 1, IsActive = true },
+            new ModuleActionPermission { Id = 101, ModulePermissionId = 2, ActionKey = "a101", DisplayName = "A101", DisplayOrder = 2, IsActive = true });
         context.Set<ApplicationRole>().Add(role);
         await context.SaveChangesAsync();
 

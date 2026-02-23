@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using erp.Security;
 
 namespace erp.Services.Authorization;
 
@@ -42,7 +43,7 @@ public class ModuleAccessHandler : AuthorizationHandler<ModuleAccessRequirement>
         }
         
         // Administrators always have access
-        if (context.User.IsInRole("Administrador"))
+        if (RoleNames.IsAdminPrincipal(context.User))
         {
             _logger.LogDebug("User is Administrator, granting access to module {Module}", requirement.ModuleKey);
             context.Succeed(requirement);

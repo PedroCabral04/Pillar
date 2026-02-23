@@ -71,6 +71,42 @@ window.erpAuth = {
       return false;
     }
   },
+  impersonate: async function (userId) {
+    try {
+      const res = await fetch(`/api/auth/impersonate/${userId}`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      const text = await res.text();
+      let data = null;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        // noop
+      }
+      return { ok: res.ok, status: res.status, text, data };
+    } catch (e) {
+      return { ok: false, status: 0, text: e?.message || 'Network error', data: null };
+    }
+  },
+  stopImpersonation: async function () {
+    try {
+      const res = await fetch('/api/auth/stop-impersonation', {
+        method: 'POST',
+        credentials: 'include'
+      });
+      const text = await res.text();
+      let data = null;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        // noop
+      }
+      return { ok: res.ok, status: res.status, text, data };
+    } catch (e) {
+      return { ok: false, status: 0, text: e?.message || 'Network error', data: null };
+    }
+  },
   monitorActivity: function (dotNetHelper, timeoutMinutes) {
     let timer;
     // Throttle events to avoid excessive processing, though setTimeout is cheap

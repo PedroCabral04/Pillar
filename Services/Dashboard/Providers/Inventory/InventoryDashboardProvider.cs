@@ -30,7 +30,7 @@ public class InventoryDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Pie,
             Icon = "mdi-package-variant",
             Unit = "produtos",
-            RequiredRoles = new[] { "Estoque", "Administrador" }
+            RequiredRoles = new[] { "Estoque", "AdminTenant", "SuperAdmin" }
         },
         new DashboardWidgetDefinition
         {
@@ -41,7 +41,7 @@ public class InventoryDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Bar,
             Icon = "mdi-alert",
             Unit = "unidades",
-            RequiredRoles = new[] { "Estoque", "Compras", "Administrador" }
+            RequiredRoles = new[] { "Estoque", "Compras", "AdminTenant", "SuperAdmin" }
         },
         new DashboardWidgetDefinition
         {
@@ -52,7 +52,7 @@ public class InventoryDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Line,
             Icon = "mdi-swap-horizontal",
             Unit = "movimentações",
-            RequiredRoles = new[] { "Estoque", "Administrador" }
+            RequiredRoles = new[] { "Estoque", "AdminTenant", "SuperAdmin" }
         },
         new DashboardWidgetDefinition
         {
@@ -63,7 +63,7 @@ public class InventoryDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Bar,
             Icon = "mdi-currency-usd",
             Unit = "R$",
-            RequiredRoles = new[] { "Estoque", "Financeiro", "Administrador" }
+            RequiredRoles = new[] { "Estoque", "Financeiro", "AdminTenant", "SuperAdmin" }
         },
         new DashboardWidgetDefinition
         {
@@ -74,7 +74,7 @@ public class InventoryDashboardProvider : IDashboardWidgetProvider
             ChartType = DashboardChartType.Donut,
             Icon = "mdi-chart-arc",
             Unit = "R$",
-            RequiredRoles = new[] { "Estoque", "Financeiro", "Gerente", "Administrador" }
+            RequiredRoles = new[] { "Estoque", "Financeiro", "Gerente", "AdminTenant", "SuperAdmin" }
         }
     };
 

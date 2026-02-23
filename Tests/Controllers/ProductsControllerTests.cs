@@ -489,7 +489,7 @@ public class ProductsControllerTests
             .ReturnsAsync((products, 2));
 
         // Act
-        var result = await _controller.GetProducts(null, 1, 20);
+        var result = await _controller.GetProducts(search: null, status: null, categoryId: null, lowStock: null, sortBy: null, sortDescending: false, page: 1, pageSize: 20);
 
         // Assert
         result.Should().BeOfType<OkObjectResult>();

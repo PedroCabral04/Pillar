@@ -1,7 +1,9 @@
 @using MudBlazor
+@using System.Security.Claims
 @using erp.Services
 @using erp.Services.Browser
 @using erp.Services.Tenancy
+@using erp.Security
 @using erp.Components.Branding
 @inherits LayoutComponentBase
 @inject ThemeService ThemeService
@@ -93,6 +95,10 @@
                             </ActivatorContent>
                             <ChildContent>
                                 <MudMenuItem Href="/settings" Icon="@Icons.Material.Filled.Settings">Configurações</MudMenuItem>
+                                @if (_isImpersonating)
+                                {
+                                    <MudMenuItem OnClick="StopImpersonationAsync" Icon="@Icons.Material.Filled.SwitchAccount">Parar impersonação</MudMenuItem>
+                                }
                                 <MudMenuItem OnClick="LogoutAsync" Icon="@Icons.Material.Filled.Logout">Sair</MudMenuItem>
                             </ChildContent>
                         </MudMenu>
@@ -163,6 +169,21 @@
             </MudTooltip>
         </div>
     }
+
+    @if (_isImpersonating)
+    {
+        <div style="position:fixed; left:16px; bottom:16px; z-index:1300; max-width: min(520px, calc(100vw - 32px));">
+            <MudPaper Elevation="6" Class="pa-3">
+                <MudStack Spacing="1">
+                    <MudText Typo="Typo.body2">Você está autenticado como <b>@(_impersonatedUserName ?? "usuário")</b>.</MudText>
+                    <MudText Typo="Typo.caption" Color="MudBlazor.Color.Secondary">Sessão original: @(_impersonatorUserName ?? "SuperAdmin")</MudText>
+                    <MudButton Variant="Variant.Filled" Color="MudBlazor.Color.Warning" StartIcon="@Icons.Material.Filled.Undo" OnClick="StopImpersonationAsync">
+                        Voltar para sessão original
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+        </div>
+    }
 </MudLayout>
 
 @code {
@@ -180,6 +201,9 @@
     private string? _currentUrl;
     private bool _isMobileView;
     private bool _brandingInitialized;
+    private bool _isImpersonating;
+    private string? _impersonatorUserName;
+    private string? _impersonatedUserName;
 
     private TenantBrandingTheme _branding = TenantBrandingTheme.Default;
 
@@ -254,7 +278,8 @@
 
             // Check Onboarding
             await CheckOnboardingAsync();
-            
+            await RefreshImpersonationStateAsync();
+             
             StateHasChanged();
         }
     }
@@ -386,7 +411,11 @@
             _ = CloseMobileDrawerAsync();
         }
 
-        InvokeAsync(StateHasChanged);
+        _ = InvokeAsync(async () =>
+        {
+            await RefreshImpersonationStateAsync();
+            StateHasChanged();
+        });
     }
 
     private async Task LogoutAsync()
@@ -413,6 +442,49 @@
             {
                 NavigationManager.NavigateTo("/login", forceLoad: true);
             }
+        }
+    }
+
+    private async Task StopImpersonationAsync()
+    {
+        try
+        {
+            var response = await JsRuntime.InvokeAsync<AuthActionResult>("erpAuth.stopImpersonation");
+            if (!response.ok)
+            {
+                var message = string.IsNullOrWhiteSpace(response.text)
+                    ? "Não foi possível encerrar a impersonação."
+                    : response.text;
+                Snackbar.Add(message, Severity.Error);
+                return;
+            }
+
+            Snackbar.Add("Impersonação encerrada com sucesso.", Severity.Success);
+            NavigationManager.NavigateTo("/", forceLoad: true);
+        }
+        catch
+        {
+            Snackbar.Add("Erro ao encerrar impersonação.", Severity.Error);
+        }
+    }
+
+    private async Task RefreshImpersonationStateAsync()
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            _isImpersonating = user.HasClaim(c => c.Type == ImpersonationClaimTypes.IsImpersonating
+                                                  && string.Equals(c.Value, "true", StringComparison.OrdinalIgnoreCase));
+            _impersonatorUserName = user.FindFirstValue(ImpersonationClaimTypes.ImpersonatorUserName);
+            _impersonatedUserName = user.Identity?.Name;
+        }
+        catch
+        {
+            _isImpersonating = false;
+            _impersonatorUserName = null;
+            _impersonatedUserName = null;
         }
     }
 
@@ -653,5 +725,12 @@
         if (route.StartsWith("admin")) return "Administracao";
 
         return "Pillar ERP";
+    }
+
+    private class AuthActionResult
+    {
+        public bool ok { get; set; }
+        public int status { get; set; }
+        public string? text { get; set; }
     }
 }

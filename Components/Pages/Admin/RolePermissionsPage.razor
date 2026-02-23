@@ -2,7 +2,7 @@
 @using erp.DTOs.Permissions
 @using erp.Services
 @using MudBlazor
-@attribute [Authorize(Roles = "Administrador")]
+@attribute [Authorize(Roles = "AdminTenant,SuperAdmin")]
 @inject IApiService ApiService
 @inject ISnackbar Snackbar
 @inject ILogger<RolePermissionsPage> Logger
@@ -59,7 +59,7 @@ else
                             {
                                 var isChecked = _roleModules.TryGetValue(role.RoleId, out var modules) && 
                                                modules.Contains(module.Id);
-                                var isAdmin = role.RoleName == "Administrador";
+                                var isAdmin = IsAdministrativeRole(role.RoleName);
                                 var actionsCount = GetSelectedActionsCount(role.RoleId, module.Id);
 
                                 <MudExpansionPanel Dense="true" Class="module-panel">
@@ -122,10 +122,10 @@ else
                             }
                         </MudExpansionPanels>
                          
-                        @if (role.RoleName == "Administrador")
+                        @if (IsAdministrativeRole(role.RoleName))
                         {
                             <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3" Icon="@Icons.Material.Filled.Info">
-                                Administradores têm acesso a todos os módulos
+                                Funções administrativas têm acesso a todos os módulos
                             </MudAlert>
                         }
                     </MudCardContent>
@@ -138,7 +138,7 @@ else
                         <MudButton Variant="Variant.Filled" 
                                    Color="MudBlazor.Color.Primary" 
                                    Size="MudBlazor.Size.Small"
-                                   Disabled="@(role.RoleName == "Administrador" || _savingRole == role.RoleId)"
+                                   Disabled="@(IsAdministrativeRole(role.RoleName) || _savingRole == role.RoleId)"
                                    OnClick="@(() => SaveRolePermissions(role.RoleId))">
                             Salvar
                         </MudButton>
@@ -334,9 +334,15 @@ else
         return _roleModuleActions.TryGetValue(roleId, out var actions) && actions.Contains(actionId);
     }
 
+    private static bool IsAdministrativeRole(string roleName)
+    {
+        return roleName is "AdminTenant" or "SuperAdmin";
+    }
+
     private MudBlazor.Color GetRoleColor(string roleName) => roleName switch
     {
-        "Administrador" => MudBlazor.Color.Primary,
+        "AdminTenant" => MudBlazor.Color.Primary,
+        "SuperAdmin" => MudBlazor.Color.Dark,
         "Gerente" => MudBlazor.Color.Secondary,
         "Vendedor" => MudBlazor.Color.Success,
         "Estoque" => MudBlazor.Color.Info,
@@ -347,7 +353,8 @@ else
 
     private string GetRoleIcon(string roleName) => roleName switch
     {
-        "Administrador" => Icons.Material.Filled.AdminPanelSettings,
+        "AdminTenant" => Icons.Material.Filled.AdminPanelSettings,
+        "SuperAdmin" => Icons.Material.Filled.Shield,
         "Gerente" => Icons.Material.Filled.SupervisorAccount,
         "Vendedor" => Icons.Material.Filled.PointOfSale,
         "Estoque" => Icons.Material.Filled.Inventory,
@@ -358,7 +365,8 @@ else
 
     private string GetDefaultDescription(string roleName) => roleName switch
     {
-        "Administrador" => "Acesso total ao sistema",
+        "AdminTenant" => "Acesso total ao tenant atual",
+        "SuperAdmin" => "Acesso global a todos os tenants",
         "Gerente" => "Gerenciar equipes e relatórios",
         "Vendedor" => "Registro de vendas e atendimento",
         "Estoque" => "Controle de estoque e produtos",

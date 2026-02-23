@@ -4,6 +4,8 @@ using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Microsoft.SemanticKernel.Connectors.Google;
 using erp.DTOs.Chatbot;
 using erp.Services.Chatbot.ChatbotPlugins;
+using System.Diagnostics;
+using System.Text.RegularExpressions;
 
 namespace erp.Services.Chatbot;
 
@@ -13,21 +15,59 @@ public class ChatbotService : IChatbotService
     private readonly ILogger<ChatbotService> _logger;
     private readonly IConfiguration _configuration;
     private readonly IChatbotCacheService _cacheService;
+    private readonly IChatbotConfirmationService _confirmationService;
     private readonly IChatbotUserContext _userContext;
+    private readonly IChatbotAuditService _auditService;
     private readonly string _aiProvider;
     private readonly bool _aiConfigured;
+
+    private static readonly string[] MutatingActionKeywords =
+    {
+        "criar", "cadastrar", "adicionar", "inserir", "gerar", "emitir",
+        "editar", "atualizar", "alterar", "ajustar", "mudar",
+        "excluir", "deletar", "remover", "cancelar", "finalizar", "aprovar",
+        "reabrir", "transferir", "baixar", "liquidar", "pagar"
+    };
+
+    private static readonly HashSet<string> MutatingActionKeywordSet =
+        new(MutatingActionKeywords, StringComparer.Ordinal);
+
+    private static readonly HashSet<string> IntentPrefixKeywords =
+        new(StringComparer.Ordinal)
+        {
+            "quero", "preciso", "pode", "poderia", "vamos", "favor", "faca", "faça", "execute", "executar"
+        };
+
+    private static readonly HashSet<string> BridgeTokens =
+        new(StringComparer.Ordinal)
+        {
+            "me", "nos", "isso", "isto", "o", "a"
+        };
+
+    private static readonly Regex WordTokenRegex =
+        new(@"\p{L}+", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    private static readonly string[] ConfirmationPrefixes =
+    {
+        "confirmar:", "confirmo:", "confirmar ", "confirmo ",
+        "sim, confirmar", "sim confirmar"
+    };
 
     public ChatbotService(
         ILogger<ChatbotService> logger,
         IConfiguration configuration,
         IServiceProvider serviceProvider,
         IChatbotCacheService cacheService,
-        IChatbotUserContext userContext)
+        IChatbotConfirmationService confirmationService,
+        IChatbotUserContext userContext,
+        IChatbotAuditService auditService)
     {
         _logger = logger;
         _configuration = configuration;
         _cacheService = cacheService;
+        _confirmationService = confirmationService;
         _userContext = userContext;
+        _auditService = auditService;
 
         // Criar o Kernel do Semantic Kernel
         var builder = Kernel.CreateBuilder();
@@ -186,8 +226,18 @@ public class ChatbotService : IChatbotService
     public async Task<ChatResponseDto> ProcessMessageAsync(
         string message,
         List<ChatMessageDto>? conversationHistory = null,
-        int? userId = null)
+        int? userId = null,
+        ChatOperationMode operationMode = ChatOperationMode.ProposeAction,
+        ChatResponseStyle responseStyle = ChatResponseStyle.Executive,
+        bool isConfirmedAction = false,
+        int? conversationId = null,
+        string source = "quick")
     {
+        var stopwatch = Stopwatch.StartNew();
+        var normalizedSource = NormalizeSource(source);
+        string effectiveMessage = message;
+        bool confirmationGranted = isConfirmedAction;
+
         try
         {
             // Set user context for this request if userId is provided
@@ -195,54 +245,126 @@ public class ChatbotService : IChatbotService
             {
                 _userContext.SetCurrentUser(userId.Value);
             }
+
+            var parsedMessage = ExtractEffectiveMessage(message);
+            var isConfirmationMessage = parsedMessage.IsConfirmation;
+            effectiveMessage = parsedMessage.EffectiveMessage;
+            confirmationGranted = isConfirmedAction;
+
+            string? pendingConfirmation = null;
+            if (userId.HasValue)
+            {
+                pendingConfirmation = _confirmationService.GetPendingAction(userId.Value, conversationId, normalizedSource);
+            }
+
+            if (!confirmationGranted && isConfirmationMessage)
+            {
+                if (!string.IsNullOrWhiteSpace(pendingConfirmation)
+                    && IsSameConfirmationTarget(pendingConfirmation, effectiveMessage))
+                {
+                    confirmationGranted = true;
+                    if (userId.HasValue)
+                    {
+                        _confirmationService.ClearPendingAction(userId.Value, conversationId, normalizedSource);
+                    }
+                }
+                else
+                {
+                    var invalidConfirmationResponse = BuildInvalidConfirmationResponse(operationMode, pendingConfirmation);
+                    return await AuditAndReturnAsync(
+                        invalidConfirmationResponse,
+                        "confirmation_invalid",
+                        userId,
+                        conversationId,
+                        normalizedSource,
+                        message,
+                        effectiveMessage,
+                        operationMode,
+                        responseStyle,
+                        false,
+                        stopwatch);
+                }
+            }
+
+            string outcome;
+
+            var guardrailResponse = EvaluateSafetyResponse(effectiveMessage, operationMode, confirmationGranted);
+            if (guardrailResponse != null)
+            {
+                if (guardrailResponse.RequiresConfirmation && userId.HasValue)
+                {
+                    _confirmationService.SetPendingAction(userId.Value, conversationId, normalizedSource, effectiveMessage);
+                }
+
+                outcome = guardrailResponse.RequiresConfirmation
+                    ? "confirmation_requested"
+                    : "guardrail_blocked";
+
+                return await AuditAndReturnAsync(
+                    guardrailResponse,
+                    outcome,
+                    userId,
+                    conversationId,
+                    normalizedSource,
+                    message,
+                    effectiveMessage,
+                    operationMode,
+                    responseStyle,
+                    confirmationGranted,
+                    stopwatch);
+            }
+
+            var cacheMessageKey = $"{operationMode}:{responseStyle}:{effectiveMessage}";
+
             // Verificar cache primeiro
             if (_cacheService.IsEnabled)
             {
                 var contextHash = _cacheService.GenerateContextHash(conversationHistory);
-                var cachedResponse = _cacheService.GetCachedResponse(message, contextHash);
+                var cachedResponse = _cacheService.GetCachedResponse(cacheMessageKey, contextHash);
                 
                 if (cachedResponse != null)
                 {
                     _logger.LogDebug("Resposta obtida do cache para: {MessagePreview}...", 
-                        message.Length > 30 ? message[..30] : message);
-                    return cachedResponse;
+                        effectiveMessage.Length > 30 ? effectiveMessage[..30] : effectiveMessage);
+                    cachedResponse.OperationMode = operationMode;
+                    return await AuditAndReturnAsync(
+                        cachedResponse,
+                        "cache_hit",
+                        userId,
+                        conversationId,
+                        normalizedSource,
+                        message,
+                        effectiveMessage,
+                        operationMode,
+                        responseStyle,
+                        confirmationGranted,
+                        stopwatch);
                 }
             }
 
             // Se não tem IA configurada, usar modo fallback
             if (!_aiConfigured)
             {
-                return ProcessFallbackMode(message);
+                var fallbackResponse = ProcessFallbackMode(effectiveMessage, operationMode);
+                return await AuditAndReturnAsync(
+                    fallbackResponse,
+                    "fallback_mode",
+                    userId,
+                    conversationId,
+                    normalizedSource,
+                    message,
+                    effectiveMessage,
+                    operationMode,
+                    responseStyle,
+                    confirmationGranted,
+                    stopwatch);
             }
 
             // Criar histórico de conversa
             var chatHistory = new ChatHistory();
             
             // System prompt
-            chatHistory.AddSystemMessage("""
-                Você é o assistente virtual do Pillar ERP, um sistema de gestão empresarial brasileiro.
-                
-                **Suas capacidades:**
-                - Gerenciar produtos, vendas, clientes e fornecedores
-                - Consultar informações financeiras (contas a pagar/receber)
-                - Gerenciar ativos da empresa e manutenções
-                - Consultar folha de pagamento e recursos humanos
-                
-                **Regras de formatação:**
-                - Use Markdown para formatar suas respostas (negrito, tabelas, listas)
-                - Seja conciso e objetivo - evite textos longos desnecessários
-                - Use tabelas Markdown para apresentar dados tabulares
-                - Use emojis com moderação para indicar status (✅ ❌ ⚠️ 📊)
-                - Destaque valores monetários e nomes importantes em **negrito**
-                - Quando listar muitos itens, limite a 10 e indique quantos restam
-                
-                **Comportamento:**
-                - Responda sempre em português brasileiro
-                - Seja profissional mas amigável
-                - Quando o usuário pedir uma ação, use as funções disponíveis
-                - Confirme sucesso ou falha das operações realizadas
-                - Se não encontrar dados, informe de forma clara
-                """);
+            chatHistory.AddSystemMessage(BuildSystemPrompt(operationMode, responseStyle));
 
             // Adicionar histórico anterior se existir
             if (conversationHistory != null)
@@ -257,7 +379,7 @@ public class ChatbotService : IChatbotService
             }
 
             // Adicionar mensagem atual
-            chatHistory.AddUserMessage(message);
+            chatHistory.AddUserMessage(effectiveMessage);
 
             // Configurar execução com auto function calling
             PromptExecutionSettings executionSettings;
@@ -288,34 +410,61 @@ public class ChatbotService : IChatbotService
                 executionSettings,
                 _kernel);
 
-            // Gerar sugestões de ações
-            // var suggestions = GenerateSuggestions(message);
+            var responseContent = result.Content ?? "Desculpe, não consegui processar sua mensagem.";
+            var suggestions = GenerateSuggestions(effectiveMessage);
 
             var response = new ChatResponseDto
             {
-                Response = result.Content ?? "Desculpe, não consegui processar sua mensagem.",
+                Response = responseContent,
                 Success = true,
-                // SuggestedActions = suggestions
+                SuggestedActions = suggestions,
+                OperationMode = operationMode,
+                EvidenceSources = ExtractEvidenceSources(responseContent)
             };
 
             // Armazenar no cache para futuras requisições
             if (_cacheService.IsEnabled)
             {
                 var contextHash = _cacheService.GenerateContextHash(conversationHistory);
-                _cacheService.SetCachedResponse(message, response, contextHash);
+                _cacheService.SetCachedResponse(cacheMessageKey, response, contextHash);
             }
 
-            return response;
+            return await AuditAndReturnAsync(
+                response,
+                "processed",
+                userId,
+                conversationId,
+                normalizedSource,
+                message,
+                effectiveMessage,
+                operationMode,
+                responseStyle,
+                confirmationGranted,
+                stopwatch);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Erro ao processar mensagem do chatbot");
-            return new ChatResponseDto
+            var errorResponse = new ChatResponseDto
             {
                 Response = "Desculpe, ocorreu um erro ao processar sua mensagem. Por favor, tente novamente.",
                 Success = false,
-                Error = ex.Message
+                Error = ex.Message,
+                OperationMode = operationMode
             };
+
+            return await AuditAndReturnAsync(
+                errorResponse,
+                "error",
+                userId,
+                conversationId,
+                normalizedSource,
+                message,
+                effectiveMessage,
+                operationMode,
+                responseStyle,
+                confirmationGranted,
+                stopwatch);
         }
         finally
         {
@@ -324,7 +473,42 @@ public class ChatbotService : IChatbotService
         }
     }
 
-    private ChatResponseDto ProcessFallbackMode(string message)
+    private async Task<ChatResponseDto> AuditAndReturnAsync(
+        ChatResponseDto response,
+        string outcome,
+        int? userId,
+        int? conversationId,
+        string source,
+        string requestMessage,
+        string effectiveMessage,
+        ChatOperationMode operationMode,
+        ChatResponseStyle responseStyle,
+        bool isConfirmedAction,
+        Stopwatch stopwatch)
+    {
+        stopwatch.Stop();
+
+        await _auditService.LogAsync(new ChatbotAuditRequest
+        {
+            UserId = userId,
+            ConversationId = conversationId,
+            Source = source,
+            Outcome = outcome,
+            RequestMessage = requestMessage,
+            EffectiveMessage = effectiveMessage,
+            Response = response,
+            OperationMode = operationMode,
+            ResponseStyle = responseStyle,
+            IsConfirmedAction = isConfirmedAction,
+            AiProvider = _aiProvider,
+            AiConfigured = _aiConfigured,
+            DurationMs = (int)stopwatch.ElapsedMilliseconds
+        });
+
+        return response;
+    }
+
+    private ChatResponseDto ProcessFallbackMode(string message, ChatOperationMode operationMode)
     {
         // Modo básico sem IA - detecta palavras-chave
         var lowerMessage = message.ToLower();
@@ -334,7 +518,8 @@ public class ChatbotService : IChatbotService
             return new ChatResponseDto
             {
                 Response = new SystemPlugin().GetHelp(),
-                Success = true
+                Success = true,
+                OperationMode = operationMode
             };
         }
 
@@ -343,7 +528,8 @@ public class ChatbotService : IChatbotService
             return new ChatResponseDto
             {
                 Response = new SystemPlugin().GetSystemInfo(),
-                Success = true
+                Success = true,
+                OperationMode = operationMode
             };
         }
 
@@ -404,11 +590,342 @@ Obtenha sua chave em: https://ai.google.dev/
 💻 **Local:** Use LMStudio para rodar modelos localmente sem custo!
 Download: https://lmstudio.ai/
 
-No momento, posso apenas fornecer informações básicas.
+            No momento, posso apenas fornecer informações básicas.
 Digite 'ajuda' para ver o que posso fazer quando configurado corretamente.",
             Success = true,
-            SuggestedActions = new List<string> { "Ajuda", "Sobre o sistema" }
+            SuggestedActions = new List<string> { "Ajuda", "Sobre o sistema" },
+            OperationMode = operationMode
         };
+    }
+
+    private static (bool IsConfirmation, string EffectiveMessage) ExtractEffectiveMessage(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return (false, message);
+        }
+
+        var normalized = message.Trim();
+        var normalizedLower = normalized.ToLowerInvariant();
+
+        foreach (var prefix in ConfirmationPrefixes)
+        {
+            if (!normalizedLower.StartsWith(prefix, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var effective = normalized[prefix.Length..].Trim();
+            if (string.IsNullOrWhiteSpace(effective))
+            {
+                effective = normalized;
+            }
+
+            return (true, effective);
+        }
+
+        return (false, normalized);
+    }
+
+    private static string NormalizeSource(string source)
+    {
+        return string.IsNullOrWhiteSpace(source)
+            ? "quick"
+            : source.Trim().ToLowerInvariant();
+    }
+
+    private static bool IsSameConfirmationTarget(string expectedMessage, string providedMessage)
+    {
+        return string.Equals(
+            NormalizeForComparison(expectedMessage),
+            NormalizeForComparison(providedMessage),
+            StringComparison.Ordinal);
+    }
+
+    private static string NormalizeForComparison(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return string.Empty;
+        }
+
+        return Regex.Replace(message.Trim().ToLowerInvariant(), @"\s+", " ");
+    }
+
+    private static string BuildConfirmationCommand(string message)
+    {
+        return $"Confirmar: {message}";
+    }
+
+    private static ChatResponseDto BuildInvalidConfirmationResponse(
+        ChatOperationMode operationMode,
+        string? pendingConfirmation)
+    {
+        if (string.IsNullOrWhiteSpace(pendingConfirmation))
+        {
+            return new ChatResponseDto
+            {
+                Success = true,
+                OperationMode = operationMode,
+                Response = "⚠️ Não há confirmação pendente. Envie primeiro a ação que deseja executar.",
+                SuggestedActions = new List<string> { "Descrever ação a executar" }
+            };
+        }
+
+        var confirmationCommand = BuildConfirmationCommand(pendingConfirmation);
+        return new ChatResponseDto
+        {
+            Success = true,
+            OperationMode = operationMode,
+            RequiresConfirmation = true,
+            ConfirmationPrompt = confirmationCommand,
+            Response = $"⚠️ A confirmação não corresponde à ação pendente. Para continuar, envie exatamente: `{confirmationCommand}`",
+            SuggestedActions = new List<string> { confirmationCommand }
+        };
+    }
+
+    private static ChatResponseDto? EvaluateSafetyResponse(
+        string message,
+        ChatOperationMode operationMode,
+        bool confirmationGranted)
+    {
+        if (!IsMutatingRequest(message))
+        {
+            return null;
+        }
+
+        if (operationMode == ChatOperationMode.ReadOnly)
+        {
+            return new ChatResponseDto
+            {
+                Success = true,
+                OperationMode = operationMode,
+                Response = """
+                    🔒 **Modo Somente Leitura Ativo**
+
+                    Não posso executar ações que alteram dados neste modo.
+
+                    **Próximo passo:** mude para **Propor ação** ou **Executar com confirmação** para continuar.
+                    """,
+                SuggestedActions = new List<string>
+                {
+                    "Mudar para Propor ação",
+                    "Mudar para Executar com confirmação"
+                }
+            };
+        }
+
+        if (operationMode == ChatOperationMode.ProposeAction)
+        {
+            return new ChatResponseDto
+            {
+                Success = true,
+                OperationMode = operationMode,
+                Response = """
+                    📝 **Modo Propor Ação Ativo**
+
+                    Posso montar o plano e validar os dados, mas não executo alterações neste modo.
+
+                    **Próximo passo:** altere para **Executar com confirmação** e envie novamente.
+                    """,
+                SuggestedActions = new List<string>
+                {
+                    "Mudar para Executar com confirmação"
+                }
+            };
+        }
+
+        if (operationMode == ChatOperationMode.ExecuteWithConfirmation && !confirmationGranted)
+        {
+            return new ChatResponseDto
+            {
+                Success = true,
+                OperationMode = operationMode,
+                RequiresConfirmation = true,
+                ConfirmationPrompt = BuildConfirmationCommand(message),
+                Response = $"""
+                    ⚠️ **Confirmação necessária**
+
+                    Identifiquei uma ação que pode alterar dados.
+
+                    Se quiser continuar, envie exatamente:
+                    `{BuildConfirmationCommand(message)}`
+                    """,
+                SuggestedActions = new List<string>
+                {
+                    BuildConfirmationCommand(message)
+                }
+            };
+        }
+
+        return null;
+    }
+
+    private static bool IsMutatingRequest(string message)
+    {
+        var normalized = NormalizeForComparison(message);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return false;
+        }
+
+        if (Regex.IsMatch(normalized, @"\bcontas?\s+a\s+(pagar|receber)\b", RegexOptions.CultureInvariant)
+            && (normalized.EndsWith("?", StringComparison.Ordinal)
+                || normalized.StartsWith("quais ", StringComparison.Ordinal)
+                || normalized.StartsWith("qual ", StringComparison.Ordinal)
+                || normalized.StartsWith("listar ", StringComparison.Ordinal)
+                || normalized.StartsWith("mostr", StringComparison.Ordinal)))
+        {
+            return false;
+        }
+
+        var tokens = WordTokenRegex.Matches(normalized)
+            .Select(match => match.Value)
+            .ToList();
+
+        if (tokens.Count == 0)
+        {
+            return false;
+        }
+
+        if (MutatingActionKeywordSet.Contains(tokens[0]))
+        {
+            return true;
+        }
+
+        for (var i = 1; i < tokens.Count; i++)
+        {
+            if (!MutatingActionKeywordSet.Contains(tokens[i]))
+            {
+                continue;
+            }
+
+            if (IntentPrefixKeywords.Contains(tokens[i - 1]))
+            {
+                return true;
+            }
+
+            if (i > 1
+                && BridgeTokens.Contains(tokens[i - 1])
+                && IntentPrefixKeywords.Contains(tokens[i - 2]))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string BuildSystemPrompt(ChatOperationMode operationMode, ChatResponseStyle responseStyle)
+    {
+        var modeInstructions = operationMode switch
+        {
+            ChatOperationMode.ReadOnly => """
+                - Você está em MODO SOMENTE LEITURA: nunca execute ações que criem, alterem ou excluam dados.
+                - Se o usuário pedir ação transacional, explique que o modo atual bloqueia execução.
+                """,
+            ChatOperationMode.ProposeAction => """
+                - Você está em MODO PROPOR AÇÃO: não execute ações transacionais.
+                - Você deve responder com o plano de ação, impactos e validações necessárias.
+                """,
+            _ => """
+                - Você está em MODO EXECUTAR COM CONFIRMAÇÃO.
+                - Só execute ações transacionais quando a mensagem do usuário vier confirmada.
+                """
+        };
+
+        var styleInstructions = responseStyle switch
+        {
+            ChatResponseStyle.Specialist => "Forneça detalhes técnicos, critérios e riscos quando relevante.",
+            _ => "Prefira respostas curtas e executivas, sem perder precisão."
+        };
+
+        return $"""
+            Você é o assistente virtual do Pillar ERP, um sistema de gestão empresarial brasileiro.
+
+            **Suas capacidades:**
+            - Gerenciar produtos, vendas, clientes e fornecedores
+            - Consultar informações financeiras (contas a pagar/receber)
+            - Gerenciar ativos da empresa e manutenções
+            - Consultar folha de pagamento e recursos humanos
+
+            **Regras de formatação e resposta:**
+            - Responda sempre em português brasileiro.
+            - Use Markdown.
+            - Estruture em três blocos quando possível: **Resumo**, **Evidências**, **Próximo passo**.
+            - No bloco **Evidências**, inclua ao menos uma linha com `Fonte: <origem> | Período: <intervalo>` quando houver dados.
+            - Seja objetivo e profissional.
+            - {styleInstructions}
+
+            **Guardrails de operação:**
+            {modeInstructions}
+            """;
+    }
+
+    private static List<ChatEvidenceSourceDto> ExtractEvidenceSources(string responseContent)
+    {
+        var evidence = new List<ChatEvidenceSourceDto>();
+        if (string.IsNullOrWhiteSpace(responseContent))
+        {
+            return evidence;
+        }
+
+        var matches = Regex.Matches(
+            responseContent,
+            @"(?im)^\s*(?:-\s*)?(?:\*\*)?(?:fonte|origem)(?:\*\*)?\s*:\s*(.+)$");
+
+        foreach (Match match in matches)
+        {
+            var rawValue = match.Groups[1].Value.Trim();
+            if (string.IsNullOrWhiteSpace(rawValue))
+            {
+                continue;
+            }
+
+            var source = rawValue;
+            string? period = null;
+
+            var parts = rawValue.Split('|', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length > 0)
+            {
+                source = parts[0].Replace("Período:", string.Empty, StringComparison.OrdinalIgnoreCase).Trim();
+            }
+
+            if (parts.Length > 1)
+            {
+                period = parts
+                    .FirstOrDefault(p => p.Contains("período", StringComparison.OrdinalIgnoreCase))
+                    ?.Replace("Período:", string.Empty, StringComparison.OrdinalIgnoreCase)
+                    .Trim();
+            }
+
+            evidence.Add(new ChatEvidenceSourceDto
+            {
+                Source = source,
+                Period = string.IsNullOrWhiteSpace(period) ? null : period
+            });
+        }
+
+        if (evidence.Count > 0)
+        {
+            return evidence;
+        }
+
+        var normalized = responseContent.ToLowerInvariant();
+        if (normalized.Contains("produto") || normalized.Contains("estoque"))
+        {
+            evidence.Add(new ChatEvidenceSourceDto { Source = "Módulo de Produtos/Estoque" });
+        }
+        else if (normalized.Contains("financeiro") || normalized.Contains("conta"))
+        {
+            evidence.Add(new ChatEvidenceSourceDto { Source = "Módulo Financeiro" });
+        }
+        else if (normalized.Contains("funcionário") || normalized.Contains("folha") || normalized.Contains("rh"))
+        {
+            evidence.Add(new ChatEvidenceSourceDto { Source = "Módulo RH/Folha" });
+        }
+
+        return evidence;
     }
 
     private List<string> GenerateSuggestions(string message)
