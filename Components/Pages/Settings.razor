@@ -10,12 +10,14 @@
 @using Color = MudBlazor.Color
 @using Size = MudBlazor.Size
 @using erp.Services.Dashboard
+@using erp.Services.Tenancy
 @using Microsoft.AspNetCore.Components.Authorization
 @inject ISnackbar Snackbar
 @inject IDashboardService DashboardService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IJSRuntime JsRuntime
 @inject IApiService ApiService
+@inject ITenantBrandingProvider TenantBrandingProvider
 
 <PageTitle>Configurações - Pillar ERP</PageTitle>
 
@@ -64,6 +66,16 @@
                         <MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText>
                         <MudChip T="string" Size="Size.Small" Color="Color.Success">Ativo</MudChip>
                     </MudItem>
+                    @if (!string.IsNullOrEmpty(_tenantName))
+                    {
+                        <MudItem xs="12" sm="6">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Empresa</MudText>
+                            <MudText Typo="Typo.body1">
+                                <MudIcon Icon="@Icons.Material.Filled.Business" Size="Size.Small" Class="mr-1" Style="vertical-align: middle;" />
+                                @_tenantName
+                            </MudText>
+                        </MudItem>
+                    }
                 </MudGrid>
             </MudPaper>
 
@@ -669,6 +681,7 @@
     private string _userName = "Usuário";
     private string _userEmail = "";
     private List<string> _userRoles = new();
+    private string _tenantName = "";
 
     // Change password
     private ChangePasswordRequest _changePasswordModel = new();
@@ -708,6 +721,13 @@
                     .ToList();
                 if (!_userRoles.Any()) _userRoles.Add("Usuário");
             }
+        }
+        catch { }
+
+        try
+        {
+            var branding = TenantBrandingProvider.GetCurrentBranding();
+            _tenantName = branding.TenantName;
         }
         catch { }
 
