@@ -31,11 +31,10 @@ public class ServiceOrderService : IServiceOrderService
 
     public async Task<ServiceOrderDto> CreateAsync(CreateServiceOrderDto dto, int userId, int tenantId)
     {
-        var retryCount = 0;
-
-        while (true)
+        for (int retryCount = 0; retryCount <= MaxOrderNumberRetries; retryCount++)
         {
-            using var transaction = await _context.Database.BeginTransactionAsync();
+            using var transaction = await _context.Database.BeginTransactionAsync(
+                System.Data.IsolationLevel.Serializable);
 
             try
             {
@@ -78,9 +77,9 @@ public class ServiceOrderService : IServiceOrderService
             {
                 // Retry on order number collision (race condition)
                 await transaction.RollbackAsync();
-                retryCount++;
                 _logger.LogWarning("Colisão no número da ordem de serviço, tentativa {RetryCount} de {MaxRetries}",
-                    retryCount, MaxOrderNumberRetries);
+                    retryCount + 1, MaxOrderNumberRetries);
+                continue;
             }
             catch (Exception ex)
             {
@@ -89,6 +88,8 @@ public class ServiceOrderService : IServiceOrderService
                 throw;
             }
         }
+
+        throw new InvalidOperationException($"Falha ao criar ordem de serviço após {MaxOrderNumberRetries} tentativas devido a conflitos de concorrência.");
     }
 
     private static bool IsUniqueConstraintViolation(DbUpdateException ex)

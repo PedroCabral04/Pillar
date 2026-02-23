@@ -27,8 +27,9 @@ public class CustomerService : ICustomerService
 
     public async Task<CustomerDto> CreateAsync(CreateCustomerDto dto)
     {
-        using var transaction = await _context.Database.BeginTransactionAsync();
-        
+        using var transaction = await _context.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.ReadCommitted);
+
         try
         {
             // Check if document already exists
@@ -112,8 +113,9 @@ public class CustomerService : ICustomerService
 
     public async Task<CustomerDto> UpdateAsync(int id, UpdateCustomerDto dto)
     {
-        using var transaction = await _context.Database.BeginTransactionAsync();
-        
+        using var transaction = await _context.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.ReadCommitted);
+
         try
         {
             var customer = await _context.Customers.FindAsync(id);
@@ -142,8 +144,9 @@ public class CustomerService : ICustomerService
 
     public async Task<bool> DeleteAsync(int id)
     {
-        using var transaction = await _context.Database.BeginTransactionAsync();
-        
+        using var transaction = await _context.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.ReadCommitted);
+
         try
         {
             var customer = await _context.Customers.FindAsync(id);

@@ -33,7 +33,8 @@ public class ChatbotCacheService : IChatbotCacheService
     private int _pluginCacheMisses;
 
     // Conjunto de chaves de plugins para invalidação seletiva
-    private readonly ConcurrentDictionary<string, HashSet<string>> _pluginCacheKeys = new();
+    // Usando ConcurrentDictionary para evitar deadlocks com lock
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _pluginCacheKeys = new();
 
     public ChatbotCacheService(
         IMemoryCache memoryCache,
@@ -70,11 +71,11 @@ public class ChatbotCacheService : IChatbotCacheService
         if (!_enabled) return null;
 
         var key = GenerateResponseCacheKey(message, contextHash);
-        
+
         if (_memoryCache.TryGetValue(key, out ChatResponseDto? cachedResponse))
         {
             Interlocked.Increment(ref _responseCacheHits);
-            _logger.LogDebug("Cache hit para mensagem: {MessagePreview}...", 
+            _logger.LogDebug("Cache hit para mensagem: {MessagePreview}...",
                 message.Length > 30 ? message[..30] : message);
             return cachedResponse;
         }
@@ -89,14 +90,14 @@ public class ChatbotCacheService : IChatbotCacheService
         if (!response.Success) return; // Não cachear respostas com erro
 
         var key = GenerateResponseCacheKey(message, contextHash);
-        
+
         var cacheOptions = new MemoryCacheEntryOptions()
             .SetAbsoluteExpiration(_responseTtl)
             .SetSize(1); // Para controle de memória se SizeLimit for configurado
 
         _memoryCache.Set(key, response, cacheOptions);
-        
-        _logger.LogDebug("Resposta cacheada para mensagem: {MessagePreview}...", 
+
+        _logger.LogDebug("Resposta cacheada para mensagem: {MessagePreview}...",
             message.Length > 30 ? message[..30] : message);
     }
 
@@ -105,7 +106,7 @@ public class ChatbotCacheService : IChatbotCacheService
         if (!_enabled) return default;
 
         var key = GeneratePluginCacheKey(pluginName, functionName, parameters);
-        
+
         if (_memoryCache.TryGetValue(key, out T? data))
         {
             Interlocked.Increment(ref _pluginCacheHits);
@@ -123,36 +124,29 @@ public class ChatbotCacheService : IChatbotCacheService
         if (data == null) return;
 
         var key = GeneratePluginCacheKey(pluginName, functionName, parameters);
-        
+
         var cacheOptions = new MemoryCacheEntryOptions()
             .SetAbsoluteExpiration(_pluginDataTtl)
             .SetSize(1);
 
         _memoryCache.Set(key, data, cacheOptions);
-        
-        // Registrar a chave para invalidação futura
-        var pluginKeys = _pluginCacheKeys.GetOrAdd(pluginName, _ => new HashSet<string>());
-        lock (pluginKeys)
-        {
-            pluginKeys.Add(key);
-        }
+
+        // Registrar a chave para invalidação futura - thread-safe sem lock
+        var pluginKeys = _pluginCacheKeys.GetOrAdd(pluginName, _ => new ConcurrentDictionary<string, byte>());
+        pluginKeys.TryAdd(key, 0);
 
         _logger.LogDebug("Dados cacheados para plugin {Plugin}.{Function}", pluginName, functionName);
     }
 
     public void InvalidatePluginCache(string pluginName)
     {
-        if (_pluginCacheKeys.TryGetValue(pluginName, out var keys))
+        if (_pluginCacheKeys.TryRemove(pluginName, out var keys))
         {
-            lock (keys)
+            foreach (var key in keys.Keys)
             {
-                foreach (var key in keys)
-                {
-                    _memoryCache.Remove(key);
-                }
-                keys.Clear();
+                _memoryCache.Remove(key);
             }
-            _logger.LogInformation("Cache do plugin {Plugin} invalidado", pluginName);
+            _logger.LogInformation("Cache do plugin {Plugin} invalidado ({Count} entradas)", pluginName, keys.Count);
         }
     }
 
@@ -196,24 +190,24 @@ public class ChatbotCacheService : IChatbotCacheService
     {
         var normalizedMessage = NormalizeMessage(message);
         var messageHash = ComputeHash(normalizedMessage);
-        
+
         if (string.IsNullOrEmpty(contextHash) || _cacheOnlyExactMatches)
         {
             return $"{ResponsePrefix}{messageHash}";
         }
-        
+
         return $"{ResponsePrefix}{messageHash}:{contextHash}";
     }
 
     private string GeneratePluginCacheKey(string pluginName, string functionName, string? parameters)
     {
         var baseKey = $"{PluginPrefix}{pluginName}:{functionName}";
-        
+
         if (string.IsNullOrEmpty(parameters))
         {
             return baseKey;
         }
-        
+
         var paramHash = ComputeHash(parameters);
         return $"{baseKey}:{paramHash}";
     }

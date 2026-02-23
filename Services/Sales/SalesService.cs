@@ -35,11 +35,11 @@ public class SalesService : ISalesService
         }
 
         const int maxRetries = 3;
-        int retryCount = 0;
 
-        while (true)
+        for (int retryCount = 0; retryCount <= maxRetries; retryCount++)
         {
-            using var transaction = await _context.Database.BeginTransactionAsync();
+            using var transaction = await _context.Database.BeginTransactionAsync(
+                System.Data.IsolationLevel.Serializable);
             try
             {
                 // Generate sale number
@@ -134,23 +134,41 @@ public class SalesService : ISalesService
                 // Calcular comissões se finalizada
                 if (_commissionService != null && SaleStatus.IsFinalized(sale.Status))
                 {
-                    try { await _commissionService.CalculateCommissionsForSaleAsync(sale.Id); }
-                    catch (Exception ex) { _logger.LogError(ex, "Erro ao calcular comissões para venda {SaleId}", sale.Id); }
+                    try
+                    {
+                        await _commissionService.CalculateCommissionsForSaleAsync(sale.Id);
+                    }
+                    catch (Exception ex)
+                    {
+                        // Log the error but don't fail the sale - the sale was successfully created
+                        // Commissions can be recalculated manually later if needed
+                        _logger.LogError(ex,
+                            "Falha ao calcular comissões para venda {SaleId} (número: {SaleNumber}). " +
+                            "A venda foi criada com sucesso, mas as comissões precisarão ser calculadas manualmente.",
+                            sale.Id, sale.SaleNumber);
+                    }
                 }
 
-                return await GetByIdAsync(sale.Id) ?? throw new InvalidOperationException("Erro ao recuperar venda criada");
+                var createdSale = await GetByIdAsync(sale.Id);
+                if (createdSale == null)
+                {
+                    _logger.LogError("Venda criada com ID {SaleId} não foi encontrada após inserção", sale.Id);
+                    throw new InvalidOperationException($"Venda criada (ID: {sale.Id}) não pôde ser recuperada do banco de dados. Contate o suporte.");
+                }
+                return createdSale;
             }
             catch (DbUpdateException ex) when (retryCount < maxRetries && (ex.InnerException?.Message.Contains("duplicate key") == true || ex is DbUpdateConcurrencyException))
             {
                 await transaction.RollbackAsync();
-                retryCount++;
-                _logger.LogWarning("Concorrência ou duplicidade detectada ao criar venda. Tentativa {RetryCount} de {MaxRetries}", retryCount, maxRetries);
-                
+                _logger.LogWarning("Concorrência ou duplicidade detectada ao criar venda. Tentativa {RetryCount} de {MaxRetries}", retryCount + 1, maxRetries);
+
                 // Limpar o contexto para evitar problemas com entidades rastreadas
+                // Isso é seguro aqui porque vamos recarregar todos os dados necessários na próxima iteração
                 _context.ChangeTracker.Clear();
-                
+
                 // Pequeno delay aleatório para evitar colisões sucessivas
                 await Task.Delay(new Random().Next(50, 200));
+                continue; // Próxima tentativa
             }
             catch (Exception)
             {
@@ -158,6 +176,9 @@ public class SalesService : ISalesService
                 throw;
             }
         }
+
+        // Se chegamos aqui, excedemos o número máximo de tentativas
+        throw new InvalidOperationException($"Falha ao criar venda após {maxRetries} tentativas devido a conflitos de concorrência.");
     }
 
     public async Task<SaleDto?> GetByIdAsync(int id, CancellationToken ct = default)
@@ -265,13 +286,21 @@ public class SalesService : ISalesService
         sale.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(ct);
-        return await GetByIdAsync(id, ct) ?? throw new InvalidOperationException("Erro ao recuperar venda atualizada");
+
+        var updatedSale = await GetByIdAsync(id, ct);
+        if (updatedSale == null)
+        {
+            _logger.LogError("Venda atualizada com ID {SaleId} não foi encontrada após atualização", id);
+            throw new InvalidOperationException($"Venda atualizada (ID: {id}) não pôde ser recuperada do banco de dados. Contate o suporte.");
+        }
+        return updatedSale;
     }
 
     public async Task<bool> CancelAsync(int id, CancellationToken ct = default)
     {
-        using var transaction = await _context.Database.BeginTransactionAsync();
-        
+        using var transaction = await _context.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.Serializable);
+
         try
         {
             var sale = await _context.Sales
@@ -345,7 +374,11 @@ public class SalesService : ISalesService
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Erro ao cancelar comissões para venda {SaleId}", id);
+                    // Log the error but don't fail the cancellation - the sale was successfully cancelled
+                    _logger.LogError(ex,
+                        "Falha ao cancelar comissões para venda {SaleId} (número: {SaleNumber}). " +
+                        "A venda foi cancelada com sucesso, mas as comissões precisarão ser canceladas manualmente.",
+                        id, sale.SaleNumber);
                 }
             }
 
@@ -361,8 +394,9 @@ public class SalesService : ISalesService
 
     public async Task<SaleDto> FinalizeAsync(int id, CancellationToken ct = default)
     {
-        using var transaction = await _context.Database.BeginTransactionAsync();
-        
+        using var transaction = await _context.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.Serializable);
+
         try
         {
             var sale = await _context.Sales
@@ -440,7 +474,11 @@ public class SalesService : ISalesService
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Erro ao calcular comissões para venda {SaleId}", id);
+                    // Log the error but don't fail the finalization - the sale was successfully finalized
+                    _logger.LogError(ex,
+                        "Falha ao calcular comissões para venda {SaleId} (número: {SaleNumber}). " +
+                        "A venda foi finalizada com sucesso, mas as comissões precisarão ser calculadas manualmente.",
+                        id, sale.SaleNumber);
                 }
             }
 
@@ -448,7 +486,13 @@ public class SalesService : ISalesService
                 "Venda {SaleNumber} finalizada com sucesso. {ItemCount} itens processados.",
                 sale.SaleNumber, sale.Items.Count);
 
-            return await GetByIdAsync(id) ?? throw new InvalidOperationException("Erro ao recuperar venda finalizada");
+            var finalizedSale = await GetByIdAsync(id);
+            if (finalizedSale == null)
+            {
+                _logger.LogError("Venda finalizada com ID {SaleId} não foi encontrada após finalização", id);
+                throw new InvalidOperationException($"Venda finalizada (ID: {id}) não pôde ser recuperada do banco de dados. Contate o suporte.");
+            }
+            return finalizedSale;
         }
         catch (Exception ex)
         {

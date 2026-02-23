@@ -1072,6 +1072,17 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .WithMany()
                 .HasForeignKey(x => x.BrandingId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // When Tenant is deleted, cascade to memberships and branding
+            tenant.HasMany(x => x.Memberships)
+                .WithOne(x => x.Tenant)
+                .HasForeignKey(x => x.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            tenant.HasMany(x => x.Users)
+                .WithOne(x => x.Tenant)
+                .HasForeignKey(x => x.TenantId)
+                .OnDelete(DeleteBehavior.Restrict); // Restrict to prevent accidental deletion
         });
 
         modelBuilder.Entity<TenantMembership>(membership =>
@@ -1154,6 +1165,22 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .WithMany()
                 .HasForeignKey(x => x.CreatedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // Cascade delete related entities when Product is deleted
+            p.HasMany(x => x.StockMovements)
+                .WithOne()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            p.HasMany(x => x.Images)
+                .WithOne()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            p.HasMany(x => x.Suppliers)
+                .WithOne()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // ProductCategory
@@ -1336,6 +1363,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             c.HasIndex(x => x.Document).IsUnique();
             c.HasIndex(x => x.Name);
             c.HasIndex(x => x.Email);
+
+            // When Customer is deleted, set their sales to null (don't cascade)
+            // This is already handled by the Sale configuration above
         });
 
         // Sale
@@ -1362,6 +1392,12 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .WithMany()
                 .HasForeignKey(x => x.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // When a Sale is deleted, cascade to items
+            s.HasMany(x => x.Items)
+                .WithOne(x => x.Sale)
+                .HasForeignKey(x => x.SaleId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // SaleItem
