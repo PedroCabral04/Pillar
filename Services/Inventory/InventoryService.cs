@@ -1,8 +1,11 @@
 using Microsoft.EntityFrameworkCore;
+using OfficeOpenXml;
 using erp.Data;
 using erp.DTOs.Inventory;
 using erp.Models.Inventory;
 using erp.Mappings;
+using System.Globalization;
+using System.Text;
 
 namespace erp.Services.Inventory;
 
@@ -138,6 +141,192 @@ public class InventoryService : IInventoryService
 
         return await GetProductByIdAsync(product.Id) 
             ?? throw new InvalidOperationException("Erro ao criar produto");
+    }
+
+    public async Task<ProductImportResultDto> ImportProductsFromExcelAsync(
+        Stream fileStream,
+        int userId,
+        CancellationToken cancellationToken = default)
+    {
+        if (fileStream == null || !fileStream.CanRead)
+        {
+            throw new InvalidOperationException("Arquivo invalido para importacao.");
+        }
+
+        ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+
+        using var package = new ExcelPackage(fileStream);
+        var worksheet = package.Workbook.Worksheets.FirstOrDefault();
+
+        if (worksheet?.Dimension == null)
+        {
+            throw new InvalidOperationException("A planilha esta vazia.");
+        }
+
+        var headerMap = BuildHeaderMap(worksheet);
+        if (!headerMap.TryGetValue("nome", out var nameCol) ||
+            !headerMap.TryGetValue("categoria", out var categoryCol) ||
+            !headerMap.TryGetValue("preco_venda", out var salePriceCol))
+        {
+            throw new InvalidOperationException("Colunas obrigatorias ausentes. Use: Nome, Categoria, Preco de Venda.");
+        }
+
+        headerMap.TryGetValue("sku", out var skuCol);
+        headerMap.TryGetValue("preco_custo", out var costPriceCol);
+        headerMap.TryGetValue("estoque_inicial", out var stockCol);
+        headerMap.TryGetValue("unidade", out var unitCol);
+        headerMap.TryGetValue("codigo_barras", out var barcodeCol);
+
+        var categories = await _context.ProductCategories
+            .AsNoTracking()
+            .Select(c => new { c.Id, c.Name, c.Code })
+            .ToListAsync(cancellationToken);
+
+        var categoryById = categories.ToDictionary(c => c.Id, c => c.Id);
+        var categoryByNameOrCode = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var category in categories)
+        {
+            categoryByNameOrCode[NormalizeKey(category.Name)] = category.Id;
+            categoryByNameOrCode[NormalizeKey(category.Code)] = category.Id;
+        }
+
+        var existingSkuList = await _context.Products
+            .AsNoTracking()
+            .Select(p => p.Sku)
+            .ToListAsync(cancellationToken);
+
+        var existingSkus = new HashSet<string>(existingSkuList, StringComparer.OrdinalIgnoreCase);
+        var seenInputSkus = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var result = new ProductImportResultDto();
+        var firstRow = worksheet.Dimension.Start.Row;
+        var lastRow = worksheet.Dimension.End.Row;
+
+        for (var row = firstRow + 1; row <= lastRow; row++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var rowValues = new[]
+            {
+                GetCellText(worksheet, row, nameCol),
+                GetCellText(worksheet, row, categoryCol),
+                GetCellText(worksheet, row, salePriceCol),
+                skuCol > 0 ? GetCellText(worksheet, row, skuCol) : null,
+                barcodeCol > 0 ? GetCellText(worksheet, row, barcodeCol) : null,
+                unitCol > 0 ? GetCellText(worksheet, row, unitCol) : null,
+                stockCol > 0 ? GetCellText(worksheet, row, stockCol) : null,
+                costPriceCol > 0 ? GetCellText(worksheet, row, costPriceCol) : null,
+            };
+
+            if (rowValues.All(v => string.IsNullOrWhiteSpace(v)))
+            {
+                continue;
+            }
+
+            result.TotalRows++;
+
+            var inputSku = skuCol > 0 ? GetCellText(worksheet, row, skuCol) : null;
+            var name = GetCellText(worksheet, row, nameCol);
+            var categoryRaw = GetCellText(worksheet, row, categoryCol);
+            var salePriceRaw = GetCellText(worksheet, row, salePriceCol);
+            var costPriceRaw = costPriceCol > 0 ? GetCellText(worksheet, row, costPriceCol) : null;
+            var stockRaw = stockCol > 0 ? GetCellText(worksheet, row, stockCol) : null;
+            var unitRaw = unitCol > 0 ? GetCellText(worksheet, row, unitCol) : null;
+            var barcodeRaw = barcodeCol > 0 ? GetCellText(worksheet, row, barcodeCol) : null;
+
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                AddIssue(result, row, "Nome obrigatorio.", inputSku, name, isSkipped: false);
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(categoryRaw))
+            {
+                AddIssue(result, row, "Categoria obrigatoria.", inputSku, name, isSkipped: false);
+                continue;
+            }
+
+            if (!TryResolveCategoryId(categoryRaw, categoryById, categoryByNameOrCode, out var categoryId))
+            {
+                AddIssue(result, row, $"Categoria '{categoryRaw}' nao encontrada.", inputSku, name, isSkipped: false);
+                continue;
+            }
+
+            if (!TryParseDecimal(salePriceRaw, out var salePrice) || salePrice <= 0)
+            {
+                AddIssue(result, row, "Preco de venda invalido.", inputSku, name, isSkipped: false);
+                continue;
+            }
+
+            var costPrice = salePrice;
+            if (!string.IsNullOrWhiteSpace(costPriceRaw) && (!TryParseDecimal(costPriceRaw, out costPrice) || costPrice < 0))
+            {
+                AddIssue(result, row, "Preco de custo invalido.", inputSku, name, isSkipped: false);
+                continue;
+            }
+
+            var initialStock = 0m;
+            if (!string.IsNullOrWhiteSpace(stockRaw) && (!TryParseDecimal(stockRaw, out initialStock) || initialStock < 0))
+            {
+                AddIssue(result, row, "Estoque inicial invalido.", inputSku, name, isSkipped: false);
+                continue;
+            }
+
+            var normalizedInputSku = string.IsNullOrWhiteSpace(inputSku) ? null : inputSku.Trim();
+            if (!string.IsNullOrWhiteSpace(normalizedInputSku))
+            {
+                if (!seenInputSkus.Add(normalizedInputSku))
+                {
+                    AddIssue(result, row, $"SKU '{normalizedInputSku}' duplicado na planilha.", normalizedInputSku, name, isSkipped: true);
+                    continue;
+                }
+
+                if (existingSkus.Contains(normalizedInputSku))
+                {
+                    AddIssue(result, row, $"SKU '{normalizedInputSku}' ja existe no cadastro.", normalizedInputSku, name, isSkipped: true);
+                    continue;
+                }
+            }
+
+            var skuToCreate = normalizedInputSku;
+            if (string.IsNullOrWhiteSpace(skuToCreate))
+            {
+                skuToCreate = GenerateUniqueSku(existingSkus);
+            }
+
+            var dto = new CreateProductDto
+            {
+                Sku = skuToCreate,
+                Barcode = string.IsNullOrWhiteSpace(barcodeRaw) ? null : barcodeRaw.Trim(),
+                Name = name.Trim(),
+                CategoryId = categoryId,
+                SalePrice = salePrice,
+                CostPrice = costPrice,
+                CurrentStock = initialStock,
+                Unit = string.IsNullOrWhiteSpace(unitRaw) ? "UN" : unitRaw.Trim(),
+                UnitsPerBox = 1,
+                IsActive = true,
+                Status = 0
+            };
+
+            try
+            {
+                await CreateProductAsync(dto, userId);
+                existingSkus.Add(dto.Sku);
+                result.ImportedCount++;
+            }
+            catch (InvalidOperationException ex)
+            {
+                var isSkuIssue = ex.Message.Contains("SKU", StringComparison.OrdinalIgnoreCase);
+                AddIssue(result, row, ex.Message, dto.Sku, dto.Name, isSkipped: isSkuIssue);
+            }
+            catch (Exception ex)
+            {
+                AddIssue(result, row, $"Falha inesperada: {ex.Message}", dto.Sku, dto.Name, isSkipped: false);
+            }
+        }
+
+        return result;
     }
 
     public async Task<ProductDto> UpdateProductAsync(UpdateProductDto dto)
@@ -660,6 +849,149 @@ public class InventoryService : IInventoryService
         };
     }
 
+    public async Task<byte[]> GenerateImportTemplateAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+
+        var categories = await _context.ProductCategories
+            .AsNoTracking()
+            .OrderBy(c => c.Name)
+            .Select(c => new
+            {
+                c.Id,
+                c.Name,
+                c.Code,
+                c.IsActive
+            })
+            .ToListAsync(cancellationToken);
+
+        using var package = new ExcelPackage();
+        var worksheet = package.Workbook.Worksheets.Add("Produtos");
+        var instructionsSheet = package.Workbook.Worksheets.Add("Instrucoes");
+        var categoriesSheet = package.Workbook.Worksheets.Add("Categorias");
+
+        var headers = new[]
+        {
+            "SKU (Opcional)",
+            "Nome",
+            "Categoria",
+            "Preco de Venda",
+            "Preco de Custo (Opcional)",
+            "Estoque Inicial (Opcional)",
+            "Unidade (Opcional)",
+            "Codigo de Barras (Opcional)"
+        };
+
+        for (var i = 0; i < headers.Length; i++)
+        {
+            worksheet.Cells[1, i + 1].Value = headers[i];
+            worksheet.Cells[1, i + 1].Style.Font.Bold = true;
+        }
+
+        var firstCategoryName = categories.FirstOrDefault(c => c.IsActive)?.Name
+            ?? categories.FirstOrDefault()?.Name
+            ?? "Categoria Exemplo";
+        var secondCategoryReference = categories.Skip(1).FirstOrDefault(c => c.IsActive)
+            ?? categories.Skip(1).FirstOrDefault()
+            ?? categories.FirstOrDefault(c => c.IsActive)
+            ?? categories.FirstOrDefault();
+
+        worksheet.Cells[2, 1].Value = string.Empty;
+        worksheet.Cells[2, 2].Value = "Produto Exemplo";
+        worksheet.Cells[2, 3].Value = firstCategoryName;
+        worksheet.Cells[2, 4].Value = 199.90m;
+        worksheet.Cells[2, 5].Value = 150.00m;
+        worksheet.Cells[2, 6].Value = 10;
+        worksheet.Cells[2, 7].Value = "UN";
+        worksheet.Cells[2, 8].Value = "7890000000000";
+
+        worksheet.Cells[3, 1].Value = "PROD-EXEMPLO";
+        worksheet.Cells[3, 2].Value = "Produto com SKU manual";
+        worksheet.Cells[3, 3].Value = secondCategoryReference?.Id.ToString() ?? firstCategoryName;
+        worksheet.Cells[3, 4].Value = 89.90m;
+        worksheet.Cells[3, 5].Value = 60.00m;
+        worksheet.Cells[3, 6].Value = 5;
+        worksheet.Cells[3, 7].Value = "UN";
+        worksheet.Cells[3, 8].Value = string.Empty;
+
+        worksheet.Cells[1, 1, 1, headers.Length].Style.Fill.PatternType = OfficeOpenXml.Style.ExcelFillStyle.Solid;
+        worksheet.Cells[1, 1, 1, headers.Length].Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.LightGray);
+        worksheet.Cells[2, 4, 3, 6].Style.Numberformat.Format = "#,##0.00";
+        worksheet.View.FreezePanes(2, 1);
+        worksheet.Cells[1, 1, 3, headers.Length].AutoFitColumns();
+
+        instructionsSheet.Cells[1, 1].Value = "Template de Importacao de Produtos";
+        instructionsSheet.Cells[1, 1].Style.Font.Bold = true;
+        instructionsSheet.Cells[1, 1].Style.Font.Size = 14;
+        instructionsSheet.Cells[3, 1].Value = "1) Colunas obrigatorias: Nome, Categoria, Preco de Venda.";
+        instructionsSheet.Cells[4, 1].Value = "2) SKU e opcional. Se vazio, sera gerado automaticamente.";
+        instructionsSheet.Cells[5, 1].Value = "3) Se um SKU informado ja existir, a linha sera pulada e reportada.";
+        instructionsSheet.Cells[6, 1].Value = "4) Categoria aceita ID, Nome ou Codigo (veja aba Categorias).";
+        instructionsSheet.Cells[7, 1].Value = "5) Erros de uma linha nao interrompem o processamento das demais.";
+
+        instructionsSheet.Cells[9, 1].Value = "Campo";
+        instructionsSheet.Cells[9, 2].Value = "Obrigatorio";
+        instructionsSheet.Cells[9, 3].Value = "Exemplo";
+        instructionsSheet.Cells[9, 4].Value = "Observacao";
+
+        var fieldRows = new[]
+        {
+            new[] { "SKU", "Nao", "PRD-1001", "Se vazio, gera automaticamente" },
+            new[] { "Nome", "Sim", "Mouse sem fio", "Maximo recomendado: 200 caracteres" },
+            new[] { "Categoria", "Sim", "Informatica ou 3", "Pode usar ID, Nome ou Codigo" },
+            new[] { "Preco de Venda", "Sim", "199.90", "Maior que zero" },
+            new[] { "Preco de Custo", "Nao", "150.00", "Se vazio, usa preco de venda" },
+            new[] { "Estoque Inicial", "Nao", "10", "Se vazio, assume 0" },
+            new[] { "Unidade", "Nao", "UN", "Se vazio, assume UN" },
+            new[] { "Codigo de Barras", "Nao", "7890000000000", "Opcional" }
+        };
+
+        for (var i = 0; i < fieldRows.Length; i++)
+        {
+            var row = 10 + i;
+            instructionsSheet.Cells[row, 1].Value = fieldRows[i][0];
+            instructionsSheet.Cells[row, 2].Value = fieldRows[i][1];
+            instructionsSheet.Cells[row, 3].Value = fieldRows[i][2];
+            instructionsSheet.Cells[row, 4].Value = fieldRows[i][3];
+        }
+
+        instructionsSheet.Cells[9, 1, 9, 4].Style.Font.Bold = true;
+        instructionsSheet.Cells[9, 1, 9, 4].Style.Fill.PatternType = OfficeOpenXml.Style.ExcelFillStyle.Solid;
+        instructionsSheet.Cells[9, 1, 9, 4].Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.LightGray);
+        instructionsSheet.Cells[1, 1, 20, 4].AutoFitColumns();
+
+        categoriesSheet.Cells[1, 1].Value = "ID";
+        categoriesSheet.Cells[1, 2].Value = "Nome";
+        categoriesSheet.Cells[1, 3].Value = "Codigo";
+        categoriesSheet.Cells[1, 4].Value = "Ativa";
+        categoriesSheet.Cells[1, 1, 1, 4].Style.Font.Bold = true;
+        categoriesSheet.Cells[1, 1, 1, 4].Style.Fill.PatternType = OfficeOpenXml.Style.ExcelFillStyle.Solid;
+        categoriesSheet.Cells[1, 1, 1, 4].Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.LightGray);
+
+        if (categories.Count == 0)
+        {
+            categoriesSheet.Cells[2, 1].Value = "Nenhuma categoria cadastrada no momento.";
+        }
+        else
+        {
+            for (var i = 0; i < categories.Count; i++)
+            {
+                var row = i + 2;
+                categoriesSheet.Cells[row, 1].Value = categories[i].Id;
+                categoriesSheet.Cells[row, 2].Value = categories[i].Name;
+                categoriesSheet.Cells[row, 3].Value = categories[i].Code;
+                categoriesSheet.Cells[row, 4].Value = categories[i].IsActive ? "Sim" : "Nao";
+            }
+        }
+
+        categoriesSheet.Cells[1, 1, Math.Max(2, categories.Count + 1), 4].AutoFitColumns();
+        categoriesSheet.View.FreezePanes(2, 1);
+
+        return package.GetAsByteArray();
+    }
+
     public async Task<byte[]> ExportProductsAsync(ProductSearchDto search, string format)
     {
         // Buscar todos os produtos sem paginação para exportação
@@ -676,6 +1008,198 @@ public class InventoryService : IInventoryService
         
         // Default: retorna CSV
         return GenerateCsv(productList);
+    }
+
+    private static Dictionary<string, int> BuildHeaderMap(ExcelWorksheet worksheet)
+    {
+        var result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var startCol = worksheet.Dimension!.Start.Column;
+        var endCol = worksheet.Dimension.End.Column;
+        var headerRow = worksheet.Dimension.Start.Row;
+
+        for (var col = startCol; col <= endCol; col++)
+        {
+            var raw = GetCellText(worksheet, headerRow, col);
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                continue;
+            }
+
+            var normalized = NormalizeKey(raw);
+            if (normalized == "sku")
+            {
+                result["sku"] = col;
+            }
+            else if (normalized is "nome" or "produto" or "nomeproduto")
+            {
+                result["nome"] = col;
+            }
+            else if (normalized is "categoria" or "categoriacodigo")
+            {
+                result["categoria"] = col;
+            }
+            else if (normalized is "precovenda" or "precodevenda" or "venda" or "preco")
+            {
+                result["preco_venda"] = col;
+            }
+            else if (normalized is "precocusto" or "custo" or "precodecusto")
+            {
+                result["preco_custo"] = col;
+            }
+            else if (normalized is "estoque" or "estoqueinicial" or "saldoinicial")
+            {
+                result["estoque_inicial"] = col;
+            }
+            else if (normalized is "unidade" or "und")
+            {
+                result["unidade"] = col;
+            }
+            else if (normalized is "codigobarras" or "codbarras" or "barcode")
+            {
+                result["codigo_barras"] = col;
+            }
+        }
+
+        return result;
+    }
+
+    private static bool TryResolveCategoryId(
+        string raw,
+        IReadOnlyDictionary<int, int> categoryById,
+        IReadOnlyDictionary<string, int> categoryByNameOrCode,
+        out int categoryId)
+    {
+        categoryId = 0;
+
+        if (int.TryParse(raw, out var idFromCell) && categoryById.TryGetValue(idFromCell, out var foundId))
+        {
+            categoryId = foundId;
+            return true;
+        }
+
+        var key = NormalizeKey(raw);
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return false;
+        }
+
+        return categoryByNameOrCode.TryGetValue(key, out categoryId);
+    }
+
+    private static bool TryParseDecimal(string? raw, out decimal value)
+    {
+        value = 0;
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return false;
+        }
+
+        var text = raw.Trim();
+
+        if (decimal.TryParse(text, NumberStyles.Number, CultureInfo.CurrentCulture, out value))
+        {
+            return true;
+        }
+
+        if (decimal.TryParse(text, NumberStyles.Number, new CultureInfo("pt-BR"), out value))
+        {
+            return true;
+        }
+
+        if (decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out value))
+        {
+            return true;
+        }
+
+        text = text.Replace("R$", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Replace(" ", string.Empty, StringComparison.Ordinal);
+
+        if (text.Contains(',') && text.Contains('.'))
+        {
+            text = text.Replace(".", string.Empty, StringComparison.Ordinal)
+                .Replace(',', '.');
+        }
+        else if (text.Contains(','))
+        {
+            text = text.Replace(',', '.');
+        }
+
+        return decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out value);
+    }
+
+    private static string NormalizeKey(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var normalized = value.Trim().Normalize(NormalizationForm.FormD);
+        var sb = new StringBuilder(normalized.Length);
+
+        foreach (var c in normalized)
+        {
+            var category = CharUnicodeInfo.GetUnicodeCategory(c);
+            if (category == UnicodeCategory.NonSpacingMark)
+            {
+                continue;
+            }
+
+            if (char.IsLetterOrDigit(c))
+            {
+                sb.Append(char.ToLowerInvariant(c));
+            }
+        }
+
+        return sb.ToString();
+    }
+
+    private static string? GetCellText(ExcelWorksheet worksheet, int row, int col)
+    {
+        return worksheet.Cells[row, col].Text?.Trim();
+    }
+
+    private static string GenerateUniqueSku(IReadOnlySet<string> existingSkus)
+    {
+        for (var attempt = 0; attempt < 50; attempt++)
+        {
+            var stamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+            var suffix = Guid.NewGuid().ToString("N")[..4].ToUpperInvariant();
+            var sku = $"PRD-{stamp}-{suffix}";
+
+            if (!existingSkus.Contains(sku))
+            {
+                return sku;
+            }
+        }
+
+        throw new InvalidOperationException("Nao foi possivel gerar um SKU unico para importacao.");
+    }
+
+    private static void AddIssue(
+        ProductImportResultDto result,
+        int row,
+        string reason,
+        string? sku,
+        string? name,
+        bool isSkipped)
+    {
+        result.Issues.Add(new ProductImportIssueDto
+        {
+            RowNumber = row,
+            Reason = reason,
+            Sku = sku,
+            Name = name,
+            IsSkipped = isSkipped
+        });
+
+        if (isSkipped)
+        {
+            result.SkippedCount++;
+            return;
+        }
+
+        result.FailedCount++;
     }
 
     private byte[] GenerateCsv(List<ProductDto> products)

@@ -11,6 +11,7 @@ using Moq;
 using Xunit;
 using erp.Controllers;
 using erp.DTOs.Inventory;
+using erp.Security;
 using erp.Services.Inventory;
 
 namespace erp.Tests.Controllers;
@@ -23,16 +24,19 @@ public class ProductsControllerTests
 {
     private readonly Mock<IInventoryService> _mockInventoryService;
     private readonly Mock<ILogger<ProductsController>> _mockLogger;
+    private readonly Mock<IFileValidationService> _mockFileValidationService;
     private readonly ProductsController _controller;
 
     public ProductsControllerTests()
     {
         _mockInventoryService = new Mock<IInventoryService>();
         _mockLogger = new Mock<ILogger<ProductsController>>();
+        _mockFileValidationService = new Mock<IFileValidationService>();
         
         _controller = new ProductsController(
             _mockInventoryService.Object,
-            _mockLogger.Object
+            _mockLogger.Object,
+            _mockFileValidationService.Object
         );
 
         // Setup user context
@@ -50,6 +54,86 @@ public class ProductsControllerTests
     }
 
     #region CRUD Tests
+
+    [Fact]
+    public async Task ImportProducts_WithoutFile_ReturnsBadRequest()
+    {
+        // Arrange
+        var formData = new ImportProductsFormDto();
+
+        // Act
+        var result = await _controller.ImportProducts(formData, CancellationToken.None);
+
+        // Assert
+        result.Result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task ImportProducts_WithSkuAlreadyExists_ReturnsOkWithSkippedCount()
+    {
+        // Arrange
+        var content = new byte[] { 1, 2, 3, 4 };
+        await using var stream = new MemoryStream(content);
+        var file = new FormFile(stream, 0, content.Length, "file", "produtos.xlsx");
+
+        var formData = new ImportProductsFormDto { File = file };
+        var importResult = new ProductImportResultDto
+        {
+            TotalRows = 1,
+            ImportedCount = 0,
+            SkippedCount = 1,
+            FailedCount = 0,
+            Issues =
+            {
+                new ProductImportIssueDto
+                {
+                    RowNumber = 2,
+                    Reason = "SKU 'ABC-001' ja existe no cadastro",
+                    Sku = "ABC-001",
+                    IsSkipped = true
+                }
+            }
+        };
+
+        _mockFileValidationService
+            .Setup(x => x.ValidateFileAsync(It.IsAny<IFormFile>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FileValidationResult(true));
+
+        _mockInventoryService
+            .Setup(x => x.ImportProductsFromExcelAsync(It.IsAny<Stream>(), 1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(importResult);
+
+        // Act
+        var result = await _controller.ImportProducts(formData, CancellationToken.None);
+
+        // Assert
+        var ok = result.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var payload = ok.Value as ProductImportResultDto;
+        payload.Should().NotBeNull();
+        payload!.SkippedCount.Should().Be(1);
+        payload.ImportedCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task DownloadImportTemplate_ReturnsExcelFile()
+    {
+        // Arrange
+        var templateBytes = new byte[] { 0x50, 0x4B, 0x03, 0x04 };
+
+        _mockInventoryService
+            .Setup(x => x.GenerateImportTemplateAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(templateBytes);
+
+        // Act
+        var result = await _controller.DownloadImportTemplate(CancellationToken.None);
+
+        // Assert
+        var fileResult = result.Should().BeOfType<FileContentResult>().Subject;
+        fileResult.ContentType.Should().Be("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        fileResult.FileContents.Should().BeEquivalentTo(templateBytes);
+        fileResult.FileDownloadName.Should().StartWith("template_importacao_produtos_");
+        fileResult.FileDownloadName.Should().EndWith(".xlsx");
+    }
 
     [Fact]
     public async Task CreateProduct_WithValidData_ReturnsCreatedResult()

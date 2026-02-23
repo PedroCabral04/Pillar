@@ -1,0 +1,221 @@
+@using erp.DTOs.Inventory
+@using erp.Services
+@using MudBlazor
+@using System.Net.Http.Headers
+@using System.Net.Http.Json
+@using System.Text.Json
+@using Size = MudBlazor.Size
+@using Color = MudBlazor.Color
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+@inject ILogger<ImportProductsDialog> Logger
+
+<MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.UploadFile" Color="Color.Primary" Size="Size.Large" />
+            <MudText Typo="Typo.h6">Importar produtos por Excel</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="2" Class="pa-2">
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
+                Colunas obrigatorias: Nome, Categoria, Preco de Venda. SKU e opcional.
+            </MudAlert>
+
+            <MudFileUpload T="IBrowserFile"
+                           @bind-Files="_selectedFile"
+                           Accept=".xlsx"
+                           MaximumFileCount="1"
+                           OnFilesChanged="OnFileSelected">
+                <ActivatorContent>
+                    <MudPaper Outlined="true" Class="pa-4" Style="cursor: pointer; border: 2px dashed #cfd8dc;">
+                        <MudStack AlignItems="AlignItems.Center" Spacing="1">
+                            <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Color="Color.Primary" Size="Size.Large" />
+                            @if (_selectedFile != null)
+                            {
+                                <MudText Typo="Typo.body1">@_selectedFile.Name (@FormatFileSize(_selectedFile.Size))</MudText>
+                            }
+                            else
+                            {
+                                <MudText Typo="Typo.body1">Clique para selecionar uma planilha .xlsx</MudText>
+                            }
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Tamanho maximo: 10 MB</MudText>
+                        </MudStack>
+                    </MudPaper>
+                </ActivatorContent>
+            </MudFileUpload>
+
+            @if (_result != null)
+            {
+                <MudDivider />
+                <MudGrid>
+                    <MudItem xs="6" md="3"><MudText Typo="Typo.subtitle2">Total</MudText><MudText Typo="Typo.h6">@_result.TotalRows</MudText></MudItem>
+                    <MudItem xs="6" md="3"><MudText Typo="Typo.subtitle2">Importados</MudText><MudText Typo="Typo.h6" Color="Color.Success">@_result.ImportedCount</MudText></MudItem>
+                    <MudItem xs="6" md="3"><MudText Typo="Typo.subtitle2">Pulados</MudText><MudText Typo="Typo.h6" Color="Color.Warning">@_result.SkippedCount</MudText></MudItem>
+                    <MudItem xs="6" md="3"><MudText Typo="Typo.subtitle2">Falhas</MudText><MudText Typo="Typo.h6" Color="Color.Error">@_result.FailedCount</MudText></MudItem>
+                </MudGrid>
+
+                @if (_result.Issues.Any())
+                {
+                    <MudPaper Outlined="true" Class="pa-2" Style="max-height: 280px; overflow-y: auto;">
+                        <MudTable T="ProductImportIssueDto" Items="@_result.Issues" Dense="true" Hover="true" Breakpoint="Breakpoint.Sm">
+                            <HeaderContent>
+                                <MudTh>Linha</MudTh>
+                                <MudTh>SKU</MudTh>
+                                <MudTh>Produto</MudTh>
+                                <MudTh>Motivo</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Linha">@context.RowNumber</MudTd>
+                                <MudTd DataLabel="SKU">@context.Sku</MudTd>
+                                <MudTd DataLabel="Produto">@context.Name</MudTd>
+                                <MudTd DataLabel="Motivo">
+                                    <MudChip T="string" Size="Size.Small" Color="@(context.IsSkipped ? Color.Warning : Color.Error)" Variant="Variant.Text">
+                                        @context.Reason
+                                    </MudChip>
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    </MudPaper>
+                }
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Outlined" OnClick="Cancel" Disabled="@_processing">Fechar</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Import" Disabled="@(_processing || _selectedFile == null)">
+            @if (_processing)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <text>Importando...</text>
+            }
+            else
+            {
+                <MudIcon Icon="@Icons.Material.Filled.Upload" Class="mr-1" />
+                <text>Importar</text>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private const long MaxFileSizeBytes = 10L * 1024 * 1024;
+    private IBrowserFile? _selectedFile;
+    private bool _processing;
+    private ProductImportResultDto? _result;
+
+    private void OnFileSelected(InputFileChangeEventArgs args)
+    {
+        _selectedFile = args.File;
+        _result = null;
+    }
+
+    private async Task Import()
+    {
+        if (_selectedFile == null)
+        {
+            return;
+        }
+
+        if (_selectedFile.Size > MaxFileSizeBytes)
+        {
+            Snackbar.Add("Arquivo muito grande. Limite: 10 MB.", Severity.Error);
+            return;
+        }
+
+        _processing = true;
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            await using var fileStream = _selectedFile.OpenReadStream(MaxFileSizeBytes);
+            using var fileContent = new StreamContent(fileStream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(string.IsNullOrWhiteSpace(_selectedFile.ContentType)
+                ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                : _selectedFile.ContentType);
+            content.Add(fileContent, "file", _selectedFile.Name);
+
+            var response = await ApiService.PostMultipartAsync("/api/produtos/import", content);
+            if (response.IsSuccessStatusCode)
+            {
+                _result = await response.Content.ReadFromJsonAsync<ProductImportResultDto>();
+                if (_result == null)
+                {
+                    Snackbar.Add("A importacao concluiu, mas nao foi possivel ler o resultado.", Severity.Warning);
+                    return;
+                }
+
+                var severity = _result.FailedCount == 0 ? Severity.Success : Severity.Warning;
+                Snackbar.Add(
+                    $"Importacao concluida: {_result.ImportedCount} importado(s), {_result.SkippedCount} pulado(s), {_result.FailedCount} falha(s).",
+                    severity);
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Snackbar.Add(ExtractErrorMessage(errorContent), Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao importar produtos por planilha");
+            Snackbar.Add($"Erro ao importar: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _processing = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        if (_result == null)
+        {
+            MudDialog.Cancel();
+            return;
+        }
+
+        MudDialog.Close(DialogResult.Ok(_result));
+    }
+
+    private static string ExtractErrorMessage(string payload)
+    {
+        if (string.IsNullOrWhiteSpace(payload))
+        {
+            return "Nao foi possivel importar a planilha.";
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(payload);
+            var root = doc.RootElement;
+            if (root.TryGetProperty("message", out var message) && message.ValueKind == JsonValueKind.String)
+            {
+                return message.GetString() ?? "Falha na importacao.";
+            }
+        }
+        catch
+        {
+        }
+
+        return payload;
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        var units = new[] { "B", "KB", "MB", "GB" };
+        double size = bytes;
+        var unitIndex = 0;
+
+        while (size >= 1024 && unitIndex < units.Length - 1)
+        {
+            size /= 1024;
+            unitIndex++;
+        }
+
+        return $"{size:0.##} {units[unitIndex]}";
+    }
+}

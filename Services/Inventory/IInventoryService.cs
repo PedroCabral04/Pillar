@@ -9,7 +9,9 @@ public interface IInventoryService
     Task<ProductDto?> GetProductByIdAsync(int id);
     Task<ProductDto?> GetProductBySkuAsync(string sku);
     Task<(IEnumerable<ProductDto> Products, int TotalCount)> SearchProductsAsync(ProductSearchDto search);
+    Task<byte[]> GenerateImportTemplateAsync(CancellationToken cancellationToken = default);
     Task<ProductDto> CreateProductAsync(CreateProductDto dto, int userId);
+    Task<ProductImportResultDto> ImportProductsFromExcelAsync(Stream fileStream, int userId, CancellationToken cancellationToken = default);
     Task<ProductDto> UpdateProductAsync(UpdateProductDto dto);
     Task<bool> DeleteProductAsync(int id);
     Task<bool> BulkUpdatePricesAsync(BulkUpdatePriceDto dto);

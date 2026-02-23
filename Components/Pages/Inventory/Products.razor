@@ -34,6 +34,14 @@
                     }
                     Exportar
                 </MudButton>
+                <MudButton StartIcon="@Icons.Material.Filled.UploadFile"
+                           OnClick="OpenImportProductsDialog">
+                    Importar Excel
+                </MudButton>
+                <MudButton StartIcon="@Icons.Material.Filled.Description"
+                           OnClick="DownloadImportTemplate">
+                    Baixar Template
+                </MudButton>
             </MudButtonGroup>
             <MudButton Color="Color.Secondary"
                        Variant="Variant.Outlined"
@@ -537,6 +545,20 @@
         }
     }
 
+    private async Task DownloadImportTemplate()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("open", "/api/produtos/import/template", "_blank");
+            Snackbar.Add("Download do template iniciado.", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao baixar template de importacao");
+            Snackbar.Add("Erro ao baixar template de importacao", Severity.Error);
+        }
+    }
+
     private async Task OpenCreateProductDialog(bool quickMode)
     {
         var options = new DialogOptions 
@@ -554,6 +576,28 @@
         var dialog = await DialogService.ShowAsync<CreateProductDialog>(quickMode ? "Produto Rápido" : "Adicionar Produto", parameters, options);
         var result = await dialog.Result;
         
+        if (result != null && !result.Canceled)
+        {
+            await LoadStatistics();
+            if (_table != null)
+            {
+                await _table.ReloadServerData();
+            }
+        }
+    }
+
+    private async Task OpenImportProductsDialog()
+    {
+        var options = new DialogOptions
+        {
+            CloseOnEscapeKey = true,
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true
+        };
+
+        var dialog = await DialogService.ShowAsync<ImportProductsDialog>("Importar produtos", options);
+        var result = await dialog.Result;
+
         if (result != null && !result.Canceled)
         {
             await LoadStatistics();

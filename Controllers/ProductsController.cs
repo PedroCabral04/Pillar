@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using erp.Services.Inventory;
 using erp.DTOs.Inventory;
 using erp.Models.Audit;
+using erp.Security;
 
 namespace erp.Controllers;
 
@@ -15,14 +16,17 @@ namespace erp.Controllers;
 public class ProductsController : ControllerBase
 {
     private readonly IInventoryService _inventoryService;
+    private readonly IFileValidationService _fileValidationService;
     private readonly ILogger<ProductsController> _logger;
 
     public ProductsController(
         IInventoryService inventoryService,
-        ILogger<ProductsController> logger)
+        ILogger<ProductsController> logger,
+        IFileValidationService fileValidationService)
     {
         _inventoryService = inventoryService;
         _logger = logger;
+        _fileValidationService = fileValidationService;
     }
 
     /// <summary>
@@ -316,6 +320,80 @@ public class ProductsController : ControllerBase
         {
             _logger.LogError(ex, "Erro ao criar produto");
             return StatusCode(500, new { message = "Erro ao criar produto", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Baixa um arquivo modelo para importacao de produtos
+    /// </summary>
+    [HttpGet("import/template")]
+    public async Task<IActionResult> DownloadImportTemplate(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var content = await _inventoryService.GenerateImportTemplateAsync(cancellationToken);
+            var fileName = $"template_importacao_produtos_{DateTime.Now:yyyyMMdd}.xlsx";
+
+            return File(
+                content,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                fileName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao gerar template de importacao de produtos");
+            return StatusCode(500, new { message = "Erro ao gerar template de importacao", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Importa produtos a partir de uma planilha Excel (.xlsx)
+    /// </summary>
+    [HttpPost("import")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(10 * 1024 * 1024)]
+    public async Task<ActionResult<ProductImportResultDto>> ImportProducts(
+        [FromForm] ImportProductsFormDto formData,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (formData.File == null || formData.File.Length == 0)
+            {
+                return BadRequest(new { message = "Nenhum arquivo foi enviado." });
+            }
+
+            var extension = Path.GetExtension(formData.File.FileName);
+            if (!extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest(new { message = "Formato invalido. Envie um arquivo .xlsx." });
+            }
+
+            var validationResult = await _fileValidationService.ValidateFileAsync(formData.File, cancellationToken);
+            if (!validationResult.IsValid)
+            {
+                return BadRequest(new { message = validationResult.ErrorMessage ?? "Arquivo invalido." });
+            }
+
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+            {
+                return Unauthorized(new { message = "Usuario nao autenticado" });
+            }
+
+            await using var stream = formData.File.OpenReadStream();
+            var result = await _inventoryService.ImportProductsFromExcelAsync(stream, userId, cancellationToken);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Erro de validacao ao importar produtos");
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao importar produtos");
+            return StatusCode(500, new { message = "Erro ao importar produtos", error = ex.Message });
         }
     }
 
