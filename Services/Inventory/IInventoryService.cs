@@ -16,6 +16,14 @@ public interface IInventoryService
     Task<bool> DeleteProductAsync(int id);
     Task<bool> BulkUpdatePricesAsync(BulkUpdatePriceDto dto);
     
+    // Product Variant operations
+    Task<List<ProductVariantDto>> GetProductVariantsAsync(int productId);
+    Task<ProductVariantOptionDto> CreateVariantOptionAsync(int productId, CreateProductVariantOptionDto dto);
+    Task<bool> DeleteVariantOptionAsync(int optionId);
+    Task<ProductVariantDto> CreateVariantAsync(int productId, CreateProductVariantDto dto);
+    Task<ProductVariantDto> UpdateVariantAsync(int variantId, UpdateProductVariantDto dto);
+    Task<bool> DeleteVariantAsync(int variantId);
+    
     // Statistics
     Task<ProductStatisticsDto> GetProductStatisticsAsync();
     

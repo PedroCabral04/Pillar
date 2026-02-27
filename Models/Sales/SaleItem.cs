@@ -18,6 +18,8 @@ public class SaleItem : IAuditable, IMustHaveTenant
     
     public int ProductId { get; set; }
     
+    public int? ProductVariantId { get; set; }
+    
     [Precision(18, 3)]
     public decimal Quantity { get; set; }
     
@@ -40,4 +42,6 @@ public class SaleItem : IAuditable, IMustHaveTenant
     public Sale Sale { get; set; } = null!;
     
     public Product Product { get; set; } = null!;
+    
+    public ProductVariant? ProductVariant { get; set; }
 }

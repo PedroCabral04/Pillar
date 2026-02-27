@@ -24,6 +24,8 @@ public partial class ProductMapper
     [MapperIgnoreTarget(nameof(Product.Images))]
     [MapperIgnoreTarget(nameof(Product.StockMovements))]
     [MapperIgnoreTarget(nameof(Product.CreatedByUser))]
+    [MapperIgnoreTarget(nameof(Product.VariantOptions))]
+    [MapperIgnoreTarget(nameof(Product.Variants))]
     public partial Product CreateProductDtoToProduct(CreateProductDto dto);
     
     // UpdateProductDto -> Product (atualiza entidade existente)
@@ -36,6 +38,8 @@ public partial class ProductMapper
     [MapperIgnoreTarget(nameof(Product.Images))]
     [MapperIgnoreTarget(nameof(Product.StockMovements))]
     [MapperIgnoreTarget(nameof(Product.CreatedByUser))]
+    [MapperIgnoreTarget(nameof(Product.VariantOptions))]
+    [MapperIgnoreTarget(nameof(Product.Variants))]
     public partial void UpdateProductDtoToProduct(UpdateProductDto dto, Product product);
     
     // ProductCategory mappings
@@ -50,6 +54,11 @@ public partial class ProductMapper
     public partial ProductSupplierDto SupplierToSupplierDto(ProductSupplier supplier);
     public partial IEnumerable<ProductSupplierDto> SuppliersToSupplierDtos(IEnumerable<ProductSupplier> suppliers);
     
+    // ProductVariant mappings
+    public partial ProductVariantOptionDto OptionToOptionDto(ProductVariantOption option);
+    public partial ProductVariantOptionValueDto OptionValueToOptionValueDto(ProductVariantOptionValue value);
+    public partial ProductVariantDto VariantToVariantDto(ProductVariant variant);
+    
     // Mapeamento customizado para calcular ProfitMargin
     public ProductDto MapWithCalculations(Product product)
     {
@@ -61,6 +70,47 @@ public partial class ProductMapper
         dto.CategoryName = product.Category?.Name ?? "";
         dto.BrandName = product.Brand?.Name;
         dto.CreatedByUserName = product.CreatedByUser?.UserName ?? "";
+        
+        // Map variants with profit margin calculations
+        if (product.HasVariants && product.Variants?.Any() == true)
+        {
+            dto.Variants = product.Variants.Select(v =>
+            {
+                var variantDto = VariantToVariantDto(v);
+                variantDto.ProfitMargin = v.SalePrice > 0
+                    ? (v.SalePrice - v.CostPrice) / v.SalePrice * 100
+                    : 0;
+                
+                // Map option values from combinations
+                if (v.Combinations?.Any() == true)
+                {
+                    variantDto.OptionValues = v.Combinations
+                        .Where(c => c.OptionValue != null)
+                        .Select(c => OptionValueToOptionValueDto(c.OptionValue))
+                        .ToList();
+                }
+                
+                return variantDto;
+            }).ToList();
+        }
+        
+        // Map variant options
+        if (product.VariantOptions?.Any() == true)
+        {
+            dto.VariantOptions = product.VariantOptions
+                .OrderBy(o => o.Position)
+                .Select(o =>
+                {
+                    var optionDto = OptionToOptionDto(o);
+                    optionDto.Values = o.Values
+                        .OrderBy(v => v.Position)
+                        .Select(OptionValueToOptionValueDto)
+                        .ToList();
+                    return optionDto;
+                }).ToList();
+        }
+        
         return dto;
     }
 }
+

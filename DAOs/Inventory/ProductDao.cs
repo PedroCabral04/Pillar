@@ -27,6 +27,11 @@ public class ProductDao : IProductDao
             .Include(p => p.Images)
             .Include(p => p.Suppliers)
             .Include(p => p.CreatedByUser)
+            .Include(p => p.VariantOptions)
+                .ThenInclude(o => o.Values)
+            .Include(p => p.Variants)
+                .ThenInclude(v => v.Combinations)
+                    .ThenInclude(c => c.OptionValue)
             .FirstOrDefaultAsync(p => p.Id == id);
     }
 

@@ -459,6 +459,276 @@ public class InventoryService : IInventoryService
         return true;
     }
 
+    // ===== Product Variant Operations =====
+
+    public async Task<List<ProductVariantDto>> GetProductVariantsAsync(int productId)
+    {
+        var variants = await _context.ProductVariants
+            .Where(v => v.ProductId == productId)
+            .Include(v => v.Combinations)
+                .ThenInclude(c => c.OptionValue)
+                    .ThenInclude(ov => ov.Option)
+            .OrderBy(v => v.Name)
+            .ToListAsync();
+
+        return variants.Select(v =>
+        {
+            var dto = _productMapper.VariantToVariantDto(v);
+            dto.ProfitMargin = v.SalePrice > 0
+                ? (v.SalePrice - v.CostPrice) / v.SalePrice * 100
+                : 0;
+            dto.OptionValues = v.Combinations
+                .Where(c => c.OptionValue != null)
+                .Select(c => _productMapper.OptionValueToOptionValueDto(c.OptionValue))
+                .ToList();
+            return dto;
+        }).ToList();
+    }
+
+    public async Task<ProductVariantOptionDto> CreateVariantOptionAsync(int productId, CreateProductVariantOptionDto dto)
+    {
+        var product = await _context.Products.FindAsync(productId);
+        if (product == null)
+            throw new InvalidOperationException($"Produto com ID {productId} não encontrado");
+
+        // Verificar se já existe uma opção com o mesmo nome
+        var exists = await _context.ProductVariantOptions
+            .AnyAsync(o => o.ProductId == productId && o.Name.ToLower() == dto.Name.ToLower());
+        if (exists)
+            throw new InvalidOperationException($"Já existe uma opção '{dto.Name}' para este produto");
+
+        var option = new ProductVariantOption
+        {
+            ProductId = productId,
+            Name = dto.Name,
+            Position = dto.Position,
+            Values = dto.Values.Select((v, i) => new ProductVariantOptionValue
+            {
+                Value = v.Value,
+                Position = v.Position > 0 ? v.Position : i
+            }).ToList()
+        };
+
+        // Marcar produto como tendo variantes
+        product.HasVariants = true;
+
+        _context.ProductVariantOptions.Add(option);
+        await _context.SaveChangesAsync();
+
+        var created = await _context.ProductVariantOptions
+            .Include(o => o.Values)
+            .FirstAsync(o => o.Id == option.Id);
+
+        var optionDto = _productMapper.OptionToOptionDto(created);
+        optionDto.Values = created.Values
+            .OrderBy(v => v.Position)
+            .Select(v => _productMapper.OptionValueToOptionValueDto(v))
+            .ToList();
+        return optionDto;
+    }
+
+    public async Task<bool> DeleteVariantOptionAsync(int optionId)
+    {
+        var option = await _context.ProductVariantOptions
+            .Include(o => o.Values)
+            .FirstOrDefaultAsync(o => o.Id == optionId);
+
+        if (option == null) return false;
+
+        // Verificar se há variantes usando valores desta opção
+        var valueIds = option.Values.Select(v => v.Id).ToList();
+        var hasVariants = await _context.ProductVariantCombinations
+            .AnyAsync(c => valueIds.Contains(c.OptionValueId));
+        if (hasVariants)
+            throw new InvalidOperationException("Não é possível excluir esta opção pois existem variações que a utilizam. Exclua as variações primeiro.");
+
+        _context.ProductVariantOptions.Remove(option);
+        await _context.SaveChangesAsync();
+
+        // Verificar se ainda existem opções; se não, desmarcar HasVariants
+        var remainingOptions = await _context.ProductVariantOptions
+            .AnyAsync(o => o.ProductId == option.ProductId);
+        if (!remainingOptions)
+        {
+            var product = await _context.Products.FindAsync(option.ProductId);
+            if (product != null)
+            {
+                product.HasVariants = false;
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        return true;
+    }
+
+    public async Task<ProductVariantDto> CreateVariantAsync(int productId, CreateProductVariantDto dto)
+    {
+        var product = await _context.Products.FindAsync(productId);
+        if (product == null)
+            throw new InvalidOperationException($"Produto com ID {productId} não encontrado");
+
+        var sku = dto.Sku;
+        
+        // Gerar SKU sequencial se não for fornecido
+        if (string.IsNullOrWhiteSpace(sku))
+        {
+            var variantCount = await _context.ProductVariants.CountAsync(v => v.ProductId == productId);
+            sku = $"{product.Sku}-V{variantCount + 1}";
+            
+            // Garantir que seja único num loop curto caso exista deleção anterior que cause colisão
+            int attempt = 1;
+            while (await _context.Products.AnyAsync(p => p.Sku == sku) ||
+                   await _context.ProductVariants.AnyAsync(v => v.Sku == sku))
+            {
+                sku = $"{product.Sku}-V{variantCount + 1 + attempt}";
+                attempt++;
+            }
+        }
+        else
+        {
+            // Validar SKU único globalmente (entre produtos e variantes) se fornecido
+            if (await _context.Products.AnyAsync(p => p.Sku == sku) ||
+                await _context.ProductVariants.AnyAsync(v => v.Sku == sku))
+                throw new InvalidOperationException($"Já existe um produto ou variação com o SKU '{sku}'");
+        }
+
+        // Validar barcode único
+        if (!string.IsNullOrWhiteSpace(dto.Barcode) &&
+            (await _context.Products.AnyAsync(p => p.Barcode == dto.Barcode) ||
+             await _context.ProductVariants.AnyAsync(v => v.Barcode == dto.Barcode)))
+            throw new InvalidOperationException($"Já existe um produto ou variação com o código de barras '{dto.Barcode}'");
+
+        // Validar que os option values existem e pertencem a este produto
+        var optionValues = await _context.ProductVariantOptionValues
+            .Include(v => v.Option)
+            .Where(v => dto.OptionValueIds.Contains(v.Id) && v.Option.ProductId == productId)
+            .ToListAsync();
+
+        if (optionValues.Count != dto.OptionValueIds.Count)
+            throw new InvalidOperationException("Um ou mais valores de opção são inválidos ou não pertencem a este produto");
+
+        // Gerar nome da variação a partir dos valores
+        var variantName = string.Join(" / ", optionValues
+            .OrderBy(v => v.Option.Position)
+            .Select(v => v.Value));
+
+        var variant = new ProductVariant
+        {
+            ProductId = productId,
+            Sku = sku,
+            Barcode = dto.Barcode,
+            Name = variantName,
+            CostPrice = dto.CostPrice,
+            SalePrice = dto.SalePrice,
+            WholesalePrice = dto.WholesalePrice,
+            CurrentStock = dto.CurrentStock,
+            MinimumStock = dto.MinimumStock,
+            IsActive = dto.IsActive,
+            ImageUrl = dto.ImageUrl,
+            CreatedAt = DateTime.UtcNow,
+            Combinations = dto.OptionValueIds.Select(valueId => new ProductVariantCombination
+            {
+                OptionValueId = valueId
+            }).ToList()
+        };
+
+        product.HasVariants = true;
+        _context.ProductVariants.Add(variant);
+        await _context.SaveChangesAsync();
+
+        // Reload com relações
+        var created = await _context.ProductVariants
+            .Include(v => v.Combinations)
+                .ThenInclude(c => c.OptionValue)
+            .FirstAsync(v => v.Id == variant.Id);
+
+        var variantDto = _productMapper.VariantToVariantDto(created);
+        variantDto.ProfitMargin = created.SalePrice > 0
+            ? (created.SalePrice - created.CostPrice) / created.SalePrice * 100
+            : 0;
+        variantDto.OptionValues = created.Combinations
+            .Where(c => c.OptionValue != null)
+            .Select(c => _productMapper.OptionValueToOptionValueDto(c.OptionValue))
+            .ToList();
+
+        return variantDto;
+    }
+
+    public async Task<ProductVariantDto> UpdateVariantAsync(int variantId, UpdateProductVariantDto dto)
+    {
+        var variant = await _context.ProductVariants
+            .Include(v => v.Combinations)
+                .ThenInclude(c => c.OptionValue)
+            .FirstOrDefaultAsync(v => v.Id == variantId);
+
+        if (variant == null)
+            throw new InvalidOperationException("Variação não encontrada");
+
+        // Validar SKU único
+        if (await _context.Products.AnyAsync(p => p.Sku == dto.Sku) ||
+            await _context.ProductVariants.AnyAsync(v => v.Sku == dto.Sku && v.Id != variantId))
+            throw new InvalidOperationException($"Já existe um produto ou variação com o SKU '{dto.Sku}'");
+
+        // Validar barcode único
+        if (!string.IsNullOrWhiteSpace(dto.Barcode) &&
+            (await _context.Products.AnyAsync(p => p.Barcode == dto.Barcode) ||
+             await _context.ProductVariants.AnyAsync(v => v.Barcode == dto.Barcode && v.Id != variantId)))
+            throw new InvalidOperationException($"Já existe um produto ou variação com o código de barras '{dto.Barcode}'");
+
+        variant.Sku = dto.Sku;
+        variant.Barcode = dto.Barcode;
+        variant.CostPrice = dto.CostPrice;
+        variant.SalePrice = dto.SalePrice;
+        variant.WholesalePrice = dto.WholesalePrice;
+        variant.MinimumStock = dto.MinimumStock;
+        variant.IsActive = dto.IsActive;
+        variant.ImageUrl = dto.ImageUrl;
+        variant.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        var variantDto = _productMapper.VariantToVariantDto(variant);
+        variantDto.ProfitMargin = variant.SalePrice > 0
+            ? (variant.SalePrice - variant.CostPrice) / variant.SalePrice * 100
+            : 0;
+        variantDto.OptionValues = variant.Combinations
+            .Where(c => c.OptionValue != null)
+            .Select(c => _productMapper.OptionValueToOptionValueDto(c.OptionValue))
+            .ToList();
+
+        return variantDto;
+    }
+
+    public async Task<bool> DeleteVariantAsync(int variantId)
+    {
+        var variant = await _context.ProductVariants.FindAsync(variantId);
+        if (variant == null) return false;
+
+        var productId = variant.ProductId;
+        _context.ProductVariants.Remove(variant);
+        await _context.SaveChangesAsync();
+
+        // Verificar se ainda existem variantes; se não, desmarcar HasVariants
+        var remainingVariants = await _context.ProductVariants
+            .AnyAsync(v => v.ProductId == productId);
+        if (!remainingVariants)
+        {
+            var remainingOptions = await _context.ProductVariantOptions
+                .AnyAsync(o => o.ProductId == productId);
+            if (!remainingOptions)
+            {
+                var product = await _context.Products.FindAsync(productId);
+                if (product != null)
+                {
+                    product.HasVariants = false;
+                    await _context.SaveChangesAsync();
+                }
+            }
+        }
+
+        return true;
+    }
+
     public async Task<IEnumerable<ProductCategoryDto>> GetCategoriesAsync()
     {
         var categories = await _context.ProductCategories

@@ -48,6 +48,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<Models.Inventory.Warehouse> Warehouses { get; set; } = null!;
     public DbSet<Models.Inventory.StockCount> StockCounts { get; set; } = null!;
     public DbSet<Models.Inventory.StockCountItem> StockCountItems { get; set; } = null!;
+    public DbSet<Models.Inventory.ProductVariantOption> ProductVariantOptions { get; set; } = null!;
+    public DbSet<Models.Inventory.ProductVariantOptionValue> ProductVariantOptionValues { get; set; } = null!;
+    public DbSet<Models.Inventory.ProductVariant> ProductVariants { get; set; } = null!;
+    public DbSet<Models.Inventory.ProductVariantCombination> ProductVariantCombinations { get; set; } = null!;
 
     // Sales
     public DbSet<Models.Sales.Customer> Customers { get; set; } = null!;
@@ -864,6 +868,49 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
 
         // Application specific configurations follow below.
         
+        // Product Variants model configuration
+        modelBuilder.Entity<Models.Inventory.ProductVariantCombination>(e =>
+        {
+            e.HasKey(x => new { x.VariantId, x.OptionValueId });
+            e.HasOne(x => x.Variant)
+                .WithMany(x => x.Combinations)
+                .HasForeignKey(x => x.VariantId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.OptionValue)
+                .WithMany(x => x.VariantCombinations)
+                .HasForeignKey(x => x.OptionValueId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Models.Inventory.ProductVariantOption>(e =>
+        {
+            e.HasOne(x => x.Product)
+                .WithMany(x => x.VariantOptions)
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.Property(x => x.Name).HasMaxLength(100).IsRequired();
+        });
+
+        modelBuilder.Entity<Models.Inventory.ProductVariantOptionValue>(e =>
+        {
+            e.HasOne(x => x.Option)
+                .WithMany(x => x.Values)
+                .HasForeignKey(x => x.OptionId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.Property(x => x.Value).HasMaxLength(100).IsRequired();
+        });
+
+        modelBuilder.Entity<Models.Inventory.ProductVariant>(e =>
+        {
+            e.HasOne(x => x.Product)
+                .WithMany(x => x.Variants)
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.Property(x => x.Sku).HasMaxLength(50).IsRequired();
+            e.Property(x => x.Name).HasMaxLength(300);
+            e.HasIndex(x => x.Sku);
+        });
+
         // Kanban model configuration
         modelBuilder.Entity<Models.Kanban.KanbanBoard>(b =>
         {

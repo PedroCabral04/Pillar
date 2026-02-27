@@ -1,7 +1,8 @@
-@using MudBlazor
 @using erp.DTOs.Inventory
 @using erp.Services
 @using erp.Services.Inventory
+@using Color = MudBlazor.Color
+@using Size = MudBlazor.Size
 @inject ISnackbar Snackbar
 @inject IApiService ApiService
 @inject ILogger<CreateProductDialog> Logger
@@ -424,6 +425,87 @@
                             </MudItem>
                         </MudGrid>
                     </MudTabPanel>
+                    <!-- Aba: Variações -->
+                    <MudTabPanel Text="Variações" Icon="@Icons.Material.Filled.Style">
+                        <MudGrid Spacing="3">
+                            <MudItem xs="12">
+                                <MudAlert Severity="Severity.Info" Variant="Variant.Text" Dense="true" Class="mb-2">
+                                    <MudIcon Icon="@Icons.Material.Filled.Info" Size="MudBlazor.Size.Small" Class="mr-1"/>
+                                    Selecione esta opção se o produto tiver variações (ex: Tamanho, Cor). As variações serão geradas após salvar o produto base, e você poderá configurar preços e estoques individuais.
+                                </MudAlert>
+                            </MudItem>
+
+                            <MudItem xs="12">
+                                <MudSwitch T="bool" 
+                                          @bind-Value="_hasVariants" 
+                                          Color="MudBlazor.Color.Primary"
+                                          Label="Este produto tem variações"/>
+                            </MudItem>
+
+                            @if (_hasVariants)
+                            {
+                                <MudItem xs="12">
+                                    <MudText Typo="Typo.subtitle2" Class="mb-2">Opções de Variação (ex: Cor, Tamanho)</MudText>
+                                    
+                                    @foreach (var (option, index) in _variantOptions.Select((o, i) => (o, i)))
+                                    {
+                                        <MudPaper Elevation="1" Class="pa-3 mb-3" Outlined="true">
+                                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                                <MudTextField T="string" 
+                                                            @bind-Value="option.Name" 
+                                                            Label="Nome da Opção" 
+                                                            Placeholder="ex: Cor" 
+                                                            Variant="Variant.Outlined" 
+                                                            Margin="Margin.Dense" />
+                                                
+                                                <MudTextField T="string" 
+                                                            @bind-Value="option.PendingValue" 
+                                                            Label="Adicionar Valor" 
+                                                            Placeholder="ex: Vermelho" 
+                                                            Variant="Variant.Outlined" 
+                                                            Margin="Margin.Dense"
+                                                            OnKeyDown="@(e => HandleValueKeyDown(e, option))" />
+                                                
+                                                <MudIconButton Icon="@Icons.Material.Filled.Add" 
+                                                             Color="Color.Primary" 
+                                                             Size="Size.Small" 
+                                                             OnClick="@(() => AddOptionValue(option))" />
+                                                
+                                                <MudSpacer />
+                                                <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                                             Color="Color.Error" 
+                                                             Size="Size.Small" 
+                                                             OnClick="@(() => RemoveOption(option))" />
+                                            </MudStack>
+                                            
+                                            @if (option.Values.Any())
+                                            {
+                                                <MudStack Row="true" Wrap="Wrap.Wrap" Class="mt-2" Spacing="1">
+                                                    @foreach (var val in option.Values)
+                                                    {
+                                                        <MudChip T="string" Color="Color.Default" OnClose="@(() => RemoveOptionValue(option, val))">@val</MudChip>
+                                                    }
+                                                </MudStack>
+                                            }
+                                        </MudPaper>
+                                    }
+                                    
+                                    <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Text" Color="Color.Primary" OnClick="AddOption">
+                                        Adicionar Nova Opção
+                                    </MudButton>
+                                </MudItem>
+                                
+                                @if (_variantOptions.Any(o => o.Values.Any()))
+                                {
+                                    <MudItem xs="12">
+                                        <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Dense="true">
+                                            <strong>@CalculateTotalCombinations() variações</strong> serão geradas após salvar.
+                                        </MudAlert>
+                                    </MudItem>
+                                }
+                            }
+                        </MudGrid>
+                    </MudTabPanel>
                 </MudTabs>
                 }
             </MudForm>
@@ -462,6 +544,16 @@
     private CreateProductDto _newProduct = new();
     private List<ProductCategoryDto> _categories = new();
     private decimal? _initialStock;
+    private bool _hasVariants = false;
+    private List<VariantOptionViewModel> _variantOptions = new();
+    
+    // ViewModel para a UI de opções
+    private class VariantOptionViewModel
+    {
+        public string Name { get; set; } = "";
+        public string PendingValue { get; set; } = "";
+        public List<string> Values { get; set; } = new();
+    }
     
     protected override async Task OnInitializedAsync()
     {
@@ -549,12 +641,45 @@
             {
                 _newProduct.CurrentStock = _initialStock.Value;
             }
-            
             var result = await ApiService.PostAsync<ProductDto>("/api/produtos", _newProduct);
             
             if (result != null)
             {
-                Snackbar.Add("Produto criado com sucesso!", Severity.Success);
+                // Se tiver variações, cria as opções
+                if (!QuickMode && _hasVariants && _variantOptions.Any(o => !string.IsNullOrWhiteSpace(o.Name) && o.Values.Any()))
+                {
+                    try
+                    {
+                        var position = 0;
+                        foreach (var option in _variantOptions.Where(o => !string.IsNullOrWhiteSpace(o.Name) && o.Values.Any()))
+                        {
+                            var createOptionDto = new CreateProductVariantOptionDto
+                            {
+                                Name = option.Name,
+                                Position = position++,
+                                Values = option.Values.Select((v, i) => new CreateProductVariantOptionValueDto
+                                {
+                                    Value = v,
+                                    Position = i
+                                }).ToList()
+                            };
+                            
+                            await ApiService.PostAsync<ProductVariantOptionDto>($"/api/produtos/{result.Id}/variantes/opcoes", createOptionDto);
+                        }
+                        
+                        Snackbar.Add("Produto e opções de variação criados com sucesso!", Severity.Success);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError(ex, "Produto criado, mas erro ao criar opções de variação");
+                        Snackbar.Add("Produto criado, mas houve um erro ao criar as opções de variação.", Severity.Warning);
+                    }
+                }
+                else
+                {
+                    Snackbar.Add("Produto criado com sucesso!", Severity.Success);
+                }
+                
                 MudDialog.Close(DialogResult.Ok(result));
             }
             else
@@ -573,6 +698,46 @@
         }
     }
 
+    private void AddOption()
+    {
+        _variantOptions.Add(new VariantOptionViewModel());
+    }
+
+    private void RemoveOption(VariantOptionViewModel option)
+    {
+        _variantOptions.Remove(option);
+    }
+
+    private void AddOptionValue(VariantOptionViewModel option)
+    {
+        if (!string.IsNullOrWhiteSpace(option.PendingValue) && !option.Values.Contains(option.PendingValue.Trim()))
+        {
+            option.Values.Add(option.PendingValue.Trim());
+            option.PendingValue = "";
+        }
+    }
+
+    private void RemoveOptionValue(VariantOptionViewModel option, string value)
+    {
+        option.Values.Remove(value);
+    }
+
+    private void HandleValueKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e, VariantOptionViewModel option)
+    {
+        if (e.Key == "Enter")
+        {
+            AddOptionValue(option);
+        }
+    }
+
+    private int CalculateTotalCombinations()
+    {
+        var validOptions = _variantOptions.Where(o => o.Values.Any()).ToList();
+        if (!validOptions.Any()) return 0;
+        
+        return validOptions.Aggregate(1, (acc, next) => acc * next.Values.Count);
+    }
+
     private class PaginatedCategoryResponse
     {
         public List<ProductCategoryDto> Items { get; set; } = new();
@@ -580,4 +745,5 @@
         public int Page { get; set; }
         public int PageSize { get; set; }
     }
+}
 }

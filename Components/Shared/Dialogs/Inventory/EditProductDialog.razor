@@ -1,7 +1,8 @@
-@using MudBlazor
 @using erp.DTOs.Inventory
 @using erp.Models.Inventory
 @using erp.Services
+@using Color = MudBlazor.Color
+@using Size = MudBlazor.Size
 @inject ISnackbar Snackbar
 @inject IApiService ApiService
 @inject ILogger<EditProductDialog> Logger
@@ -388,6 +389,103 @@
                             </MudItem>
                         </MudGrid>
                     </MudTabPanel>
+                    <!-- Aba: Variações -->
+                    <MudTabPanel Text="Variações" Icon="@Icons.Material.Filled.Style">
+                        <MudGrid Spacing="3">
+                            <MudItem xs="12">
+                                <MudAlert Severity="Severity.Info" Variant="Variant.Text" Dense="true" Class="mb-2">
+                                    <MudIcon Icon="@Icons.Material.Filled.Info" Size="MudBlazor.Size.Small" Class="mr-1"/>
+                                    Selecione o switch abaixo para transformar este produto num produto base com variações (ex: Tamanho, Cor).
+                                    A configuração de preços, códigos e estoque de cada variação é feita na página de detalhes do produto.
+                                </MudAlert>
+                            </MudItem>
+
+                            <MudItem xs="12">
+                                <MudSwitch T="bool" 
+                                          @bind-Value="Product.HasVariants" 
+                                          Color="MudBlazor.Color.Primary"
+                                          Label="Este produto tem variações"
+                                          Disabled="true" /> <!-- Desabilitado para edição, o backend que controla primariamente -->
+                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-2">
+                                    Para adicionar ou remover variações, gerencie as opções abaixo. O produto será marcado com variações automaticamente se tiver opções.
+                                </MudText>
+                            </MudItem>
+
+                            <MudItem xs="12">
+                                <MudText Typo="Typo.subtitle2" Class="mb-2">Opções de Variação (ex: Cor, Tamanho)</MudText>
+                                
+                                @foreach (var option in _variantOptions)
+                                {
+                                    <MudPaper Elevation="1" Class="pa-3 mb-3" Outlined="true">
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                            @if (option.Id > 0)
+                                            {
+                                                <MudText Typo="Typo.body1" Class="fw-bold" Style="width: 200px">@option.Name</MudText>
+                                            }
+                                            else
+                                            {
+                                                <MudTextField T="string" 
+                                                            @bind-Value="option.Name" 
+                                                            Label="Nome da Opção" 
+                                                            Placeholder="ex: Cor" 
+                                                            Variant="Variant.Outlined" 
+                                                            Margin="Margin.Dense" />
+                                            }
+                                            
+                                            <MudTextField T="string" 
+                                                        @bind-Value="option.PendingValue" 
+                                                        Label="Adicionar Valor" 
+                                                        Placeholder="ex: Vermelho" 
+                                                        Variant="Variant.Outlined" 
+                                                        Margin="Margin.Dense"
+                                                        OnKeyDown="@(e => HandleValueKeyDown(e, option))" />
+                                            
+                                            <MudIconButton Icon="@Icons.Material.Filled.Add" 
+                                                         Color="Color.Primary" 
+                                                         Size="Size.Small" 
+                                                         OnClick="@(() => AddOptionValue(option))" />
+                                            
+                                            <MudSpacer />
+                                            <!-- Só permite apagar se for nova (ID=0) -->
+                                            @if (option.Id == 0)
+                                            {
+                                                <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                                             Color="Color.Error" 
+                                                             Size="Size.Small" 
+                                                             OnClick="@(() => RemoveOption(option))" />
+                                            }
+                                            else
+                                            {
+                                                <MudTooltip Text="Opções salvas devem ser apagadas individualmente">
+                                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                                                 Color="Color.Default" 
+                                                                 Size="Size.Small" 
+                                                                 Disabled="true" />
+                                                </MudTooltip>
+                                            }
+                                        </MudStack>
+                                        
+                                        @if (option.Values.Any())
+                                        {
+                                            <MudStack Row="true" Wrap="Wrap.Wrap" Class="mt-2" Spacing="1">
+                                                @foreach (var val in option.Values)
+                                                {
+                                                    <MudChip T="string" Color="Color.Default" OnClose="@(() => RemoveOptionValue(option, val))" Disabled="@(option.Id > 0)">@val</MudChip>
+                                                }
+                                            </MudStack>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1 d-block">
+                                                @(option.Id > 0 ? "Nota: para alterar valores salvas, exclua e crie a opção novamente na listagem." : "")
+                                            </MudText>
+                                        }
+                                    </MudPaper>
+                                }
+                                
+                                <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Text" Color="Color.Primary" OnClick="AddOption">
+                                    Adicionar Nova Opção
+                                </MudButton>
+                            </MudItem>
+                        </MudGrid>
+                    </MudTabPanel>
                 </MudTabs>
             </MudForm>
         }
@@ -424,6 +522,16 @@
     private bool _saving;
     private List<ProductCategoryDto> _categories = new();
     private UpdateProductDto _updateProduct = new();
+    private List<VariantOptionViewModel> _variantOptions = new();
+    
+    // ViewModel para a UI de opções
+    private class VariantOptionViewModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public string PendingValue { get; set; } = "";
+        public List<string> Values { get; set; } = new();
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -435,6 +543,7 @@
         }
 
         MapProductValues();
+        LoadExistingOptions();
         _loading = true;
 
         try
@@ -503,6 +612,23 @@
         _updateProduct.MainImageUrl = product.MainImageUrl;
     }
 
+    private void LoadExistingOptions()
+    {
+        _variantOptions.Clear();
+        if (Product != null && Product.HasVariants && Product.VariantOptions != null)
+        {
+            foreach (var opt in Product.VariantOptions)
+            {
+                _variantOptions.Add(new VariantOptionViewModel
+                {
+                    Id = opt.Id,
+                    Name = opt.Name,
+                    Values = opt.Values.Select(v => v.Value).ToList()
+                });
+            }
+        }
+    }
+
     private decimal GetProfitMargin()
     {
         if (_updateProduct.CostPrice <= 0 || _updateProduct.SalePrice <= 0)
@@ -556,6 +682,36 @@
 
             if (result != null)
             {
+                // Salvar as novas opções de variação
+                var newOptions = _variantOptions.Where(o => o.Id == 0 && !string.IsNullOrWhiteSpace(o.Name) && o.Values.Any()).ToList();
+                if (newOptions.Any())
+                {
+                    try
+                    {
+                        var position = _variantOptions.Count(o => o.Id > 0);
+                        foreach (var option in newOptions)
+                        {
+                            var createOptionDto = new CreateProductVariantOptionDto
+                            {
+                                Name = option.Name,
+                                Position = position++,
+                                Values = option.Values.Select((v, i) => new CreateProductVariantOptionValueDto
+                                {
+                                    Value = v,
+                                    Position = i
+                                }).ToList()
+                            };
+                            
+                            await ApiService.PostAsync<ProductVariantOptionDto>($"/api/produtos/{result.Id}/variantes/opcoes", createOptionDto);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError(ex, "Falha ao salvar novas opções");
+                        Snackbar.Add("Algumas opções de variação podem não ter sido salvas corretamente.", Severity.Warning);
+                    }
+                }
+
                 Snackbar.Add("Produto atualizado com sucesso!", Severity.Success);
                 MudDialog.Close(DialogResult.Ok(result));
             }
@@ -572,6 +728,43 @@
         finally
         {
             _saving = false;
+        }
+    }
+
+    private void AddOption()
+    {
+        _variantOptions.Add(new VariantOptionViewModel());
+    }
+
+    private void RemoveOption(VariantOptionViewModel option)
+    {
+        if (option.Id == 0)
+        {
+            _variantOptions.Remove(option);
+        }
+    }
+
+    private void AddOptionValue(VariantOptionViewModel option)
+    {
+        if (option.Id > 0) return; // Não permite adicionar valores a opções existentes via UI simples
+        if (!string.IsNullOrWhiteSpace(option.PendingValue) && !option.Values.Contains(option.PendingValue.Trim()))
+        {
+            option.Values.Add(option.PendingValue.Trim());
+            option.PendingValue = "";
+        }
+    }
+
+    private void RemoveOptionValue(VariantOptionViewModel option, string value)
+    {
+        if (option.Id > 0) return; // Não permite remover valores de opções existentes via UI simples
+        option.Values.Remove(value);
+    }
+
+    private void HandleValueKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e, VariantOptionViewModel option)
+    {
+        if (e.Key == "Enter")
+        {
+            AddOptionValue(option);
         }
     }
 

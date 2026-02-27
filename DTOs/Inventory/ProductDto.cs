@@ -55,6 +55,10 @@ public class ProductDto
     public List<ProductImageDto> Images { get; set; } = new();
     public List<ProductSupplierDto> Suppliers { get; set; } = new();
     
+    public bool HasVariants { get; set; }
+    public List<ProductVariantOptionDto> VariantOptions { get; set; } = new();
+    public List<ProductVariantDto> Variants { get; set; } = new();
+    
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public int CreatedByUserId { get; set; }

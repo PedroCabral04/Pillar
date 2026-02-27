@@ -164,6 +164,90 @@
                     </MudGrid>
                 </MudPaper>
 
+                <!-- Seção de Variações -->
+                @if (_product.HasVariants)
+                {
+                    <MudPaper Elevation="2" Class="pa-4 mb-4">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+                            <MudText Typo="Typo.h6">
+                                <MudIcon Icon="@Icons.Material.Filled.Style" Class="mr-2" Style="vertical-align: middle;"/>
+                                Variações do Produto
+                            </MudText>
+                            
+                            <MudButton Variant="Variant.Outlined" 
+                                       Color="Color.Primary" 
+                                       Size="Size.Small" 
+                                       StartIcon="@Icons.Material.Filled.Refresh"
+                                       OnClick="LoadVariants">
+                                Recarregar
+                            </MudButton>
+                        </MudStack>
+                        <MudDivider Class="mb-4"/>
+
+                        @if (_loadingVariants)
+                        {
+                            <MudStack AlignItems="AlignItems.Center" Class="pa-4">
+                                <MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Primary" />
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Carregando variações...</MudText>
+                            </MudStack>
+                        }
+                        else if (_variants.Any())
+                        {
+                            <MudTable Items="@_variants" Dense="true" Hover="true" Breakpoint="Breakpoint.Sm" Elevation="0">
+                                <HeaderContent>
+                                    <MudTh>SKU</MudTh>
+                                    @foreach (var opt in _product.VariantOptions.OrderBy(o => o.Position))
+                                    {
+                                        <MudTh>@opt.Name</MudTh>
+                                    }
+                                    <MudTh>Preço Base / Venda</MudTh>
+                                    <MudTh>Estoque</MudTh>
+                                    <MudTh Style="width: 50px"></MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd DataLabel="SKU">
+                                        <MudText Typo="Typo.body2" Style="font-family: monospace;">@context.Sku</MudText>
+                                    </MudTd>
+                                    @foreach (var opt in _product.VariantOptions.OrderBy(o => o.Position))
+                                    {
+                                        var val = context.OptionValues.FirstOrDefault(v => _product.VariantOptions.FirstOrDefault(x => x.Values.Any(y => y.Id == v.Id))?.Name == opt.Name)?.Value ?? "-";
+                                        <MudTd DataLabel="@opt.Name">
+                                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@val</MudChip>
+                                        </MudTd>
+                                    }
+                                    <MudTd DataLabel="Preço Base">
+                                        @if (context.SalePrice > 0)
+                                        {
+                                            @Currency.Format(context.SalePrice) 
+                                        }
+                                        else
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@Currency.Format(_product.SalePrice) (padrão)</MudText>
+                                        }
+                                    </MudTd>
+                                    <MudTd DataLabel="Estoque">
+                                        <MudText Typo="Typo.body2" Color="@(context.CurrentStock > 0 ? Color.Success : Color.Error)">
+                                            @context.CurrentStock.ToString("N0")
+                                        </MudText>
+                                    </MudTd>
+                                    <MudTd>
+                                        <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                                                       Size="Size.Small" 
+                                                       Color="Color.Info" 
+                                                       OnClick="@(() => EditVariant(context))" />
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        }
+                        else
+                        {
+                            <MudAlert Severity="Severity.Warning" Variant="Variant.Text">
+                                Este produto está marcado para ter variações, mas nenhuma combinação foi gerada ou encontada.
+                            </MudAlert>
+                        }
+                    </MudPaper>
+                }
+
                 <!-- Informações Fiscais -->
                 <MudPaper Elevation="2" Class="pa-4 mb-4">
                     <MudText Typo="Typo.h6" Class="mb-3">
@@ -358,6 +442,8 @@
 
     private ProductDto? _product;
     private bool _loading = true;
+    private bool _loadingVariants = false;
+    private List<ProductVariantDto> _variants = new();
     private List<BreadcrumbItem> _breadcrumbs = new();
 
     protected override async Task OnInitializedAsync()
@@ -388,6 +474,11 @@
                     new("Produtos", href: "/inventory/products", icon: Icons.Material.Filled.Inventory2),
                     new(_product.Name, href: null, disabled: true)
                 };
+
+                if (_product.HasVariants)
+                {
+                    await LoadVariants();
+                }
             }
         }
         catch (Exception ex)
@@ -399,6 +490,35 @@
         {
             _loading = false;
         }
+    }
+
+    private async Task LoadVariants()
+    {
+        _loadingVariants = true;
+        try
+        {
+            var response = await ApiService.GetAsync<List<ProductVariantDto>>($"/api/produtos/{Id}/variantes");
+            if (response != null)
+            {
+                _variants = response;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao carregar variações do produto {ProductId}", Id);
+            Snackbar.Add("Erro ao carregar variações do produto", Severity.Warning);
+        }
+        finally
+        {
+            _loadingVariants = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task EditVariant(ProductVariantDto variant)
+    {
+        // TODO: Implementar dialog para editar preços/SKU da variação individualmente
+        Snackbar.Add("A edição de variações individuais será implementada em breve.", Severity.Info);
     }
 
     private async Task OpenEditDialog()

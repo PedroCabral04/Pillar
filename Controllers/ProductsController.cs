@@ -32,36 +32,6 @@ public class ProductsController : ControllerBase
     /// <summary>
     /// Busca produtos com filtros avançados, ordenação e paginação
     /// </summary>
-    /// <param name="searchDto">Critérios de busca incluindo termo, categoria, filtros, ordenação e paginação</param>
-    /// <returns>Lista paginada de produtos correspondentes aos critérios</returns>
-    /// <response code="200">Produtos encontrados com sucesso</response>
-    /// <response code="401">Usuário não autenticado</response>
-    /// <response code="500">Erro interno ao processar busca</response>
-    /// <remarks>
-    /// Permite buscar produtos por diversos critérios:
-    /// - Termo de busca (nome, SKU, código de barras)
-    /// - Categoria
-    /// - Status (ativo/inativo)
-    /// - Faixa de preço
-    /// - Nível de estoque
-    /// 
-    /// Suporta ordenação por nome, SKU, preço, estoque, etc.
-    /// 
-    /// Exemplo de requisição:
-    /// 
-    ///     POST /api/products/search
-    ///     {
-    ///         "searchTerm": "notebook",
-    ///         "categoryId": 5,
-    ///         "minPrice": 1000,
-    ///         "maxPrice": 5000,
-    ///         "onlyActive": true,
-    ///         "sortBy": "Name",
-    ///         "sortDescending": false,
-    ///         "page": 1,
-    ///         "pageSize": 20
-    ///     }
-    /// </remarks>
     [HttpPost("search")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -95,26 +65,6 @@ public class ProductsController : ControllerBase
     /// <summary>
     /// Lista produtos de forma simplificada (wrapper para busca)
     /// </summary>
-    /// <param name="search">Termo de busca opcional</param>
-    /// <param name="status">Status do produto (ex.: "ativo", "inativo", "descontinuado")</param>
-    /// <param name="categoryId">ID da categoria para filtrar</param>
-    /// <param name="lowStock">Se true, retorna apenas produtos com estoque baixo</param>
-    /// <param name="sortBy">Campo para ordenação (ex.: "Name", "Price")</param>
-    /// <param name="sortDescending">Define se a ordenação é descendente</param>
-    /// <param name="page">Número da página (inicia em 1)</param>
-    /// <param name="pageSize">Quantidade de itens por página (padrão: 20)</param>
-    /// <returns>Lista paginada de produtos</returns>
-    /// <response code="200">Produtos listados com sucesso</response>
-    /// <response code="401">Usuário não autenticado</response>
-    /// <response code="500">Erro interno ao processar requisição</response>
-    /// <remarks>
-    /// Endpoint simplificado para listagem de produtos com busca básica por texto.
-    /// Para filtros avançados, use POST /api/products/search
-    /// 
-    /// Exemplo de uso:
-    /// 
-    ///     GET /api/products?search=notebook&amp;page=1&amp;pageSize=20
-    /// </remarks>
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -721,6 +671,161 @@ public class ProductsController : ControllerBase
         {
             _logger.LogError(ex, "Erro ao deletar categoria {CategoryId}", id);
             return StatusCode(500, new { message = "Erro ao deletar categoria", error = ex.Message });
+        }
+    }
+
+    #endregion
+
+    #region Variants
+
+    /// <summary>
+    /// Lista variações de um produto
+    /// </summary>
+    [HttpGet("{id:int}/variantes")]
+    public async Task<ActionResult<List<ProductVariantDto>>> GetProductVariants(int id)
+    {
+        try
+        {
+            var variants = await _inventoryService.GetProductVariantsAsync(id);
+            return Ok(variants);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao listar variações do produto {ProductId}", id);
+            return StatusCode(500, new { message = "Erro ao listar variações", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Cria uma opção de variação para o produto (ex: Cor, Tamanho)
+    /// </summary>
+    [HttpPost("{id:int}/variantes/opcoes")]
+    public async Task<ActionResult<ProductVariantOptionDto>> CreateVariantOption(int id, [FromBody] CreateProductVariantOptionDto dto)
+    {
+        try
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var option = await _inventoryService.CreateVariantOptionAsync(id, dto);
+            return Ok(option);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Erro de validação ao criar opção de variação para produto {ProductId}", id);
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao criar opção de variação para produto {ProductId}", id);
+            return StatusCode(500, new { message = "Erro ao criar opção", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Remove uma opção de variação
+    /// </summary>
+    [HttpDelete("{id:int}/variantes/opcoes/{optionId:int}")]
+    public async Task<ActionResult> DeleteVariantOption(int id, int optionId)
+    {
+        try
+        {
+            var success = await _inventoryService.DeleteVariantOptionAsync(optionId);
+            if (!success)
+                return NotFound(new { message = $"Opção de variação com ID {optionId} não encontrada" });
+
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Erro ao excluir opção de variação {OptionId}", optionId);
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao excluir opção de variação {OptionId}", optionId);
+            return StatusCode(500, new { message = "Erro ao excluir opção", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Cria uma variação concreta do produto
+    /// </summary>
+    [HttpPost("{id:int}/variantes")]
+    public async Task<ActionResult<ProductVariantDto>> CreateVariant(int id, [FromBody] CreateProductVariantDto dto)
+    {
+        try
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var variant = await _inventoryService.CreateVariantAsync(id, dto);
+            return Ok(variant);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Erro de validação ao criar variação para produto {ProductId}", id);
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao criar variação para produto {ProductId}", id);
+            return StatusCode(500, new { message = "Erro ao criar variação", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Atualiza uma variação existente
+    /// </summary>
+    [HttpPut("{id:int}/variantes/{variantId:int}")]
+    public async Task<ActionResult<ProductVariantDto>> UpdateVariant(int id, int variantId, [FromBody] UpdateProductVariantDto dto)
+    {
+        try
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            if (variantId != dto.Id)
+                return BadRequest(new { message = "ID da URL não corresponde ao ID da variação" });
+
+            var variant = await _inventoryService.UpdateVariantAsync(variantId, dto);
+            return Ok(variant);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Erro de validação ao atualizar variação {VariantId}", variantId);
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao atualizar variação {VariantId}", variantId);
+            return StatusCode(500, new { message = "Erro ao atualizar variação", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Remove uma variação
+    /// </summary>
+    [HttpDelete("{id:int}/variantes/{variantId:int}")]
+    public async Task<ActionResult> DeleteVariant(int id, int variantId)
+    {
+        try
+        {
+            var success = await _inventoryService.DeleteVariantAsync(variantId);
+            if (!success)
+                return NotFound(new { message = $"Variação com ID {variantId} não encontrada" });
+
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Erro ao excluir variação {VariantId}", variantId);
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao excluir variação {VariantId}", variantId);
+            return StatusCode(500, new { message = "Erro ao excluir variação", error = ex.Message });
         }
     }
 

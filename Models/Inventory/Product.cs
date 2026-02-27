@@ -71,6 +71,11 @@ public class Product : IAuditable, IMustHaveTenant
     public string? MainImageUrl { get; set; }
     public virtual ICollection<ProductImage> Images { get; set; } = new List<ProductImage>();
     
+    // Variações
+    public bool HasVariants { get; set; } = false;
+    public virtual ICollection<ProductVariantOption> VariantOptions { get; set; } = new List<ProductVariantOption>();
+    public virtual ICollection<ProductVariant> Variants { get; set; } = new List<ProductVariant>();
+    
     // Movimentações
     public virtual ICollection<StockMovement> StockMovements { get; set; } = new List<StockMovement>();
     
