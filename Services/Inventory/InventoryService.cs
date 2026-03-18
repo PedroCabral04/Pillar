@@ -1417,7 +1417,8 @@ public class InventoryService : IInventoryService
                 continue;
             }
 
-            var normalized = NormalizeKey(raw);
+            var cleaned = raw.Replace("(Opcional)", "", StringComparison.OrdinalIgnoreCase).Trim();
+            var normalized = NormalizeKey(cleaned);
             var mappedKey = MapHeaderKey(normalized);
             if (mappedKey == null)
             {
