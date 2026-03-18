@@ -22,6 +22,7 @@ namespace erp.Controllers
     /// </summary>
     [ApiController]
     [Route("api/usuarios")]
+    [Route("api/users")]
     [Authorize]
     public class UsersController : ControllerBase
     {
