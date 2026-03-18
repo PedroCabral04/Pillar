@@ -24,6 +24,44 @@ public class AuthController(
     IEmailService emailService,
     ILogger<AuthController> logger) : ControllerBase
 {
+    private static object BuildImpersonationCapabilityResponse(bool canImpersonate, string? reason = null)
+    {
+        return new
+        {
+            canImpersonate,
+            reason = canImpersonate ? null : reason
+        };
+    }
+
+    private static bool IsImpersonatingPrincipal(ClaimsPrincipal principal)
+    {
+        return principal.HasClaim(c => c.Type == ImpersonationClaimTypes.IsImpersonating &&
+                                       string.Equals(c.Value, "true", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Authorize]
+    [HttpGet("impersonation-capability")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public IActionResult GetImpersonationCapability()
+    {
+        if (!User.Identity?.IsAuthenticated ?? true)
+        {
+            return Ok(BuildImpersonationCapabilityResponse(false, "Usuário não autenticado."));
+        }
+
+        if (!User.IsInRole(RoleNames.SuperAdmin))
+        {
+            return Ok(BuildImpersonationCapabilityResponse(false, "Apenas SuperAdmin pode iniciar impersonação."));
+        }
+
+        if (IsImpersonatingPrincipal(User))
+        {
+            return Ok(BuildImpersonationCapabilityResponse(false, "Finalize a impersonação atual antes de iniciar outra."));
+        }
+
+        return Ok(BuildImpersonationCapabilityResponse(true));
+    }
+
     /// <summary>
     /// Autentica um usuário no sistema
     /// </summary>
@@ -207,10 +245,13 @@ public class AuthController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ImpersonateUser([FromRoute] int userId)
     {
-        if (User.HasClaim(c => c.Type == ImpersonationClaimTypes.IsImpersonating &&
-                               string.Equals(c.Value, "true", StringComparison.OrdinalIgnoreCase)))
+        if (IsImpersonatingPrincipal(User))
         {
-            return BadRequest(new { message = "Finalize a impersonação atual antes de iniciar outra." });
+            return BadRequest(new
+            {
+                reason = "already_impersonating",
+                message = "Finalize a impersonação atual antes de iniciar outra."
+            });
         }
 
         var superAdminIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -221,7 +262,11 @@ public class AuthController(
 
         if (superAdminId == userId)
         {
-            return BadRequest(new { message = "Você já está autenticado como este usuário." });
+            return BadRequest(new
+            {
+                reason = "same_user",
+                message = "Você já está autenticado como este usuário."
+            });
         }
 
         var superAdmin = await userManager.FindByIdAsync(superAdminId.ToString());
@@ -243,7 +288,11 @@ public class AuthController(
 
         if (!targetUser.IsActive)
         {
-            return BadRequest(new { message = "Não é possível impersonar um usuário inativo." });
+            return BadRequest(new
+            {
+                reason = "inactive_target",
+                message = "Não é possível impersonar um usuário inativo."
+            });
         }
 
         var impersonatorName = superAdmin.UserName ?? superAdmin.Email ?? $"user-{superAdmin.Id}";

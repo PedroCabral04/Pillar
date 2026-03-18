@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using System.Text.Json;
 using Moq;
 using Xunit;
 using FluentAssertions;
@@ -298,6 +299,86 @@ public class AuthControllerTests
     #endregion
 
     #region Impersonation Tests
+
+    [Fact]
+    public void GetImpersonationCapability_WithSuperAdmin_ReturnsCanImpersonateTrue()
+    {
+        // Arrange
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, "1"),
+                    new Claim(ClaimTypes.Role, RoleNames.SuperAdmin)
+                }, "TestAuth"))
+            }
+        };
+
+        // Act
+        var result = _controller.GetImpersonationCapability();
+
+        // Assert
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var json = JsonSerializer.Serialize(ok.Value);
+        json.Should().Contain("\"canImpersonate\":true");
+    }
+
+    [Fact]
+    public void GetImpersonationCapability_WithoutSuperAdmin_ReturnsBlockedReason()
+    {
+        // Arrange
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, "1"),
+                    new Claim(ClaimTypes.Role, RoleNames.AdminTenant)
+                }, "TestAuth"))
+            }
+        };
+
+        // Act
+        var result = _controller.GetImpersonationCapability();
+
+        // Assert
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var json = JsonSerializer.Serialize(ok.Value);
+        var payload = JsonDocument.Parse(json).RootElement;
+        json.Should().Contain("\"canImpersonate\":false");
+        payload.GetProperty("reason").GetString().Should().Be("Apenas SuperAdmin pode iniciar impersonação.");
+    }
+
+    [Fact]
+    public void GetImpersonationCapability_WithActiveImpersonation_ReturnsBlockedReason()
+    {
+        // Arrange
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, "1"),
+                    new Claim(ClaimTypes.Role, RoleNames.SuperAdmin),
+                    new Claim(ImpersonationClaimTypes.IsImpersonating, "true")
+                }, "TestAuth"))
+            }
+        };
+
+        // Act
+        var result = _controller.GetImpersonationCapability();
+
+        // Assert
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var json = JsonSerializer.Serialize(ok.Value);
+        var payload = JsonDocument.Parse(json).RootElement;
+        json.Should().Contain("\"canImpersonate\":false");
+        payload.GetProperty("reason").GetString().Should().Be("Finalize a impersonação atual antes de iniciar outra.");
+    }
 
     [Fact]
     public async Task ImpersonateUser_WithSuperAdmin_ReturnsOk()
