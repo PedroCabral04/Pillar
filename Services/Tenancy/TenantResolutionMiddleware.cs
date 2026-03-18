@@ -62,26 +62,38 @@ public class TenantResolutionMiddleware
 
     private static bool IsPublicPath(string path)
     {
-        // Rotas públicas que não requerem tenant
-        var publicPaths = new[]
+        // Paths exatos públicos. Inclui "/" para permitir acesso inicial e redirecionamento de autenticação.
+        var exactPublicPaths = new[]
         {
+            "/",
             "/health",
             "/api/health",
+            "/favicon.ico",
+            "/login",
+            "/forgot-password",
+            "/reset-password"
+        };
+
+        if (exactPublicPaths.Any(publicPath => string.Equals(path, publicPath, StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        // Prefixos públicos para recursos estáticos e endpoints de autenticação.
+        var publicPrefixes = new[]
+        {
             "/_framework",
             "/_blazor",
             "/css",
             "/js",
             "/lib",
-            "/favicon.ico",
             "/Onboarding",
-            // Fluxos de autenticação devem ser acessíveis sem tenant pré-resolvido.
-            "/login",
-            "/forgot-password",
-            "/reset-password",
-            "/api/auth"
+            "/api/auth",
+            "/login/",
+            "/account/"
         };
 
-        return publicPaths.Any(publicPath => path.StartsWith(publicPath, StringComparison.OrdinalIgnoreCase));
+        return publicPrefixes.Any(publicPath => path.StartsWith(publicPath, StringComparison.OrdinalIgnoreCase));
     }
 
     private static void StampTenantContext(HttpContext context, ITenantContextAccessor accessor, Tenant tenant)

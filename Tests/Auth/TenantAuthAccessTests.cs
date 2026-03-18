@@ -16,6 +16,16 @@ public class TenantAuthAccessTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
+    public async Task AnonymousUser_CanAccessRootPath_WithoutTenantForbidden()
+    {
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var response = await client.GetAsync("/");
+
+        response.StatusCode.Should().NotBe(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
     public async Task AnonymousUser_CanAccessLoginPage()
     {
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
