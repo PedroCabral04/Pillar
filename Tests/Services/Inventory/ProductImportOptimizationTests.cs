@@ -168,6 +168,48 @@ public class ProductImportOptimizationTests
     }
 
     [Fact]
+    public async Task ImportProductsFromExcel_SanitizesSpacesInSku_ReplacingWithDash()
+    {
+        var tenantContext = BuildTenantContext(1);
+        var tenantAccessor = new Mock<ITenantContextAccessor>();
+        tenantAccessor.SetupGet(x => x.Current).Returns(tenantContext);
+
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        await using var context = new ApplicationDbContext(options, tenantContextAccessor: tenantAccessor.Object);
+
+        context.ProductCategories.Add(new ProductCategory
+        {
+            Id = 1,
+            Name = "Informatica",
+            Code = "INFO",
+            IsActive = true
+        });
+
+        context.Users.Add(new ApplicationUser
+        {
+            Id = 1,
+            UserName = "import.tester",
+            Email = "import.tester@local"
+        });
+
+        await context.SaveChangesAsync();
+
+        var service = new InventoryService(context, new ProductMapper());
+        await using var fileStream = BuildTemplateWithSpacedSku();
+
+        var result = await service.ImportProductsFromExcelAsync(fileStream, userId: 1, CancellationToken.None);
+
+        result.ImportedCount.Should().Be(1);
+        result.FailedCount.Should().Be(0);
+
+        var product = await context.Products.AsNoTracking().SingleAsync();
+        product.Sku.Should().Be("Y8177-02", "spaces in SKU should be replaced with dashes");
+    }
+
+    [Fact]
     public async Task ImportProductsFromExcel_ReadsInitialStock_WhenHeaderHasOpcionalSuffix()
     {
         var tenantContext = BuildTenantContext(1);
@@ -339,10 +381,29 @@ public class ProductImportOptimizationTests
         worksheet.Cells[1, 3].Value = "Categoria";
         worksheet.Cells[1, 4].Value = "Preco de Venda";
 
-        worksheet.Cells[2, 1].Value = "SKU COM ESPACO";
+        worksheet.Cells[2, 1].Value = "SKU@INVALIDO";
         worksheet.Cells[2, 2].Value = "Mouse";
         worksheet.Cells[2, 3].Value = "Informatica";
-        worksheet.Cells[2, 4].Value = "150.00";
+        worksheet.Cells[2, 4].Value = "150";
+
+        return new MemoryStream(package.GetAsByteArray());
+    }
+
+    private static MemoryStream BuildTemplateWithSpacedSku()
+    {
+        ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+        using var package = new ExcelPackage();
+        var worksheet = package.Workbook.Worksheets.Add("Produtos");
+
+        worksheet.Cells[1, 1].Value = "SKU";
+        worksheet.Cells[1, 2].Value = "Nome";
+        worksheet.Cells[1, 3].Value = "Categoria";
+        worksheet.Cells[1, 4].Value = "Preco de Venda";
+
+        worksheet.Cells[2, 1].Value = "Y8177 02";
+        worksheet.Cells[2, 2].Value = "WiFi Panorama Camera";
+        worksheet.Cells[2, 3].Value = "Informatica";
+        worksheet.Cells[2, 4].Value = "129";
 
         return new MemoryStream(package.GetAsByteArray());
     }

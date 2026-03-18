@@ -329,7 +329,7 @@ public class InventoryService : IInventoryService
                 continue;
             }
 
-            var normalizedInputSku = string.IsNullOrWhiteSpace(inputSku) ? null : inputSku.Trim();
+            var normalizedInputSku = string.IsNullOrWhiteSpace(inputSku) ? null : inputSku.Trim().Replace(" ", "-");
             if (!string.IsNullOrWhiteSpace(normalizedInputSku))
             {
                 if (normalizedInputSku.Length > ProductSkuMaxLength)
