@@ -99,6 +99,74 @@ public class ProductImportOptimizationTests
         importedCategory.IsActive.Should().BeTrue();
     }
 
+    [Fact]
+    public async Task ImportProductsFromExcel_WithDuplicatedNameHeader_ThrowsInvalidOperationException()
+    {
+        var tenantContext = BuildTenantContext(1);
+        var tenantAccessor = new Mock<ITenantContextAccessor>();
+        tenantAccessor.SetupGet(x => x.Current).Returns(tenantContext);
+
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        await using var context = new ApplicationDbContext(options, tenantContextAccessor: tenantAccessor.Object);
+        context.Users.Add(new ApplicationUser
+        {
+            Id = 1,
+            UserName = "import.tester",
+            Email = "import.tester@local"
+        });
+        await context.SaveChangesAsync();
+
+        var service = new InventoryService(context, new ProductMapper());
+        await using var fileStream = BuildTemplateWithDuplicatedNameHeader();
+
+        Func<Task> act = async () => await service.ImportProductsFromExcelAsync(fileStream, userId: 1, CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Colunas duplicadas detectadas*Nome*");
+    }
+
+    [Fact]
+    public async Task ImportProductsFromExcel_WithInvalidSkuFormat_AddsFailureIssue()
+    {
+        var tenantContext = BuildTenantContext(1);
+        var tenantAccessor = new Mock<ITenantContextAccessor>();
+        tenantAccessor.SetupGet(x => x.Current).Returns(tenantContext);
+
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        await using var context = new ApplicationDbContext(options, tenantContextAccessor: tenantAccessor.Object);
+        context.ProductCategories.Add(new ProductCategory
+        {
+            Id = 1,
+            Name = "Informatica",
+            Code = "INFO",
+            IsActive = true
+        });
+
+        context.Users.Add(new ApplicationUser
+        {
+            Id = 1,
+            UserName = "import.tester",
+            Email = "import.tester@local"
+        });
+
+        await context.SaveChangesAsync();
+
+        var service = new InventoryService(context, new ProductMapper());
+        await using var fileStream = BuildTemplateWithInvalidSkuFormat();
+
+        var result = await service.ImportProductsFromExcelAsync(fileStream, userId: 1, CancellationToken.None);
+
+        result.ImportedCount.Should().Be(0);
+        result.FailedCount.Should().Be(1);
+        result.Issues.Should().ContainSingle(i => i.Reason.Contains("SKU invalido", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static TenantContext BuildTenantContext(int tenantId)
     {
         var context = new TenantContext();
@@ -157,6 +225,46 @@ public class ProductImportOptimizationTests
         categoriesSheet.Cells[2, 1].Value = "Nova Categoria";
         categoriesSheet.Cells[2, 2].Value = "NOVA-CAT";
         categoriesSheet.Cells[2, 3].Value = string.Empty;
+
+        return new MemoryStream(package.GetAsByteArray());
+    }
+
+    private static MemoryStream BuildTemplateWithDuplicatedNameHeader()
+    {
+        ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+        using var package = new ExcelPackage();
+        var worksheet = package.Workbook.Worksheets.Add("Produtos");
+
+        worksheet.Cells[1, 1].Value = "SKU";
+        worksheet.Cells[1, 2].Value = "Nome";
+        worksheet.Cells[1, 3].Value = "Categoria";
+        worksheet.Cells[1, 4].Value = "Preco de Venda";
+        worksheet.Cells[1, 5].Value = "Produto";
+
+        worksheet.Cells[2, 1].Value = "PROD-001";
+        worksheet.Cells[2, 2].Value = "Mouse";
+        worksheet.Cells[2, 3].Value = "1";
+        worksheet.Cells[2, 4].Value = "150.00";
+        worksheet.Cells[2, 5].Value = "Mouse Duplicado";
+
+        return new MemoryStream(package.GetAsByteArray());
+    }
+
+    private static MemoryStream BuildTemplateWithInvalidSkuFormat()
+    {
+        ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+        using var package = new ExcelPackage();
+        var worksheet = package.Workbook.Worksheets.Add("Produtos");
+
+        worksheet.Cells[1, 1].Value = "SKU";
+        worksheet.Cells[1, 2].Value = "Nome";
+        worksheet.Cells[1, 3].Value = "Categoria";
+        worksheet.Cells[1, 4].Value = "Preco de Venda";
+
+        worksheet.Cells[2, 1].Value = "SKU COM ESPACO";
+        worksheet.Cells[2, 2].Value = "Mouse";
+        worksheet.Cells[2, 3].Value = "Informatica";
+        worksheet.Cells[2, 4].Value = "150.00";
 
         return new MemoryStream(package.GetAsByteArray());
     }

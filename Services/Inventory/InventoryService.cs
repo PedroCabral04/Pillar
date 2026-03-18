@@ -6,11 +6,19 @@ using erp.Models.Inventory;
 using erp.Mappings;
 using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace erp.Services.Inventory;
 
 public class InventoryService : IInventoryService
 {
+    private const int ProductSkuMaxLength = 50;
+    private const int ProductNameMaxLength = 200;
+    private const int ProductBarcodeMaxLength = 50;
+    private const int ProductUnitMaxLength = 10;
+    private static readonly Regex UnitFormatRegex = new("^[A-Za-z0-9._/-]+$", RegexOptions.Compiled);
+    private static readonly Regex BarcodeFormatRegex = new("^[A-Za-z0-9._/-]+$", RegexOptions.Compiled);
+
     private readonly ApplicationDbContext _context;
     private readonly ProductMapper _productMapper;
 
@@ -163,13 +171,23 @@ public class InventoryService : IInventoryService
             throw new InvalidOperationException("A planilha esta vazia.");
         }
 
-        var headerMap = BuildHeaderMap(worksheet);
-        if (!headerMap.TryGetValue("nome", out var nameCol) ||
-            !headerMap.TryGetValue("categoria", out var categoryCol) ||
-            !headerMap.TryGetValue("preco_venda", out var salePriceCol))
+        var headerMap = BuildHeaderMap(worksheet, out var duplicatedHeaders);
+        if (duplicatedHeaders.Count > 0)
         {
-            throw new InvalidOperationException("Colunas obrigatorias ausentes. Use: Nome, Categoria, Preco de Venda.");
+            var duplicatedDisplay = string.Join(", ", duplicatedHeaders.Select(GetHeaderDisplayName));
+            throw new InvalidOperationException($"Cabecalho invalido. Colunas duplicadas detectadas: {duplicatedDisplay}.");
         }
+
+        var missingHeaders = GetMissingRequiredHeaders(headerMap);
+        if (missingHeaders.Count > 0)
+        {
+            var missingDisplay = string.Join(", ", missingHeaders.Select(GetHeaderDisplayName));
+            throw new InvalidOperationException($"Colunas obrigatorias ausentes. Use: {missingDisplay}.");
+        }
+
+        var nameCol = headerMap["nome"];
+        var categoryCol = headerMap["categoria"];
+        var salePriceCol = headerMap["preco_venda"];
 
         headerMap.TryGetValue("sku", out var skuCol);
         headerMap.TryGetValue("preco_custo", out var costPriceCol);
@@ -255,6 +273,12 @@ public class InventoryService : IInventoryService
                 continue;
             }
 
+            if (name.Trim().Length > ProductNameMaxLength)
+            {
+                AddIssue(result, row, $"Nome invalido. Maximo de {ProductNameMaxLength} caracteres.", inputSku, name, isSkipped: false);
+                continue;
+            }
+
             if (string.IsNullOrWhiteSpace(categoryRaw))
             {
                 AddIssue(result, row, "Categoria obrigatoria.", inputSku, name, isSkipped: false);
@@ -273,10 +297,22 @@ public class InventoryService : IInventoryService
                 continue;
             }
 
+            if (!HasAtMostDecimalPlaces(salePrice, 2))
+            {
+                AddIssue(result, row, "Preco de venda invalido. Maximo de 2 casas decimais.", inputSku, name, isSkipped: false);
+                continue;
+            }
+
             var costPrice = salePrice;
             if (!string.IsNullOrWhiteSpace(costPriceRaw) && (!TryParseDecimal(costPriceRaw, out costPrice) || costPrice < 0))
             {
                 AddIssue(result, row, "Preco de custo invalido.", inputSku, name, isSkipped: false);
+                continue;
+            }
+
+            if (!string.IsNullOrWhiteSpace(costPriceRaw) && !HasAtMostDecimalPlaces(costPrice, 2))
+            {
+                AddIssue(result, row, "Preco de custo invalido. Maximo de 2 casas decimais.", inputSku, name, isSkipped: false);
                 continue;
             }
 
@@ -287,9 +323,27 @@ public class InventoryService : IInventoryService
                 continue;
             }
 
+            if (!string.IsNullOrWhiteSpace(stockRaw) && !HasAtMostDecimalPlaces(initialStock, 2))
+            {
+                AddIssue(result, row, "Estoque inicial invalido. Maximo de 2 casas decimais.", inputSku, name, isSkipped: false);
+                continue;
+            }
+
             var normalizedInputSku = string.IsNullOrWhiteSpace(inputSku) ? null : inputSku.Trim();
             if (!string.IsNullOrWhiteSpace(normalizedInputSku))
             {
+                if (normalizedInputSku.Length > ProductSkuMaxLength)
+                {
+                    AddIssue(result, row, $"SKU invalido. Maximo de {ProductSkuMaxLength} caracteres.", normalizedInputSku, name, isSkipped: false);
+                    continue;
+                }
+
+                if (!IsValidTokenFormat(normalizedInputSku, BarcodeFormatRegex))
+                {
+                    AddIssue(result, row, "SKU invalido. Use apenas letras, numeros, '.', '-', '_' ou '/'.", normalizedInputSku, name, isSkipped: false);
+                    continue;
+                }
+
                 if (!seenInputSkus.Add(normalizedInputSku))
                 {
                     AddIssue(result, row, $"SKU '{normalizedInputSku}' duplicado na planilha.", normalizedInputSku, name, isSkipped: true);
@@ -306,6 +360,18 @@ public class InventoryService : IInventoryService
             var normalizedBarcode = string.IsNullOrWhiteSpace(barcodeRaw) ? null : barcodeRaw.Trim();
             if (!string.IsNullOrWhiteSpace(normalizedBarcode))
             {
+                if (normalizedBarcode.Length > ProductBarcodeMaxLength)
+                {
+                    AddIssue(result, row, $"Codigo de barras invalido. Maximo de {ProductBarcodeMaxLength} caracteres.", normalizedInputSku, name, isSkipped: false);
+                    continue;
+                }
+
+                if (!IsValidTokenFormat(normalizedBarcode, BarcodeFormatRegex))
+                {
+                    AddIssue(result, row, "Codigo de barras invalido. Use apenas letras, numeros, '.', '-', '_' ou '/'.", normalizedInputSku, name, isSkipped: false);
+                    continue;
+                }
+
                 if (!seenInputBarcodes.Add(normalizedBarcode))
                 {
                     AddIssue(result, row, $"Codigo de barras '{normalizedBarcode}' duplicado na planilha.", normalizedInputSku, name, isSkipped: false);
@@ -325,6 +391,19 @@ public class InventoryService : IInventoryService
                 skuToCreate = GenerateUniqueSku(existingSkus);
             }
 
+            var unitToUse = string.IsNullOrWhiteSpace(unitRaw) ? "UN" : unitRaw.Trim();
+            if (unitToUse.Length > ProductUnitMaxLength)
+            {
+                AddIssue(result, row, $"Unidade invalida. Maximo de {ProductUnitMaxLength} caracteres.", skuToCreate, name, isSkipped: false);
+                continue;
+            }
+
+            if (!IsValidTokenFormat(unitToUse, UnitFormatRegex))
+            {
+                AddIssue(result, row, "Unidade invalida. Use apenas letras, numeros, '.', '-', '_' ou '/'.", skuToCreate, name, isSkipped: false);
+                continue;
+            }
+
             existingSkus.Add(skuToCreate);
 
             var dto = new CreateProductDto
@@ -336,7 +415,7 @@ public class InventoryService : IInventoryService
                 SalePrice = salePrice,
                 CostPrice = costPrice,
                 CurrentStock = initialStock,
-                Unit = string.IsNullOrWhiteSpace(unitRaw) ? "UN" : unitRaw.Trim(),
+                Unit = unitToUse,
                 UnitsPerBox = 1,
                 IsActive = true,
                 Status = 0
@@ -1322,9 +1401,10 @@ public class InventoryService : IInventoryService
         return GenerateCsv(productList);
     }
 
-    private static Dictionary<string, int> BuildHeaderMap(ExcelWorksheet worksheet)
+    private static Dictionary<string, int> BuildHeaderMap(ExcelWorksheet worksheet, out List<string> duplicatedHeaders)
     {
         var result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        duplicatedHeaders = new List<string>();
         var startCol = worksheet.Dimension!.Start.Column;
         var endCol = worksheet.Dimension.End.Column;
         var headerRow = worksheet.Dimension.Start.Row;
@@ -1338,41 +1418,86 @@ public class InventoryService : IInventoryService
             }
 
             var normalized = NormalizeKey(raw);
-            if (normalized == "sku")
+            var mappedKey = MapHeaderKey(normalized);
+            if (mappedKey == null)
             {
-                result["sku"] = col;
+                continue;
             }
-            else if (normalized is "nome" or "produto" or "nomeproduto")
+
+            if (!result.TryAdd(mappedKey, col))
             {
-                result["nome"] = col;
-            }
-            else if (normalized is "categoria" or "categoriacodigo")
-            {
-                result["categoria"] = col;
-            }
-            else if (normalized is "precovenda" or "precodevenda" or "venda" or "preco")
-            {
-                result["preco_venda"] = col;
-            }
-            else if (normalized is "precocusto" or "custo" or "precodecusto")
-            {
-                result["preco_custo"] = col;
-            }
-            else if (normalized is "estoque" or "estoqueinicial" or "saldoinicial")
-            {
-                result["estoque_inicial"] = col;
-            }
-            else if (normalized is "unidade" or "und")
-            {
-                result["unidade"] = col;
-            }
-            else if (normalized is "codigobarras" or "codbarras" or "barcode")
-            {
-                result["codigo_barras"] = col;
+                duplicatedHeaders.Add(mappedKey);
             }
         }
 
         return result;
+    }
+
+    private static string? MapHeaderKey(string normalized)
+    {
+        if (normalized == "sku")
+        {
+            return "sku";
+        }
+
+        if (normalized is "nome" or "produto" or "nomeproduto")
+        {
+            return "nome";
+        }
+
+        if (normalized is "categoria" or "categoriacodigo")
+        {
+            return "categoria";
+        }
+
+        if (normalized is "precovenda" or "precodevenda" or "venda" or "preco")
+        {
+            return "preco_venda";
+        }
+
+        if (normalized is "precocusto" or "custo" or "precodecusto")
+        {
+            return "preco_custo";
+        }
+
+        if (normalized is "estoque" or "estoqueinicial" or "saldoinicial")
+        {
+            return "estoque_inicial";
+        }
+
+        if (normalized is "unidade" or "und")
+        {
+            return "unidade";
+        }
+
+        if (normalized is "codigobarras" or "codbarras" or "barcode")
+        {
+            return "codigo_barras";
+        }
+
+        return null;
+    }
+
+    private static List<string> GetMissingRequiredHeaders(IReadOnlyDictionary<string, int> headerMap)
+    {
+        var required = new[] { "nome", "categoria", "preco_venda" };
+        return required.Where(key => !headerMap.ContainsKey(key)).ToList();
+    }
+
+    private static string GetHeaderDisplayName(string headerKey)
+    {
+        return headerKey switch
+        {
+            "sku" => "SKU",
+            "nome" => "Nome",
+            "categoria" => "Categoria",
+            "preco_venda" => "Preco de Venda",
+            "preco_custo" => "Preco de Custo",
+            "estoque_inicial" => "Estoque Inicial",
+            "unidade" => "Unidade",
+            "codigo_barras" => "Codigo de Barras",
+            _ => headerKey
+        };
     }
 
     private async Task ImportCategoriesFromTemplateAsync(
@@ -1572,6 +1697,31 @@ public class InventoryService : IInventoryService
         }
 
         return decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out value);
+    }
+
+    private static bool HasAtMostDecimalPlaces(decimal value, int decimalPlaces)
+    {
+        if (decimalPlaces < 0)
+        {
+            return false;
+        }
+
+        return decimal.Round(value, decimalPlaces) == value;
+    }
+
+    private static bool IsValidTokenFormat(string value, Regex regex)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        if (value.Any(char.IsWhiteSpace))
+        {
+            return false;
+        }
+
+        return regex.IsMatch(value);
     }
 
     private static string NormalizeKey(string? value)
