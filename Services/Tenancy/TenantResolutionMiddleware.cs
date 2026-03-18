@@ -73,7 +73,12 @@ public class TenantResolutionMiddleware
             "/js",
             "/lib",
             "/favicon.ico",
-            "/Onboarding"
+            "/Onboarding",
+            // Fluxos de autenticação devem ser acessíveis sem tenant pré-resolvido.
+            "/login",
+            "/forgot-password",
+            "/reset-password",
+            "/api/auth"
         };
 
         return publicPaths.Any(publicPath => path.StartsWith(publicPath, StringComparison.OrdinalIgnoreCase));
