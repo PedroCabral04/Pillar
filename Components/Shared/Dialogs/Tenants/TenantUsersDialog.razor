@@ -1,12 +1,18 @@
 @using erp.DTOs.Tenancy
 @using erp.DTOs.User
 @using erp.DTOs.Role
+@using erp.Security
 @using erp.Services
+@using System.Security.Claims
+@using System.Text.Json
 @using Color = MudBlazor.Color
 @using Size = MudBlazor.Size
 @inject IApiService ApiService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject IJSRuntime JS
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <MudDialog>
     <DialogContent>
@@ -25,6 +31,11 @@
             @if (_loadError != null)
             {
                 <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
+            }
+
+            @if (!_canImpersonate && !string.IsNullOrWhiteSpace(_impersonationCapabilityReason))
+            {
+                <MudAlert Severity="Severity.Info">Impersonação indisponível: @_impersonationCapabilityReason</MudAlert>
             }
 
             <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
@@ -119,6 +130,13 @@
                                                    OnClick="@(() => ToggleUserStatus(context))"
                                                    Title="@(context.IsActive ? "Desativar" : "Ativar")" />
                                 </MudTooltip>
+                                <MudTooltip Text="@GetImpersonationButtonTooltip(context)">
+                                    <MudIconButton Icon="@Icons.Material.Filled.SwitchAccount"
+                                                   Color="Color.Secondary"
+                                                   Disabled="@(!CanImpersonateTarget(context))"
+                                                   OnClick="@(() => ImpersonateUserAsync(context))"
+                                                   Title="Impersonar usuário" />
+                                </MudTooltip>
                             </MudButtonGroup>
                         </MudTd>
                     </RowTemplate>
@@ -147,6 +165,10 @@
     private bool _saving;
     private string _search = string.Empty;
     private string? _statusFilter;
+    private bool _canImpersonate;
+    private string? _impersonationCapabilityReason;
+    private bool _isImpersonating;
+    private int? _currentUserId;
 
     private IEnumerable<UserDto> FilteredUsers => _users
         .Where(u => string.IsNullOrWhiteSpace(_search)
@@ -159,7 +181,123 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadCurrentPrincipalAsync();
+        await LoadImpersonationCapabilityAsync();
         await LoadUsersAsync();
+    }
+
+    private async Task LoadCurrentPrincipalAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var principal = authState.User;
+
+        _isImpersonating = principal.HasClaim(c => c.Type == ImpersonationClaimTypes.IsImpersonating &&
+                                                   string.Equals(c.Value, "true", StringComparison.OrdinalIgnoreCase));
+
+        var currentUserClaim = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        _currentUserId = int.TryParse(currentUserClaim, out var parsedUserId) ? parsedUserId : null;
+    }
+
+    private async Task LoadImpersonationCapabilityAsync()
+    {
+        try
+        {
+            var response = await ApiService.GetAsync("api/auth/impersonation-capability");
+            if (!response.IsSuccessStatusCode)
+            {
+                return;
+            }
+
+            var payload = await response.Content.ReadFromJsonAsync<ImpersonationCapabilityResponse>();
+            if (payload is null)
+            {
+                return;
+            }
+
+            _canImpersonate = payload.canImpersonate;
+            _impersonationCapabilityReason = payload.reason;
+        }
+        catch (Exception)
+        {
+            _canImpersonate = false;
+            _impersonationCapabilityReason = "Não foi possível validar a capacidade de impersonação.";
+        }
+    }
+
+    private bool CanImpersonateTarget(UserDto user)
+    {
+        if (!_canImpersonate)
+        {
+            return false;
+        }
+
+        if (_isImpersonating)
+        {
+            return false;
+        }
+
+        if (_currentUserId == user.Id)
+        {
+            return false;
+        }
+
+        return user.IsActive;
+    }
+
+    private string GetImpersonationButtonTooltip(UserDto user)
+    {
+        if (!_canImpersonate)
+        {
+            return _impersonationCapabilityReason ?? "Impersonação indisponível.";
+        }
+
+        if (_isImpersonating)
+        {
+            return "Finalize a impersonação atual antes de iniciar outra.";
+        }
+
+        if (_currentUserId == user.Id)
+        {
+            return "Você já está autenticado como este usuário.";
+        }
+
+        if (!user.IsActive)
+        {
+            return "Não é possível impersonar um usuário inativo.";
+        }
+
+        return "Entrar como este usuário";
+    }
+
+    private async Task ImpersonateUserAsync(UserDto user)
+    {
+        if (!CanImpersonateTarget(user))
+        {
+            Snackbar.Add(GetImpersonationButtonTooltip(user), Severity.Warning);
+            return;
+        }
+
+        var confirmed = await DialogService.ShowMessageBox(
+            "Confirmar impersonação",
+            $"Deseja entrar como o usuário '{user.Username}'? Você será redirecionado para o tenant desse usuário.",
+            yesText: "Entrar como usuário",
+            cancelText: "Cancelar");
+
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        var response = await JS.InvokeAsync<AuthActionResult>("erpAuth.impersonate", user.Id);
+        if (response.ok)
+        {
+            Snackbar.Add($"Agora você está autenticado como {user.Username}.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+            NavigationManager.NavigateTo("/", forceLoad: true);
+            return;
+        }
+
+        Snackbar.Add(GetImpersonationErrorMessage(response), Severity.Error);
     }
 
     private async Task LoadUsersAsync()
@@ -318,6 +456,38 @@
             .Select(role => role.Id)
             .Distinct()
             .ToList();
+    }
+
+    private class ImpersonationCapabilityResponse
+    {
+        public bool canImpersonate { get; set; }
+        public string? reason { get; set; }
+    }
+
+    private class AuthActionResult
+    {
+        public bool ok { get; set; }
+        public int status { get; set; }
+        public string? text { get; set; }
+        public JsonElement? data { get; set; }
+    }
+
+    private static string GetImpersonationErrorMessage(AuthActionResult response)
+    {
+        if (response.data.HasValue &&
+            response.data.Value.ValueKind == JsonValueKind.Object &&
+            response.data.Value.TryGetProperty("message", out var messageElement) &&
+            messageElement.ValueKind == JsonValueKind.String)
+        {
+            return messageElement.GetString() ?? "Não foi possível iniciar a impersonação.";
+        }
+
+        if (!string.IsNullOrWhiteSpace(response.text))
+        {
+            return response.text;
+        }
+
+        return "Não foi possível iniciar a impersonação.";
     }
 
     private void Close() => MudDialog.Close(DialogResult.Ok(true));
