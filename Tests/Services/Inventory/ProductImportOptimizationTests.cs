@@ -168,6 +168,69 @@ public class ProductImportOptimizationTests
     }
 
     [Fact]
+    public async Task ImportProductsFromExcel_DuplicateSku_ImportsWithVariantSku()
+    {
+        var tenantContext = BuildTenantContext(1);
+        var tenantAccessor = new Mock<ITenantContextAccessor>();
+        tenantAccessor.SetupGet(x => x.Current).Returns(tenantContext);
+
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        await using var context = new ApplicationDbContext(options, tenantContextAccessor: tenantAccessor.Object);
+
+        context.ProductCategories.Add(new ProductCategory { Id = 1, Name = "Informatica", Code = "INFO", IsActive = true });
+        context.Users.Add(new ApplicationUser { Id = 1, UserName = "import.tester", Email = "import.tester@local" });
+        await context.SaveChangesAsync();
+
+        var service = new InventoryService(context, new ProductMapper());
+        await using var fileStream = BuildTemplateWithDuplicateSkus();
+
+        var result = await service.ImportProductsFromExcelAsync(fileStream, userId: 1, CancellationToken.None);
+
+        // All 3 rows must be imported (no skips, no failures)
+        result.ImportedCount.Should().Be(3);
+        result.SkippedCount.Should().Be(0);
+        result.FailedCount.Should().Be(0);
+
+        var skus = await context.Products.AsNoTracking().Select(p => p.Sku).ToListAsync();
+        skus.Should().Contain("MC-207");
+        skus.Should().Contain("MC-207-2");
+        skus.Should().Contain("MC-207-3");
+    }
+
+    [Fact]
+    public async Task ImportProductsFromExcel_SkuExistsInDb_ImportsWithVariantSku()
+    {
+        var tenantContext = BuildTenantContext(1);
+        var tenantAccessor = new Mock<ITenantContextAccessor>();
+        tenantAccessor.SetupGet(x => x.Current).Returns(tenantContext);
+
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        await using var context = new ApplicationDbContext(options, tenantContextAccessor: tenantAccessor.Object);
+
+        context.ProductCategories.Add(new ProductCategory { Id = 1, Name = "Informatica", Code = "INFO", IsActive = true });
+        context.Products.Add(new Product { Id = 1, Sku = "CB129-2", Name = "Existing Product", SalePrice = 10, CurrentStock = 0, Unit = "UN", CategoryId = 1, CreatedAt = DateTime.UtcNow });
+        context.Users.Add(new ApplicationUser { Id = 1, UserName = "import.tester", Email = "import.tester@local" });
+        await context.SaveChangesAsync();
+
+        var service = new InventoryService(context, new ProductMapper());
+        await using var fileStream = BuildTemplateWithSkuExistingInDb();
+
+        var result = await service.ImportProductsFromExcelAsync(fileStream, userId: 1, CancellationToken.None);
+
+        result.ImportedCount.Should().Be(1);
+        result.SkippedCount.Should().Be(0);
+
+        var newProduct = await context.Products.AsNoTracking().SingleAsync(p => p.Id != 1);
+        newProduct.Sku.Should().Be("CB129-2-2");
+    }
+
+    [Fact]
     public async Task ImportProductsFromExcel_SanitizesSpacesInSku_ReplacingWithDash()
     {
         var tenantContext = BuildTenantContext(1);
@@ -385,6 +448,43 @@ public class ProductImportOptimizationTests
         worksheet.Cells[2, 2].Value = "Mouse";
         worksheet.Cells[2, 3].Value = "Informatica";
         worksheet.Cells[2, 4].Value = "150";
+
+        return new MemoryStream(package.GetAsByteArray());
+    }
+
+    private static MemoryStream BuildTemplateWithDuplicateSkus()
+    {
+        ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+        using var package = new ExcelPackage();
+        var ws = package.Workbook.Worksheets.Add("Produtos");
+
+        ws.Cells[1, 1].Value = "SKU";
+        ws.Cells[1, 2].Value = "Nome";
+        ws.Cells[1, 3].Value = "Categoria";
+        ws.Cells[1, 4].Value = "Preco de Venda";
+
+        ws.Cells[2, 1].Value = "MC-207"; ws.Cells[2, 2].Value = "Produto A"; ws.Cells[2, 3].Value = "Informatica"; ws.Cells[2, 4].Value = "100";
+        ws.Cells[3, 1].Value = "MC-207"; ws.Cells[3, 2].Value = "Produto B"; ws.Cells[3, 3].Value = "Informatica"; ws.Cells[3, 4].Value = "100";
+        ws.Cells[4, 1].Value = "MC-207"; ws.Cells[4, 2].Value = "Produto C"; ws.Cells[4, 3].Value = "Informatica"; ws.Cells[4, 4].Value = "100";
+
+        return new MemoryStream(package.GetAsByteArray());
+    }
+
+    private static MemoryStream BuildTemplateWithSkuExistingInDb()
+    {
+        ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+        using var package = new ExcelPackage();
+        var ws = package.Workbook.Worksheets.Add("Produtos");
+
+        ws.Cells[1, 1].Value = "SKU";
+        ws.Cells[1, 2].Value = "Nome";
+        ws.Cells[1, 3].Value = "Categoria";
+        ws.Cells[1, 4].Value = "Preco de Venda";
+
+        ws.Cells[2, 1].Value = "CB129-2";
+        ws.Cells[2, 2].Value = "Cabo USB Alpha Gold";
+        ws.Cells[2, 3].Value = "Informatica";
+        ws.Cells[2, 4].Value = "50";
 
         return new MemoryStream(package.GetAsByteArray());
     }

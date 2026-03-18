@@ -344,16 +344,18 @@ public class InventoryService : IInventoryService
                     continue;
                 }
 
-                if (!seenInputSkus.Add(normalizedInputSku))
+                var isDuplicateInSheet = !seenInputSkus.Add(normalizedInputSku);
+                if (isDuplicateInSheet || existingSkus.Contains(normalizedInputSku))
                 {
-                    AddIssue(result, row, $"SKU '{normalizedInputSku}' duplicado na planilha.", normalizedInputSku, name, isSkipped: true);
-                    continue;
-                }
+                    var variant = ResolveVariantSku(normalizedInputSku, existingSkus, seenInputSkus);
+                    if (variant == null)
+                    {
+                        AddIssue(result, row, $"SKU '{normalizedInputSku}' duplicado e nao foi possivel gerar variante unica.", normalizedInputSku, name, isSkipped: true);
+                        continue;
+                    }
 
-                if (existingSkus.Contains(normalizedInputSku))
-                {
-                    AddIssue(result, row, $"SKU '{normalizedInputSku}' ja existe no cadastro.", normalizedInputSku, name, isSkipped: true);
-                    continue;
+                    normalizedInputSku = variant;
+                    seenInputSkus.Add(normalizedInputSku);
                 }
             }
 
@@ -1759,6 +1761,24 @@ public class InventoryService : IInventoryService
     private static string? GetCellText(ExcelWorksheet worksheet, int row, int col)
     {
         return worksheet.Cells[row, col].Text?.Trim();
+    }
+
+    private static string? ResolveVariantSku(string baseSku, HashSet<string> existingSkus, HashSet<string> seenInputSkus)
+    {
+        for (var i = 2; i <= 99; i++)
+        {
+            var suffix = $"-{i}";
+            var candidate = baseSku.Length + suffix.Length <= ProductSkuMaxLength
+                ? $"{baseSku}{suffix}"
+                : $"{baseSku[..(ProductSkuMaxLength - suffix.Length)]}{suffix}";
+
+            if (!existingSkus.Contains(candidate) && !seenInputSkus.Contains(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return null;
     }
 
     private static string GenerateUniqueSku(IReadOnlySet<string> existingSkus)
