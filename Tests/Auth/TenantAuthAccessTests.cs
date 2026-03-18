@@ -80,4 +80,16 @@ public class TenantAuthAccessTests : IClassFixture<TestWebApplicationFactory>
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
+
+    [Fact]
+    public async Task AnonymousUser_ProtectedPage_RedirectsToHomeWhenTenantIsNotResolved()
+    {
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var response = await client.GetAsync("/dashboard");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        response.Headers.Location.Should().NotBeNull();
+        response.Headers.Location!.OriginalString.Should().Be("/");
+    }
 }

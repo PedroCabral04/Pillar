@@ -36,9 +36,16 @@ public class TenantResolutionMiddleware
                 // Se não conseguimos resolver o tenant e não é uma rota pública, retorna 403
                 if (!IsPublicPath(context.Request.Path))
                 {
-                    _logger.LogWarning("Tenant não resolvido para o caminho: {Path}", context.Request.Path);
-                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                    await context.Response.WriteAsync("Tenant não identificado. Acesso negado.");
+                    if (IsApiPath(context.Request.Path))
+                    {
+                        _logger.LogWarning("Tenant não resolvido para o caminho de API: {Path}", context.Request.Path);
+                        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                        await context.Response.WriteAsync("Tenant não identificado. Acesso negado.");
+                        return; // Importante: não chama _next(context)
+                    }
+
+                    _logger.LogInformation("Tenant não resolvido para caminho web {Path}. Redirecionando para '/'.", context.Request.Path);
+                    context.Response.Redirect("/");
                     return; // Importante: não chama _next(context)
                 }
             }
@@ -51,8 +58,16 @@ public class TenantResolutionMiddleware
             // Se houver erro na resolução do tenant e não for rota pública, retorna 403
             if (!IsPublicPath(context.Request.Path))
             {
-                context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                await context.Response.WriteAsync("Erro ao identificar tenant. Acesso negado.");
+                if (IsApiPath(context.Request.Path))
+                {
+                    _logger.LogWarning("Erro ao resolver tenant para caminho de API {Path}. Retornando 403.", context.Request.Path);
+                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    await context.Response.WriteAsync("Erro ao identificar tenant. Acesso negado.");
+                    return; // Importante: não chama _next(context)
+                }
+
+                _logger.LogInformation("Erro ao resolver tenant para caminho web {Path}. Redirecionando para '/'.", context.Request.Path);
+                context.Response.Redirect("/");
                 return; // Importante: não chama _next(context)
             }
         }
@@ -94,6 +109,11 @@ public class TenantResolutionMiddleware
         };
 
         return publicPrefixes.Any(publicPath => path.StartsWith(publicPath, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool IsApiPath(string path)
+    {
+        return path.StartsWith("/api", StringComparison.OrdinalIgnoreCase);
     }
 
     private static void StampTenantContext(HttpContext context, ITenantContextAccessor accessor, Tenant tenant)

@@ -1563,6 +1563,10 @@ public class InventoryService : IInventoryService
 
             _context.ProductCategories.Add(category);
             newCategories.Add(category);
+
+            // Track immediately so subsequent rows in the same sheet are deduplicated
+            categoryByNameOrCode[normalizedName] = 0;
+            categoryByNameOrCode[NormalizeKey(category.Code)] = 0;
         }
 
         if (newCategories.Count == 0)

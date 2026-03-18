@@ -167,6 +167,40 @@ public class ProductImportOptimizationTests
         result.Issues.Should().ContainSingle(i => i.Reason.Contains("SKU invalido", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public async Task ImportProductsFromExcel_DeduplicatesCategoriesWithinSheet_WhenNamesNormalizeToSameKey()
+    {
+        var tenantContext = BuildTenantContext(1);
+        var tenantAccessor = new Mock<ITenantContextAccessor>();
+        tenantAccessor.SetupGet(x => x.Current).Returns(tenantContext);
+
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        await using var context = new ApplicationDbContext(options, tenantContextAccessor: tenantAccessor.Object);
+
+        context.Users.Add(new ApplicationUser
+        {
+            Id = 1,
+            UserName = "import.tester",
+            Email = "import.tester@local"
+        });
+
+        await context.SaveChangesAsync();
+
+        var service = new InventoryService(context, new ProductMapper());
+        await using var fileStream = BuildTemplateWithDuplicateCategoriesInSheet();
+
+        var result = await service.ImportProductsFromExcelAsync(fileStream, userId: 1, CancellationToken.None);
+
+        result.ImportedCount.Should().Be(1);
+        result.FailedCount.Should().Be(0);
+
+        var categoryCount = await context.ProductCategories.CountAsync();
+        categoryCount.Should().Be(1, "the two equivalent category names should produce only one inserted category");
+    }
+
     private static TenantContext BuildTenantContext(int tenantId)
     {
         var context = new TenantContext();
@@ -265,6 +299,33 @@ public class ProductImportOptimizationTests
         worksheet.Cells[2, 2].Value = "Mouse";
         worksheet.Cells[2, 3].Value = "Informatica";
         worksheet.Cells[2, 4].Value = "150.00";
+
+        return new MemoryStream(package.GetAsByteArray());
+    }
+
+    private static MemoryStream BuildTemplateWithDuplicateCategoriesInSheet()
+    {
+        ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+        using var package = new ExcelPackage();
+
+        var productsSheet = package.Workbook.Worksheets.Add("Produtos");
+        productsSheet.Cells[1, 1].Value = "SKU";
+        productsSheet.Cells[1, 2].Value = "Nome";
+        productsSheet.Cells[1, 3].Value = "Categoria";
+        productsSheet.Cells[1, 4].Value = "Preco de Venda";
+
+        productsSheet.Cells[2, 1].Value = "PROD-001";
+        productsSheet.Cells[2, 2].Value = "Notebook";
+        productsSheet.Cells[2, 3].Value = "Eletronicos";
+        productsSheet.Cells[2, 4].Value = "3500.00";
+
+        // "Categorias" sheet has two rows that normalize to the same key:
+        // NormalizeKey("Eletrônicos") == NormalizeKey("Eletronicos") == "eletronicos"
+        var categoriesSheet = package.Workbook.Worksheets.Add("Categorias");
+        categoriesSheet.Cells[1, 1].Value = "Nome";
+
+        categoriesSheet.Cells[2, 1].Value = "Eletrônicos";
+        categoriesSheet.Cells[3, 1].Value = "Eletronicos";
 
         return new MemoryStream(package.GetAsByteArray());
     }
