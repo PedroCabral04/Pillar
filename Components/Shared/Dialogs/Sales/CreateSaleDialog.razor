@@ -232,20 +232,18 @@
                         <MudDivider Class="my-2"/>
                     </MudItem>
                     
-                    @if (!QuickMode)
-                    {
-                        <MudItem xs="12" md="6">
-                            <MudNumericField T="decimal"
-                                            Label="Desconto Geral"
-                                            @bind-Value="_newSale.DiscountAmount"
-                                            Min="0"
-                                            Step="0.01m"
-                                            Variant="Variant.Outlined"
-                                            Format="C2"
-                                            Adornment="Adornment.Start"
-                                            AdornmentText="R$"/>
-                        </MudItem>
-                    }
+                    <MudItem xs="12" md="6">
+                        <MudNumericField T="decimal"
+                                        Label="Desconto Geral"
+                                        @bind-Value="_newSale.DiscountAmount"
+                                        Min="0"
+                                        Max="GetItemsTotal()"
+                                        Step="0.01m"
+                                        Variant="Variant.Outlined"
+                                        Format="C2"
+                                        Adornment="Adornment.Start"
+                                        AdornmentText="R$"/>
+                    </MudItem>
                     
                     <MudItem xs="12" md="6">
                         <MudPaper Elevation="3" Class="pa-3" Style="background: var(--mud-palette-primary); color: white;">
