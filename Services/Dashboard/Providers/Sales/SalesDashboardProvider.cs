@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using erp.Data;
 using erp.DTOs.Dashboard;
 using erp.DTOs.Reports;
+using erp.Models.ServiceOrders;
 using erp.Services.Dashboard;
 using erp.Services.Reports;
 
@@ -26,8 +27,8 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
         {
             ProviderKey = Key,
             WidgetKey = "sales-today",
-            Title = "Resumo de Vendas",
-            Description = "Vendas finalizadas no período selecionado",
+            Title = "Resumo de Vendas + OS",
+            Description = "Vendas finalizadas e OS concluídas no período selecionado",
             ChartType = DashboardChartType.Bar,
             Icon = "mdi-cash-register",
             Unit = "R$",
@@ -37,8 +38,8 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
         {
             ProviderKey = Key,
             WidgetKey = "sales-by-month",
-            Title = "Vendas por Mês",
-            Description = "Total de vendas agregadas por mês",
+            Title = "Vendas + OS por Mês",
+            Description = "Total de vendas e OS agregadas por mês",
             ChartType = DashboardChartType.Bar,
             Icon = "mdi-chart-bar",
             Unit = "R$"
@@ -109,9 +110,22 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
             })
             .ToListAsync(ct);
 
-        var totalAmount = sales.Sum(s => s.NetAmount);
-        var salesCount = sales.Count;
-        
+        var serviceOrders = await _context.ServiceOrders
+            .Where(o => (o.Status == ServiceOrderStatus.Completed.ToString() || o.Status == ServiceOrderStatus.Delivered.ToString()) &&
+                       o.ActualCompletionDate.HasValue &&
+                       o.ActualCompletionDate.Value >= startDate &&
+                       o.ActualCompletionDate.Value < endDate)
+            .Select(o => new
+            {
+                o.Id,
+                o.NetAmount,
+                o.ActualCompletionDate
+            })
+            .ToListAsync(ct);
+
+        var totalAmount = sales.Sum(s => s.NetAmount) + serviceOrders.Sum(o => o.NetAmount);
+        var salesCount = sales.Count + serviceOrders.Count;
+
         // Build dynamic title based on date range
         var periodLabel = DashboardDateUtils.FormatPeriodLabel(query.From, query.To);
         var dynamicTitle = GetDynamicSalesTitle(query.From, query.To);
@@ -123,14 +137,15 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
             {
                 new() { Name = "Valor", Data = new List<decimal> { totalAmount, salesCount } }
             },
-            Subtitle = $"{salesCount} venda(s) | Total: {CurrencyFormatService.FormatStatic(totalAmount)}",
+            Subtitle = $"{sales.Count} venda(s) + {serviceOrders.Count} OS | Total: {CurrencyFormatService.FormatStatic(totalAmount)}",
             DynamicTitle = dynamicTitle,
-            DynamicDescription = $"Vendas finalizadas de {periodLabel}",
+            DynamicDescription = $"Vendas e OS finalizadas de {periodLabel}",
             PeriodLabel = periodLabel,
             Meta = new Dictionary<string, object>
             {
                 { "TotalAmount", totalAmount },
-                { "SalesCount", salesCount },
+                { "SalesCount", sales.Count },
+                { "ServiceOrderCount", serviceOrders.Count },
                 { "StartDate", startDate.ToString("yyyy-MM-dd") },
                 { "EndDate", endDate.AddDays(-1).ToString("yyyy-MM-dd") }
             }
@@ -172,8 +187,8 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
         var periodLabel = DashboardDateUtils.FormatPeriodLabel(query.From, query.To);
 
         var salesByMonth = await _context.Sales
-            .Where(s => s.Status == "Finalizada" && 
-                       s.SaleDate >= startDate && 
+            .Where(s => s.Status == "Finalizada" &&
+                       s.SaleDate >= startDate &&
                        s.SaleDate <= endDate)
             .GroupBy(s => new { s.SaleDate.Year, s.SaleDate.Month })
             .Select(g => new
@@ -181,6 +196,20 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
                 g.Key.Year,
                 g.Key.Month,
                 Total = g.Sum(s => s.NetAmount)
+            })
+            .ToListAsync(ct);
+
+        var serviceOrdersByMonth = await _context.ServiceOrders
+            .Where(o => (o.Status == ServiceOrderStatus.Completed.ToString() || o.Status == ServiceOrderStatus.Delivered.ToString()) &&
+                       o.ActualCompletionDate.HasValue &&
+                       o.ActualCompletionDate.Value >= startDate &&
+                       o.ActualCompletionDate.Value <= endDate)
+            .GroupBy(o => new { o.ActualCompletionDate.Value.Year, o.ActualCompletionDate.Value.Month })
+            .Select(g => new
+            {
+                g.Key.Year,
+                g.Key.Month,
+                Total = g.Sum(o => o.NetAmount)
             })
             .OrderBy(x => x.Year).ThenBy(x => x.Month)
             .ToListAsync(ct);
@@ -198,13 +227,20 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
             s => s.Total
         );
 
+        var serviceOrdersDict = serviceOrdersByMonth.ToDictionary(
+            s => $"{s.Month}/{s.Year}",
+            s => s.Total
+        );
+
         var data = months.Select(m =>
         {
             var parts = m.Split('/');
             var monthNum = DateTime.ParseExact(parts[0], "MMM", System.Globalization.CultureInfo.CurrentCulture).Month;
             var year = int.Parse("20" + parts[1]);
             var key = $"{monthNum}/{year}";
-            return salesDict.GetValueOrDefault(key, 0);
+            var salesTotal = salesDict.GetValueOrDefault(key, 0);
+            var osTotal = serviceOrdersDict.GetValueOrDefault(key, 0);
+            return salesTotal + osTotal;
         }).ToList();
 
         return new ChartDataResponse
@@ -216,7 +252,7 @@ public class SalesDashboardProvider : IDashboardWidgetProvider
             },
             Subtitle = $"Total: {CurrencyFormatService.FormatStatic(data.Sum(d => d))}",
             PeriodLabel = periodLabel,
-            DynamicDescription = $"Vendas agregadas por mês de {periodLabel}"
+            DynamicDescription = $"Vendas e OS agregadas por mês de {periodLabel}"
         };
     }
 

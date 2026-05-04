@@ -443,6 +443,7 @@ builder.Services.AddScoped<IDashboardWidgetProvider, SalesDashboardProvider>();
 builder.Services.AddScoped<IDashboardWidgetProvider, FinanceDashboardProvider>();
 builder.Services.AddScoped<IDashboardWidgetProvider, erp.Services.Dashboard.Providers.Inventory.InventoryDashboardProvider>();
 builder.Services.AddScoped<IDashboardWidgetProvider, erp.Services.Dashboard.Providers.HR.HRDashboardProvider>();
+builder.Services.AddScoped<IDashboardWidgetProvider, erp.Services.Dashboard.Providers.ServiceOrders.ServiceOrderDashboardProvider>();
 builder.Services.AddScoped<erp.Services.DashboardCustomization.IDashboardLayoutService, erp.Services.DashboardCustomization.DashboardLayoutService>();
 // Validation services
 builder.Services.AddScoped<erp.Services.Validation.IUserValidationService, erp.Services.Validation.UserValidationService>();
