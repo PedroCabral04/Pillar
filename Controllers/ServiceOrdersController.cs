@@ -607,6 +607,7 @@ public class ServiceOrdersController : ControllerBase
             Documento gerado em {DateTime.Now:dd/MM/yyyy HH:mm} - {tenantName} - Ordem de Serviço
         </div>
     </div>
+    <script>window.onload = function() {{ window.print(); }};</script>
 </body>
 </html>";
     }
