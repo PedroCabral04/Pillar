@@ -435,7 +435,7 @@ else if (_sale != null)
         try
         {
             var url = $"/api/vendas/{Id}/export/pdf";
-            await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+            await JSRuntime.InvokeVoidAsync("downloadFileFromUrl", url, $"venda-{_sale.SaleNumber}.pdf");
             Snackbar.Add("Exportando PDF...", Severity.Info);
         }
         catch (Exception ex)

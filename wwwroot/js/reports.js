@@ -1,5 +1,6 @@
 // File download helper for exporting reports
-window.downloadFile = function (filename, base64Data, contentType) {
+window.downloadBase64File = function (filename, base64Data, contentType) {
+    contentType = contentType || 'application/octet-stream';
     const byteCharacters = atob(base64Data);
     const byteNumbers = new Array(byteCharacters.length);
     
@@ -18,4 +19,27 @@ window.downloadFile = function (filename, base64Data, contentType) {
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
+};
+
+window.downloadFileFromUrl = function(url, fileName) {
+    fetch(url, { credentials: 'same-origin' })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.blob();
+        })
+        .then(blob => {
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
+        })
+        .catch(error => {
+            console.error('Error downloading file:', error);
+            alert('Erro ao baixar arquivo');
+        });
 };

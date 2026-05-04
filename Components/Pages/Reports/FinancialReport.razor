@@ -717,7 +717,23 @@
                 }
             }
             
-            await JS.InvokeVoidAsync("open", url, "_blank");
+            var fileName = format == "pdf"
+                ? $"{reportType}-{_cashFlowFilter.StartDate:yyyyMMdd}-{_cashFlowFilter.EndDate:yyyyMMdd}.pdf"
+                : $"{reportType}-{_cashFlowFilter.StartDate:yyyyMMdd}-{_cashFlowFilter.EndDate:yyyyMMdd}.xlsx";
+            if (reportType == "daily-closing")
+            {
+                var selectedDate = (_dailyClosingDate ?? DateTime.Now.Date).Date;
+                fileName = format == "pdf"
+                    ? $"{reportType}-{selectedDate:yyyyMMdd}.pdf"
+                    : $"{reportType}-{selectedDate:yyyyMMdd}.xlsx";
+            }
+            else if (reportType == "balance-sheet")
+            {
+                fileName = format == "pdf"
+                    ? $"{reportType}-{_balanceSheetFilter.StartDate:yyyyMMdd}.pdf"
+                    : $"{reportType}-{_balanceSheetFilter.StartDate:yyyyMMdd}.xlsx";
+            }
+            await JS.InvokeVoidAsync("downloadFileFromUrl", url, fileName);
             Snackbar.Add($"Relatório exportado em {format.ToUpper()}!", Severity.Success);
         }
         catch (Exception ex)

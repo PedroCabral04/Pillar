@@ -454,7 +454,10 @@
             if (!string.IsNullOrEmpty(_filter.Status))
                 url += $"&Status={_filter.Status}";
             
-            await JS.InvokeVoidAsync("open", url, "_blank");
+            var fileName = format == "pdf" 
+                ? $"relatorio-vendas-{_filter.StartDate:yyyyMMdd}-{_filter.EndDate:yyyyMMdd}.pdf"
+                : $"relatorio-vendas-{_filter.StartDate:yyyyMMdd}-{_filter.EndDate:yyyyMMdd}.xlsx";
+            await JS.InvokeVoidAsync("downloadFileFromUrl", url, fileName);
             Snackbar.Add($"Relatório exportado em {format.ToUpper()}!", Severity.Success);
         }
         catch (Exception ex)

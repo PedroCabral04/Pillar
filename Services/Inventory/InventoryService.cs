@@ -140,15 +140,15 @@ public class InventoryService : IInventoryService
     {
         var tenantId = GetCurrentTenantId();
 
-        // Validar SKU único
-        if (await _context.Products.AnyAsync(p => p.Sku == dto.Sku))
+        // Validar SKU único no tenant
+        if (await _context.Products.AnyAsync(p => p.Sku == dto.Sku && p.TenantId == tenantId))
         {
             throw new InvalidOperationException($"Já existe um produto com o SKU '{dto.Sku}'");
         }
 
-        // Validar Barcode único se informado
+        // Validar Barcode único no tenant se informado
         if (!string.IsNullOrWhiteSpace(dto.Barcode) && 
-            await _context.Products.AnyAsync(p => p.Barcode == dto.Barcode))
+            await _context.Products.AnyAsync(p => p.Barcode == dto.Barcode && p.TenantId == tenantId))
         {
             throw new InvalidOperationException($"Já existe um produto com o código de barras '{dto.Barcode}'");
         }
@@ -181,6 +181,8 @@ public class InventoryService : IInventoryService
         int userId,
         CancellationToken cancellationToken = default)
     {
+        var tenantId = GetCurrentTenantId();
+
         if (fileStream == null || !fileStream.CanRead)
         {
             throw new InvalidOperationException("Arquivo invalido para importacao.");
@@ -241,12 +243,13 @@ public class InventoryService : IInventoryService
 
         var existingSkuList = await _context.Products
             .AsNoTracking()
+            .Where(p => p.TenantId == tenantId)
             .Select(p => p.Sku)
             .ToListAsync(cancellationToken);
 
         var existingBarcodeList = await _context.Products
             .AsNoTracking()
-            .Where(p => p.Barcode != null && p.Barcode != string.Empty)
+            .Where(p => p.TenantId == tenantId && p.Barcode != null && p.Barcode != string.Empty)
             .Select(p => p.Barcode!)
             .ToListAsync(cancellationToken);
 
@@ -488,15 +491,15 @@ public class InventoryService : IInventoryService
             throw new InvalidOperationException("Produto não encontrado");
         }
 
-        // Validar SKU único
-        if (await _context.Products.AnyAsync(p => p.Sku == dto.Sku && p.Id != dto.Id))
+        // Validar SKU único no tenant
+        if (await _context.Products.AnyAsync(p => p.Sku == dto.Sku && p.Id != dto.Id && p.TenantId == tenantId))
         {
             throw new InvalidOperationException($"Já existe outro produto com o SKU '{dto.Sku}'");
         }
 
-        // Validar Barcode único se informado
+        // Validar Barcode único no tenant se informado
         if (!string.IsNullOrWhiteSpace(dto.Barcode) && 
-            await _context.Products.AnyAsync(p => p.Barcode == dto.Barcode && p.Id != dto.Id))
+            await _context.Products.AnyAsync(p => p.Barcode == dto.Barcode && p.Id != dto.Id && p.TenantId == tenantId))
         {
             throw new InvalidOperationException($"Já existe outro produto com o código de barras '{dto.Barcode}'");
         }
