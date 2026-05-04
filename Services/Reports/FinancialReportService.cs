@@ -2,6 +2,7 @@ using erp.Data;
 using erp.DTOs.Reports;
 using erp.Extensions;
 using erp.Models.Financial;
+using erp.Models.ServiceOrders;
 using Microsoft.EntityFrameworkCore;
 
 namespace erp.Services.Reports;
@@ -72,9 +73,25 @@ public class FinancialReportService : IFinancialReportService
             var receivables = await receivablesQuery.ToListAsync();
             var payables = await payablesQuery.ToListAsync();
 
+            var completedStatuses = new[] { ServiceOrderStatus.Completed.ToString(), ServiceOrderStatus.Delivered.ToString() };
+            var osQuery = _context.ServiceOrders
+                .Where(o => !o.CustomerId.HasValue && completedStatuses.Contains(o.Status));
+
+            if (filter.StartDate.HasValue)
+            {
+                var startDate = filter.StartDate.Value.ToUniversalTime();
+                osQuery = osQuery.Where(o => o.ActualCompletionDate >= startDate || (o.ActualCompletionDate == null && o.EntryDate >= startDate));
+            }
+            if (filter.EndDate.HasValue)
+            {
+                var endDate = filter.EndDate.Value.ToUniversalTime();
+                osQuery = osQuery.Where(o => o.ActualCompletionDate <= endDate || (o.ActualCompletionDate == null && o.EntryDate <= endDate));
+            }
+
+            var orphanServiceOrders = await osQuery.ToListAsync();
+
             var items = new List<CashFlowItemDto>();
 
-            // Add receivables
             items.AddRange(receivables.Select(r => new CashFlowItemDto
             {
                 Date = r.DueDate,
@@ -86,7 +103,6 @@ public class FinancialReportService : IFinancialReportService
                 Status = r.Status.ToString()
             }));
 
-            // Add payables
             items.AddRange(payables.Select(p => new CashFlowItemDto
             {
                 Date = p.DueDate,
@@ -98,11 +114,24 @@ public class FinancialReportService : IFinancialReportService
                 Status = p.Status.ToString()
             }));
 
+            items.AddRange(orphanServiceOrders.Select(o => new CashFlowItemDto
+            {
+                Date = o.ActualCompletionDate ?? o.EntryDate,
+                Description = $"OS {o.OrderNumber}",
+                Type = "Receita",
+                Category = "Ordem de Servico",
+                PaymentMethod = o.PaymentMethod ?? "Nao informado",
+                Amount = o.NetAmount,
+                Status = "Paid"
+            }));
+
             items = items.OrderBy(i => i.Date).ToList();
+
+            var osRevenue = orphanServiceOrders.Sum(o => o.NetAmount);
 
             var summary = new CashFlowSummaryDto
             {
-                TotalRevenue = receivables.Where(r => r.Status == AccountStatus.Paid).Sum(r => r.NetAmount),
+                TotalRevenue = receivables.Where(r => r.Status == AccountStatus.Paid).Sum(r => r.NetAmount) + osRevenue,
                 TotalExpenses = payables.Where(p => p.Status == AccountStatus.Paid).Sum(p => p.NetAmount),
                 PendingReceivables = receivables.Where(r => r.Status == AccountStatus.Pending).Sum(r => r.NetAmount),
                 PendingPayables = payables.Where(p => p.Status == AccountStatus.Pending).Sum(p => p.NetAmount),
@@ -176,6 +205,21 @@ public class FinancialReportService : IFinancialReportService
             var receivables = await receivablesQuery.ToListAsync();
             var payables = await payablesQuery.ToListAsync();
 
+            var completedStatuses = new[] { ServiceOrderStatus.Completed.ToString(), ServiceOrderStatus.Delivered.ToString() };
+            var orphanServiceOrders = await _context.ServiceOrders
+                .Where(o => !o.CustomerId.HasValue && completedStatuses.Contains(o.Status)
+                    && o.ActualCompletionDate.HasValue
+                    && o.ActualCompletionDate.Value.Date >= reportDate
+                    && o.ActualCompletionDate.Value.Date < nextDate)
+                .ToListAsync();
+
+            var orphanDueEntries = await _context.ServiceOrders
+                .Where(o => !o.CustomerId.HasValue && completedStatuses.Contains(o.Status)
+                    && !o.ActualCompletionDate.HasValue
+                    && o.EntryDate.Date >= reportDate
+                    && o.EntryDate.Date < nextDate)
+                .ToListAsync();
+
             var openingEntries = receivables
                 .Where(r => r.PaymentDate.HasValue
                     && r.PaymentDate.Value.Date < reportDate
@@ -195,6 +239,7 @@ public class FinancialReportService : IFinancialReportService
                     && (r.Status == AccountStatus.Paid || r.Status == AccountStatus.PartiallyPaid)
                     && r.PaidAmount > 0)
                 .Select(r => MapReceivableToDailyClosingItem(r, reportDate))
+                .Concat(orphanServiceOrders.Concat(orphanDueEntries).Select(o => MapServiceOrderToDailyClosingItem(o, reportDate)))
                 .OrderBy(x => x.PaymentDate)
                 .ThenBy(x => x.DueDate)
                 .ToList();
@@ -215,6 +260,7 @@ public class FinancialReportService : IFinancialReportService
                     && r.DueDate.Date < nextDate
                     && r.Status != AccountStatus.Cancelled)
                 .Select(r => MapReceivableToDailyClosingItem(r, reportDate))
+                .Concat(orphanDueEntries.Select(o => MapServiceOrderToDailyClosingItem(o, reportDate)))
                 .OrderBy(x => x.DueDate)
                 .ToList();
 
@@ -324,14 +370,14 @@ public class FinancialReportService : IFinancialReportService
             {
                 var startDate = filter.StartDate.Value.ToUniversalTime();
                 salesQuery = salesQuery.Where(s => s.SaleDate >= startDate);
-                serviceOrdersQuery = serviceOrdersQuery.Where(o => o.EntryDate >= startDate);
+                serviceOrdersQuery = serviceOrdersQuery.Where(o => o.ActualCompletionDate >= startDate || (o.ActualCompletionDate == null && o.EntryDate >= startDate));
             }
             
             if (filter.EndDate.HasValue)
             {
                 var endDate = filter.EndDate.Value.ToUniversalTime();
                 salesQuery = salesQuery.Where(s => s.SaleDate <= endDate);
-                serviceOrdersQuery = serviceOrdersQuery.Where(o => o.EntryDate <= endDate);
+                serviceOrdersQuery = serviceOrdersQuery.Where(o => o.ActualCompletionDate <= endDate || (o.ActualCompletionDate == null && o.EntryDate <= endDate));
             }
 
             var sales = await salesQuery
@@ -540,6 +586,34 @@ public class FinancialReportService : IFinancialReportService
             PaidAmount = account.PaidAmount,
             RemainingAmount = account.RemainingAmount,
             IsOverdue = account.DueDate.Date < reportDate && account.Status != AccountStatus.Paid && account.Status != AccountStatus.Cancelled
+        };
+    }
+
+    private static DailyClosingItemDto MapServiceOrderToDailyClosingItem(ServiceOrder order, DateTime reportDate)
+    {
+        var completionDate = order.ActualCompletionDate ?? order.EntryDate;
+        return new DailyClosingItemDto
+        {
+            Id = order.Id,
+            Source = "Ordem de Servico",
+            Type = "Entrada",
+            Counterparty = order.Customer?.Name ?? "Cliente nao informado",
+            Description = $"OS {order.OrderNumber}",
+            Category = "Ordem de Servico",
+            CostCenter = "Sem centro de custo",
+            PaymentMethod = order.PaymentMethod ?? "Nao informado",
+            Status = "Pago",
+            IssueDate = order.EntryDate,
+            DueDate = completionDate,
+            PaymentDate = completionDate,
+            OriginalAmount = order.TotalAmount,
+            DiscountAmount = order.DiscountAmount,
+            InterestAmount = 0,
+            FineAmount = 0,
+            NetAmount = order.NetAmount,
+            PaidAmount = order.NetAmount,
+            RemainingAmount = 0,
+            IsOverdue = false
         };
     }
 

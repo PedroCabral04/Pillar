@@ -1,6 +1,9 @@
 using erp.DAOs.Financial;
+using erp.Data;
 using erp.DTOs.Financial;
 using erp.Models.Financial;
+using erp.Models.ServiceOrders;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace erp.Services.Financial;
@@ -9,25 +12,26 @@ public class FinancialDashboardService : IFinancialDashboardService
 {
     private readonly IAccountPayableDao _payableDao;
     private readonly IAccountReceivableDao _receivableDao;
+    private readonly ApplicationDbContext _dbContext;
     private readonly FinancialOptions _options;
 
     public FinancialDashboardService(
         IAccountPayableDao payableDao,
         IAccountReceivableDao receivableDao,
+        ApplicationDbContext dbContext,
         IOptions<FinancialOptions> options)
     {
         _payableDao = payableDao;
         _receivableDao = receivableDao;
+        _dbContext = dbContext;
         _options = options.Value;
     }
 
     public async Task<FinancialDashboardDto> GetDashboardDataAsync(DateTime? startDate = null, DateTime? endDate = null, decimal initialBalance = 0)
     {
-        // Use date-filtered queries to avoid loading all records into memory
         var allPayables = await _payableDao.GetByDateRangeAsync(startDate, endDate);
         var allReceivables = await _receivableDao.GetByDateRangeAsync(startDate, endDate);
 
-        // Apply date filter if provided (using IssueDate for historical analysis)
         var payables = allPayables.AsEnumerable();
         var receivables = allReceivables.AsEnumerable();
         
@@ -47,34 +51,53 @@ public class FinancialDashboardService : IFinancialDashboardService
         
         var payablesList = payables.ToList();
         var receivablesList = receivables.ToList();
+
+        var completedStatuses = new[] { ServiceOrderStatus.Completed.ToString(), ServiceOrderStatus.Delivered.ToString() };
+        var osQuery = _dbContext.ServiceOrders
+            .Where(o => !o.CustomerId.HasValue && completedStatuses.Contains(o.Status));
+
+        if (startDate.HasValue)
+        {
+            var filterStart = startDate.Value.ToUniversalTime();
+            osQuery = osQuery.Where(o => o.ActualCompletionDate >= filterStart || (o.ActualCompletionDate == null && o.EntryDate >= filterStart));
+        }
+        if (endDate.HasValue)
+        {
+            var filterEnd = endDate.Value.ToUniversalTime();
+            osQuery = osQuery.Where(o => o.ActualCompletionDate <= filterEnd || (o.ActualCompletionDate == null && o.EntryDate <= filterEnd));
+        }
+
+        var orphanServiceOrders = await osQuery.ToListAsync();
+        var osRevenueTotal = orphanServiceOrders.Sum(o => o.NetAmount);
+
+        var osByCompletionDate = orphanServiceOrders
+            .Where(o => o.ActualCompletionDate.HasValue)
+            .GroupBy(o => o.ActualCompletionDate!.Value.Date)
+            .ToDictionary(g => g.Key, g => g.Sum(o => o.NetAmount));
         
         var dto = new FinancialDashboardDto();
 
-        // Totals (filtered by period)
         dto.TotalPayable = payablesList.Sum(x => x.NetAmount);
         dto.TotalPayableOverdue = payablesList.Where(x => x.Status == AccountStatus.Overdue).Sum(x => x.RemainingAmount);
         dto.TotalPayablePaid = payablesList.Where(x => x.Status == AccountStatus.Paid).Sum(x => x.PaidAmount);
         dto.TotalPayablePending = payablesList.Where(x => x.Status == AccountStatus.Pending).Sum(x => x.RemainingAmount);
 
-        dto.TotalReceivable = receivablesList.Sum(x => x.NetAmount);
+        dto.TotalReceivable = receivablesList.Sum(x => x.NetAmount) + osRevenueTotal;
         dto.TotalReceivableOverdue = receivablesList.Where(x => x.Status == AccountStatus.Overdue).Sum(x => x.RemainingAmount);
-        dto.TotalReceivablePaid = receivablesList.Where(x => x.Status == AccountStatus.Paid).Sum(x => x.PaidAmount);
+        dto.TotalReceivablePaid = receivablesList.Where(x => x.Status == AccountStatus.Paid).Sum(x => x.PaidAmount) + osRevenueTotal;
         dto.TotalReceivablePending = receivablesList.Where(x => x.Status == AccountStatus.Pending).Sum(x => x.RemainingAmount);
 
-        // Counts
         dto.PayablesCount = payablesList.Count(x => x.Status != AccountStatus.Paid && x.Status != AccountStatus.Cancelled);
         dto.PayablesOverdueCount = payablesList.Count(x => x.Status == AccountStatus.Overdue);
         dto.ReceivablesCount = receivablesList.Count(x => x.Status != AccountStatus.Paid && x.Status != AccountStatus.Cancelled);
         dto.ReceivablesOverdueCount = receivablesList.Count(x => x.Status == AccountStatus.Overdue);
 
-        // Cash Flow Projection - Use date range if provided, otherwise next 30 days
         var projectionStart = startDate?.ToUniversalTime().Date ?? DateTime.UtcNow.Date;
         var projectionEnd = endDate?.ToUniversalTime().Date ?? projectionStart.AddDays(30);
         var projectionDays = (int)(projectionEnd - projectionStart).TotalDays;
         if (projectionDays <= 0) projectionDays = 30;
-        if (projectionDays > 365) projectionDays = 365; // Cap at 1 year for performance
+        if (projectionDays > 365) projectionDays = 365;
         
-        // For projection, we need all unpaid accounts with DueDate in the range
         var flowPayables = allPayables
             .Where(x => x.DueDate >= projectionStart && x.DueDate <= projectionEnd && x.Status != AccountStatus.Paid && x.Status != AccountStatus.Cancelled)
             .GroupBy(x => x.DueDate.Date)
@@ -85,7 +108,6 @@ public class FinancialDashboardService : IFinancialDashboardService
             .GroupBy(x => x.DueDate.Date)
             .ToDictionary(g => g.Key, g => g.Sum(x => x.RemainingAmount));
 
-        // Get realized (paid) accounts to show what already happened
         var today = DateTime.UtcNow.Date;
         var historyDays = 30;
         var finalDate = projectionEnd;
@@ -100,7 +122,14 @@ public class FinancialDashboardService : IFinancialDashboardService
             .GroupBy(x => x.PaymentDate!.Value.Date)
             .ToDictionary(g => g.Key, g => g.Sum(x => x.PaidAmount));
 
-        // Calculate cumulative balance starting from initial balance
+        foreach (var kv in osByCompletionDate)
+        {
+            if (flowReceivablesPaid.ContainsKey(kv.Key))
+                flowReceivablesPaid[kv.Key] += kv.Value;
+            else
+                flowReceivablesPaid[kv.Key] = kv.Value;
+        }
+
         decimal cumulativeBalance = dto.TotalReceivablePaid - dto.TotalPayablePaid;
 
         for (int i = 0; i <= projectionDays; i++)
@@ -121,7 +150,6 @@ public class FinancialDashboardService : IFinancialDashboardService
             
             dto.CashFlowProjection.Add(cashFlowItem);
             
-            // Add alert for negative balance days
             if (cumulativeBalance < 0)
             {
                 dto.CashFlowAlerts.Add(new CashFlowAlertDto
@@ -135,11 +163,9 @@ public class FinancialDashboardService : IFinancialDashboardService
             }
         }
 
-        // Aging List (uses all accounts, not date-filtered, as aging is about current overdue status)
         dto.PayablesAgingList = CalculateAgingList(allPayables.Where(x => x.Status != AccountStatus.Paid && x.Status != AccountStatus.Cancelled));
         dto.ReceivablesAgingList = CalculateAgingList(allReceivables.Where(x => x.Status != AccountStatus.Paid && x.Status != AccountStatus.Cancelled));
 
-        // Top Suppliers (filtered by period)
         dto.TopSuppliers = payablesList
             .Where(x => x.Supplier != null)
             .GroupBy(x => x.SupplierId)
@@ -154,7 +180,6 @@ public class FinancialDashboardService : IFinancialDashboardService
             .Take(5)
             .ToList();
 
-        // Top Customers (filtered by period)
         dto.TopCustomers = receivablesList
             .Where(x => x.Customer != null)
             .GroupBy(x => x.CustomerId)
@@ -179,19 +204,15 @@ public class FinancialDashboardService : IFinancialDashboardService
 
         var overdue = accounts.Where(x => x.DueDate < today).ToList();
         
-        // 0-30 days overdue
         var d0_30 = overdue.Where(x => (today - x.DueDate).TotalDays <= 30).ToList();
         list.Add(new AgingListItemDto { Period = "0-30 dias", Count = d0_30.Count, Amount = d0_30.Sum(x => (decimal)x.RemainingAmount) });
 
-        // 31-60 days overdue
         var d31_60 = overdue.Where(x => (today - x.DueDate).TotalDays > 30 && (today - x.DueDate).TotalDays <= 60).ToList();
         list.Add(new AgingListItemDto { Period = "31-60 dias", Count = d31_60.Count, Amount = d31_60.Sum(x => (decimal)x.RemainingAmount) });
 
-        // 61-90 days overdue
         var d61_90 = overdue.Where(x => (today - x.DueDate).TotalDays > 60 && (today - x.DueDate).TotalDays <= 90).ToList();
         list.Add(new AgingListItemDto { Period = "61-90 dias", Count = d61_90.Count, Amount = d61_90.Sum(x => (decimal)x.RemainingAmount) });
 
-        // >90 days overdue
         var d90plus = overdue.Where(x => (today - x.DueDate).TotalDays > 90).ToList();
         list.Add(new AgingListItemDto { Period = ">90 dias", Count = d90plus.Count, Amount = d90plus.Sum(x => (decimal)x.RemainingAmount) });
 

@@ -252,6 +252,11 @@ public class ServiceOrderService : IServiceOrderService
         _mapper.UpdateEntity(dto, order);
         order.UpdatedAt = DateTime.UtcNow;
 
+        if (order.Status == ServiceOrderStatus.Completed.ToString() && !order.ActualCompletionDate.HasValue)
+        {
+            order.ActualCompletionDate = DateTime.UtcNow;
+        }
+
         // Update items if provided
         if (dto.Items != null)
         {
