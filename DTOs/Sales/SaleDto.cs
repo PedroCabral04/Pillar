@@ -17,6 +17,9 @@ public class SaleDto
     public string Status { get; set; } = string.Empty;
     public string? PaymentMethod { get; set; }
     public string? Notes { get; set; }
+    public string? WarrantyType { get; set; }
+    public DateTime? WarrantyExpiration { get; set; }
+    public string? ReceiptNotes { get; set; }
     public List<SaleItemDto> Items { get; set; } = new();
     public DateTime CreatedAt { get; set; }
 }
@@ -55,9 +58,15 @@ public class CreateSaleDto
     
     [StringLength(50)]
     public string? PaymentMethod { get; set; }
-    
+
     public string? Notes { get; set; }
-    
+
+    [StringLength(50)]
+    public string? WarrantyType { get; set; }
+
+    [StringLength(2000)]
+    public string? ReceiptNotes { get; set; }
+
     [Required(ErrorMessage = "A venda deve conter pelo menos um item")]
     [MinLength(1, ErrorMessage = "A venda deve conter pelo menos um item")]
     public List<CreateSaleItemDto> Items { get; set; } = new();
@@ -96,4 +105,10 @@ public class UpdateSaleDto
     public string? PaymentMethod { get; set; }
     
     public string? Notes { get; set; }
+
+    [StringLength(50)]
+    public string? WarrantyType { get; set; }
+
+    [StringLength(2000)]
+    public string? ReceiptNotes { get; set; }
 }

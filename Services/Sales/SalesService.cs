@@ -55,6 +55,9 @@ public class SalesService : ISalesService
                     Status = dto.Status,
                     PaymentMethod = dto.PaymentMethod,
                     Notes = dto.Notes,
+                    WarrantyType = dto.WarrantyType,
+                    ReceiptNotes = dto.ReceiptNotes,
+                    WarrantyExpiration = CalculateWarrantyExpiration(dto.WarrantyType, dto.SaleDate),
                     CreatedAt = DateTime.UtcNow
                 };
 
@@ -282,6 +285,9 @@ public class SalesService : ISalesService
         sale.Status = dto.Status;
         sale.PaymentMethod = dto.PaymentMethod;
         sale.Notes = dto.Notes;
+        sale.WarrantyType = dto.WarrantyType;
+        sale.ReceiptNotes = dto.ReceiptNotes;
+        sale.WarrantyExpiration = CalculateWarrantyExpiration(dto.WarrantyType, sale.SaleDate);
         sale.NetAmount = sale.TotalAmount - sale.DiscountAmount;
         sale.UpdatedAt = DateTime.UtcNow;
 
@@ -294,6 +300,18 @@ public class SalesService : ISalesService
             throw new InvalidOperationException($"Venda atualizada (ID: {id}) não pôde ser recuperada do banco de dados. Contate o suporte.");
         }
         return updatedSale;
+    }
+
+    private static DateTime? CalculateWarrantyExpiration(string? warrantyType, DateTime saleDate)
+    {
+        return warrantyType switch
+        {
+            "Days30" => saleDate.AddDays(30),
+            "Days90" => saleDate.AddDays(90),
+            "Days180" => saleDate.AddDays(180),
+            "Days365" => saleDate.AddDays(365),
+            _ => null
+        };
     }
 
     public async Task<bool> CancelAsync(int id, CancellationToken ct = default)

@@ -22,6 +22,12 @@ public partial class SalesMapper
     // SaleItem mappings
     [UserMapping(Default = true)]
     public partial SaleItemDto ToDto(SaleItem item);
+
+    // Receipt mapping
+    [MapProperty(nameof(Sale.WarrantyType), nameof(SaleDto.WarrantyType))]
+    [MapProperty(nameof(Sale.WarrantyExpiration), nameof(SaleDto.WarrantyExpiration))]
+    [MapProperty(nameof(Sale.ReceiptNotes), nameof(SaleDto.ReceiptNotes))]
+    public partial void UpdateReceiptInfo(Sale source, SaleDto target);
     
     [MapProperty(nameof(SaleItem.Product.Name), nameof(SaleItemDto.ProductName))]
     [MapProperty(nameof(SaleItem.Product.Sku), nameof(SaleItemDto.ProductSku))]

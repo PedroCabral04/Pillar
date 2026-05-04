@@ -5,6 +5,7 @@ using erp.Models.Identity;
 using erp.Services.Sales;
 using erp.Services.Authorization;
 using erp.Services.Reports;
+using erp.Services.Tenancy;
 using erp.Models.Audit;
 
 namespace erp.Controllers;
@@ -22,6 +23,7 @@ public class SalesController : ControllerBase
     private readonly IPdfExportService _pdfExportService;
     private readonly IWebHostEnvironment _webHostEnvironment;
     private readonly IPermissionService _permissionService;
+    private readonly ITenantContextAccessor _tenantContextAccessor;
     private readonly ILogger<SalesController> _logger;
 
     public SalesController(
@@ -30,6 +32,7 @@ public class SalesController : ControllerBase
         IPdfExportService pdfExportService,
         IWebHostEnvironment webHostEnvironment,
         IPermissionService permissionService,
+        ITenantContextAccessor tenantContextAccessor,
         ILogger<SalesController> logger)
     {
         _salesService = salesService;
@@ -37,6 +40,7 @@ public class SalesController : ControllerBase
         _pdfExportService = pdfExportService;
         _webHostEnvironment = webHostEnvironment;
         _permissionService = permissionService;
+        _tenantContextAccessor = tenantContextAccessor;
         _logger = logger;
     }
 
@@ -671,6 +675,63 @@ public class SalesController : ControllerBase
     private async Task<bool> HasSalesActionAsync(string actionKey)
     {
         return await _permissionService.HasModuleActionAccessAsync(User, ModuleKeys.Sales, actionKey);
+    }
+
+    /// <summary>
+    /// Gera comprovante de venda em PDF (com garantia)
+    /// </summary>
+    /// <param name="id">ID da venda</param>
+    /// <returns>Arquivo PDF do comprovante</returns>
+    [HttpGet("{id:int}/receipt/pdf")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> ExportSaleReceiptToPdf(int id)
+    {
+        var denied = await EnsureSalesActionAsync(ModuleActionKeys.Sales.ExportPdf, "Você não tem permissão para exportar comprovantes de venda.");
+        if (denied != null)
+            return denied;
+
+        try
+        {
+            var sale = await _salesService.GetByIdAsync(id);
+            if (sale == null)
+            {
+                return NotFound(new { message = $"Venda com ID {id} não encontrada" });
+            }
+
+            var tenantName = GetCurrentTenantName();
+            var logoPath = ResolveTenantLogoPhysicalPath();
+            var pdfBytes = _pdfExportService.ExportSaleReceiptToPdf(sale, logoPath, tenantName);
+            return File(pdfBytes, "application/pdf", $"comprovante-{sale.SaleNumber}.pdf");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao gerar comprovante da venda {SaleId}", id);
+            return StatusCode(500, new { message = "Erro ao gerar comprovante", error = ex.Message });
+        }
+    }
+
+    private string GetCurrentTenantName()
+    {
+        return string.IsNullOrWhiteSpace(_tenantContextAccessor.Current?.Name)
+            ? "Pillar ERP"
+            : _tenantContextAccessor.Current.Name!;
+    }
+
+    private string? ResolveTenantLogoPhysicalPath()
+    {
+        var logoUrl = _tenantContextAccessor.Current?.Branding?.LogoUrl;
+        if (string.IsNullOrWhiteSpace(logoUrl))
+            return null;
+
+        if (Uri.TryCreate(logoUrl, UriKind.Absolute, out _))
+            return null;
+
+        var relativePath = logoUrl.Split('?')[0].TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+        var fullPath = Path.Combine(_webHostEnvironment.WebRootPath, relativePath);
+        return System.IO.File.Exists(fullPath) ? fullPath : null;
     }
 
     private static void RedactSensitiveValues(SaleDto sale)

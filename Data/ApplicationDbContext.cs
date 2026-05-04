@@ -1425,7 +1425,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             s.Property(x => x.SaleNumber).HasMaxLength(20).IsRequired();
             s.Property(x => x.Status).HasMaxLength(20).IsRequired();
             s.Property(x => x.PaymentMethod).HasMaxLength(50);
-            
+            s.Property(x => x.WarrantyType).HasMaxLength(50);
+            s.Property(x => x.ReceiptNotes).HasMaxLength(2000);
+
             s.HasIndex(x => x.SaleNumber).IsUnique();
             s.HasIndex(x => x.CustomerId);
             s.HasIndex(x => x.UserId);

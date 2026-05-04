@@ -42,7 +42,24 @@ public class Sale : IAuditable, IMustHaveTenant
     public string? PaymentMethod { get; set; }
     
     public string? Notes { get; set; }
-    
+
+    /// <summary>
+    /// Tipo de garantia oferecida na venda (None, Days30, Days90, Days180, Days365)
+    /// </summary>
+    [MaxLength(50)]
+    public string? WarrantyType { get; set; }
+
+    /// <summary>
+    /// Data de expiração da garantia
+    /// </summary>
+    public DateTime? WarrantyExpiration { get; set; }
+
+    /// <summary>
+    /// Observações que aparecem no comprovante de venda entregue ao cliente
+    /// </summary>
+    [MaxLength(2000)]
+    public string? ReceiptNotes { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     
     public DateTime? UpdatedAt { get; set; }

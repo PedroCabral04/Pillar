@@ -90,6 +90,25 @@
                             <MudSelectItem T="string" Value="@("Boleto")">Boleto</MudSelectItem>
                         </MudSelect>
                     </MudItem>
+
+                    @if (!QuickMode)
+                    {
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="string"
+                                      Label="Garantia"
+                                      @bind-Value="_newSale.WarrantyType"
+                                      Variant="Variant.Outlined"
+                                      Clearable="true"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Verified">
+                                <MudSelectItem T="string" Value="@((string?)null)">Sem garantia</MudSelectItem>
+                                <MudSelectItem T="string" Value="@("Days30")">30 dias</MudSelectItem>
+                                <MudSelectItem T="string" Value="@("Days90")">90 dias</MudSelectItem>
+                                <MudSelectItem T="string" Value="@("Days180")">180 dias</MudSelectItem>
+                                <MudSelectItem T="string" Value="@("Days365")">1 ano</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                    }
                     
                     @if (!QuickMode)
                     {
@@ -261,14 +280,24 @@
                     
                     @if (!QuickMode)
                     {
-                        <MudItem xs="12">
+                        <MudItem xs="12" md="6">
                             <MudTextField T="string"
-                                         Label="Observações"
+                                         Label="Observações Internas"
                                          @bind-Value="_newSale.Notes"
                                          Variant="Variant.Outlined"
                                          Lines="3"
                                          Adornment="Adornment.Start"
                                          AdornmentIcon="@Icons.Material.Filled.Notes"/>
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField T="string"
+                                         Label="Observações do Comprovante"
+                                         @bind-Value="_newSale.ReceiptNotes"
+                                         Variant="Variant.Outlined"
+                                         Lines="3"
+                                         Adornment="Adornment.Start"
+                                         AdornmentIcon="@Icons.Material.Filled.ReceiptLong"
+                                         HelperText="Aparece no comprovante entregue ao cliente"/>
                         </MudItem>
                     }
                 </MudGrid>

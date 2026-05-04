@@ -16,6 +16,7 @@ public interface IPdfExportService
     byte[] ExportStockLevelsReportToPdf(StockLevelsReportDto report, InventoryReportFilterDto filter);
     byte[] ExportHeadcountReportToPdf(HeadcountReportDto report, HRReportFilterDto filter);
     byte[] ExportSaleToPdf(SaleDto sale, string? logoPath = null);
+    byte[] ExportSaleReceiptToPdf(SaleDto sale, string? logoPath = null, string? tenantName = null);
     byte[] ExportServiceOrderToPdf(ServiceOrderDto order, string? logoPath = null, string? tenantName = null);
 }
 
@@ -826,6 +827,253 @@ public class PdfExportService : IPdfExportService
                             x.CurrentPageNumber().FontSize(8).FontColor(Colors.Grey.Medium);
                         });
                     });
+                });
+            });
+        });
+
+        return document.GeneratePdf();
+    }
+
+    public byte[] ExportSaleReceiptToPdf(SaleDto sale, string? logoPath = null, string? tenantName = null)
+    {
+        var headerColor = Colors.Blue.Darken1;
+        var tenantDisplayName = string.IsNullOrWhiteSpace(tenantName) ? "Pillar ERP" : tenantName;
+        var nonFiscalWarning = "ESTE DOCUMENTO NÃO POSSUI VALOR FISCAL. UTILIZAR APENAS COMO COMPROVANTE DE VENDA E GARANTIA.";
+
+        var statusColor = sale.Status switch
+        {
+            "Pendente" => Colors.Orange.Lighten3,
+            "Finalizada" => Colors.Green.Darken2,
+            "Cancelada" => Colors.Red.Lighten3,
+            _ => Colors.Grey.Lighten2
+        };
+
+        var warrantyDisplay = sale.WarrantyType switch
+        {
+            "Days30" => "30 dias",
+            "Days90" => "90 dias",
+            "Days180" => "180 dias",
+            "Days365" => "1 ano",
+            _ => "Sem garantia"
+        };
+
+        var document = Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A4);
+                page.Margin(2, Unit.Centimetre);
+                page.PageColor(Colors.White);
+                page.DefaultTextStyle(x => x.FontSize(10));
+
+                page.Header().Column(headerCol =>
+                {
+                    headerCol.Item().Row(row =>
+                    {
+                        row.RelativeItem().Column(logoCol =>
+                        {
+                            if (!string.IsNullOrEmpty(logoPath) && File.Exists(logoPath))
+                            {
+                                try
+                                {
+                                    logoCol.Item().Height(50).Image(logoPath, ImageScaling.FitHeight);
+                                }
+                                catch
+                                {
+                                    logoCol.Item().Text(tenantDisplayName).Bold().FontSize(24).FontColor(headerColor);
+                                }
+                            }
+                            else
+                            {
+                                logoCol.Item().Text(tenantDisplayName).Bold().FontSize(24).FontColor(headerColor);
+                            }
+                            logoCol.Item().Text(tenantDisplayName).SemiBold().FontSize(11).FontColor(Colors.Grey.Darken2);
+                            logoCol.Item().Text("Comprovante de Venda").FontSize(10).FontColor(Colors.Grey.Medium);
+                        });
+
+                        row.ConstantItem(20);
+
+                        row.RelativeItem().AlignRight().Column(infoCol =>
+                        {
+                            infoCol.Item().Text("COMPROVANTE DE VENDA").SemiBold().FontSize(16).FontColor(headerColor);
+                            infoCol.Item().Text(sale.SaleNumber).Bold().FontSize(20).FontColor(headerColor);
+                            infoCol.Item().AlignRight().Background(statusColor).Padding(4)
+                                .Text(sale.Status).FontColor(Colors.White).FontSize(10).Bold();
+                        });
+                    });
+
+                    headerCol.Item().PaddingTop(10).LineHorizontal(2).LineColor(headerColor);
+                });
+
+                page.Content().PaddingVertical(15).Column(column =>
+                {
+                    column.Spacing(12);
+
+                    column.Item().Background(Colors.Red.Lighten5).Border(1).BorderColor(Colors.Red.Lighten3).Padding(8)
+                        .Text(nonFiscalWarning).SemiBold().FontSize(9).FontColor(Colors.Red.Darken2).AlignCenter();
+
+                    // Dados da Venda e Cliente
+                    column.Item().Grid(grid =>
+                    {
+                        grid.VerticalSpacing(5);
+                        grid.HorizontalSpacing(10);
+                        grid.Columns(2);
+
+                        grid.Item().Column(col =>
+                        {
+                            col.Item().Text("DADOS DA VENDA").SemiBold().FontSize(11).FontColor(headerColor);
+                            col.Item().PaddingTop(3);
+                            col.Item().Text($"Data: {sale.SaleDate:dd/MM/yyyy HH:mm}");
+                            col.Item().Text($"Pagamento: {sale.PaymentMethod ?? "Não informado"}");
+                            col.Item().Text($"Vendedor: {sale.UserName}");
+                        });
+
+                        grid.Item(2).Column(col =>
+                        {
+                            col.Item().Text("DADOS DO CLIENTE").SemiBold().FontSize(11).FontColor(headerColor);
+                            col.Item().PaddingTop(3);
+                            col.Item().Text(sale.CustomerName ?? "Cliente não informado").Bold();
+                        });
+                    });
+
+                    // Garantia
+                    column.Item().Background(Colors.Green.Lighten4).Padding(10).Border(1).BorderColor(Colors.Green.Lighten2).Column(warrantyCol =>
+                    {
+                        warrantyCol.Item().Text("GARANTIA DO PRODUTO").SemiBold().FontSize(11).FontColor(Colors.Green.Darken2);
+                        warrantyCol.Item().PaddingTop(5);
+                        warrantyCol.Item().Text($"Tipo de Garantia: {warrantyDisplay}").Bold();
+                        if (sale.WarrantyExpiration.HasValue)
+                        {
+                            warrantyCol.Item().Text($"Válida até: {sale.WarrantyExpiration.Value:dd/MM/yyyy}");
+                        }
+                        warrantyCol.Item().PaddingTop(3).Text("A garantia cobre apenas defeitos de fabricação. Não cobre danos causados por mau uso, quedas, contato com líquidos ou desmontagem não autorizada.").FontSize(9).FontColor(Colors.Grey.Darken1);
+                    });
+
+                    // Produtos Vendidos
+                    if (sale.Items.Any())
+                    {
+                        column.Item().Text($"PRODUTOS VENDIDOS ({sale.Items.Count})").SemiBold().FontSize(11).FontColor(headerColor);
+
+                        column.Item().Table(table =>
+                        {
+                            table.ColumnsDefinition(columns =>
+                            {
+                                columns.ConstantColumn(60);
+                                columns.RelativeColumn(3);
+                                columns.ConstantColumn(50);
+                                columns.ConstantColumn(70);
+                                columns.ConstantColumn(70);
+                            });
+
+                            table.Header(header =>
+                            {
+                                header.Cell().Element(HeaderCellStyle).Text("SKU");
+                                header.Cell().Element(HeaderCellStyle).Text("Produto");
+                                header.Cell().Element(HeaderCellStyle).AlignRight().Text("Qtd");
+                                header.Cell().Element(HeaderCellStyle).AlignRight().Text("Unitário");
+                                header.Cell().Element(HeaderCellStyle).AlignRight().Text("Total");
+
+                                IContainer HeaderCellStyle(IContainer container)
+                                {
+                                    return container
+                                        .DefaultTextStyle(x => x.SemiBold().FontColor(Colors.White))
+                                        .Background(headerColor)
+                                        .PaddingVertical(6)
+                                        .PaddingHorizontal(8);
+                                }
+                            });
+
+                            foreach (var item in sale.Items)
+                            {
+                                table.Cell().Element(CellStyle).Text(item.ProductSku).FontSize(9);
+                                table.Cell().Element(CellStyle).Text(item.ProductName);
+                                table.Cell().Element(CellStyle).AlignRight().Text(item.Quantity.ToString("N2"));
+                                table.Cell().Element(CellStyle).AlignRight().Text(CurrencyFormatService.FormatStatic(item.UnitPrice));
+                                table.Cell().Element(CellStyle).AlignRight().Text(CurrencyFormatService.FormatStatic(item.Total)).Bold();
+
+                                IContainer CellStyle(IContainer container)
+                                {
+                                    return container
+                                        .BorderBottom(1)
+                                        .BorderColor(Colors.Grey.Lighten2)
+                                        .PaddingVertical(6)
+                                        .PaddingHorizontal(8);
+                                }
+                            }
+                        });
+                    }
+
+                    // Observações do Comprovante
+                    if (!string.IsNullOrWhiteSpace(sale.ReceiptNotes))
+                    {
+                        column.Item().Background(Colors.Blue.Lighten5).BorderLeft(4).BorderColor(Colors.Blue.Medium).Padding(10).Column(notesCol =>
+                        {
+                            notesCol.Item().Text("OBSERVAÇÕES").SemiBold().FontColor(Colors.Blue.Darken2);
+                            notesCol.Item().PaddingTop(5).Text(sale.ReceiptNotes);
+                        });
+                    }
+
+                    // Totais
+                    column.Item().AlignRight().Width(220).Background(headerColor).Padding(12).Column(totalsCol =>
+                    {
+                        totalsCol.Item().Row(row =>
+                        {
+                            row.RelativeItem().Text("Subtotal").FontColor(Colors.White);
+                            row.ConstantItem(70).AlignRight().Text(CurrencyFormatService.FormatStatic(sale.TotalAmount)).FontColor(Colors.White);
+                        });
+                        if (sale.DiscountAmount > 0)
+                        {
+                            totalsCol.Item().PaddingTop(3).Row(row =>
+                            {
+                                row.RelativeItem().Text("Desconto").FontColor(Colors.White);
+                                row.ConstantItem(70).AlignRight().Text($"- {CurrencyFormatService.FormatStatic(sale.DiscountAmount)}").FontColor(Colors.White);
+                            });
+                        }
+                        totalsCol.Item().PaddingTop(6).LineHorizontal(1).LineColor(Colors.White);
+                        totalsCol.Item().PaddingTop(6).Row(row =>
+                        {
+                            row.RelativeItem().Text("TOTAL").Bold().FontSize(13).FontColor(Colors.White);
+                            row.ConstantItem(70).AlignRight().Text(CurrencyFormatService.FormatStatic(sale.NetAmount)).Bold().FontSize(13).FontColor(Colors.White);
+                        });
+                    });
+
+                    // Área de Assinatura
+                    column.Item().PaddingTop(20).Column(sigCol =>
+                    {
+                        sigCol.Item().Grid(grid =>
+                        {
+                            grid.Columns(2);
+                            grid.HorizontalSpacing(40);
+
+                            grid.Item().Column(col =>
+                            {
+                                col.Item().Height(50).BorderBottom(1).BorderColor(Colors.Black);
+                                col.Item().PaddingTop(5).AlignCenter().Text("Assinatura do Vendedor");
+                            });
+
+                            grid.Item(2).Column(col =>
+                            {
+                                col.Item().Height(50).BorderBottom(1).BorderColor(Colors.Black);
+                                col.Item().PaddingTop(5).AlignCenter().Text("Assinatura do Cliente");
+                            });
+                        });
+                    });
+                });
+
+                page.Footer().Column(footerCol =>
+                {
+                    footerCol.Item().LineHorizontal(1).LineColor(Colors.Grey.Lighten2);
+                    footerCol.Item().PaddingTop(5).Row(row =>
+                    {
+                        row.RelativeItem().Text($"Documento gerado em {DateTime.Now:dd/MM/yyyy HH:mm}").FontSize(8).FontColor(Colors.Grey.Medium);
+                        row.RelativeItem().AlignCenter().Text($"{tenantDisplayName} - Comprovante de Venda").FontSize(8).FontColor(Colors.Grey.Medium);
+                        row.RelativeItem().AlignRight().Text(x =>
+                        {
+                            x.Span("Página ").FontSize(8).FontColor(Colors.Grey.Medium);
+                            x.CurrentPageNumber().FontSize(8).FontColor(Colors.Grey.Medium);
+                        });
+                    });
+                    footerCol.Item().PaddingTop(2).AlignCenter().Text(nonFiscalWarning).FontSize(7).FontColor(Colors.Red.Darken2);
                 });
             });
         });

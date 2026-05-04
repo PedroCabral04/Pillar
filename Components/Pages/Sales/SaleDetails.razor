@@ -44,18 +44,25 @@ else if (_sale != null)
             <MudChip T="string" Size="Size.Medium" Color="@GetStatusColor(_sale.Status)">@_sale.Status</MudChip>
         </MudStack>
         <MudStack Row="true" Spacing="2">
-            <MudButton Variant="Variant.Outlined" 
+            <MudButton Variant="Variant.Outlined"
                        StartIcon="@Icons.Material.Filled.Print"
                        OnClick="PrintSale"
                        Title="Imprimir">
                 Imprimir
             </MudButton>
-            <MudButton Variant="Variant.Outlined" 
+            <MudButton Variant="Variant.Outlined"
                        Color="Color.Error"
                        StartIcon="@Icons.Material.Filled.PictureAsPdf"
                        OnClick="ExportPdf"
                        Title="Exportar PDF">
                 Exportar PDF
+            </MudButton>
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Success"
+                       StartIcon="@Icons.Material.Filled.ReceiptLong"
+                       OnClick="ExportReceiptPdf"
+                       Title="Gerar Comprovante de Venda">
+                Comprovante
             </MudButton>
             @if (_sale.Status == "Pendente")
             {
@@ -109,6 +116,19 @@ else if (_sale != null)
                             <MudText Typo="Typo.body2" Color="Color.Secondary">Método de Pagamento</MudText>
                             <MudText Typo="Typo.body1">@(_sale.PaymentMethod ?? "Não informado")</MudText>
                         </MudStack>
+                        <MudDivider/>
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Garantia</MudText>
+                            <MudText Typo="Typo.body1">@(GetWarrantyDisplay(_sale.WarrantyType))</MudText>
+                        </MudStack>
+                        @if (_sale.WarrantyExpiration.HasValue)
+                        {
+                            <MudDivider/>
+                            <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Expiração da Garantia</MudText>
+                                <MudText Typo="Typo.body1">@(_sale.WarrantyExpiration.Value.ToString("dd/MM/yyyy"))</MudText>
+                            </MudStack>
+                        }
                     </MudStack>
                 </MudCardContent>
             </MudCard>
@@ -181,7 +201,7 @@ else if (_sale != null)
     <!-- Totals -->
     <MudGrid Spacing="3" Class="mb-4">
         <MudItem xs="12" md="6">
-            @if (!string.IsNullOrWhiteSpace(_sale.Notes))
+            @if (!string.IsNullOrWhiteSpace(_sale.Notes) || !string.IsNullOrWhiteSpace(_sale.ReceiptNotes))
             {
                 <MudCard Elevation="2">
                     <MudCardHeader>
@@ -193,7 +213,16 @@ else if (_sale != null)
                         </CardHeaderContent>
                     </MudCardHeader>
                     <MudCardContent>
-                        <MudText Typo="Typo.body1" Style="white-space: pre-wrap;">@_sale.Notes</MudText>
+                        @if (!string.IsNullOrWhiteSpace(_sale.Notes))
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-1">Observações Internas:</MudText>
+                            <MudText Typo="Typo.body1" Style="white-space: pre-wrap;" Class="mb-3">@_sale.Notes</MudText>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(_sale.ReceiptNotes))
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-1">Observações do Comprovante:</MudText>
+                            <MudText Typo="Typo.body1" Style="white-space: pre-wrap;">@_sale.ReceiptNotes</MudText>
+                        }
                     </MudCardContent>
                 </MudCard>
             }
@@ -443,6 +472,35 @@ else if (_sale != null)
             Logger.LogError(ex, "Erro ao exportar PDF da venda {SaleId}", Id);
             Snackbar.Add("Erro ao exportar PDF", Severity.Error);
         }
+    }
+
+    private async Task ExportReceiptPdf()
+    {
+        if (_sale == null) return;
+
+        try
+        {
+            var url = $"/api/vendas/{Id}/receipt/pdf";
+            await JSRuntime.InvokeVoidAsync("downloadFileFromUrl", url, $"comprovante-{_sale.SaleNumber}.pdf");
+            Snackbar.Add("Gerando comprovante de venda...", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erro ao gerar comprovante da venda {SaleId}", Id);
+            Snackbar.Add("Erro ao gerar comprovante", Severity.Error);
+        }
+    }
+
+    private static string GetWarrantyDisplay(string? warrantyType)
+    {
+        return warrantyType switch
+        {
+            "Days30" => "30 dias",
+            "Days90" => "90 dias",
+            "Days180" => "180 dias",
+            "Days365" => "1 ano",
+            _ => "Sem garantia"
+        };
     }
 
     private async Task FinalizeSale()
