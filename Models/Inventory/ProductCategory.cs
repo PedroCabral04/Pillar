@@ -1,8 +1,9 @@
 namespace erp.Models.Inventory;
 
-public class ProductCategory
+public class ProductCategory : IMustHaveTenant
 {
     public int Id { get; set; }
+    public int TenantId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string Code { get; set; } = string.Empty;
     public int? ParentCategoryId { get; set; }

@@ -21,11 +21,22 @@ public class InventoryService : IInventoryService
 
     private readonly ApplicationDbContext _context;
     private readonly ProductMapper _productMapper;
+    private readonly erp.Services.Tenancy.ITenantContextAccessor _tenantContextAccessor;
 
-    public InventoryService(ApplicationDbContext context, ProductMapper productMapper)
+    public InventoryService(
+        ApplicationDbContext context,
+        ProductMapper productMapper,
+        erp.Services.Tenancy.ITenantContextAccessor tenantContextAccessor)
     {
         _context = context;
         _productMapper = productMapper;
+        _tenantContextAccessor = tenantContextAccessor;
+    }
+
+    private int GetCurrentTenantId()
+    {
+        return _tenantContextAccessor.Current?.TenantId
+            ?? throw new InvalidOperationException("Tenant contexto não disponível");
     }
 
     public async Task<ProductDto?> GetProductByIdAsync(int id)
@@ -127,6 +138,8 @@ public class InventoryService : IInventoryService
 
     public async Task<ProductDto> CreateProductAsync(CreateProductDto dto, int userId)
     {
+        var tenantId = GetCurrentTenantId();
+
         // Validar SKU único
         if (await _context.Products.AnyAsync(p => p.Sku == dto.Sku))
         {
@@ -138,6 +151,18 @@ public class InventoryService : IInventoryService
             await _context.Products.AnyAsync(p => p.Barcode == dto.Barcode))
         {
             throw new InvalidOperationException($"Já existe um produto com o código de barras '{dto.Barcode}'");
+        }
+
+        // Validar categoria pertence ao tenant atual
+        if (!await _context.ProductCategories.AnyAsync(c => c.Id == dto.CategoryId && c.TenantId == tenantId))
+        {
+            throw new InvalidOperationException("Categoria não encontrada ou não pertence ao tenant atual");
+        }
+
+        // Validar marca pertence ao tenant atual se informada
+        if (dto.BrandId.HasValue && !await _context.Brands.AnyAsync(b => b.Id == dto.BrandId.Value && b.TenantId == tenantId))
+        {
+            throw new InvalidOperationException("Marca não encontrada ou não pertence ao tenant atual");
         }
 
         var product = _productMapper.CreateProductDtoToProduct(dto);
@@ -456,6 +481,7 @@ public class InventoryService : IInventoryService
 
     public async Task<ProductDto> UpdateProductAsync(UpdateProductDto dto)
     {
+        var tenantId = GetCurrentTenantId();
         var product = await _context.Products.FindAsync(dto.Id);
         if (product == null)
         {
@@ -473,6 +499,18 @@ public class InventoryService : IInventoryService
             await _context.Products.AnyAsync(p => p.Barcode == dto.Barcode && p.Id != dto.Id))
         {
             throw new InvalidOperationException($"Já existe outro produto com o código de barras '{dto.Barcode}'");
+        }
+
+        // Validar categoria pertence ao tenant atual
+        if (!await _context.ProductCategories.AnyAsync(c => c.Id == dto.CategoryId && c.TenantId == tenantId))
+        {
+            throw new InvalidOperationException("Categoria não encontrada ou não pertence ao tenant atual");
+        }
+
+        // Validar marca pertence ao tenant atual se informada
+        if (dto.BrandId.HasValue && !await _context.Brands.AnyAsync(b => b.Id == dto.BrandId.Value && b.TenantId == tenantId))
+        {
+            throw new InvalidOperationException("Marca não encontrada ou não pertence ao tenant atual");
         }
 
         _productMapper.UpdateProductDtoToProduct(dto, product);
@@ -993,8 +1031,16 @@ public class InventoryService : IInventoryService
 
     public async Task<ProductCategoryDto> CreateCategoryAsync(CreateProductCategoryDto dto)
     {
+        var tenantId = GetCurrentTenantId();
+
+        if (dto.ParentCategoryId.HasValue && !await _context.ProductCategories.AnyAsync(c => c.Id == dto.ParentCategoryId.Value && c.TenantId == tenantId))
+        {
+            throw new InvalidOperationException("Categoria pai não encontrada ou não pertence ao tenant atual");
+        }
+
         var category = new ProductCategory
         {
+            TenantId = tenantId,
             Name = dto.Name,
             Code = dto.Code,
             ParentCategoryId = dto.ParentCategoryId,
@@ -1010,9 +1056,15 @@ public class InventoryService : IInventoryService
 
     public async Task<ProductCategoryDto> UpdateCategoryAsync(UpdateProductCategoryDto dto)
     {
+        var tenantId = GetCurrentTenantId();
         var category = await _context.ProductCategories.FindAsync(dto.Id);
         if (category == null)
             throw new InvalidOperationException($"Categoria com ID {dto.Id} não encontrada");
+
+        if (dto.ParentCategoryId.HasValue && !await _context.ProductCategories.AnyAsync(c => c.Id == dto.ParentCategoryId.Value && c.TenantId == tenantId))
+        {
+            throw new InvalidOperationException("Categoria pai não encontrada ou não pertence ao tenant atual");
+        }
 
         category.Name = dto.Name;
         category.Code = dto.Code;

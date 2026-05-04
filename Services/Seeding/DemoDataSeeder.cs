@@ -422,26 +422,26 @@ public sealed class DemoDataSeeder
 
     private async Task SeedLookupsAsync(int tenantId, CancellationToken cancellationToken)
     {
-        if (!await _db.ProductCategories.AnyAsync(cancellationToken))
+        if (!await _db.ProductCategories.AnyAsync(c => c.TenantId == tenantId, cancellationToken))
         {
             var categories = new[]
             {
-                new ProductCategory { Name = "Eletrônicos", Code = "ELEC" },
-                new ProductCategory { Name = "Escritório", Code = "OFF" },
-                new ProductCategory { Name = "Serviços", Code = "SERV" },
-                new ProductCategory { Name = "Acessórios", Code = "ACC" }
+                new ProductCategory { TenantId = tenantId, Name = "Eletrônicos", Code = "ELEC" },
+                new ProductCategory { TenantId = tenantId, Name = "Escritório", Code = "OFF" },
+                new ProductCategory { TenantId = tenantId, Name = "Serviços", Code = "SERV" },
+                new ProductCategory { TenantId = tenantId, Name = "Acessórios", Code = "ACC" }
             };
 
             await _db.ProductCategories.AddRangeAsync(categories, cancellationToken);
         }
 
-        if (!await _db.Brands.AnyAsync(cancellationToken))
+        if (!await _db.Brands.AnyAsync(b => b.TenantId == tenantId, cancellationToken))
         {
             var brands = new[]
             {
-                new Brand { Name = "Pillar" },
-                new Brand { Name = "Apex" },
-                new Brand { Name = "Vertex" }
+                new Brand { TenantId = tenantId, Name = "Pillar" },
+                new Brand { TenantId = tenantId, Name = "Apex" },
+                new Brand { TenantId = tenantId, Name = "Vertex" }
             };
 
             await _db.Brands.AddRangeAsync(brands, cancellationToken);

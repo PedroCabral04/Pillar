@@ -16,8 +16,10 @@ public class InventoryReportServiceTests
 {
     private static ApplicationDbContext CreateContext()
     {
+        var tenantContext = new TenantContext();
+        tenantContext.ApplyTenant(new erp.Models.Tenancy.Tenant { Id = 1, Name = "Test", Slug = "test" });
         var tenantAccessor = new Mock<ITenantContextAccessor>();
-        tenantAccessor.SetupGet(x => x.Current).Returns(new TenantContext());
+        tenantAccessor.SetupGet(x => x.Current).Returns(tenantContext);
 
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())

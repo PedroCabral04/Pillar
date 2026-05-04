@@ -49,7 +49,7 @@ public class ProductImportOptimizationTests
         await context.SaveChangesAsync();
         saveChangesCounter.Reset();
 
-        var service = new InventoryService(context, new ProductMapper());
+        var service = new InventoryService(context, new ProductMapper(), tenantAccessor.Object);
         await using var fileStream = BuildTemplateWithTwoValidRows();
 
         var result = await service.ImportProductsFromExcelAsync(fileStream, userId: 1, CancellationToken.None);
@@ -82,7 +82,7 @@ public class ProductImportOptimizationTests
 
         await context.SaveChangesAsync();
 
-        var service = new InventoryService(context, new ProductMapper());
+        var service = new InventoryService(context, new ProductMapper(), tenantAccessor.Object);
         await using var fileStream = BuildTemplateWithNewCategoryWithoutIdAndBlankAtiva();
 
         var result = await service.ImportProductsFromExcelAsync(fileStream, userId: 1, CancellationToken.None);
@@ -119,7 +119,7 @@ public class ProductImportOptimizationTests
         });
         await context.SaveChangesAsync();
 
-        var service = new InventoryService(context, new ProductMapper());
+        var service = new InventoryService(context, new ProductMapper(), tenantAccessor.Object);
         await using var fileStream = BuildTemplateWithDuplicatedNameHeader();
 
         Func<Task> act = async () => await service.ImportProductsFromExcelAsync(fileStream, userId: 1, CancellationToken.None);
@@ -157,7 +157,7 @@ public class ProductImportOptimizationTests
 
         await context.SaveChangesAsync();
 
-        var service = new InventoryService(context, new ProductMapper());
+        var service = new InventoryService(context, new ProductMapper(), tenantAccessor.Object);
         await using var fileStream = BuildTemplateWithInvalidSkuFormat();
 
         var result = await service.ImportProductsFromExcelAsync(fileStream, userId: 1, CancellationToken.None);
@@ -184,7 +184,7 @@ public class ProductImportOptimizationTests
         context.Users.Add(new ApplicationUser { Id = 1, UserName = "import.tester", Email = "import.tester@local" });
         await context.SaveChangesAsync();
 
-        var service = new InventoryService(context, new ProductMapper());
+        var service = new InventoryService(context, new ProductMapper(), tenantAccessor.Object);
         await using var fileStream = BuildTemplateWithDuplicateSkus();
 
         var result = await service.ImportProductsFromExcelAsync(fileStream, userId: 1, CancellationToken.None);
@@ -218,7 +218,7 @@ public class ProductImportOptimizationTests
         context.Users.Add(new ApplicationUser { Id = 1, UserName = "import.tester", Email = "import.tester@local" });
         await context.SaveChangesAsync();
 
-        var service = new InventoryService(context, new ProductMapper());
+        var service = new InventoryService(context, new ProductMapper(), tenantAccessor.Object);
         await using var fileStream = BuildTemplateWithSkuExistingInDb();
 
         var result = await service.ImportProductsFromExcelAsync(fileStream, userId: 1, CancellationToken.None);
@@ -260,7 +260,7 @@ public class ProductImportOptimizationTests
 
         await context.SaveChangesAsync();
 
-        var service = new InventoryService(context, new ProductMapper());
+        var service = new InventoryService(context, new ProductMapper(), tenantAccessor.Object);
         await using var fileStream = BuildTemplateWithSpacedSku();
 
         var result = await service.ImportProductsFromExcelAsync(fileStream, userId: 1, CancellationToken.None);
@@ -302,7 +302,7 @@ public class ProductImportOptimizationTests
 
         await context.SaveChangesAsync();
 
-        var service = new InventoryService(context, new ProductMapper());
+        var service = new InventoryService(context, new ProductMapper(), tenantAccessor.Object);
         await using var fileStream = BuildTemplateWithOpcionalSuffixHeaders();
 
         var result = await service.ImportProductsFromExcelAsync(fileStream, userId: 1, CancellationToken.None);
@@ -338,7 +338,7 @@ public class ProductImportOptimizationTests
 
         await context.SaveChangesAsync();
 
-        var service = new InventoryService(context, new ProductMapper());
+        var service = new InventoryService(context, new ProductMapper(), tenantAccessor.Object);
         await using var fileStream = BuildTemplateWithDuplicateCategoriesInSheet();
 
         var result = await service.ImportProductsFromExcelAsync(fileStream, userId: 1, CancellationToken.None);

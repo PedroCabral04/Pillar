@@ -1238,7 +1238,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             c.Property(x => x.Name).HasMaxLength(100).IsRequired();
             c.Property(x => x.Code).HasMaxLength(50).IsRequired();
             
-            c.HasIndex(x => x.Code).IsUnique();
+            c.HasIndex(x => new { x.Code, x.TenantId }).IsUnique();
+            c.HasIndex(x => x.TenantId);
             c.HasIndex(x => x.ParentCategoryId);
             
             c.HasOne(x => x.ParentCategory)
@@ -1256,7 +1257,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             b.Property(x => x.Description).HasMaxLength(500);
             b.Property(x => x.LogoUrl).HasMaxLength(500);
             
-            b.HasIndex(x => x.Name);
+            b.HasIndex(x => new { x.Name, x.TenantId }).IsUnique();
+            b.HasIndex(x => x.TenantId);
         });
 
         // ProductImage
