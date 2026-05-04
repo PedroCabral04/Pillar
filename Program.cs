@@ -411,7 +411,8 @@ builder.Services.AddHttpClient<IApiService, ApiService>((serviceProvider, client
     if (httpContext != null)
     {
         var request = httpContext.Request;
-        var baseUrl = $"{request.Scheme}://{request.Host}";
+        var scheme = request.Scheme is "wss" ? "https" : request.Scheme is "ws" ? "http" : request.Scheme;
+        var baseUrl = $"{scheme}://{request.Host}";
         client.BaseAddress = new Uri(baseUrl);
     }
     else
