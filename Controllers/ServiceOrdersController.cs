@@ -1,9 +1,13 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using erp.Data;
 using erp.DTOs.ServiceOrders;
 using erp.Services.ServiceOrders;
 using erp.Services.Tenancy;
 using erp.Services.Reports;
+using erp.Services.Assets;
+using erp.Security;
 using Microsoft.AspNetCore.Hosting;
 using System.Security.Claims;
 
@@ -17,22 +21,31 @@ namespace erp.Controllers;
 [Route("api/ordens-servico")]
 public class ServiceOrdersController : ControllerBase
 {
+    private readonly ApplicationDbContext _context;
     private readonly IServiceOrderService _serviceOrderService;
     private readonly ITenantContextAccessor _tenantContextAccessor;
     private readonly IPdfExportService _pdfExportService;
+    private readonly IFileStorageService _fileStorage;
+    private readonly IFileValidationService _fileValidation;
     private readonly IWebHostEnvironment _webHostEnvironment;
     private readonly ILogger<ServiceOrdersController> _logger;
 
     public ServiceOrdersController(
+        ApplicationDbContext context,
         IServiceOrderService serviceOrderService,
         ITenantContextAccessor tenantContextAccessor,
         IPdfExportService pdfExportService,
+        IFileStorageService fileStorage,
+        IFileValidationService fileValidation,
         IWebHostEnvironment webHostEnvironment,
         ILogger<ServiceOrdersController> logger)
     {
+        _context = context;
         _serviceOrderService = serviceOrderService;
         _tenantContextAccessor = tenantContextAccessor;
         _pdfExportService = pdfExportService;
+        _fileStorage = fileStorage;
+        _fileValidation = fileValidation;
         _webHostEnvironment = webHostEnvironment;
         _logger = logger;
     }
@@ -596,5 +609,142 @@ public class ServiceOrdersController : ControllerBase
     </div>
 </body>
 </html>";
+    }
+
+    // ==================== ANEXOS ====================
+
+    /// <summary>
+    /// Lista os anexos de uma ordem de serviço
+    /// </summary>
+    [HttpGet("{id}/anexos")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<List<ServiceOrderAttachmentDto>>> GetAttachments(int id)
+    {
+        try
+        {
+            var order = await _serviceOrderService.GetByIdAsync(id);
+            if (order == null)
+                return NotFound(new { message = "Ordem de serviço não encontrada" });
+
+            var attachments = await _serviceOrderService.GetAttachmentsAsync(id);
+            return Ok(attachments);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao listar anexos da OS {OrderId}", id);
+            return StatusCode(500, new { message = "Erro ao listar anexos", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Faz upload de um anexo (imagem/documento) para uma ordem de serviço
+    /// </summary>
+    [HttpPost("{id}/anexos")]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ServiceOrderAttachmentDto>> UploadAttachment(
+        int id,
+        [FromForm] UploadServiceOrderAttachmentDto formData)
+    {
+        try
+        {
+            if (formData.File == null || formData.File.Length == 0)
+                return BadRequest(new { message = "Arquivo não fornecido ou vazio" });
+
+            var validationResult = await _fileValidation.ValidateFileAsync(formData.File);
+            if (!validationResult.IsValid)
+            {
+                _logger.LogWarning("Upload rejeitado: {Reason}. Arquivo: {FileName}",
+                    validationResult.ErrorMessage, formData.File.FileName);
+                return BadRequest(new { message = validationResult.ErrorMessage });
+            }
+
+            if (!CurrentUserId.HasValue)
+                return Unauthorized(new { message = "Usuário não autenticado" });
+
+            var order = await _serviceOrderService.GetByIdAsync(id);
+            if (order == null)
+                return NotFound(new { message = "Ordem de serviço não encontrada" });
+
+            var attachment = await _serviceOrderService.AddAttachmentAsync(
+                id, formData.File, formData.Description, CurrentUserId.Value);
+
+            return CreatedAtAction(
+                nameof(GetAttachments),
+                new { id },
+                attachment);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao fazer upload de anexo para OS {OrderId}", id);
+            return StatusCode(500, new { message = "Erro ao fazer upload de anexo", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Remove um anexo de uma ordem de serviço
+    /// </summary>
+    [HttpDelete("anexos/{attachmentId}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteAttachment(int attachmentId)
+    {
+        try
+        {
+            if (!CurrentTenantId.HasValue)
+                return Unauthorized(new { message = "Tenant não identificado" });
+
+            await _serviceOrderService.DeleteAttachmentAsync(attachmentId, CurrentTenantId.Value);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao remover anexo {AttachmentId}", attachmentId);
+            return StatusCode(500, new { message = "Erro ao remover anexo", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Faz download de um anexo
+    /// </summary>
+    [HttpGet("anexos/{attachmentId}/download")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DownloadAttachment(int attachmentId)
+    {
+        try
+        {
+            if (!CurrentTenantId.HasValue)
+                return Unauthorized(new { message = "Tenant não identificado" });
+
+            var attachment = await _context.ServiceOrderAttachments
+                .AsNoTracking()
+                .FirstOrDefaultAsync(a => a.Id == attachmentId && a.TenantId == CurrentTenantId.Value);
+            if (attachment == null)
+                return NotFound(new { message = "Anexo não encontrado" });
+
+            var fileBytes = await _fileStorage.GetFileBytesAsync(attachment.FilePath);
+            return File(fileBytes, attachment.ContentType, attachment.OriginalFileName);
+        }
+        catch (FileNotFoundException)
+        {
+            return NotFound(new { message = "Arquivo não encontrado no servidor" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao baixar anexo {AttachmentId}", attachmentId);
+            return StatusCode(500, new { message = "Erro ao baixar anexo", error = ex.Message });
+        }
     }
 }

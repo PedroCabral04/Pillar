@@ -157,4 +157,5 @@ public class ServiceOrder : IAuditable, IMustHaveTenant
     public Models.Sales.Customer? Customer { get; set; }
     public ApplicationUser User { get; set; } = null!;
     public ICollection<ServiceOrderItem> Items { get; set; } = new List<ServiceOrderItem>();
+    public ICollection<ServiceOrderAttachment> Attachments { get; set; } = new List<ServiceOrderAttachment>();
 }

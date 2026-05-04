@@ -68,4 +68,19 @@ public interface IServiceOrderService
     /// Gera o próximo número de ordem de serviço
     /// </summary>
     Task<string> GenerateNextOrderNumberAsync(int tenantId);
+
+    /// <summary>
+    /// Obtém anexos de uma ordem de serviço
+    /// </summary>
+    Task<List<ServiceOrderAttachmentDto>> GetAttachmentsAsync(int serviceOrderId);
+
+    /// <summary>
+    /// Adiciona um anexo a uma ordem de serviço
+    /// </summary>
+    Task<ServiceOrderAttachmentDto> AddAttachmentAsync(int serviceOrderId, Microsoft.AspNetCore.Http.IFormFile file, string? description, int uploadedByUserId);
+
+    /// <summary>
+    /// Remove um anexo de uma ordem de serviço
+    /// </summary>
+    Task DeleteAttachmentAsync(int attachmentId, int tenantId);
 }

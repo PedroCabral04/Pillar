@@ -53,6 +53,10 @@ public class ServiceOrderDto
 
     public List<ServiceOrderItemDto> Items { get; set; } = new();
 
+    // ===== Anexos =====
+
+    public List<ServiceOrderAttachmentDto> Attachments { get; set; } = new();
+
     // ===== Auditoria =====
 
     public DateTime CreatedAt { get; set; }

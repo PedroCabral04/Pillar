@@ -5,6 +5,7 @@ using erp.Models.Financial;
 using erp.Models.ServiceOrders;
 using erp.Mappings;
 using erp.Services.Financial;
+using erp.Services.Assets;
 
 namespace erp.Services.ServiceOrders;
 
@@ -15,15 +16,18 @@ public class ServiceOrderService : IServiceOrderService
 {
     private readonly ApplicationDbContext _context;
     private readonly ServiceOrderMapper _mapper;
+    private readonly IFileStorageService _fileStorage;
     private readonly ILogger<ServiceOrderService> _logger;
 
     public ServiceOrderService(
         ApplicationDbContext context,
         ServiceOrderMapper mapper,
+        IFileStorageService fileStorage,
         ILogger<ServiceOrderService> logger)
     {
         _context = context;
         _mapper = mapper;
+        _fileStorage = fileStorage;
         _logger = logger;
     }
 
@@ -107,6 +111,8 @@ public class ServiceOrderService : IServiceOrderService
             .Include(o => o.Items)
             .Include(o => o.Customer)
             .Include(o => o.User)
+            .Include(o => o.Attachments)
+                .ThenInclude(a => a.UploadedByUser)
             .FirstOrDefaultAsync(o => o.Id == id);
 
         if (order == null)
@@ -135,6 +141,21 @@ public class ServiceOrderService : IServiceOrderService
                 ZipCode = order.Customer.ZipCode
             };
         }
+
+        dto.Attachments = order.Attachments.Select(a => new ServiceOrderAttachmentDto
+        {
+            Id = a.Id,
+            ServiceOrderId = a.ServiceOrderId,
+            FileName = a.FileName,
+            OriginalFileName = a.OriginalFileName,
+            FileUrl = _fileStorage.GetFileUrl(a.FilePath),
+            ContentType = a.ContentType,
+            FileSize = a.FileSize,
+            Description = a.Description,
+            UploadedByUserId = a.UploadedByUserId,
+            UploadedByUserName = a.UploadedByUser?.UserName ?? "N/A",
+            CreatedAt = a.CreatedAt
+        }).ToList();
 
         return dto;
     }
@@ -421,6 +442,8 @@ public class ServiceOrderService : IServiceOrderService
             .Include(o => o.Items)
             .Include(o => o.Customer)
             .Include(o => o.User)
+            .Include(o => o.Attachments)
+                .ThenInclude(a => a.UploadedByUser)
             .FirstOrDefaultAsync(o => o.Id == id);
 
         if (order == null)
@@ -449,6 +472,21 @@ public class ServiceOrderService : IServiceOrderService
                 ZipCode = order.Customer.ZipCode
             };
         }
+
+        dto.Attachments = order.Attachments?.Select(a => new ServiceOrderAttachmentDto
+        {
+            Id = a.Id,
+            ServiceOrderId = a.ServiceOrderId,
+            FileName = a.FileName,
+            OriginalFileName = a.OriginalFileName,
+            FileUrl = _fileStorage.GetFileUrl(a.FilePath),
+            ContentType = a.ContentType,
+            FileSize = a.FileSize,
+            Description = a.Description,
+            UploadedByUserId = a.UploadedByUserId,
+            UploadedByUserName = a.UploadedByUser?.UserName ?? "N/A",
+            CreatedAt = a.CreatedAt
+        }).ToList() ?? new List<ServiceOrderAttachmentDto>();
 
         return dto;
     }
@@ -538,5 +576,96 @@ public class ServiceOrderService : IServiceOrderService
 
         receivable.Status = AccountStatus.Cancelled;
         receivable.UpdatedAt = DateTime.UtcNow;
+    }
+
+    public async Task<List<ServiceOrderAttachmentDto>> GetAttachmentsAsync(int serviceOrderId)
+    {
+        var attachments = await _context.ServiceOrderAttachments
+            .AsNoTracking()
+            .Include(a => a.UploadedByUser)
+            .Where(a => a.ServiceOrderId == serviceOrderId)
+            .OrderByDescending(a => a.CreatedAt)
+            .ToListAsync();
+
+        return attachments.Select(a => new ServiceOrderAttachmentDto
+        {
+            Id = a.Id,
+            ServiceOrderId = a.ServiceOrderId,
+            FileName = a.FileName,
+            OriginalFileName = a.OriginalFileName,
+            FileUrl = _fileStorage.GetFileUrl(a.FilePath),
+            ContentType = a.ContentType,
+            FileSize = a.FileSize,
+            Description = a.Description,
+            UploadedByUserId = a.UploadedByUserId,
+            UploadedByUserName = a.UploadedByUser?.UserName ?? "N/A",
+            CreatedAt = a.CreatedAt
+        }).ToList();
+    }
+
+    public async Task<ServiceOrderAttachmentDto> AddAttachmentAsync(int serviceOrderId, Microsoft.AspNetCore.Http.IFormFile file, string? description, int uploadedByUserId)
+    {
+        var order = await _context.ServiceOrders.FindAsync(serviceOrderId);
+        if (order == null)
+            throw new InvalidOperationException($"Ordem de serviço {serviceOrderId} não encontrada");
+
+        using var stream = file.OpenReadStream();
+        var filePath = await _fileStorage.SaveFileAsync(stream, file.FileName, $"serviceorders/{serviceOrderId}");
+
+        var attachment = new ServiceOrderAttachment
+        {
+            TenantId = order.TenantId,
+            ServiceOrderId = serviceOrderId,
+            FileName = Path.GetFileName(filePath),
+            OriginalFileName = file.FileName,
+            FilePath = filePath,
+            ContentType = file.ContentType,
+            FileSize = file.Length,
+            Description = description,
+            UploadedByUserId = uploadedByUserId,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _context.ServiceOrderAttachments.Add(attachment);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Anexo {AttachmentId} adicionado à OS {ServiceOrderId}", attachment.Id, serviceOrderId);
+
+        return new ServiceOrderAttachmentDto
+        {
+            Id = attachment.Id,
+            ServiceOrderId = attachment.ServiceOrderId,
+            FileName = attachment.FileName,
+            OriginalFileName = attachment.OriginalFileName,
+            FileUrl = _fileStorage.GetFileUrl(attachment.FilePath),
+            ContentType = attachment.ContentType,
+            FileSize = attachment.FileSize,
+            Description = attachment.Description,
+            UploadedByUserId = attachment.UploadedByUserId,
+            UploadedByUserName = "N/A",
+            CreatedAt = attachment.CreatedAt
+        };
+    }
+
+    public async Task DeleteAttachmentAsync(int attachmentId, int tenantId)
+    {
+        var attachment = await _context.ServiceOrderAttachments
+            .FirstOrDefaultAsync(a => a.Id == attachmentId && a.TenantId == tenantId);
+        if (attachment == null)
+            throw new InvalidOperationException($"Anexo {attachmentId} não encontrado");
+
+        _context.ServiceOrderAttachments.Remove(attachment);
+        await _context.SaveChangesAsync();
+
+        try
+        {
+            await _fileStorage.DeleteFileAsync(attachment.FilePath);
+        }
+        catch (FileNotFoundException)
+        {
+            _logger.LogWarning("Arquivo físico do anexo {AttachmentId} já não existia no storage", attachmentId);
+        }
+
+        _logger.LogInformation("Anexo {AttachmentId} removido da OS {ServiceOrderId}", attachmentId, attachment.ServiceOrderId);
     }
 }

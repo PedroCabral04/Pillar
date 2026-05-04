@@ -61,6 +61,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     // Service Orders
     public DbSet<Models.ServiceOrders.ServiceOrder> ServiceOrders { get; set; } = null!;
     public DbSet<Models.ServiceOrders.ServiceOrderItem> ServiceOrderItems { get; set; } = null!;
+    public DbSet<Models.ServiceOrders.ServiceOrderAttachment> ServiceOrderAttachments { get; set; } = null!;
 
     // Financial
     public DbSet<Supplier> Suppliers { get; set; } = null!;
@@ -1540,6 +1541,31 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .WithMany(o => o.Items)
                 .HasForeignKey(e => e.ServiceOrderId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ServiceOrderAttachment
+        modelBuilder.Entity<Models.ServiceOrders.ServiceOrderAttachment>(entity =>
+        {
+            entity.ToTable("ServiceOrderAttachments");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.FileName).HasMaxLength(255).IsRequired();
+            entity.Property(e => e.OriginalFileName).HasMaxLength(255).IsRequired();
+            entity.Property(e => e.FilePath).HasMaxLength(500).IsRequired();
+            entity.Property(e => e.ContentType).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Description).HasMaxLength(500);
+
+            entity.HasIndex(e => e.ServiceOrderId);
+
+            entity.HasOne(e => e.ServiceOrder)
+                .WithMany(o => o.Attachments)
+                .HasForeignKey(e => e.ServiceOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.UploadedByUser)
+                .WithMany()
+                .HasForeignKey(e => e.UploadedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 

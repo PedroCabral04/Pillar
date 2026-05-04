@@ -122,6 +122,31 @@
                         <MudText Typo="Typo.body2">@_order.CustomerNotes</MudText>
                     </MudPaper>
                 }
+
+                <!-- Anexos -->
+                @if (_order.Attachments.Any())
+                {
+                    <MudPaper Class="pa-3" Elevation="0">
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">Anexos</MudText>
+                        <MudStack Spacing="1">
+                            @foreach (var att in _order.Attachments)
+                            {
+                                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                                        <MudIcon Icon="@FileFormatHelper.GetAttachmentIcon(att.ContentType)" Size="Size.Small" />
+                                        <MudText Typo="Typo.body2">@att.OriginalFileName</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@FileFormatHelper.FormatFileSize(att.FileSize)</MudText>
+                                    </MudStack>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Download"
+                                                   Size="Size.Small"
+                                                   Color="Color.Primary"
+                                                   Href="@($"/api/ordens-servico/anexos/{att.Id}/download")"
+                                                   Target="_blank" />
+                                </MudStack>
+                            }
+                        </MudStack>
+                    </MudPaper>
+                }
             </MudStack>
         }
     </DialogContent>
@@ -194,4 +219,7 @@
     {
         MudDialog.Close(DialogResult.Ok(OrderId));
     }
+
+    private string GetAttachmentIcon(string contentType) => FileFormatHelper.GetAttachmentIcon(contentType);
+    private string FormatFileSize(long bytes) => FileFormatHelper.FormatFileSize(bytes);
 }
