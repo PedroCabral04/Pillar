@@ -91,7 +91,7 @@
         <MudTh>Ações</MudTh>
     </HeaderContent>
     <RowTemplate>
-        <MudTd DataLabel="Nome">@context.Username</MudTd>
+        <MudTd DataLabel="Nome">@(context.FullName ?? context.Username)</MudTd>
         <MudTd DataLabel="Email">@context.Email</MudTd>
         <MudTd DataLabel="Telefone">@context.Phone</MudTd>
         <MudTd DataLabel="Departamento">
@@ -236,7 +236,8 @@
                 // Search filter
                 if (!string.IsNullOrWhiteSpace(_searchString))
                 {
-                    if (!user.Username.Contains(_searchString, StringComparison.OrdinalIgnoreCase) &&
+                    if (!user.FullName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) &&
+                        !user.Username.Contains(_searchString, StringComparison.OrdinalIgnoreCase) &&
                         !user.Email.Contains(_searchString, StringComparison.OrdinalIgnoreCase) &&
                         !user.Phone.Contains(_searchString, StringComparison.OrdinalIgnoreCase) &&
                         !user.RoleNames.Any(r => r.Contains(_searchString, StringComparison.OrdinalIgnoreCase)))

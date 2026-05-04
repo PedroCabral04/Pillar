@@ -398,13 +398,21 @@
     {
         try
         {
-            var url = string.IsNullOrWhiteSpace(value)
-                ? "/api/users?pageSize=20&isActive=true"
-                : $"/api/users?search={Uri.EscapeDataString(value)}&pageSize=20&isActive=true";
+            var users = await ApiService.GetAsync<List<UserDto>>("/api/users");
+            var results = users ?? new List<UserDto>();
 
-            var response = await ApiService.GetAsync<PaginatedUsersResponse>(url);
-            return response?.Items?.Select(u => new VendorUserInfo { Id = u.Id, Name = u.FullName ?? u.UserName ?? "" })
-                   ?? new List<VendorUserInfo>();
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                var searchLower = value.ToLowerInvariant();
+                results = results.Where(u =>
+                    (u.FullName?.ToLowerInvariant().Contains(searchLower) ?? false) ||
+                    (u.UserName?.ToLowerInvariant().Contains(searchLower) ?? false))
+                    .ToList();
+            }
+
+            return results
+                .Where(u => u.IsActive)
+                .Select(u => new VendorUserInfo { Id = u.Id, Name = u.FullName ?? u.UserName ?? "" });
         }
         catch (Exception ex)
         {
@@ -568,15 +576,11 @@
         public string Name { get; set; } = string.Empty;
     }
 
-    private class PaginatedUsersResponse
-    {
-        public List<UserDto> Items { get; set; } = new();
-    }
-
     private class UserDto
     {
         public int Id { get; set; }
         public string? UserName { get; set; }
         public string? FullName { get; set; }
+        public bool IsActive { get; set; }
     }
 }

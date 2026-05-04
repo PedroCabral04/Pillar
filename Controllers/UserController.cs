@@ -424,6 +424,23 @@ namespace erp.Controllers
                     return BadRequest(string.Join("; ", r.Errors.Select(e => e.Description)));
             }
 
+            string? departmentName = null;
+            string? positionTitle = null;
+            if (user.DepartmentId.HasValue)
+            {
+                departmentName = await _context.Departments
+                    .Where(d => d.Id == user.DepartmentId.Value)
+                    .Select(d => d.Name)
+                    .FirstOrDefaultAsync();
+            }
+            if (user.PositionId.HasValue)
+            {
+                positionTitle = await _context.Positions
+                    .Where(p => p.Id == user.PositionId.Value)
+                    .Select(p => p.Title)
+                    .FirstOrDefaultAsync();
+            }
+
             var dto = new UserDto
             {
                 Id = user.Id,
@@ -432,7 +449,12 @@ namespace erp.Controllers
                 Phone = user.PhoneNumber ?? string.Empty,
                 RoleNames = toAssign,
                 RoleAbbreviations = toAssign,
-                IsActive = user.IsActive
+                IsActive = user.IsActive,
+                FullName = user.FullName,
+                DepartmentId = user.DepartmentId,
+                DepartmentName = departmentName,
+                PositionId = user.PositionId,
+                PositionTitle = positionTitle
             };
 
             return CreatedAtAction(nameof(GetUserById), new { id = dto.Id }, dto);

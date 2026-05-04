@@ -792,6 +792,31 @@ public class PdfExportService : IPdfExportService
                         });
                     }
 
+                    // Warranty
+                    var warrantyDisplay = sale.WarrantyType switch
+                    {
+                        "Days30" => "30 dias",
+                        "Days90" => "90 dias",
+                        "Days180" => "180 dias",
+                        "Days365" => "1 ano",
+                        _ => "Sem garantia"
+                    };
+
+                    if (!string.IsNullOrWhiteSpace(sale.WarrantyType) && sale.WarrantyType != "None")
+                    {
+                        column.Item().Background(Colors.Green.Lighten4).BorderLeft(4).BorderColor(Colors.Green.Medium).Padding(10).Column(warrantyCol =>
+                        {
+                            warrantyCol.Item().Text("Garantia").Bold().FontSize(12).FontColor(Colors.Green.Darken2);
+                            warrantyCol.Item().PaddingTop(5);
+                            warrantyCol.Item().Text($"Tipo de Garantia: {warrantyDisplay}").Bold();
+                            if (sale.WarrantyExpiration.HasValue)
+                            {
+                                warrantyCol.Item().Text($"Válida até: {sale.WarrantyExpiration.Value:dd/MM/yyyy}");
+                            }
+                            warrantyCol.Item().PaddingTop(3).Text("A garantia cobre apenas defeitos de fabricação. Não cobre danos causados por mau uso, quedas, contato com líquidos ou desmontagem não autorizada.").FontSize(9).FontColor(Colors.Grey.Darken1);
+                        });
+                    }
+
                     // Totals
                     column.Item().AlignRight().Width(250).Background(headerColor).Padding(15).Column(totalsCol =>
                     {

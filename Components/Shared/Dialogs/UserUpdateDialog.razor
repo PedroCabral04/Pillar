@@ -42,8 +42,8 @@
                                       Label="Nome completo" 
                                       Variant="Variant.Outlined"
                                       InputType="InputType.Text"
-                                      @bind-Value="_updateUser.Username"
-                                      Validation="@(_usernameRules)"
+                                      @bind-Value="_updateUser.FullName"
+                                      Validation="@(_fullNameRules)"
                                       Immediate="true"
                                       HelperText="Mínimo 3 caracteres"
                                       Adornment="Adornment.Start"
@@ -278,11 +278,11 @@
     private Func<string, string?> _required(string fieldName) =>
         v => string.IsNullOrWhiteSpace(v) ? $"{fieldName} é obrigatório" : null;
 
-    private IEnumerable<Func<string, string?>> _usernameRules => new List<Func<string, string?>>
+    private IEnumerable<Func<string, string?>> _fullNameRules => new List<Func<string, string?>>
     {
-        _required("Nome"),
+        v => string.IsNullOrWhiteSpace(v) ? "Nome é obrigatório" : null,
         v => v?.Trim().Length < 3 ? "Nome deve ter pelo menos 3 caracteres" : null,
-        v => v?.Trim().Length > 50 ? "Nome não pode exceder 50 caracteres" : null
+        v => v?.Trim().Length > 200 ? "Nome não pode exceder 200 caracteres" : null
     };
 
     private IEnumerable<Func<string, string?>> _emailRules => new List<Func<string, string?>>
@@ -345,6 +345,7 @@
                 _updateUser = new UpdateUserDto
                 {
                     Username = user.Username,
+                    FullName = user.FullName,
                     Email = user.Email,
                     Phone = user.Phone,
                     IsActive = user.IsActive,
