@@ -379,8 +379,15 @@ public class SalesController : ControllerBase
                 return NotFound(new { message = $"Venda com ID {id} não encontrada" });
             }
 
+            var currentUserId = GetCurrentUserId();
+            if (!currentUserId.HasValue)
+            {
+                return Unauthorized(new { message = "Usuário não autenticado" });
+            }
+
             var canViewValues = await HasSalesActionAsync(ModuleActionKeys.Sales.ViewValues);
-            if (!canViewValues)
+            var isOwnSale = sale.UserId == currentUserId.Value;
+            if (!canViewValues && !isOwnSale)
             {
                 RedactSensitiveValues(sale);
             }
@@ -493,15 +500,26 @@ public class SalesController : ControllerBase
 
         try
         {
-            var (items, total) = await _salesService.SearchAsync(
-                search, status, startDate, endDate, customerId, page, pageSize);
+            var currentUserId = GetCurrentUserId();
+            if (!currentUserId.HasValue)
+            {
+                return Unauthorized(new { message = "Usuário não autenticado" });
+            }
 
             var canViewValues = await HasSalesActionAsync(ModuleActionKeys.Sales.ViewValues);
+            int? sellerId = canViewValues ? null : currentUserId.Value;
+
+            var (items, total) = await _salesService.SearchAsync(
+                search, status, startDate, endDate, customerId, sellerId, page, pageSize);
+
             if (!canViewValues)
             {
                 foreach (var sale in items)
                 {
-                    RedactSensitiveValues(sale);
+                    if (sale.UserId != currentUserId.Value)
+                    {
+                        RedactSensitiveValues(sale);
+                    }
                 }
             }
 
@@ -675,6 +693,16 @@ public class SalesController : ControllerBase
     private async Task<bool> HasSalesActionAsync(string actionKey)
     {
         return await _permissionService.HasModuleActionAccessAsync(User, ModuleKeys.Sales, actionKey);
+    }
+
+    private int? GetCurrentUserId()
+    {
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+        {
+            return null;
+        }
+        return userId;
     }
 
     /// <summary>

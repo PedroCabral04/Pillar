@@ -211,6 +211,7 @@ public class SalesService : ISalesService
         DateTime? startDate,
         DateTime? endDate,
         int? customerId,
+        int? sellerId,
         int page,
         int pageSize,
         CancellationToken ct = default)
@@ -245,6 +246,11 @@ public class SalesService : ISalesService
         if (customerId.HasValue)
         {
             query = query.Where(s => s.CustomerId == customerId.Value);
+        }
+
+        if (sellerId.HasValue)
+        {
+            query = query.Where(s => s.UserId == sellerId.Value);
         }
 
         var total = await query.CountAsync(ct);

@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using erp.Controllers;
 using erp.DTOs.Dashboard;
+using erp.Models.Identity;
+using erp.Services.Authorization;
 using erp.Services.Dashboard;
 using erp.Services.DashboardCustomization;
 using FluentAssertions;
@@ -14,19 +16,24 @@ public class DashboardControllerTests
 {
     private readonly Mock<IDashboardRegistry> _registry;
     private readonly Mock<IDashboardLayoutService> _layoutService;
+    private readonly Mock<IPermissionService> _permissionService;
     private readonly DashboardController _controller;
 
     public DashboardControllerTests()
     {
         _registry = new Mock<IDashboardRegistry>();
         _layoutService = new Mock<IDashboardLayoutService>();
-        _controller = new DashboardController(_registry.Object, _layoutService.Object);
+        _permissionService = new Mock<IPermissionService>();
+        _permissionService
+            .Setup(x => x.HasModuleActionAccessAsync(It.IsAny<ClaimsPrincipal>(), ModuleKeys.Sales, ModuleActionKeys.Sales.ViewValues))
+            .ReturnsAsync(true);
+        _controller = new DashboardController(_registry.Object, _layoutService.Object, _permissionService.Object);
 
         SetUserRoles("Vendas");
     }
 
     [Fact]
-    public void GetWidgets_FiltersByRolesAndReturnsCatalog()
+    public async Task GetWidgets_FiltersByRolesAndReturnsCatalog()
     {
         _layoutService.Setup(x => x.GetAvailableWidgets(It.IsAny<string[]>()))
             .Returns(new List<WidgetCatalogItem>
@@ -41,16 +48,16 @@ public class DashboardControllerTests
         _registry.Setup(x => x.Find("sales", "sales-only"))
             .Returns(new DashboardWidgetDefinition { ProviderKey = "sales", WidgetKey = "sales-only", Title = "Vendas", Description = "Desc", ChartType = DashboardChartType.Line });
 
-        var result = _controller.GetWidgets();
+        var result = await _controller.GetWidgets();
 
-        var ok = result.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
         var widgets = ok.Value.Should().BeAssignableTo<IEnumerable<DashboardWidgetDefinition>>().Subject.ToList();
         widgets.Select(w => w.WidgetKey).Should().Contain(["public", "sales-only"]);
         widgets.Select(w => w.WidgetKey).Should().NotContain("finance-only");
     }
 
     [Fact]
-    public void GetWidgetsByProvider_ReturnsOnlyMatchingProvider()
+    public async Task GetWidgetsByProvider_ReturnsOnlyMatchingProvider()
     {
         _layoutService.Setup(x => x.GetAvailableWidgets(It.IsAny<string[]>()))
             .Returns(new List<WidgetCatalogItem>
@@ -62,9 +69,9 @@ public class DashboardControllerTests
         _registry.Setup(x => x.Find("sales", "a"))
             .Returns(new DashboardWidgetDefinition { ProviderKey = "sales", WidgetKey = "a", Title = "A", Description = "Desc", ChartType = DashboardChartType.Bar });
 
-        var result = _controller.GetWidgetsByProvider("sales");
+        var result = await _controller.GetWidgetsByProvider("sales");
 
-        var ok = result.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
         var widgets = ok.Value.Should().BeAssignableTo<IEnumerable<DashboardWidgetDefinition>>().Subject.ToList();
         widgets.Should().HaveCount(1);
         widgets[0].ProviderKey.Should().Be("sales");

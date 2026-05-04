@@ -45,6 +45,7 @@ public class SalesPlugin
                 startDate: null,
                 endDate: null,
                 customerId: null,
+                sellerId: null,
                 page: 1,
                 pageSize: limit);
 
@@ -255,6 +256,7 @@ public class SalesPlugin
                 startDate: start,
                 endDate: end,
                 customerId: null,
+                sellerId: null,
                 page: 1,
                 pageSize: 10000);
 

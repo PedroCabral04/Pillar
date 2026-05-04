@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using erp.DTOs.Reports;
+using erp.Models.Identity;
+using erp.Services.Authorization;
 using erp.Services.Reports;
 
 namespace erp.Controllers;
@@ -17,6 +19,7 @@ public class ReportsController : ControllerBase
     private readonly IHRReportService _hrReportService;
     private readonly IPdfExportService _pdfExportService;
     private readonly IExcelExportService _excelExportService;
+    private readonly IPermissionService _permissionService;
     private readonly ILogger<ReportsController> _logger;
 
     public ReportsController(
@@ -26,6 +29,7 @@ public class ReportsController : ControllerBase
         IHRReportService hrReportService,
         IPdfExportService pdfExportService,
         IExcelExportService excelExportService,
+        IPermissionService permissionService,
         ILogger<ReportsController> logger)
     {
         _salesReportService = salesReportService;
@@ -34,10 +38,20 @@ public class ReportsController : ControllerBase
         _hrReportService = hrReportService;
         _pdfExportService = pdfExportService;
         _excelExportService = excelExportService;
+        _permissionService = permissionService;
         _logger = logger;
     }
 
     #region Sales Reports
+
+    private async Task<ActionResult?> EnsureCanViewSalesValuesAsync()
+    {
+        var hasAccess = await _permissionService.HasModuleActionAccessAsync(User, ModuleKeys.Sales, ModuleActionKeys.Sales.ViewValues);
+        if (hasAccess)
+            return null;
+
+        return StatusCode(StatusCodes.Status403Forbidden, new { message = "Você não tem permissão para visualizar relatórios financeiros de vendas." });
+    }
 
     /// <summary>
     /// Gera relatório de vendas
@@ -45,6 +59,10 @@ public class ReportsController : ControllerBase
     [HttpPost("sales")]
     public async Task<ActionResult<SalesReportResultDto>> GenerateSalesReport([FromBody] SalesReportFilterDto filter)
     {
+        var denied = await EnsureCanViewSalesValuesAsync();
+        if (denied != null)
+            return denied;
+
         try
         {
             var report = await _salesReportService.GenerateSalesReportAsync(filter);
@@ -63,6 +81,10 @@ public class ReportsController : ControllerBase
     [HttpPost("sales/export")]
     public async Task<IActionResult> ExportSalesReport([FromBody] SalesReportFilterDto filter)
     {
+        var denied = await EnsureCanViewSalesValuesAsync();
+        if (denied != null)
+            return denied;
+
         return await ExportSalesReportInternal(filter);
     }
 
@@ -72,6 +94,10 @@ public class ReportsController : ControllerBase
     [HttpGet("sales/export")]
     public async Task<IActionResult> ExportSalesReportGet([FromQuery] SalesReportFilterDto filter)
     {
+        var denied = await EnsureCanViewSalesValuesAsync();
+        if (denied != null)
+            return denied;
+
         return await ExportSalesReportInternal(filter);
     }
 
@@ -106,6 +132,10 @@ public class ReportsController : ControllerBase
     [HttpPost("sales/heatmap")]
     public async Task<ActionResult<SalesHeatmapReportDto>> GenerateSalesHeatmap([FromBody] SalesReportFilterDto filter)
     {
+        var denied = await EnsureCanViewSalesValuesAsync();
+        if (denied != null)
+            return denied;
+
         try
         {
             var report = await _salesReportService.GenerateSalesHeatmapAsync(filter);

@@ -4,6 +4,7 @@ using erp.DTOs.Sales;
 using erp.Services.Authorization;
 using erp.Services.Reports;
 using erp.Services.Sales;
+using erp.Services.Tenancy;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -19,6 +20,7 @@ public class SalesControllerTests
     private readonly Mock<IPdfExportService> _pdfExportService;
     private readonly Mock<IWebHostEnvironment> _webHostEnvironment;
     private readonly Mock<IPermissionService> _permissionService;
+    private readonly Mock<ITenantContextAccessor> _tenantContextAccessor;
     private readonly Mock<ILogger<SalesController>> _logger;
     private readonly SalesController _controller;
 
@@ -29,6 +31,7 @@ public class SalesControllerTests
         _pdfExportService = new Mock<IPdfExportService>();
         _webHostEnvironment = new Mock<IWebHostEnvironment>();
         _permissionService = new Mock<IPermissionService>();
+        _tenantContextAccessor = new Mock<ITenantContextAccessor>();
         _logger = new Mock<ILogger<SalesController>>();
 
         _permissionService
@@ -41,6 +44,7 @@ public class SalesControllerTests
             _pdfExportService.Object,
             _webHostEnvironment.Object,
             _permissionService.Object,
+            _tenantContextAccessor.Object,
             _logger.Object);
 
         SetUser("1");

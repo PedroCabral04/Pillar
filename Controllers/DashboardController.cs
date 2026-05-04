@@ -1,5 +1,8 @@
 using erp.DTOs.Dashboard;
+using erp.Models.Identity;
+using erp.Services.Authorization;
 using erp.Services.Dashboard;
+using erp.Services.Dashboard.Providers.Sales;
 using erp.Services.DashboardCustomization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,11 +17,18 @@ public class DashboardController : ControllerBase
 {
     private readonly IDashboardRegistry _registry;
     private readonly IDashboardLayoutService _layoutService;
+    private readonly IPermissionService _permissionService;
 
-    public DashboardController(IDashboardRegistry registry, IDashboardLayoutService layoutService)
+    public DashboardController(IDashboardRegistry registry, IDashboardLayoutService layoutService, IPermissionService permissionService)
     {
         _registry = registry;
         _layoutService = layoutService;
+        _permissionService = permissionService;
+    }
+
+    private async Task<bool> CanAccessSalesWidgetsAsync()
+    {
+        return await _permissionService.HasModuleActionAccessAsync(User, ModuleKeys.Sales, ModuleActionKeys.Sales.ViewValues);
     }
 
     /// <summary>
@@ -27,9 +37,10 @@ public class DashboardController : ControllerBase
     /// </summary>
     /// <returns>200 OK com uma coleção de <see cref="DashboardWidgetDefinition"/>.</returns>
     [HttpGet("widgets")]
-    public ActionResult<IEnumerable<DashboardWidgetDefinition>> GetWidgets()
+    public async Task<ActionResult<IEnumerable<DashboardWidgetDefinition>>> GetWidgets()
     {
         var userRoles = User.FindAll(ClaimTypes.Role).Select(c => c.Value).ToArray();
+        var canViewSalesValues = await CanAccessSalesWidgetsAsync();
         
         // Get widgets with role overrides from database
         var catalog = _layoutService.GetAvailableWidgets(userRoles);
@@ -37,6 +48,7 @@ public class DashboardController : ControllerBase
         // Filter by user roles - if no roles required, show to everyone; if roles required, user must have at least one
         var filteredWidgets = catalog
             .Where(w => w.RequiredRoles == null || w.RequiredRoles.Length == 0 || w.RequiredRoles.Intersect(userRoles).Any())
+            .Where(w => canViewSalesValues || w.ProviderKey != SalesDashboardProvider.Key)
             .Select(w => new DashboardWidgetDefinition
             {
                 ProviderKey = w.ProviderKey,
@@ -59,10 +71,15 @@ public class DashboardController : ControllerBase
     /// <param name="providerKey">A chave do provedor para filtrar os widgets.</param>
     /// <returns>200 OK com uma coleção de <see cref="DashboardWidgetDefinition"/> para o provedor.</returns>
     [HttpGet("widgets/{providerKey}")]
-    public ActionResult<IEnumerable<DashboardWidgetDefinition>> GetWidgetsByProvider(string providerKey)
+    public async Task<ActionResult<IEnumerable<DashboardWidgetDefinition>>> GetWidgetsByProvider(string providerKey)
     {
         var userRoles = User.FindAll(ClaimTypes.Role).Select(c => c.Value).ToArray();
         var catalog = _layoutService.GetAvailableWidgets(userRoles);
+        
+        if (providerKey == SalesDashboardProvider.Key && !await CanAccessSalesWidgetsAsync())
+        {
+            return Ok(Enumerable.Empty<DashboardWidgetDefinition>());
+        }
         
         var filteredWidgets = catalog
             .Where(w => w.ProviderKey == providerKey)
@@ -105,6 +122,12 @@ public class DashboardController : ControllerBase
         var widgetRoles = await _layoutService.GetWidgetRolesAsync(providerKey, widgetKey);
         
         if (widgetRoles != null && widgetRoles.Length > 0 && !widgetRoles.Intersect(userRoles).Any())
+        {
+            return Forbid();
+        }
+
+        // Block sales widgets if user doesn't have view_values permission
+        if (providerKey == SalesDashboardProvider.Key && !await CanAccessSalesWidgetsAsync())
         {
             return Forbid();
         }

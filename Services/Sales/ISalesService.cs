@@ -12,6 +12,7 @@ public interface ISalesService
         DateTime? startDate,
         DateTime? endDate,
         int? customerId,
+        int? sellerId,
         int page,
         int pageSize,
         CancellationToken ct = default);
