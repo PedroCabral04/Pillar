@@ -141,7 +141,7 @@
             // load cost centers (non-fatal)
             try
             {
-                _costCenters = await ApiService.GetAsync<List<CostCenterDto>>("api/costcenters");
+                _costCenters = await ApiService.GetAsync<List<CostCenterDto>>("api/CostCenters");
                 if (_costCenters != null)
                 {
                     _costCenterOptions = _costCenters

@@ -7,7 +7,7 @@ using System.Security.Claims;
 namespace erp.Controllers;
 
 [ApiController]
-[Route("api/centros-custo")]
+[Route("api/CostCenters")]
 [Authorize]
 public class CostCentersController : ControllerBase
 {
