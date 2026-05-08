@@ -62,7 +62,7 @@
                             </MudItem>
 
                             <MudItem xs="12" sm="9">
-                                <MudSelect T="int" @bind-Value="_model.CategoryId"
+                                <MudSelect T="int?" Value="@_model.CategoryId" ValueChanged="@(async (int? v) => _model.CategoryId = v ?? 0)"
                                            Label="Categoria"
                                            Required="true"
                                            RequiredError="Categoria é obrigatória"
@@ -74,13 +74,13 @@
                                            ToStringFunc="@(id => _categories.FirstOrDefault(c => c.Id == id)?.Name ?? "Selecione uma categoria")">
                                     @if (!_categories.Any())
                                     {
-                                        <MudSelectItem T="int" Value="0" Disabled="true">
+                                        <MudSelectItem T="int?" Value="0" Disabled="true">
                                             <MudText Color="Color.Secondary">Nenhuma categoria cadastrada</MudText>
                                         </MudSelectItem>
                                     }
                                     @foreach (var category in _categories)
                                     {
-                                        <MudSelectItem T="int" Value="@category.Id">
+                                        <MudSelectItem T="int?" Value="@category.Id">
                                             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
                                                 <MudIcon Icon="@(category.Icon ?? Icons.Material.Filled.Category)" Size="Size.Small" />
                                                 <MudText>@category.Name</MudText>
@@ -179,7 +179,7 @@
                 </MudItem>
 
                 <MudItem xs="12" md="3">
-                    <MudNumericField @bind-Value="_model.PurchaseValue"
+                    <MudNumericField T="decimal?" @bind-Value="_model.PurchaseValue"
                                      Label="Valor de Compra"
                                      Variant="Variant.Outlined"
                                      Adornment="Adornment.Start"
@@ -281,7 +281,7 @@
                             </MudItem>
 
                             <MudItem xs="12" sm="6">
-                                <MudNumericField @bind-Value="_model.ExpectedLifespanMonths"
+                                <MudNumericField T="int?" @bind-Value="_model.ExpectedLifespanMonths"
                                                  Label="Vida Útil Esperada"
                                                  Variant="Variant.Outlined"
                                                  Adornment="Adornment.Start"
@@ -308,7 +308,7 @@
                                    Label="Garantia até" />
                 </MudItem>
                             <MudItem xs="12" sm="6">
-                                <MudNumericField @bind-Value="_model.PurchaseValue"
+                                <MudNumericField T="decimal?" @bind-Value="_model.PurchaseValue"
                                                  Label="Valor de Compra"
                                                  Variant="Variant.Outlined"
                                                  Adornment="Adornment.Start"

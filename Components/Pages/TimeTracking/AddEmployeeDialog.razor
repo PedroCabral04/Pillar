@@ -6,7 +6,7 @@
 <MudDialog>
     <DialogContent>
         <MudText>Selecione o colaborador para adicionar ao período.</MudText>
-        <MudSelect T="int" Label="Colaborador" @bind-Value="_selectedUserId" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+        <MudSelect T="int?" Label="Colaborador" Value="@_selectedUserId" ValueChanged="@(async (int? v) => _selectedUserId = v ?? 0)" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
             @foreach (var user in AvailableUsers)
             {
                 <MudSelectItem Value="@user.Id">@user.FullName (@user.Email)</MudSelectItem>

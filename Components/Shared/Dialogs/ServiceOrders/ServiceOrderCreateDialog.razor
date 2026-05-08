@@ -191,7 +191,7 @@
                                                             Variant="Variant.Outlined" Dense="true" Required="true"/>
                                             </MudItem>
                                             <MudItem xs="12" md="3">
-                                                <MudNumericField T="decimal" @bind-Value="item.Price" Label="Preço"
+                                                <MudNumericField T="decimal?" Value="@item.Price" ValueChanged="@(async (decimal? v) => item.Price = v ?? 0)" Label="Preço"
                                                             Variant="Variant.Outlined" Dense="true" Required="true" Format="C2"
                                                             Adornment="Adornment.Start" AdornmentText="R$"/>
                                             </MudItem>
@@ -223,7 +223,7 @@
 
                     <!-- Totais e Condições -->
                     <MudItem xs="12" md="6">
-                        <MudNumericField T="decimal" Label="Desconto" @bind-Value="_dto.DiscountAmount"
+                        <MudNumericField T="decimal?" Label="Desconto" @bind-Value="_dto.DiscountAmount"
                                     Variant="Variant.Outlined" Min="0" Format="C2"
                                     Adornment="Adornment.Start" AdornmentText="R$"/>
                     </MudItem>

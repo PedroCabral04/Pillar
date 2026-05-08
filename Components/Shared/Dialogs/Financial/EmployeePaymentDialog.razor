@@ -7,11 +7,11 @@
 <MudDialog>
     <DialogContent>
         <MudStack Spacing="3">
-            <MudSelect T="int" @bind-Value="_model.EmployeeId" Label="Funcionário" Variant="Variant.Outlined"
+            <MudSelect T="int?" @bind-Value="_model.EmployeeId" Label="Funcionário" Variant="Variant.Outlined"
                        For="@(() => _model.EmployeeId)" Disabled="@IsEdit">
                 @foreach (var emp in Employees)
                 {
-                    <MudSelectItem Value="@emp.Id">@(emp.FullName ?? emp.Username)</MudSelectItem>
+                    <MudSelectItem T="int?" Value="@emp.Id">@(emp.FullName ?? emp.Username)</MudSelectItem>
                 }
             </MudSelect>
 
@@ -24,22 +24,22 @@
 
             @if (_model.Type == EmployeePaymentType.SalaryFixed)
             {
-                <MudNumericField T="decimal" @bind-Value="_model.Amount" Label="Valor (Salário)"
+                <MudNumericField T="decimal?" @bind-Value="_model.Amount" Label="Valor (Salário)"
                                  Variant="Variant.Outlined" Min="0" Disabled="@_autoFillSalary" />
                 <MudCheckBox @bind-Value="_autoFillSalary" Label="Usar salário cadastrado do funcionário" />
             }
             else
             {
-                <MudNumericField T="decimal" @bind-Value="_model.Amount" Label="Valor"
+                <MudNumericField T="decimal?" @bind-Value="_model.Amount" Label="Valor"
                                  Variant="Variant.Outlined" Min="0" />
             }
 
-            <MudNumericField T="decimal" @bind-Value="_model.DiscountAmount" Label="Desconto"
+            <MudNumericField T="decimal?" @bind-Value="_model.DiscountAmount" Label="Desconto"
                              Variant="Variant.Outlined" Min="0" />
 
             @if (_model.Type == EmployeePaymentType.SalaryByService)
             {
-                <MudNumericField T="int" @bind-Value="_serviceCount" Label="Quantidade de Serviços"
+                <MudNumericField T="int?" @bind-Value="_serviceCount" Label="Quantidade de Serviços"
                                  Variant="Variant.Outlined" Min="0" />
                 <MudStack Row="true" Spacing="2">
                     <MudNumericField T="decimal?" @bind-Value="_model.ServiceUnitValue" Label="Valor por Serviço"
@@ -51,22 +51,22 @@
             }
 
             <MudStack Row="true" Spacing="2">
-                <MudSelect T="int" @bind-Value="_model.ReferenceMonth" Label="Mês" Variant="Variant.Outlined"
+                <MudSelect T="int?" @bind-Value="_model.ReferenceMonth" Label="Mês" Variant="Variant.Outlined"
                            Class="flex-grow-1" Disabled="@IsEdit">
                     @for (int m = 1; m <= 12; m++)
                     {
                         var month = m;
-                        <MudSelectItem Value="@month">
+                        <MudSelectItem T="int?" Value="@month">
                             @System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month)
                         </MudSelectItem>
                     }
                 </MudSelect>
-                <MudSelect T="int" @bind-Value="_model.ReferenceYear" Label="Ano" Variant="Variant.Outlined"
+                <MudSelect T="int?" @bind-Value="_model.ReferenceYear" Label="Ano" Variant="Variant.Outlined"
                            Class="flex-grow-1" Disabled="@IsEdit">
                     @for (int y = DateTime.Now.Year + 1; y >= DateTime.Now.Year - 3; y--)
                     {
                         var year = y;
-                        <MudSelectItem Value="@year">@year</MudSelectItem>
+                        <MudSelectItem T="int?" Value="@year">@year</MudSelectItem>
                     }
                 </MudSelect>
             </MudStack>
@@ -105,7 +105,7 @@
     private CreateEmployeePaymentDto _model = new();
     private DateTime? _dueDate = DateTime.Now.AddDays(5);
     private bool _autoFillSalary = true;
-    private int _serviceCount;
+    private int? _serviceCount;
 
     protected override async Task OnInitializedAsync()
     {
@@ -148,7 +148,7 @@
 
         if (_model.Type == EmployeePaymentType.SalaryFixed && _autoFillSalary)
         {
-            _model.Amount = 0;
+            _model.Amount = null;
         }
 
         _model.ServiceCount = _serviceCount;

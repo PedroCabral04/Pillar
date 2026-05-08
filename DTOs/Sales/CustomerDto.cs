@@ -90,8 +90,8 @@ public class CreateCustomerDto
     [StringLength(200)]
     public string? Website { get; set; }
     
-    public decimal CreditLimit { get; set; } = 0;
-    public int PaymentTermDays { get; set; } = 30;
+    public decimal? CreditLimit { get; set; }
+    public int? PaymentTermDays { get; set; }
     
     [StringLength(50)]
     public string PaymentMethod { get; set; } = "Dinheiro";
@@ -152,8 +152,8 @@ public class UpdateCustomerDto
     [StringLength(200)]
     public string? Website { get; set; }
     
-    public decimal CreditLimit { get; set; } = 0;
-    public int PaymentTermDays { get; set; } = 30;
+    public decimal? CreditLimit { get; set; }
+    public int? PaymentTermDays { get; set; }
     
     [StringLength(50)]
     public string PaymentMethod { get; set; } = "Dinheiro";

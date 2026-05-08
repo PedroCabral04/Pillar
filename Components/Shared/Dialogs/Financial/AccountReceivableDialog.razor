@@ -25,7 +25,7 @@
             </MudText>
             <MudGrid Spacing="3">
                 <MudItem xs="12" sm="6">
-                    <MudSelect T="int" 
+                    <MudSelect T="int?" 
                                Label="Cliente" 
                                @bind-Value="Model.CustomerId" 
                                Required="true" 
@@ -37,7 +37,7 @@
                                AnchorOrigin="Origin.BottomCenter">
                         @foreach (var customer in Customers)
                         {
-                            <MudSelectItem Value="@customer.Id">@customer.Name</MudSelectItem>
+                            <MudSelectItem T="int?" Value="@customer.Id">@customer.Name</MudSelectItem>
                         }
                     </MudSelect>
                 </MudItem>
@@ -85,7 +85,7 @@
             </MudText>
             <MudGrid Spacing="3">
                 <MudItem xs="12" sm="6" md="3">
-                    <MudNumericField @bind-Value="Model.OriginalAmount" 
+                    <MudNumericField T="decimal?" @bind-Value="Model.OriginalAmount" 
                                      Label="Valor Original" 
                                      Format="C2" 
                                      Required="true" 
@@ -97,7 +97,7 @@
                                      AdornmentIcon="@Icons.Material.Filled.AttachMoney"/>
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
-                    <MudNumericField @bind-Value="Model.DiscountAmount" 
+                    <MudNumericField T="decimal?" @bind-Value="Model.DiscountAmount" 
                                      Label="Desconto" 
                                      Format="C2" 
                                      Min="0" 
@@ -107,7 +107,7 @@
                                      AdornmentIcon="@Icons.Material.Filled.Discount"/>
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
-                    <MudNumericField @bind-Value="Model.InterestAmount" 
+                    <MudNumericField T="decimal?" @bind-Value="Model.InterestAmount" 
                                      Label="Juros" 
                                      Format="C2" 
                                      Min="0" 
@@ -117,7 +117,7 @@
                                      AdornmentIcon="@Icons.Material.Filled.TrendingUp"/>
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
-                    <MudNumericField @bind-Value="Model.FineAmount" 
+                    <MudNumericField T="decimal?" @bind-Value="Model.FineAmount" 
                                      Label="Multa" 
                                      Format="C2" 
                                      Min="0" 

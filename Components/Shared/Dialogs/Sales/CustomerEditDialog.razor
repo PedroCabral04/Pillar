@@ -189,7 +189,7 @@
                 </MudText>
                 <MudGrid Spacing="3">
                     <MudItem xs="12" md="4">
-                        <MudNumericField @bind-Value="_model.CreditLimit" 
+                        <MudNumericField T="decimal?" @bind-Value="_model.CreditLimit" 
                                          Label="Limite de Crédito"
                                          Variant="Variant.Outlined"
                                          Adornment="Adornment.Start"
@@ -198,7 +198,7 @@
                                          Min="0"/>
                     </MudItem>
                     <MudItem xs="12" md="4">
-                        <MudNumericField @bind-Value="_model.PaymentTermDays" 
+                        <MudNumericField T="int?" @bind-Value="_model.PaymentTermDays" 
                                          Label="Prazo de Pagamento (dias)"
                                          Variant="Variant.Outlined"
                                          Adornment="Adornment.Start"

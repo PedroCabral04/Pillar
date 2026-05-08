@@ -13,7 +13,7 @@ public static class QuickProductDefaults
 
         dto.CostPrice = dto.SalePrice;
         dto.Unit = string.IsNullOrWhiteSpace(dto.Unit) ? "UN" : dto.Unit;
-        dto.UnitsPerBox = dto.UnitsPerBox <= 0 ? 1 : dto.UnitsPerBox;
+        dto.UnitsPerBox = (dto.UnitsPerBox ?? 0) <= 0 ? 1 : dto.UnitsPerBox;
         dto.IsActive = true;
         dto.Status = 0;
         dto.CurrentStock = initialStock.GetValueOrDefault() > 0 ? initialStock!.Value : 0;

@@ -25,7 +25,7 @@
             </MudText>
             <MudGrid Spacing="3">
                 <MudItem xs="12" sm="6">
-                    <MudSelect T="int" 
+                    <MudSelect T="int?" 
                                Label="Fornecedor" 
                                @bind-Value="Model.SupplierId" 
                                Required="true" 
@@ -37,7 +37,7 @@
                                AnchorOrigin="Origin.BottomCenter">
                         @foreach (var supplier in Suppliers)
                         {
-                            <MudSelectItem Value="@supplier.Id">@supplier.Name</MudSelectItem>
+                            <MudSelectItem T="int?" Value="@supplier.Id">@supplier.Name</MudSelectItem>
                         }
                     </MudSelect>
                 </MudItem>

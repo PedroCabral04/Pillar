@@ -164,7 +164,7 @@
                                           AdornmentIcon="@Icons.Material.Filled.Payment"/>
                         </MudItem>
                         <MudItem xs="12" sm="4">
-                            <MudNumericField @bind-Value="Model.PaymentTermDays" 
+                            <MudNumericField T="int?" @bind-Value="Model.PaymentTermDays" 
                                              Label="Prazo de Pagamento (dias)" 
                                              Min="0" 
                                              Variant="Variant.Outlined"
@@ -172,7 +172,7 @@
                                              AdornmentIcon="@Icons.Material.Filled.CalendarMonth"/>
                         </MudItem>
                         <MudItem xs="12" sm="4">
-                            <MudNumericField @bind-Value="Model.DeliveryLeadTimeDays" 
+                            <MudNumericField T="int?" @bind-Value="Model.DeliveryLeadTimeDays" 
                                              Label="Prazo de Entrega (dias)" 
                                              Min="0" 
                                              Variant="Variant.Outlined"
@@ -180,7 +180,7 @@
                                              AdornmentIcon="@Icons.Material.Filled.LocalShipping"/>
                         </MudItem>
                         <MudItem xs="12" sm="4">
-                            <MudNumericField @bind-Value="Model.MinimumOrderValue" 
+                            <MudNumericField T="decimal?" @bind-Value="Model.MinimumOrderValue" 
                                              Label="Pedido Mínimo" 
                                              Format="C2" 
                                              Variant="Variant.Outlined"

@@ -6,24 +6,27 @@ namespace erp.DTOs.Financial;
 public class CreateEmployeePaymentDto
 {
     [Required]
-    public int EmployeeId { get; set; }
+    public int? EmployeeId { get; set; }
 
     [Required]
     public EmployeePaymentType Type { get; set; }
 
+    [Required]
     [Range(0.01, 99999999)]
-    public decimal Amount { get; set; }
+    public decimal? Amount { get; set; }
 
-    public decimal DiscountAmount { get; set; }
+    public decimal? DiscountAmount { get; set; }
 
     [MaxLength(500)]
     public string? Description { get; set; }
 
+    [Required]
     [Range(1, 12)]
-    public int ReferenceMonth { get; set; }
+    public int? ReferenceMonth { get; set; }
 
+    [Required]
     [Range(2000, 2100)]
-    public int ReferenceYear { get; set; }
+    public int? ReferenceYear { get; set; }
 
     public DateTime DueDate { get; set; }
 
@@ -40,10 +43,11 @@ public class CreateEmployeePaymentDto
 
 public class UpdateEmployeePaymentDto
 {
+    [Required]
     [Range(0.01, 99999999)]
-    public decimal Amount { get; set; }
+    public decimal? Amount { get; set; }
 
-    public decimal DiscountAmount { get; set; }
+    public decimal? DiscountAmount { get; set; }
 
     [MaxLength(500)]
     public string? Description { get; set; }
@@ -69,11 +73,13 @@ public class PayEmployeePaymentDto
 
 public class GenerateServicePaymentsDto
 {
+    [Required]
     [Range(1, 12)]
-    public int ReferenceMonth { get; set; }
+    public int? ReferenceMonth { get; set; }
 
+    [Required]
     [Range(2000, 2100)]
-    public int ReferenceYear { get; set; }
+    public int? ReferenceYear { get; set; }
 
     public DateTime DueDate { get; set; }
 

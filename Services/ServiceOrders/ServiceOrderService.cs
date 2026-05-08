@@ -58,7 +58,7 @@ public class ServiceOrderService : IServiceOrderService
                 if (dto.DiscountAmount > order.TotalAmount)
                     throw new InvalidOperationException("Desconto não pode ser maior que o valor total");
 
-                order.NetAmount = order.TotalAmount - dto.DiscountAmount;
+                order.NetAmount = order.TotalAmount - (dto.DiscountAmount ?? 0);
 
                 // Set items tenant ID
                 foreach (var item in order.Items)
@@ -302,7 +302,7 @@ public class ServiceOrderService : IServiceOrderService
         if (dto.DiscountAmount > order.TotalAmount)
             throw new InvalidOperationException("Desconto não pode ser maior que o valor total");
 
-        order.NetAmount = order.TotalAmount - dto.DiscountAmount;
+        order.NetAmount = order.TotalAmount - (dto.DiscountAmount ?? 0);
 
         await EnsureFinancialReceivableForServiceOrderAsync(order);
         if (order.Status == ServiceOrderStatus.Cancelled.ToString())

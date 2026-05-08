@@ -9,22 +9,22 @@
         </MudText>
         <MudStack Spacing="3">
             <MudStack Row="true" Spacing="2">
-                <MudSelect T="int" @bind-Value="_model.ReferenceMonth" Label="Mês" Variant="Variant.Outlined"
+                <MudSelect T="int?" @bind-Value="_model.ReferenceMonth" Label="Mês" Variant="Variant.Outlined"
                            Class="flex-grow-1">
                     @for (int m = 1; m <= 12; m++)
                     {
                         var month = m;
-                        <MudSelectItem Value="@month">
+                        <MudSelectItem T="int?" Value="@month">
                             @System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month)
                         </MudSelectItem>
                     }
                 </MudSelect>
-                <MudSelect T="int" @bind-Value="_model.ReferenceYear" Label="Ano" Variant="Variant.Outlined"
+                <MudSelect T="int?" @bind-Value="_model.ReferenceYear" Label="Ano" Variant="Variant.Outlined"
                            Class="flex-grow-1">
                     @for (int y = DateTime.Now.Year + 1; y >= DateTime.Now.Year - 3; y--)
                     {
                         var year = y;
-                        <MudSelectItem Value="@year">@year</MudSelectItem>
+                        <MudSelectItem T="int?" Value="@year">@year</MudSelectItem>
                     }
                 </MudSelect>
             </MudStack>

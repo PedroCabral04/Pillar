@@ -56,39 +56,39 @@
                     </MudItem>
                     
                     <MudItem xs="12" md="6">
-                        <MudSelect T="int"
+                        <MudSelect T="int?"
                                   Label="Tipo de Movimentação"
-                                  @bind-Value="_newMovement.Type"
+                                  Value="@_newMovement.Type" ValueChanged="@(async (int? v) => _newMovement.Type = v ?? 0)"
                                   Variant="Variant.Outlined"
                                   Required="true"
                                   Adornment="Adornment.Start"
                                   AdornmentIcon="@Icons.Material.Filled.SwapHoriz">
-                            <MudSelectItem T="int" Value="0">Entrada</MudSelectItem>
-                            <MudSelectItem T="int" Value="1">Saída</MudSelectItem>
-                            <MudSelectItem T="int" Value="2">Ajuste</MudSelectItem>
-                            <MudSelectItem T="int" Value="3">Transferência</MudSelectItem>
+                            <MudSelectItem T="int?" Value="0">Entrada</MudSelectItem>
+                            <MudSelectItem T="int?" Value="1">Saída</MudSelectItem>
+                            <MudSelectItem T="int?" Value="2">Ajuste</MudSelectItem>
+                            <MudSelectItem T="int?" Value="3">Transferência</MudSelectItem>
                         </MudSelect>
                     </MudItem>
                     
                     <MudItem xs="12" md="6">
-                        <MudSelect T="int"
+                        <MudSelect T="int?"
                                   Label="Motivo"
-                                  @bind-Value="_newMovement.Reason"
+                                  Value="@_newMovement.Reason" ValueChanged="@(async (int? v) => _newMovement.Reason = v ?? 0)"
                                   Variant="Variant.Outlined"
                                   Required="true"
                                   Adornment="Adornment.Start"
                                   AdornmentIcon="@Icons.Material.Filled.Description">
                             @foreach (var reason in GetReasonsForType())
                             {
-                                <MudSelectItem T="int" Value="@reason.Value">@reason.Text</MudSelectItem>
+                                <MudSelectItem T="int?" Value="@reason.Value">@reason.Text</MudSelectItem>
                             }
                         </MudSelect>
                     </MudItem>
                     
                     <MudItem xs="12" md="6">
-                        <MudNumericField T="decimal"
+                        <MudNumericField T="decimal?"
                                         Label="Quantidade"
-                                        @bind-Value="_newMovement.Quantity"
+                                        Value="@_newMovement.Quantity" ValueChanged="@(async (decimal? v) => _newMovement.Quantity = v ?? 0)"
                                         Min="0.01m"
                                         Step="1"
                                         Variant="Variant.Outlined"
@@ -99,9 +99,9 @@
                     </MudItem>
                     
                     <MudItem xs="12" md="6">
-                        <MudNumericField T="decimal"
+                        <MudNumericField T="decimal?"
                                         Label="Custo Unitário"
-                                        @bind-Value="_newMovement.UnitCost"
+                                        Value="@_newMovement.UnitCost" ValueChanged="@(async (decimal? v) => _newMovement.UnitCost = v ?? 0)"
                                         Min="0"
                                         Step="0.01m"
                                         Variant="Variant.Outlined"

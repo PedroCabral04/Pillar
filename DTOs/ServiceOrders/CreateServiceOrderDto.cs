@@ -45,7 +45,7 @@ public class CreateServiceOrderDto
     // ===== Informações Financeiras =====
 
     [System.ComponentModel.DataAnnotations.Range(0, double.MaxValue, ErrorMessage = "Desconto deve ser positivo")]
-    public decimal DiscountAmount { get; set; }
+    public decimal? DiscountAmount { get; set; }
 
     [System.ComponentModel.DataAnnotations.StringLength(50)]
     public string? PaymentMethod { get; set; }

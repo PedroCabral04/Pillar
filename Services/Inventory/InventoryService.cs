@@ -166,6 +166,16 @@ public class InventoryService : IInventoryService
         }
 
         var product = _productMapper.CreateProductDtoToProduct(dto);
+        product.CategoryId = dto.CategoryId ?? 0;
+        product.UnitsPerBox = dto.UnitsPerBox ?? 0;
+        product.MinimumStock = dto.MinimumStock ?? 0;
+        product.MaximumStock = dto.MaximumStock ?? 0;
+        product.CurrentStock = dto.CurrentStock ?? 0;
+        product.ReorderPoint = dto.ReorderPoint ?? 0;
+        product.SafetyStock = dto.SafetyStock ?? 0;
+        product.CostPrice = dto.CostPrice ?? 0;
+        product.SalePrice = dto.SalePrice ?? 0;
+        product.Status = (ProductStatus)(dto.Status ?? 0);
         product.CreatedByUserId = userId;
         product.CreatedAt = DateTime.UtcNow;
 
@@ -452,6 +462,16 @@ public class InventoryService : IInventoryService
             };
 
             var product = _productMapper.CreateProductDtoToProduct(dto);
+            product.CategoryId = dto.CategoryId ?? 0;
+            product.UnitsPerBox = dto.UnitsPerBox ?? 0;
+            product.MinimumStock = dto.MinimumStock ?? 0;
+            product.MaximumStock = dto.MaximumStock ?? 0;
+            product.CurrentStock = dto.CurrentStock ?? 0;
+            product.ReorderPoint = dto.ReorderPoint ?? 0;
+            product.SafetyStock = dto.SafetyStock ?? 0;
+            product.CostPrice = dto.CostPrice ?? 0;
+            product.SalePrice = dto.SalePrice ?? 0;
+            product.Status = (ProductStatus)(dto.Status ?? 0);
             product.CreatedByUserId = userId;
             product.CreatedAt = DateTime.UtcNow;
 
@@ -517,6 +537,15 @@ public class InventoryService : IInventoryService
         }
 
         _productMapper.UpdateProductDtoToProduct(dto, product);
+        product.CategoryId = dto.CategoryId ?? 0;
+        product.UnitsPerBox = dto.UnitsPerBox ?? 0;
+        product.MinimumStock = dto.MinimumStock ?? 0;
+        product.MaximumStock = dto.MaximumStock ?? 0;
+        product.ReorderPoint = dto.ReorderPoint ?? 0;
+        product.SafetyStock = dto.SafetyStock ?? 0;
+        product.CostPrice = dto.CostPrice ?? 0;
+        product.SalePrice = dto.SalePrice ?? 0;
+        product.Status = (ProductStatus)(dto.Status ?? 0);
         product.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();

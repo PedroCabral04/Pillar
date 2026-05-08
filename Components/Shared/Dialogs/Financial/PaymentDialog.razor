@@ -4,10 +4,10 @@
     <DialogContent>
         <MudForm @ref="form" @bind-IsValid="@success">
             <DatePicker Label="Data" @bind-Date="PaymentDate" Required="true" />
-            <MudNumericField @bind-Value="PaidAmount" Label="@AmountLabel" Format="C2" Required="true" />
-            <MudNumericField @bind-Value="AdditionalDiscount" Label="Desconto Adicional" Format="C2" />
-            <MudNumericField @bind-Value="AdditionalInterest" Label="Juros Adicionais" Format="C2" />
-            <MudNumericField @bind-Value="AdditionalFine" Label="Multa Adicional" Format="C2" />
+            <MudNumericField T="decimal?" Value="@PaidAmount" ValueChanged="@(async (decimal? v) => PaidAmount = v ?? 0)" Label="@AmountLabel" Format="C2" Required="true" />
+            <MudNumericField T="decimal?" @bind-Value="AdditionalDiscount" Label="Desconto Adicional" Format="C2" />
+            <MudNumericField T="decimal?" @bind-Value="AdditionalInterest" Label="Juros Adicionais" Format="C2" />
+            <MudNumericField T="decimal?" @bind-Value="AdditionalFine" Label="Multa Adicional" Format="C2" />
             <MudTextField @bind-Value="Notes" Label="Observações" Lines="2" />
         </MudForm>
     </DialogContent>

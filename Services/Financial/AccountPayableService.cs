@@ -112,7 +112,7 @@ public class AccountPayableService : IAccountPayableService
 
     public async Task<AccountPayableDto> CreateAsync(CreateAccountPayableDto createDto, int userId)
     {
-        if (createDto.OriginalAmount <= 0)
+        if ((createDto.OriginalAmount ?? 0) <= 0)
             throw new ArgumentException("O valor original deve ser maior que zero");
 
         var entity = _mapper.ToEntity(createDto);
@@ -267,7 +267,7 @@ public class AccountPayableService : IAccountPayableService
             throw new ArgumentException("O número de parcelas deve ser maior que 1");
 
         var installmentCalculations = _accountingService.CalculateInstallments(
-            baseDto.OriginalAmount,
+            baseDto.OriginalAmount ?? 0,
             installments,
             monthlyInterestRate);
 
@@ -287,7 +287,7 @@ public class AccountPayableService : IAccountPayableService
             
             var entity = new AccountPayable
             {
-                SupplierId = baseDto.SupplierId,
+                SupplierId = baseDto.SupplierId ?? 0,
                 InvoiceNumber = $"{baseDto.InvoiceNumber}/{calc.InstallmentNumber}",
                 OriginalAmount = calc.PrincipalAmount,
                 DiscountAmount = 0,

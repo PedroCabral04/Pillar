@@ -145,7 +145,7 @@
                     Roles e Permissões
                 </MudText>
 
-                <MudSelect T="int"
+                <MudSelect T="int?"
                            SelectedValues="@_selectedRoleIds"
                            SelectedValuesChanged="OnSelectedRolesChanged"
                            Label="Roles"
@@ -160,7 +160,7 @@
                     {
                         @foreach (var role in _roles)
                         {
-                            <MudSelectItem T="int" Value="@role.Id">
+                            <MudSelectItem T="int?" Value="@role.Id">
                                 <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
                                     <MudText Typo="Typo.body2">@role.Name</MudText>
                                     <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">@role.Abbreviation</MudChip>
@@ -223,7 +223,7 @@
     private readonly List<DepartmentDto> _departments = new();
     private readonly List<PositionDto> _positions = new();
     private readonly List<RoleDto> _roles = new();
-    private HashSet<int> _selectedRoleIds = new();
+    private HashSet<int?> _selectedRoleIds = new();
     private bool _loading;
     private bool _saving;
     private bool _isActive = true;
@@ -263,7 +263,7 @@
                 {
                     _selectedRoleIds = _roles
                         .Where(r => User.RoleNames.Contains(r.Name, StringComparer.OrdinalIgnoreCase))
-                        .Select(r => r.Id)
+                        .Select(r => (int?)r.Id)
                         .ToHashSet();
                 }
             }
@@ -380,7 +380,7 @@
                     PositionId = _userDto.PositionId,
                     IsActive = _isActive,
                     Password = string.IsNullOrWhiteSpace(_newPassword) ? null : _newPassword,
-                    RoleIds = _selectedRoleIds.ToList()
+                    RoleIds = _selectedRoleIds.Where(id => id.HasValue).Select(id => id!.Value).ToList()
                 };
 
                 response = await ApiService.PutAsync($"api/tenants/{Tenant.Id}/users/{User.Id}", dto);
@@ -397,7 +397,7 @@
                     DepartmentId = _userDto.DepartmentId,
                     PositionId = _userDto.PositionId,
                     Password = _userDto.Password,
-                    RoleIds = _selectedRoleIds.ToList()
+                    RoleIds = _selectedRoleIds.Where(id => id.HasValue).Select(id => id!.Value).ToList()
                 };
 
                 response = await ApiService.PostAsync($"api/tenants/{Tenant.Id}/users", dto);
@@ -424,9 +424,9 @@
         }
     }
 
-    private Task OnSelectedRolesChanged(IEnumerable<int> roleIds)
+    private Task OnSelectedRolesChanged(IEnumerable<int?> roleIds)
     {
-        _selectedRoleIds = roleIds.ToHashSet();
+        _selectedRoleIds = roleIds.Where(id => id.HasValue).ToHashSet()!;
         return Task.CompletedTask;
     }
 

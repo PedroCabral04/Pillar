@@ -42,9 +42,9 @@
                     </MudItem>
                     
                     <MudItem xs="12">
-                        <MudSelect T="int"
+                        <MudSelect T="int?"
                                   Label="Armazém"
-                                  @bind-Value="_newCount.WarehouseId"
+                                  Value="@_newCount.WarehouseId" ValueChanged="@(async (int? v) => _newCount.WarehouseId = v ?? 0)"
                                   Variant="Variant.Outlined"
                                   Required="true"
                                   Adornment="Adornment.Start"
@@ -52,7 +52,7 @@
                                   HelperText="Selecione o armazém para realizar a contagem">
                             @foreach (var warehouse in _warehouses)
                             {
-                                <MudSelectItem T="int" Value="@warehouse.Id">@warehouse.Name</MudSelectItem>
+                                <MudSelectItem T="int?" Value="@warehouse.Id">@warehouse.Name</MudSelectItem>
                             }
                         </MudSelect>
                     </MudItem>

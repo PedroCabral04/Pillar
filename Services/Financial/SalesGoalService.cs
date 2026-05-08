@@ -31,7 +31,7 @@ public class SalesGoalService : ISalesGoalService
     public async Task<SalesGoalDto> CreateAsync(CreateSalesGoalDto dto)
     {
         // Check if goal already exists for this period
-        var existing = await _salesGoalDao.GetByUserAndPeriodAsync(dto.UserId, dto.Year, dto.Month);
+        var existing = await _salesGoalDao.GetByUserAndPeriodAsync(dto.UserId ?? 0, dto.Year ?? 0, dto.Month ?? 0);
         if (existing != null)
         {
             throw new InvalidOperationException($"Já existe uma meta para o usuário no período {dto.Month}/{dto.Year}");
@@ -40,13 +40,13 @@ public class SalesGoalService : ISalesGoalService
         var goal = new SalesGoal
         {
             TenantId = dto.TenantId,
-            UserId = dto.UserId,
-            Year = dto.Year,
-            Month = dto.Month,
-            TargetSalesAmount = dto.TargetSalesAmount,
-            TargetProfitAmount = dto.TargetProfitAmount,
-            TargetSalesCount = dto.TargetSalesCount,
-            BonusCommissionPercent = dto.BonusCommissionPercent,
+            UserId = dto.UserId ?? 0,
+            Year = dto.Year ?? 0,
+            Month = dto.Month ?? 0,
+            TargetSalesAmount = dto.TargetSalesAmount ?? 0,
+            TargetProfitAmount = dto.TargetProfitAmount ?? 0,
+            TargetSalesCount = dto.TargetSalesCount ?? 0,
+            BonusCommissionPercent = dto.BonusCommissionPercent ?? 0,
             Notes = dto.Notes,
             CreatedAt = DateTime.UtcNow,
             CreatedByUserId = dto.CreatedByUserId
@@ -64,10 +64,10 @@ public class SalesGoalService : ISalesGoalService
         if (goal == null)
             throw new KeyNotFoundException($"Meta {id} não encontrada");
 
-        goal.TargetSalesAmount = dto.TargetSalesAmount;
-        goal.TargetProfitAmount = dto.TargetProfitAmount;
-        goal.TargetSalesCount = dto.TargetSalesCount;
-        goal.BonusCommissionPercent = dto.BonusCommissionPercent;
+        goal.TargetSalesAmount = dto.TargetSalesAmount ?? 0;
+        goal.TargetProfitAmount = dto.TargetProfitAmount ?? 0;
+        goal.TargetSalesCount = dto.TargetSalesCount ?? 0;
+        goal.BonusCommissionPercent = dto.BonusCommissionPercent ?? 0;
         goal.Notes = dto.Notes;
         goal.UpdatedAt = DateTime.UtcNow;
 

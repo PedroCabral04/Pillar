@@ -16,7 +16,7 @@
             </MudText>
             <MudGrid Spacing="3">
                 <MudItem xs="12">
-                    <MudSelect T="int"
+                    <MudSelect T="int?"
                                Label="Vendedor"
                                @bind-Value="_model.UserId"
                                Required="true"
@@ -28,7 +28,7 @@
                                HelperText="Selecione o vendedor">
                         @foreach (var user in Users.Where(u => u.IsActive))
                         {
-                            <MudSelectItem T="int" Value="@user.Id">@user.FullName (@user.Username)</MudSelectItem>
+                            <MudSelectItem T="int?" Value="@user.Id">@user.FullName (@user.Username)</MudSelectItem>
                         }
                     </MudSelect>
                 </MudItem>
@@ -42,7 +42,7 @@
             </MudText>
             <MudGrid Spacing="3">
                 <MudItem xs="6" sm="3">
-                    <MudSelect T="int"
+                    <MudSelect T="int?"
                                Label="Mês"
                                @bind-Value="_model.Month"
                                Required="true"
@@ -52,12 +52,12 @@
                         @for (int m = 1; m <= 12; m++)
                         {
                             var monthName = new DateTime(2025, m, 1).ToString("MMMM", new System.Globalization.CultureInfo("pt-BR"));
-                            <MudSelectItem T="int" Value="@(m)">@(char.ToUpper(monthName[0]) + monthName.Substring(1))</MudSelectItem>
+                            <MudSelectItem T="int?" Value="@(m)">@(char.ToUpper(monthName[0]) + monthName.Substring(1))</MudSelectItem>
                         }
                     </MudSelect>
                 </MudItem>
                 <MudItem xs="6" sm="3">
-                    <MudSelect T="int"
+                    <MudSelect T="int?"
                                Label="Ano"
                                @bind-Value="_model.Year"
                                Required="true"
@@ -65,7 +65,7 @@
                                Variant="Variant.Outlined">
                         @foreach (var year in AvailableYears)
                         {
-                            <MudSelectItem T="int" Value="@year">@year</MudSelectItem>
+                            <MudSelectItem T="int?" Value="@year">@year</MudSelectItem>
                         }
                     </MudSelect>
                 </MudItem>
@@ -80,7 +80,7 @@
             <MudGrid Spacing="3">
                 <MudItem xs="12" sm="6" md="4">
                     <MudNumericField @bind-Value="_model.TargetSalesAmount"
-                                     T="decimal"
+                                     T="decimal?"
                                      Label="Meta de Vendas (R$)"
                                      Format="C2"
                                      Min="0.01m"
@@ -94,7 +94,7 @@
                 </MudItem>
                 <MudItem xs="12" sm="6" md="4">
                     <MudNumericField @bind-Value="_model.TargetProfitAmount"
-                                     T="decimal"
+                                     T="decimal?"
                                      Label="Meta de Lucro (R$)"
                                      Format="C2"
                                      Min="0m"
@@ -106,7 +106,7 @@
                 </MudItem>
                 <MudItem xs="12" sm="6" md="4">
                     <MudNumericField @bind-Value="_model.TargetSalesCount"
-                                     T="int"
+                                     T="int?"
                                      Label="Qtd. de Vendas"
                                      Min="1"
                                      Required="true"
@@ -186,12 +186,12 @@
     protected override void OnParametersSet()
     {
         base.OnParametersSet();
-        _bonusPercentString = _model.BonusCommissionPercent.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-        if (_model.Year == 0)
+        _bonusPercentString = (_model.BonusCommissionPercent ?? 0).ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+        if (_model.Year == null || _model.Year == 0)
         {
             _model.Year = DateTime.Now.Year;
         }
-        if (_model.Month == 0)
+        if (_model.Month == null || _model.Month == 0)
         {
             _model.Month = DateTime.Now.Month;
         }

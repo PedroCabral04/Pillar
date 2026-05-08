@@ -11,16 +11,16 @@
                 
                 <MudGrid>
                     <MudItem xs="6">
-                        <MudNumericField @bind-Value="_model.Faltas" Label="Faltas" Variant="Variant.Outlined" Min="0" />
+                        <MudNumericField T="decimal?" @bind-Value="_model.Faltas" Label="Faltas" Variant="Variant.Outlined" Min="0" />
                     </MudItem>
                     <MudItem xs="6">
-                        <MudNumericField @bind-Value="_model.Abonos" Label="Abonos" Variant="Variant.Outlined" Min="0" />
+                        <MudNumericField T="decimal?" @bind-Value="_model.Abonos" Label="Abonos" Variant="Variant.Outlined" Min="0" />
                     </MudItem>
                     <MudItem xs="6">
-                        <MudNumericField @bind-Value="_model.HorasExtras" Label="Horas Extras" Variant="Variant.Outlined" Min="0" />
+                        <MudNumericField T="decimal?" @bind-Value="_model.HorasExtras" Label="Horas Extras" Variant="Variant.Outlined" Min="0" />
                     </MudItem>
                     <MudItem xs="6">
-                        <MudNumericField @bind-Value="_model.Atrasos" Label="Atrasos" Variant="Variant.Outlined" Min="0" />
+                        <MudNumericField T="decimal?" @bind-Value="_model.Atrasos" Label="Atrasos" Variant="Variant.Outlined" Min="0" />
                     </MudItem>
                 </MudGrid>
 

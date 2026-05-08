@@ -136,7 +136,7 @@ public class AssetAssignmentDto
 public class CreateAssetAssignmentDto
 {
     public int AssetId { get; set; }
-    public int AssignedToUserId { get; set; }
+    public int? AssignedToUserId { get; set; }
     public DateTime AssignedDate { get; set; } = DateTime.UtcNow;
     public AssetCondition ConditionOnAssignment { get; set; } = AssetCondition.Good;
     public string? AssignmentNotes { get; set; }

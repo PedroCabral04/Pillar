@@ -39,6 +39,8 @@ public class CustomerService : ICustomerService
             }
 
             var customer = _mapper.ToEntity(dto);
+            customer.CreditLimit = dto.CreditLimit ?? 0;
+            customer.PaymentTermDays = dto.PaymentTermDays ?? 0;
             customer.CreatedAt = DateTime.UtcNow;
             
             // Explicitly set TenantId if available in context
@@ -125,6 +127,8 @@ public class CustomerService : ICustomerService
             }
 
             _mapper.UpdateEntity(dto, customer);
+            customer.CreditLimit = dto.CreditLimit ?? 0;
+            customer.PaymentTermDays = dto.PaymentTermDays ?? 0;
             customer.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();

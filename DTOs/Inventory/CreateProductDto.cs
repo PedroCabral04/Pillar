@@ -22,7 +22,7 @@ public class CreateProductDto
     
     [Required(ErrorMessage = "Categoria é obrigatória")]
     [Range(1, int.MaxValue, ErrorMessage = "Categoria inválida")]
-    public int CategoryId { get; set; }
+    public int? CategoryId { get; set; }
     
     public int? BrandId { get; set; }
     public string? Tags { get; set; }
@@ -31,8 +31,9 @@ public class CreateProductDto
     [StringLength(10, ErrorMessage = "Unidade deve ter no máximo 10 caracteres")]
     public string Unit { get; set; } = "UN";
     
+    [Required]
     [Range(0.01, double.MaxValue, ErrorMessage = "Unidades por caixa deve ser maior que zero")]
-    public decimal UnitsPerBox { get; set; } = 1;
+    public decimal? UnitsPerBox { get; set; }
     
     [Range(0, double.MaxValue, ErrorMessage = "Peso deve ser positivo")]
     public decimal? Weight { get; set; }
@@ -47,30 +48,30 @@ public class CreateProductDto
     public decimal? Height { get; set; }
     
     [Range(0, double.MaxValue, ErrorMessage = "Estoque mínimo deve ser positivo")]
-    public decimal MinimumStock { get; set; } = 0;
+    public decimal? MinimumStock { get; set; }
     
     [Range(0, double.MaxValue, ErrorMessage = "Estoque máximo deve ser positivo")]
-    public decimal MaximumStock { get; set; } = 0;
+    public decimal? MaximumStock { get; set; }
     
     [Range(0, double.MaxValue, ErrorMessage = "Estoque inicial deve ser positivo")]
-    public decimal CurrentStock { get; set; } = 0;
+    public decimal? CurrentStock { get; set; }
     
     [Range(0, double.MaxValue, ErrorMessage = "Ponto de reposição deve ser positivo")]
-    public decimal ReorderPoint { get; set; } = 0;
+    public decimal? ReorderPoint { get; set; }
     
     [Range(0, double.MaxValue, ErrorMessage = "Estoque de segurança deve ser positivo")]
-    public decimal SafetyStock { get; set; } = 0;
+    public decimal? SafetyStock { get; set; }
     
     [StringLength(100, ErrorMessage = "Localização deve ter no máximo 100 caracteres")]
     public string? WarehouseLocation { get; set; }
     
     [Required(ErrorMessage = "Preço de custo é obrigatório")]
     [Range(0, double.MaxValue, ErrorMessage = "Preço de custo deve ser positivo")]
-    public decimal CostPrice { get; set; } = 0;
+    public decimal? CostPrice { get; set; }
     
     [Required(ErrorMessage = "Preço de venda é obrigatório")]
     [Range(0, double.MaxValue, ErrorMessage = "Preço de venda deve ser positivo")]
-    public decimal SalePrice { get; set; } = 0;
+    public decimal? SalePrice { get; set; }
     
     [Range(0, double.MaxValue, ErrorMessage = "Preço atacado deve ser positivo")]
     public decimal? WholesalePrice { get; set; }
@@ -93,7 +94,7 @@ public class CreateProductDto
     [Range(0, 100, ErrorMessage = "Taxa de COFINS deve estar entre 0 e 100")]
     public decimal CofinsRate { get; set; } = 0;
     
-    public int Status { get; set; } = 0;
+    public int? Status { get; set; }
     public bool IsActive { get; set; } = true;
     public bool AllowNegativeStock { get; set; } = false;
     public bool IsKit { get; set; } = false;

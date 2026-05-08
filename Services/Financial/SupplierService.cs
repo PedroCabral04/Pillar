@@ -77,6 +77,9 @@ public class SupplierService : ISupplierService
             throw new InvalidOperationException("Já existe um fornecedor com este CNPJ/CPF");
 
         var supplier = _mapper.ToEntity(dto);
+        supplier.MinimumOrderValue = dto.MinimumOrderValue ?? 0;
+        supplier.DeliveryLeadTimeDays = dto.DeliveryLeadTimeDays ?? 0;
+        supplier.PaymentTermDays = dto.PaymentTermDays ?? 0;
         supplier.TaxId = cleanedTaxId;
         supplier.CreatedByUserId = currentUserId;
         supplier.CreatedAt = DateTime.UtcNow;
@@ -101,6 +104,9 @@ public class SupplierService : ISupplierService
             throw new InvalidOperationException("Já existe outro fornecedor com este CNPJ/CPF");
 
         _mapper.UpdateEntity(dto, existing);
+        existing.MinimumOrderValue = dto.MinimumOrderValue ?? 0;
+        existing.DeliveryLeadTimeDays = dto.DeliveryLeadTimeDays ?? 0;
+        existing.PaymentTermDays = dto.PaymentTermDays ?? 0;
         existing.TaxId = cleanedTaxId;
         existing.UpdatedAt = DateTime.UtcNow;
 

@@ -45,7 +45,7 @@
                         </MudItem>
 
                         <MudItem xs="12">
-                            <MudSelect T="int"
+                            <MudSelect T="int?"
                                        Label="Categoria"
                                        @bind-Value="_newProduct.CategoryId"
                                        Variant="Variant.Outlined"
@@ -54,13 +54,13 @@
                                        AdornmentIcon="@Icons.Material.Filled.Category">
                                 @foreach (var category in _categories)
                                 {
-                                    <MudSelectItem T="int" Value="@category.Id">@category.Name</MudSelectItem>
+                                    <MudSelectItem T="int?" Value="@category.Id">@category.Name</MudSelectItem>
                                 }
                             </MudSelect>
                         </MudItem>
 
                         <MudItem xs="12">
-                            <MudNumericField T="decimal"
+                            <MudNumericField T="decimal?"
                                              Label="Preço de Venda"
                                              @bind-Value="_newProduct.SalePrice"
                                              Min="0"
@@ -112,7 +112,7 @@
                             </MudItem>
                             
                             <MudItem xs="12" md="4">
-                                <MudSelect T="int"
+                                <MudSelect T="int?"
                                           Label="Categoria"
                                           @bind-Value="_newProduct.CategoryId"
                                           Variant="Variant.Outlined"
@@ -121,7 +121,7 @@
                                           AdornmentIcon="@Icons.Material.Filled.Category">
                                     @foreach (var category in _categories)
                                     {
-                                        <MudSelectItem T="int" Value="@category.Id">@category.Name</MudSelectItem>
+                                        <MudSelectItem T="int?" Value="@category.Id">@category.Name</MudSelectItem>
                                     }
                                 </MudSelect>
                             </MudItem>
@@ -174,7 +174,7 @@
                     <MudTabPanel Text="Preços" Icon="@Icons.Material.Filled.AttachMoney">
                         <MudGrid Spacing="3">
                             <MudItem xs="12" md="4">
-                                <MudNumericField T="decimal"
+                                <MudNumericField T="decimal?"
                                                 Label="Preço de Custo"
                                                 @bind-Value="_newProduct.CostPrice"
                                                 Min="0"
@@ -187,7 +187,7 @@
                             </MudItem>
                             
                             <MudItem xs="12" md="4">
-                                <MudNumericField T="decimal"
+                                <MudNumericField T="decimal?"
                                                 Label="Preço de Venda"
                                                 @bind-Value="_newProduct.SalePrice"
                                                 Min="0"
@@ -242,7 +242,7 @@
                             </MudItem>
                             
                             <MudItem xs="12" md="6">
-                                <MudNumericField T="decimal"
+                                <MudNumericField T="decimal?"
                                                 Label="Estoque Mínimo"
                                                 @bind-Value="_newProduct.MinimumStock"
                                                 Min="0"
@@ -253,7 +253,7 @@
                             </MudItem>
                             
                             <MudItem xs="12" md="6">
-                                <MudNumericField T="decimal"
+                                <MudNumericField T="decimal?"
                                                 Label="Estoque Máximo"
                                                 @bind-Value="_newProduct.MaximumStock"
                                                 Min="0"
@@ -264,7 +264,7 @@
                             </MudItem>
                             
                             <MudItem xs="12" md="6">
-                                <MudNumericField T="decimal"
+                                <MudNumericField T="decimal?"
                                                 Label="Ponto de Reposição"
                                                 @bind-Value="_newProduct.ReorderPoint"
                                                 Min="0"
@@ -276,7 +276,7 @@
                             </MudItem>
                             
                             <MudItem xs="12" md="6">
-                                <MudNumericField T="decimal"
+                                <MudNumericField T="decimal?"
                                                 Label="Estoque de Segurança"
                                                 @bind-Value="_newProduct.SafetyStock"
                                                 Min="0"
@@ -313,7 +313,7 @@
                             </MudItem>
                             
                             <MudItem xs="12" md="6">
-                                <MudNumericField T="decimal"
+                                <MudNumericField T="decimal?"
                                                 Label="Unidades por Caixa"
                                                 @bind-Value="_newProduct.UnitsPerBox"
                                                 Min="0.01m"
@@ -583,10 +583,10 @@
     
     private decimal GetProfitMargin()
     {
-        if (_newProduct.CostPrice <= 0 || _newProduct.SalePrice <= 0)
+        if (_newProduct.CostPrice <= 0 || _newProduct.SalePrice == null || _newProduct.SalePrice <= 0)
             return 0;
         
-        return (_newProduct.SalePrice - _newProduct.CostPrice) / _newProduct.SalePrice;
+        return (_newProduct.SalePrice.Value - _newProduct.CostPrice!.Value) / _newProduct.SalePrice.Value;
     }
     
     private void Cancel()
@@ -612,13 +612,13 @@
             return;
         }
         
-        if (_newProduct.CategoryId <= 0)
+        if (_newProduct.CategoryId == null || _newProduct.CategoryId <= 0)
         {
             Snackbar.Add("Selecione uma categoria", Severity.Warning);
             return;
         }
 
-        if (_newProduct.SalePrice <= 0)
+        if (_newProduct.SalePrice == null || _newProduct.SalePrice <= 0)
         {
             Snackbar.Add("Informe um preço de venda maior que zero", Severity.Warning);
             return;

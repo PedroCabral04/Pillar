@@ -29,9 +29,9 @@ public class CreateSupplierDto
 
     // Financial
     public int? CategoryId { get; set; }
-    public decimal MinimumOrderValue { get; set; } = 0;
-    public int DeliveryLeadTimeDays { get; set; } = 0;
-    public int PaymentTermDays { get; set; } = 30;
+    public decimal? MinimumOrderValue { get; set; }
+    public int? DeliveryLeadTimeDays { get; set; }
+    public int? PaymentTermDays { get; set; }
     public string PaymentMethod { get; set; } = "Boleto";
     public bool IsPreferred { get; set; } = false;
 

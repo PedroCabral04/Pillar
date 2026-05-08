@@ -34,7 +34,7 @@
         <MudCardContent>
             <MudGrid>
                 <MudItem xs="12" sm="6" md="3">
-                    <MudSelect T="int" Label="Mês" @bind-Value="_selectedMonth" Style="min-width: 100px;">
+                    <MudSelect T="int?" Label="Mês" Value="@_selectedMonth" ValueChanged="@(async (int? v) => _selectedMonth = v ?? 0)" Style="min-width: 100px;">
                         @for (int m = 1; m <= 12; m++)
                         {
                             var monthName = new DateTime(2025, m, 1).ToString("MMMM", new System.Globalization.CultureInfo("pt-BR"));
@@ -43,7 +43,7 @@
                     </MudSelect>
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
-                    <MudSelect T="int" Label="Ano" @bind-Value="_selectedYear" Style="min-width: 120px;">
+                    <MudSelect T="int?" Label="Ano" Value="@_selectedYear" ValueChanged="@(async (int? v) => _selectedYear = v ?? 0)" Style="min-width: 120px;">
                         @foreach (var year in _availableYears)
                         {
                             <MudSelectItem Value="@year">@year</MudSelectItem>

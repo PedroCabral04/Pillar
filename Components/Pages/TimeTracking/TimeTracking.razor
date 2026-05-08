@@ -23,13 +23,13 @@
         <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
             <MudText Typo="Typo.h5">Apontamento</MudText>
             <MudSpacer />
-            <MudSelect T="int" Label="Mês" Value="@_selectedMonth" ValueChanged="@(async (int v) => await OnMonthChanged(v))" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 150px">
+            <MudSelect T="int?" Label="Mês" Value="@_selectedMonth" ValueChanged="@(async (int? v) => await OnMonthChanged(v ?? 0))" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 150px">
                 @foreach (var month in _months)
                 {
                     <MudSelectItem Value="@month.Value">@month.Label</MudSelectItem>
                 }
             </MudSelect>
-            <MudNumericField T="int" Label="Ano" Value="@_selectedYear" ValueChanged="@(async (int v) => await OnYearChanged(v))" Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 100px" Min="2000" Max="2100" />
+            <MudNumericField T="int?" Label="Ano" Value="@_selectedYear" ValueChanged="@(async (int? v) => await OnYearChanged(v ?? 0))" Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 100px" Min="2000" Max="2100" />
             <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="CreatePeriodAsync" StartIcon="@Icons.Material.Filled.Add">Novo Período</MudButton>
         </MudStack>
     </MudPaper>
@@ -81,16 +81,16 @@
                         <MudText Typo="Typo.caption" Color="Color.Secondary">@context.EmployeeEmail</MudText>
                     </MudTd>
                     <MudTd DataLabel="Faltas">
-                        <MudNumericField @bind-Value="context.Faltas" Format="N2" Culture="@_ptBr" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" HideSpinButtons="true" />
+                        <MudNumericField T="decimal?" @bind-Value="context.Faltas" Format="N2" Culture="@_ptBr" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" HideSpinButtons="true" />
                     </MudTd>
                     <MudTd DataLabel="Abonos">
-                        <MudNumericField @bind-Value="context.Abonos" Format="N2" Culture="@_ptBr" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" HideSpinButtons="true" />
+                        <MudNumericField T="decimal?" @bind-Value="context.Abonos" Format="N2" Culture="@_ptBr" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" HideSpinButtons="true" />
                     </MudTd>
                     <MudTd DataLabel="H. Extras">
-                        <MudNumericField @bind-Value="context.HorasExtras" Format="N2" Culture="@_ptBr" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" HideSpinButtons="true" />
+                        <MudNumericField T="decimal?" @bind-Value="context.HorasExtras" Format="N2" Culture="@_ptBr" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" HideSpinButtons="true" />
                     </MudTd>
                     <MudTd DataLabel="Atrasos">
-                        <MudNumericField @bind-Value="context.Atrasos" Format="N2" Culture="@_ptBr" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" HideSpinButtons="true" />
+                        <MudNumericField T="decimal?" @bind-Value="context.Atrasos" Format="N2" Culture="@_ptBr" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" HideSpinButtons="true" />
                     </MudTd>
                     <MudTd DataLabel="Observações">
                         <MudTextField @bind-Value="context.Observacoes" Variant="Variant.Outlined" Margin="Margin.Dense" />

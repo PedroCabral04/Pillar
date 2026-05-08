@@ -64,7 +64,7 @@ public class EmployeePaymentService : IEmployeePaymentService
 
     public async Task<EmployeePaymentDto> CreateAsync(CreateEmployeePaymentDto dto, int userId)
     {
-        var employee = await _context.Users.FindAsync(dto.EmployeeId);
+        var employee = await _context.Users.FindAsync(dto.EmployeeId ?? 0);
         if (employee == null)
             throw new InvalidOperationException("Funcionário não encontrado");
 
@@ -73,7 +73,7 @@ public class EmployeePaymentService : IEmployeePaymentService
             dto.Amount = employee.Salary ?? 0;
         }
 
-        if (dto.DiscountAmount > dto.Amount)
+        if ((dto.DiscountAmount ?? 0) > (dto.Amount ?? 0))
             throw new InvalidOperationException("Desconto não pode ser maior que o valor");
 
         var payment = _mapper.ToEntity(dto);
@@ -94,12 +94,12 @@ public class EmployeePaymentService : IEmployeePaymentService
         if (payment.Status == AccountStatus.Paid)
             throw new InvalidOperationException("Não é possível editar um pagamento já realizado");
 
-        if (dto.DiscountAmount > dto.Amount)
+        if ((dto.DiscountAmount ?? 0) > (dto.Amount ?? 0))
             throw new InvalidOperationException("Desconto não pode ser maior que o valor");
 
-        payment.Amount = dto.Amount;
-        payment.DiscountAmount = dto.DiscountAmount;
-        payment.NetAmount = dto.Amount - dto.DiscountAmount;
+        payment.Amount = dto.Amount ?? 0;
+        payment.DiscountAmount = dto.DiscountAmount ?? 0;
+        payment.NetAmount = (dto.Amount ?? 0) - (dto.DiscountAmount ?? 0);
         payment.Description = dto.Description;
         payment.DueDate = dto.DueDate;
         payment.PaymentMethod = dto.PaymentMethod;
@@ -147,7 +147,7 @@ public class EmployeePaymentService : IEmployeePaymentService
     public async Task<List<EmployeePaymentDto>> GenerateServicePaymentsAsync(
         GenerateServicePaymentsDto dto, int userId)
     {
-        var startDate = new DateTime(dto.ReferenceYear, dto.ReferenceMonth, 1);
+        var startDate = new DateTime(dto.ReferenceYear ?? 0, dto.ReferenceMonth ?? 0, 1);
         var endDate = startDate.AddMonths(1);
 
         var completedOrders = await _context.ServiceOrders
@@ -172,7 +172,7 @@ public class EmployeePaymentService : IEmployeePaymentService
             if (employee == null) continue;
 
             var existingPayments = await _dao.GetByEmployeeAndPeriodAsync(
-                group.Key, dto.ReferenceMonth, dto.ReferenceYear);
+                group.Key, dto.ReferenceMonth ?? 0, dto.ReferenceYear ?? 0);
             if (existingPayments.Any(p => p.Type == EmployeePaymentType.SalaryByService))
                 continue;
 
@@ -185,8 +185,8 @@ public class EmployeePaymentService : IEmployeePaymentService
                 DiscountAmount = 0,
                 NetAmount = totalNet,
                 Description = $"Pagamento por serviços - {orderCount} OS concluídas",
-                ReferenceMonth = dto.ReferenceMonth,
-                ReferenceYear = dto.ReferenceYear,
+                ReferenceMonth = dto.ReferenceMonth ?? 0,
+                ReferenceYear = dto.ReferenceYear ?? 0,
                 DueDate = dto.DueDate,
                 PaymentMethod = dto.PaymentMethod,
                 ServiceCount = orderCount,

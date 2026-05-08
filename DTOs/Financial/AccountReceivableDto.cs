@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using erp.Models.Financial;
 
 namespace erp.DTOs.Financial;
@@ -7,12 +8,14 @@ namespace erp.DTOs.Financial;
 /// </summary>
 public class CreateAccountReceivableDto
 {
-    public int CustomerId { get; set; }
+    [Required]
+    public int? CustomerId { get; set; }
     public string? InvoiceNumber { get; set; }
-    public decimal OriginalAmount { get; set; }
-    public decimal DiscountAmount { get; set; } = 0;
-    public decimal InterestAmount { get; set; } = 0;
-    public decimal FineAmount { get; set; } = 0;
+    [Required]
+    public decimal? OriginalAmount { get; set; }
+    public decimal? DiscountAmount { get; set; }
+    public decimal? InterestAmount { get; set; }
+    public decimal? FineAmount { get; set; }
     
     public DateTime IssueDate { get; set; }
     public DateTime DueDate { get; set; }
@@ -25,8 +28,8 @@ public class CreateAccountReceivableDto
     public int? CostCenterId { get; set; }
     
     public int? ParentAccountId { get; set; }
-    public int InstallmentNumber { get; set; } = 1;
-    public int TotalInstallments { get; set; } = 1;
+    public int? InstallmentNumber { get; set; }
+    public int? TotalInstallments { get; set; }
     
     public string? Notes { get; set; }
     public string? InternalNotes { get; set; }
@@ -38,7 +41,7 @@ public class CreateAccountReceivableDto
 public class UpdateAccountReceivableDto : CreateAccountReceivableDto
 {
     public AccountStatus Status { get; set; }
-    public decimal PaidAmount { get; set; } = 0;
+    public decimal? PaidAmount { get; set; }
     public DateTime? PaymentDate { get; set; }
 }
 
