@@ -88,4 +88,23 @@ public partial class FinancialMapper
     
     [MapProperty(nameof(CostCenter.Manager.UserName), nameof(CostCenterDto.ManagerName))]
     public partial CostCenterDto ToDtoWithRelations(CostCenter costCenter);
+    
+    // Employee Payment mappings
+    public partial EmployeePayment ToEntity(CreateEmployeePaymentDto dto);
+    
+    [MapperIgnoreTarget(nameof(EmployeePaymentDto.TypeName))]
+    [MapperIgnoreTarget(nameof(EmployeePaymentDto.StatusDescription))]
+    [MapperIgnoreTarget(nameof(EmployeePaymentDto.PaymentMethodDescription))]
+    public partial EmployeePaymentDto ToDto(EmployeePayment payment);
+    
+    [MapperIgnoreTarget(nameof(EmployeePaymentDto.TypeName))]
+    [MapperIgnoreTarget(nameof(EmployeePaymentDto.StatusDescription))]
+    [MapperIgnoreTarget(nameof(EmployeePaymentDto.PaymentMethodDescription))]
+    [MapProperty(nameof(EmployeePayment.Employee.FullName), nameof(EmployeePaymentDto.EmployeeName))]
+    [MapProperty(nameof(EmployeePayment.Category.Name), nameof(EmployeePaymentDto.CategoryName))]
+    [MapProperty(nameof(EmployeePayment.CostCenter.Name), nameof(EmployeePaymentDto.CostCenterName))]
+    [MapProperty(nameof(EmployeePayment.ServiceOrder.OrderNumber), nameof(EmployeePaymentDto.ServiceOrderNumber))]
+    [MapProperty(nameof(EmployeePayment.CreatedByUser.UserName), nameof(EmployeePaymentDto.CreatedByUserName))]
+    [MapProperty(nameof(EmployeePayment.PaidByUser.UserName), nameof(EmployeePaymentDto.PaidByUserName))]
+    public partial EmployeePaymentDto ToDtoWithRelations(EmployeePayment payment);
 }

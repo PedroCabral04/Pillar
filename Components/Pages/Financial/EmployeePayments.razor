@@ -1,0 +1,460 @@
+@page "/financial/employee-payments"
+@using erp.DTOs
+@using erp.DTOs.Financial
+@using erp.DTOs.User
+@using erp.Models.Financial
+@using erp.Services.Authorization
+@using erp.Components.Shared
+@using erp.Components.Shared.Dialogs.Financial
+@attribute [Authorize(Policy = ModulePolicies.Financial)]
+
+<PageTitle>Pagamentos de Funcionários - Pillar ERP</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudText Typo="Typo.h4">
+            <MudIcon Icon="@Icons.Material.Filled.Payments" Class="mr-2" Color="Color.Primary" />
+            Pagamentos de Funcionários
+        </MudText>
+        <MudStack Row="true" Spacing="2">
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary"
+                       StartIcon="@Icons.Material.Filled.Build" OnClick="OpenGenerateServiceDialog">
+                Gerar por Serviços
+            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add" OnClick="OpenCreateDialog">
+                Novo Pagamento
+            </MudButton>
+        </MudStack>
+    </MudStack>
+
+    <!-- Summary Cards -->
+    <MudGrid Spacing="2" Class="mb-4">
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Total Pendente</MudText>
+                <MudText Typo="Typo.h6" Color="Color.Info">@Currency.Format(_totalPending)</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Total Pago</MudText>
+                <MudText Typo="Typo.h6" Color="Color.Success">@Currency.Format(_totalPaid)</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Total Vencido</MudText>
+                <MudText Typo="Typo.h6" Color="Color.Error">@Currency.Format(_totalOverdue)</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Total Cancelado</MudText>
+                <MudText Typo="Typo.h6" Color="Color.Default">@Currency.Format(_totalCancelled)</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Filters -->
+    <MudPaper Class="pa-4 mb-4" Elevation="2">
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="mb-3">
+            <MudText Typo="Typo.subtitle1">
+                <MudIcon Icon="@Icons.Material.Filled.FilterList" Size="Size.Small" Class="mr-1" />
+                Filtros
+            </MudText>
+            <MudSpacer />
+        </MudStack>
+        <MudGrid Spacing="2">
+            <MudItem xs="12" sm="6" md="2">
+                <MudSelect T="int?" Value="_selectedEmployeeId" Label="Funcionário"
+                           Variant="Variant.Outlined" Clearable="true"
+                           ValueChanged="@((int? val) => { _selectedEmployeeId = val; OnFilterChanged(); })">
+                    @foreach (var emp in _employees)
+                    {
+                        <MudSelectItem Value="@((int?)emp.Id)">@emp.FullName</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="2">
+                <MudSelect T="EmployeePaymentType?" Value="_selectedType" Label="Tipo"
+                           Variant="Variant.Outlined" Clearable="true"
+                           ValueChanged="@((EmployeePaymentType? val) => { _selectedType = val; OnFilterChanged(); })">
+                    <MudSelectItem Value="@((EmployeePaymentType?)EmployeePaymentType.SalaryFixed)">Salário Fixo</MudSelectItem>
+                    <MudSelectItem Value="@((EmployeePaymentType?)EmployeePaymentType.SalaryByService)">Por Serviço</MudSelectItem>
+                    <MudSelectItem Value="@((EmployeePaymentType?)EmployeePaymentType.Advance)">Adiantamento</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="2">
+                <MudSelect T="AccountStatus?" Value="_selectedStatus" Label="Status"
+                           Variant="Variant.Outlined" Clearable="true"
+                           ValueChanged="@((AccountStatus? val) => { _selectedStatus = val; OnFilterChanged(); })">
+                    <MudSelectItem Value="@((AccountStatus?)AccountStatus.Pending)">Pendente</MudSelectItem>
+                    <MudSelectItem Value="@((AccountStatus?)AccountStatus.Paid)">Pago</MudSelectItem>
+                    <MudSelectItem Value="@((AccountStatus?)AccountStatus.Overdue)">Vencido</MudSelectItem>
+                    <MudSelectItem Value="@((AccountStatus?)AccountStatus.Cancelled)">Cancelado</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="2">
+                <MudSelect T="int?" Value="_selectedMonth" Label="Mês"
+                           Variant="Variant.Outlined" Clearable="true"
+                           ValueChanged="@((int? val) => { _selectedMonth = val; OnFilterChanged(); })">
+                    @for (int m = 1; m <= 12; m++)
+                    {
+                        var month = m;
+                        <MudSelectItem Value="@((int?)month)">@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month)</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="2">
+                <MudSelect T="int?" Value="_selectedYear" Label="Ano"
+                           Variant="Variant.Outlined" Clearable="true"
+                           ValueChanged="@((int? val) => { _selectedYear = val; OnFilterChanged(); })">
+                    @for (int y = DateTime.Now.Year; y >= DateTime.Now.Year - 3; y--)
+                    {
+                        var year = y;
+                        <MudSelectItem Value="@((int?)year)">@year</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <!-- Table -->
+    <MudPaper Elevation="2">
+        <MudTable T="EmployeePaymentDto" @ref="_table" ServerData="LoadServerData"
+                  Dense="true" Hover="true" Striped="true" Loading="@_isLoading">
+            <ToolBarContent>
+                <MudText Typo="Typo.h6">Listagem</MudText>
+                <MudSpacer />
+                <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="RefreshTable" />
+            </ToolBarContent>
+            <HeaderContent>
+                <MudTh><MudTableSortLabel SortLabel="employee" T="EmployeePaymentDto">Funcionário</MudTableSortLabel></MudTh>
+                <MudTh>Tipo</MudTh>
+                <MudTh><MudTableSortLabel SortLabel="duedate" T="EmployeePaymentDto">Vencimento</MudTableSortLabel></MudTh>
+                <MudTh>Referência</MudTh>
+                <MudTh><MudTableSortLabel SortLabel="amount" T="EmployeePaymentDto">Valor Líquido</MudTableSortLabel></MudTh>
+                <MudTh><MudTableSortLabel SortLabel="status" T="EmployeePaymentDto">Status</MudTableSortLabel></MudTh>
+                <MudTh Style="width: 180px;">Ações</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Funcionário">
+                    <MudText Typo="Typo.body2">@context.EmployeeName</MudText>
+                </MudTd>
+                <MudTd DataLabel="Tipo">
+                    <MudChip T="string" Size="Size.Small" Color="GetTypeColor(context.Type)" Variant="Variant.Text">
+                        @context.TypeName
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Vencimento">
+                    <MudText Typo="Typo.body2">@context.DueDate.ToString("dd/MM/yyyy")</MudText>
+                </MudTd>
+                <MudTd DataLabel="Referência">
+                    <MudText Typo="Typo.body2">@context.ReferenceMonth/@context.ReferenceYear</MudText>
+                </MudTd>
+                <MudTd DataLabel="Valor Líquido">@Currency.Format(context.NetAmount)</MudTd>
+                <MudTd DataLabel="Status">
+                    <AccountStatusChip Status="@context.Status" />
+                </MudTd>
+                <MudTd DataLabel="Ações">
+                    <MudStack Row="true" Spacing="0">
+                        @if (context.Status != AccountStatus.Paid && context.Status != AccountStatus.Cancelled)
+                        {
+                            <MudTooltip Text="Registrar pagamento">
+                                <MudIconButton Icon="@Icons.Material.Filled.Payment" Size="Size.Small"
+                                               Color="Color.Success"
+                                               OnClick="@(() => PayPayment(context))" />
+                            </MudTooltip>
+                            <MudTooltip Text="Editar">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                               OnClick="@(() => OpenEditDialog(context))" />
+                            </MudTooltip>
+                            <MudTooltip Text="Cancelar">
+                                <MudIconButton Icon="@Icons.Material.Filled.Cancel" Size="Size.Small"
+                                               Color="Color.Error"
+                                               OnClick="@(() => CancelPayment(context))" />
+                            </MudTooltip>
+                        }
+                        else if (context.Status == AccountStatus.Paid)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Success">
+                                @context.PaymentDate?.ToString("dd/MM/yyyy")
+                            </MudText>
+                        }
+                    </MudStack>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText>Nenhum pagamento encontrado.</MudText>
+            </NoRecordsContent>
+            <LoadingContent>
+                <MudText>Carregando...</MudText>
+            </LoadingContent>
+            <PagerContent>
+                <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+            </PagerContent>
+        </MudTable>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [Inject] private IApiService ApiService { get; set; } = null!;
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
+    [Inject] private IDialogService DialogService { get; set; } = null!;
+    [Inject] private CurrencyFormatService Currency { get; set; } = null!;
+
+    private MudTable<EmployeePaymentDto>? _table;
+    private bool _isLoading = false;
+
+    private int? _selectedEmployeeId;
+    private EmployeePaymentType? _selectedType;
+    private AccountStatus? _selectedStatus;
+    private int? _selectedMonth;
+    private int? _selectedYear;
+
+    private decimal _totalPending;
+    private decimal _totalPaid;
+    private decimal _totalOverdue;
+    private decimal _totalCancelled;
+
+    private List<UserDto> _employees = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReferenceData();
+        await LoadSummary();
+    }
+
+    private async Task LoadReferenceData()
+    {
+        try
+        {
+            _employees = await ApiService.GetAsync<List<UserDto>>("api/users") ?? new();
+        }
+        catch
+        {
+            _employees = new();
+        }
+    }
+
+    private async Task LoadSummary()
+    {
+        try
+        {
+            var result = await ApiService.GetAsync<TotalByStatusResult>("api/employee-payments/totals-by-status");
+            if (result != null)
+            {
+                _totalPending = result.Pending;
+                _totalPaid = result.Paid;
+                _totalOverdue = result.Overdue;
+                _totalCancelled = result.Cancelled;
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private async Task<TableData<EmployeePaymentDto>> LoadServerData(TableState state, CancellationToken token)
+    {
+        _isLoading = true;
+        try
+        {
+            var sortBy = state.SortLabel;
+            var sortDesc = state.SortDirection == SortDirection.Descending;
+
+            var queryParams = new List<string>
+            {
+                $"page={state.Page + 1}",
+                $"pageSize={state.PageSize}"
+            };
+
+            if (_selectedEmployeeId.HasValue)
+                queryParams.Add($"employeeId={_selectedEmployeeId}");
+            if (_selectedType.HasValue)
+                queryParams.Add($"type={(int)_selectedType.Value}");
+            if (_selectedStatus.HasValue)
+                queryParams.Add($"status={(int)_selectedStatus.Value}");
+            if (_selectedMonth.HasValue)
+                queryParams.Add($"referenceMonth={_selectedMonth}");
+            if (_selectedYear.HasValue)
+                queryParams.Add($"referenceYear={_selectedYear}");
+            if (!string.IsNullOrEmpty(sortBy))
+            {
+                queryParams.Add($"sortBy={sortBy}");
+                queryParams.Add($"sortDescending={sortDesc}");
+            }
+
+            var url = $"api/employee-payments?{string.Join("&", queryParams)}";
+            var result = await ApiService.GetAsync<PaginatedResult<EmployeePaymentDto>>(url);
+
+            return new TableData<EmployeePaymentDto>
+            {
+                Items = result?.Items ?? new List<EmployeePaymentDto>(),
+                TotalItems = result?.TotalCount ?? 0
+            };
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar dados: {ex.Message}", Severity.Error);
+            return new TableData<EmployeePaymentDto> { Items = new List<EmployeePaymentDto>(), TotalItems = 0 };
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void OnFilterChanged()
+    {
+        _table?.ReloadServerData();
+    }
+
+    private async Task RefreshTable()
+    {
+        await LoadSummary();
+        if (_table != null)
+            await _table.ReloadServerData();
+    }
+
+    private Color GetTypeColor(EmployeePaymentType type) => type switch
+    {
+        EmployeePaymentType.SalaryFixed => Color.Primary,
+        EmployeePaymentType.SalaryByService => Color.Secondary,
+        EmployeePaymentType.Advance => Color.Warning,
+        _ => Color.Default
+    };
+
+    private async Task OpenCreateDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { "Employees", _employees }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<EmployeePaymentDialog>("Novo Pagamento", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false } && result.Data is CreateEmployeePaymentDto dto)
+        {
+            try
+            {
+                await ApiService.PostAsync("api/employee-payments", dto);
+                Snackbar.Add("Pagamento criado com sucesso!", Severity.Success);
+                await RefreshTable();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao criar pagamento: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task OpenEditDialog(EmployeePaymentDto payment)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Employees", _employees },
+            { "PaymentId", payment.Id },
+            { "IsEdit", true }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<EmployeePaymentDialog>("Editar Pagamento", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false } && result.Data is UpdateEmployeePaymentDto updateDto)
+        {
+            try
+            {
+                await ApiService.PutAsync($"api/employee-payments/{payment.Id}", updateDto);
+                Snackbar.Add("Pagamento atualizado com sucesso!", Severity.Success);
+                await RefreshTable();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao atualizar pagamento: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task PayPayment(EmployeePaymentDto payment)
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Registrar Pagamento",
+            $"Confirmar pagamento de {Currency.Format(payment.NetAmount)} para {payment.EmployeeName}?",
+            yesText: "Confirmar", cancelText: "Cancelar");
+
+        if (confirm == true)
+        {
+            try
+            {
+                var dto = new PayEmployeePaymentDto { PaymentDate = DateTime.Now };
+                await ApiService.PostAsync($"api/employee-payments/{payment.Id}/pay", dto);
+                Snackbar.Add("Pagamento registrado com sucesso!", Severity.Success);
+                await RefreshTable();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao registrar pagamento: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task CancelPayment(EmployeePaymentDto payment)
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Cancelar Pagamento",
+            $"Tem certeza que deseja cancelar o pagamento de {payment.EmployeeName}?",
+            yesText: "Cancelar", cancelText: "Voltar");
+
+        if (confirm == true)
+        {
+            try
+            {
+                await ApiService.DeleteAsync($"api/employee-payments/{payment.Id}");
+                Snackbar.Add("Pagamento cancelado com sucesso!", Severity.Success);
+                await RefreshTable();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao cancelar pagamento: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task OpenGenerateServiceDialog()
+    {
+        var now = DateTime.Now;
+        var dueDate = new DateTime(now.Year, now.Month, DateTime.DaysInMonth(now.Year, now.Month));
+        var parameters = new DialogParameters
+        {
+            { "ReferenceMonth", now.Month },
+            { "ReferenceYear", now.Year },
+            { "DueDate", dueDate }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<GenerateServicePaymentsDialog>("Gerar Pagamentos por Serviço", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false } && result.Data is GenerateServicePaymentsDto dto)
+        {
+            try
+            {
+                var generated = await ApiService.PostAsync<List<EmployeePaymentDto>>("api/employee-payments/generate-service-payments", dto);
+                Snackbar.Add($"{generated?.Count ?? 0} pagamentos gerados com sucesso!", Severity.Success);
+                await RefreshTable();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao gerar pagamentos: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}
+
+<style>
+    .mud-theme-error {
+        background-color: rgba(244, 67, 54, 0.08) !important;
+    }
+</style>

@@ -1,0 +1,176 @@
+@using erp.DTOs.Financial
+@using erp.DTOs.User
+@using erp.Models.Financial
+@using erp.Services
+@using Color = MudBlazor.Color
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudSelect T="int" @bind-Value="_model.EmployeeId" Label="Funcionário" Variant="Variant.Outlined"
+                       For="@(() => _model.EmployeeId)" Disabled="@IsEdit">
+                @foreach (var emp in Employees)
+                {
+                    <MudSelectItem Value="@emp.Id">@(emp.FullName ?? emp.Username)</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudSelect T="EmployeePaymentType" @bind-Value="_model.Type" Label="Tipo de Pagamento"
+                       Variant="Variant.Outlined" Disabled="@IsEdit">
+                <MudSelectItem Value="EmployeePaymentType.SalaryFixed">Salário Fixo</MudSelectItem>
+                <MudSelectItem Value="EmployeePaymentType.SalaryByService">Por Serviço</MudSelectItem>
+                <MudSelectItem Value="EmployeePaymentType.Advance">Adiantamento</MudSelectItem>
+            </MudSelect>
+
+            @if (_model.Type == EmployeePaymentType.SalaryFixed)
+            {
+                <MudNumericField T="decimal" @bind-Value="_model.Amount" Label="Valor (Salário)"
+                                 Variant="Variant.Outlined" Min="0" Disabled="@_autoFillSalary" />
+                <MudCheckBox @bind-Value="_autoFillSalary" Label="Usar salário cadastrado do funcionário" />
+            }
+            else
+            {
+                <MudNumericField T="decimal" @bind-Value="_model.Amount" Label="Valor"
+                                 Variant="Variant.Outlined" Min="0" />
+            }
+
+            <MudNumericField T="decimal" @bind-Value="_model.DiscountAmount" Label="Desconto"
+                             Variant="Variant.Outlined" Min="0" />
+
+            @if (_model.Type == EmployeePaymentType.SalaryByService)
+            {
+                <MudNumericField T="int" @bind-Value="_serviceCount" Label="Quantidade de Serviços"
+                                 Variant="Variant.Outlined" Min="0" />
+                <MudStack Row="true" Spacing="2">
+                    <MudNumericField T="decimal?" @bind-Value="_model.ServiceUnitValue" Label="Valor por Serviço"
+                                     Variant="Variant.Outlined" Min="0" Class="flex-grow-1" />
+                    <MudText Typo="Typo.body1" Class="align-self-center">ou</MudText>
+                    <MudNumericField T="decimal?" @bind-Value="_model.ServicePercent" Label="% do Valor"
+                                     Variant="Variant.Outlined" Min="0" Max="100" Class="flex-grow-1" />
+                </MudStack>
+            }
+
+            <MudStack Row="true" Spacing="2">
+                <MudSelect T="int" @bind-Value="_model.ReferenceMonth" Label="Mês" Variant="Variant.Outlined"
+                           Class="flex-grow-1" Disabled="@IsEdit">
+                    @for (int m = 1; m <= 12; m++)
+                    {
+                        var month = m;
+                        <MudSelectItem Value="@month">
+                            @System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month)
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+                <MudSelect T="int" @bind-Value="_model.ReferenceYear" Label="Ano" Variant="Variant.Outlined"
+                           Class="flex-grow-1" Disabled="@IsEdit">
+                    @for (int y = DateTime.Now.Year + 1; y >= DateTime.Now.Year - 3; y--)
+                    {
+                        var year = y;
+                        <MudSelectItem Value="@year">@year</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudStack>
+
+            <MudDatePicker @bind-Date="_dueDate" Label="Data de Vencimento" Variant="Variant.Outlined" />
+
+            <MudSelect T="PaymentMethod" @bind-Value="_model.PaymentMethod" Label="Método de Pagamento"
+                       Variant="Variant.Outlined">
+                <MudSelectItem Value="PaymentMethod.Pix">Pix</MudSelectItem>
+                <MudSelectItem Value="PaymentMethod.BankTransfer">Transferência</MudSelectItem>
+                <MudSelectItem Value="PaymentMethod.Cash">Dinheiro</MudSelectItem>
+                <MudSelectItem Value="PaymentMethod.BankSlip">Boleto</MudSelectItem>
+                <MudSelectItem Value="PaymentMethod.Check">Cheque</MudSelectItem>
+                <MudSelectItem Value="PaymentMethod.Other">Outro</MudSelectItem>
+            </MudSelect>
+
+            <MudTextField T="string" @bind-Value="_model.Description" Label="Descrição / Observação"
+                          Variant="Variant.Outlined" Lines="3" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">Salvar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Inject] IApiService ApiService { get; set; } = null!;
+
+    [Parameter] public List<UserDto> Employees { get; set; } = new();
+    [Parameter] public int PaymentId { get; set; }
+    [Parameter] public bool IsEdit { get; set; }
+    [Parameter] public bool IsReadOnly { get; set; }
+
+    private CreateEmployeePaymentDto _model = new();
+    private DateTime? _dueDate = DateTime.Now.AddDays(5);
+    private bool _autoFillSalary = true;
+    private int _serviceCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var now = DateTime.Now;
+        _model.ReferenceMonth = now.Month;
+        _model.ReferenceYear = now.Year;
+
+        if (IsEdit && PaymentId > 0)
+        {
+            try
+            {
+                var existing = await ApiService.GetAsync<EmployeePaymentDto>($"api/employee-payments/{PaymentId}");
+                if (existing != null)
+                {
+                    _model.EmployeeId = existing.EmployeeId;
+                    _model.Type = existing.Type;
+                    _model.Amount = existing.Amount;
+                    _model.DiscountAmount = existing.DiscountAmount;
+                    _model.Description = existing.Description;
+                    _model.ReferenceMonth = existing.ReferenceMonth;
+                    _model.ReferenceYear = existing.ReferenceYear;
+                    _model.PaymentMethod = existing.PaymentMethod;
+                    _model.CategoryId = existing.CategoryId;
+                    _model.CostCenterId = existing.CostCenterId;
+                    _dueDate = existing.DueDate;
+                    _serviceCount = existing.ServiceCount ?? 0;
+                    _model.ServiceUnitValue = existing.ServiceUnitValue;
+                    _model.ServicePercent = existing.ServicePercent;
+                    _autoFillSalary = false;
+                }
+            }
+            catch { }
+        }
+    }
+
+    private void Save()
+    {
+        if (_dueDate.HasValue)
+            _model.DueDate = _dueDate.Value;
+
+        if (_model.Type == EmployeePaymentType.SalaryFixed && _autoFillSalary)
+        {
+            _model.Amount = 0;
+        }
+
+        _model.ServiceCount = _serviceCount;
+
+        if (IsEdit)
+        {
+            var updateDto = new UpdateEmployeePaymentDto
+            {
+                Amount = _model.Amount,
+                DiscountAmount = _model.DiscountAmount,
+                Description = _model.Description,
+                DueDate = _model.DueDate,
+                PaymentMethod = _model.PaymentMethod,
+                CategoryId = _model.CategoryId,
+                CostCenterId = _model.CostCenterId
+            };
+            MudDialog.Close(DialogResult.Ok(updateDto));
+            return;
+        }
+
+        MudDialog.Close(DialogResult.Ok(_model));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

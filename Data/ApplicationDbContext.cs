@@ -73,6 +73,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<SalesGoal> SalesGoals { get; set; } = null!;
     public DbSet<VendorPerformance> VendorPerformances { get; set; } = null!;
     public DbSet<ServiceOrderCommission> ServiceOrderCommissions { get; set; } = null!;
+    public DbSet<EmployeePayment> EmployeePayments { get; set; } = null!;
     
     // HR Management
     public DbSet<Department> Departments { get; set; } = null!;
@@ -1833,6 +1834,56 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .WithMany()
                 .HasForeignKey(x => x.PayrollId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // EmployeePayment
+        modelBuilder.Entity<EmployeePayment>(ep =>
+        {
+            ep.ToTable("EmployeePayments");
+            ep.HasKey(x => x.Id);
+            ep.Property(x => x.Amount).HasPrecision(18, 2);
+            ep.Property(x => x.DiscountAmount).HasPrecision(18, 2);
+            ep.Property(x => x.NetAmount).HasPrecision(18, 2);
+            ep.Property(x => x.Description).HasMaxLength(500);
+            ep.Property(x => x.ServiceUnitValue).HasPrecision(18, 2);
+            ep.Property(x => x.ServicePercent).HasPrecision(5, 2);
+
+            ep.HasIndex(x => x.EmployeeId);
+            ep.HasIndex(x => x.Status);
+            ep.HasIndex(x => x.Type);
+            ep.HasIndex(x => x.DueDate);
+            ep.HasIndex(x => new { x.ReferenceMonth, x.ReferenceYear });
+            ep.HasIndex(x => new { x.EmployeeId, x.ReferenceMonth, x.ReferenceYear, x.Type });
+
+            ep.HasOne(x => x.Employee)
+                .WithMany()
+                .HasForeignKey(x => x.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            ep.HasOne(x => x.Category)
+                .WithMany()
+                .HasForeignKey(x => x.CategoryId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            ep.HasOne(x => x.CostCenter)
+                .WithMany()
+                .HasForeignKey(x => x.CostCenterId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            ep.HasOne(x => x.ServiceOrder)
+                .WithMany()
+                .HasForeignKey(x => x.ServiceOrderId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            ep.HasOne(x => x.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            ep.HasOne(x => x.PaidByUser)
+                .WithMany()
+                .HasForeignKey(x => x.PaidByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
     

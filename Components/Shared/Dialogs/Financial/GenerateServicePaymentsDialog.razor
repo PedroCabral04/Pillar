@@ -1,0 +1,72 @@
+@using erp.DTOs.Financial
+@using erp.Models.Financial
+@using Color = MudBlazor.Color
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.body1" Class="mb-4">
+            Gerar pagamentos automaticamente com base nas Ordens de Serviço concluídas no período selecionado.
+        </MudText>
+        <MudStack Spacing="3">
+            <MudStack Row="true" Spacing="2">
+                <MudSelect T="int" @bind-Value="_model.ReferenceMonth" Label="Mês" Variant="Variant.Outlined"
+                           Class="flex-grow-1">
+                    @for (int m = 1; m <= 12; m++)
+                    {
+                        var month = m;
+                        <MudSelectItem Value="@month">
+                            @System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month)
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+                <MudSelect T="int" @bind-Value="_model.ReferenceYear" Label="Ano" Variant="Variant.Outlined"
+                           Class="flex-grow-1">
+                    @for (int y = DateTime.Now.Year + 1; y >= DateTime.Now.Year - 3; y--)
+                    {
+                        var year = y;
+                        <MudSelectItem Value="@year">@year</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudStack>
+            <MudDatePicker @bind-Date="_dueDate" Label="Data de Vencimento" Variant="Variant.Outlined" />
+            <MudSelect T="PaymentMethod" @bind-Value="_model.PaymentMethod" Label="Método de Pagamento"
+                       Variant="Variant.Outlined">
+                <MudSelectItem Value="PaymentMethod.Pix">Pix</MudSelectItem>
+                <MudSelectItem Value="PaymentMethod.BankTransfer">Transferência</MudSelectItem>
+                <MudSelectItem Value="PaymentMethod.Cash">Dinheiro</MudSelectItem>
+            </MudSelect>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Generate">Gerar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private GenerateServicePaymentsDto _model = new();
+    private DateTime? _dueDate = DateTime.Now.AddDays(5);
+
+    [Parameter] public int ReferenceMonth { get; set; }
+    [Parameter] public int ReferenceYear { get; set; }
+    [Parameter] public DateTime DueDate { get; set; }
+
+    protected override void OnInitialized()
+    {
+        _model.ReferenceMonth = ReferenceMonth;
+        _model.ReferenceYear = ReferenceYear;
+        _dueDate = DueDate;
+    }
+
+    private void Generate()
+    {
+        if (_dueDate.HasValue)
+            _model.DueDate = _dueDate.Value;
+
+        MudDialog.Close(DialogResult.Ok(_model));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}
