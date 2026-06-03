@@ -16,32 +16,32 @@ public class TwoFactorTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
-    public async Task EnableTwoFactor_WithoutAuthentication_ReturnsUnauthorized()
+    public async Task EnableTwoFactor_WithoutAuthentication_ReturnsForbidden()
     {
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
         var response = await client.PostAsJsonAsync("/api/dois-fatores/enable", new { });
 
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Fact]
-    public async Task VerifySetup_WithoutAuthentication_ReturnsUnauthorized()
+    public async Task VerifySetup_WithoutAuthentication_ReturnsForbidden()
     {
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
         var response = await client.PostAsJsonAsync("/api/dois-fatores/verify-setup", new { code = "000000" });
 
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Fact]
-    public async Task DisableTwoFactor_WithoutAuthentication_ReturnsUnauthorized()
+    public async Task DisableTwoFactor_WithoutAuthentication_ReturnsForbidden()
     {
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
         var response = await client.PostAsJsonAsync("/api/dois-fatores/disable", new { });
 
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 }

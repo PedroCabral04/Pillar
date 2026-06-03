@@ -50,7 +50,7 @@ public class DashboardControllerTests
 
         var result = await _controller.GetWidgets();
 
-        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var ok = result.Result.Should().BeOfType<OkObjectResult>().Subject;
         var widgets = ok.Value.Should().BeAssignableTo<IEnumerable<DashboardWidgetDefinition>>().Subject.ToList();
         widgets.Select(w => w.WidgetKey).Should().Contain(["public", "sales-only"]);
         widgets.Select(w => w.WidgetKey).Should().NotContain("finance-only");
@@ -71,7 +71,7 @@ public class DashboardControllerTests
 
         var result = await _controller.GetWidgetsByProvider("sales");
 
-        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var ok = result.Result.Should().BeOfType<OkObjectResult>().Subject;
         var widgets = ok.Value.Should().BeAssignableTo<IEnumerable<DashboardWidgetDefinition>>().Subject.ToList();
         widgets.Should().HaveCount(1);
         widgets[0].ProviderKey.Should().Be("sales");

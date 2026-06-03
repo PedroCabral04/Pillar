@@ -1,5 +1,6 @@
 @page "/financial/commissions"
 @using erp.DTOs.Financial
+@using erp.DTOs.User
 @using erp.Models.Financial
 @using erp.Services.Authorization
 @using erp.Components.Shared
@@ -239,7 +240,7 @@
     private CommissionSummary _summary = new();
 
     // Lista de usuários
-    private List<VendorUserInfo> _users = new();
+    private List<UserLookupDto> _users = new();
 
     // DI
     [Inject] private IApiService ApiService { get; set; } = null!;
@@ -248,7 +249,20 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadUsers();
         await LoadData();
+    }
+
+    private async Task LoadUsers()
+    {
+        try
+        {
+            _users = await ApiService.GetAsync<List<UserLookupDto>>("/api/users/vendors") ?? new List<UserLookupDto>();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar vendedores: {ex.Message}", Severity.Error);
+        }
     }
 
     private async Task LoadData()
@@ -267,13 +281,6 @@
 
             var commissions = await ApiService.GetAsync<IEnumerable<CommissionDto>>($"api/comissoes{queryString}");
             _commissions = commissions?.ToList() ?? new List<CommissionDto>();
-
-            // Carregar usuários (simulado - você pode ter um endpoint real)
-            _users = _commissions
-                .GroupBy(c => c.UserId)
-                .Select(g => new VendorUserInfo { Id = g.Key, Name = g.First().UserName })
-                .OrderBy(u => u.Name)
-                .ToList();
 
             ApplyFilters();
             CalculateSummary();
@@ -352,13 +359,6 @@
     {
         // TODO: Abrir diálogo de detalhes
         Snackbar.Add("Detalhes da comissão em desenvolvimento", Severity.Info);
-    }
-
-    // Classes auxiliares
-    private class VendorUserInfo
-    {
-        public int Id { get; set; }
-        public string Name { get; set; } = string.Empty;
     }
 
     private class CommissionSummary

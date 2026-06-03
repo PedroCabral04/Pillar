@@ -477,31 +477,33 @@ public class ServiceOrdersController : ControllerBase
     <meta charset=""utf-8"" />
     <title>OS {order.OrderNumber}</title>
     <style>
-        body {{ font-family: Arial, sans-serif; font-size: 12px; line-height: 1.4; color: #333; }}
-        .container {{ max-width: 800px; margin: 0 auto; padding: 20px; }}
-        .header {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0066cc; padding-bottom: 10px; margin-bottom: 20px; }}
-        .title {{ font-size: 24px; font-weight: bold; color: #0066cc; }}
-        .tenant-logo {{ max-height: 56px; max-width: 220px; object-fit: contain; }}
-        .tenant-name {{ font-size: 13px; font-weight: 600; color: #1f2937; margin-top: 6px; }}
-        .non-fiscal-warning {{ background: #fff5f5; color: #8b0000; border: 1px solid #ffcccc; font-weight: 700; text-align: center; padding: 8px; margin-bottom: 15px; }}
-        .order-number {{ font-size: 20px; font-weight: bold; }}
+        @page {{ size: A4; margin: 8mm; }}
+        * {{ box-sizing: border-box; }}
+        body {{ font-family: Arial, sans-serif; font-size: 10px; line-height: 1.25; color: #333; margin: 0; }}
+        .container {{ width: 100%; max-width: 190mm; margin: 0 auto; padding: 0; }}
+        .header {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0066cc; padding-bottom: 6px; margin-bottom: 8px; page-break-inside: avoid; }}
+        .title {{ font-size: 18px; font-weight: bold; color: #0066cc; }}
+        .tenant-logo {{ max-height: 42px; max-width: 180px; object-fit: contain; }}
+        .tenant-name {{ font-size: 11px; font-weight: 600; color: #1f2937; margin-top: 3px; }}
+        .non-fiscal-warning {{ background: #fff5f5; color: #8b0000; border: 1px solid #ffcccc; font-weight: 700; text-align: center; padding: 5px; margin-bottom: 7px; page-break-inside: avoid; }}
+        .order-number {{ font-size: 16px; font-weight: bold; }}
         .status {{ background: {statusColor}; color: white; padding: 4px 12px; border-radius: 4px; font-weight: bold; }}
-        .section {{ margin-bottom: 15px; }}
-        .section-title {{ font-weight: bold; color: #0066cc; margin-bottom: 5px; }}
-        .grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }}
-        .device-info {{ background: #e3f2fd; padding: 10px; border: 1px solid #90caf9; }}
-        .problem-box {{ background: #fff3e0; border-left: 4px solid #ff9800; padding: 10px; margin: 10px 0; }}
+        .section {{ margin-bottom: 7px; page-break-inside: avoid; }}
+        .section-title {{ font-weight: bold; color: #0066cc; margin-bottom: 3px; }}
+        .grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }}
+        .device-info {{ background: #e3f2fd; padding: 6px; border: 1px solid #90caf9; }}
+        .problem-box {{ background: #fff3e0; border-left: 4px solid #ff9800; padding: 6px; margin: 6px 0; page-break-inside: avoid; }}
         table {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
-        th {{ background: #0066cc; color: white; padding: 8px; text-align: left; }}
-        td {{ padding: 8px; border-bottom: 1px solid #ddd; }}
+        th {{ background: #0066cc; color: white; padding: 4px 5px; text-align: left; }}
+        td {{ padding: 4px 5px; border-bottom: 1px solid #ddd; }}
         .text-right {{ text-align: right; }}
-        .totals {{ background: #0066cc; color: white; padding: 12px; width: 220px; margin-left: auto; }}
+        .totals {{ background: #0066cc; color: white; padding: 7px; width: 200px; margin-left: auto; page-break-inside: avoid; }}
         .totals-row {{ display: flex; justify-content: space-between; }}
-        .totals-total {{ font-size: 16px; font-weight: bold; margin-top: 8px; padding-top: 8px; border-top: 1px solid white; }}
-        .signatures {{ display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 40px; }}
+        .totals-total {{ font-size: 13px; font-weight: bold; margin-top: 4px; padding-top: 4px; border-top: 1px solid white; }}
+        .signatures {{ display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 18px; page-break-inside: avoid; }}
         .signature {{ text-align: center; }}
-        .signature-line {{ border-bottom: 1px solid black; height: 50px; }}
-        .footer {{ margin-top: 30px; padding-top: 10px; border-top: 1px solid #ddd; font-size: 10px; color: #666; text-align: center; }}
+        .signature-line {{ border-bottom: 1px solid black; height: 28px; }}
+        .footer {{ margin-top: 10px; padding-top: 5px; border-top: 1px solid #ddd; font-size: 8px; color: #666; text-align: center; page-break-inside: avoid; }}
         @media print {{ body {{ -webkit-print-color-adjust: exact; print-color-adjust: exact; }} }}
     </style>
 </head>

@@ -238,6 +238,39 @@ namespace erp.Controllers
         }
 
         /// <summary>
+        /// Retorna usuários vendedores ativos para filtros e seletores.
+        /// </summary>
+        [HttpGet("vendors")]
+        [HttpGet("vendedores")]
+        [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<ActionResult<IEnumerable<UserLookupDto>>> GetVendorLookups()
+        {
+            var vendors = await ApplyTenantScope(_users.Users)
+                .AsNoTracking()
+                .Where(u => u.IsActive)
+                .Join(_context.UserRoles,
+                    user => user.Id,
+                    userRole => userRole.UserId,
+                    (user, userRole) => new { user, userRole.RoleId })
+                .Join(ApplyTenantScope(_context.Roles).Where(r => r.Name == "Vendedor"),
+                    userRole => userRole.RoleId,
+                    role => role.Id,
+                    (userRole, _) => new UserLookupDto
+                    {
+                        Id = userRole.user.Id,
+                        Name = string.IsNullOrWhiteSpace(userRole.user.FullName)
+                            ? userRole.user.UserName ?? string.Empty
+                            : userRole.user.FullName
+                    })
+                .OrderBy(u => u.Name)
+                .ToListAsync();
+
+            return Ok(vendors);
+        }
+
+        /// <summary>
         /// Busca um usuário específico por ID
         /// </summary>
         /// <param name="id">ID do usuário</param>

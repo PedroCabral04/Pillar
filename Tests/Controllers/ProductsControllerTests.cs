@@ -158,13 +158,13 @@ public class ProductsControllerTests
             Sku = createDto.Sku,
             Name = createDto.Name,
             Description = createDto.Description,
-            CategoryId = createDto.CategoryId,
+            CategoryId = createDto.CategoryId ?? 0,
             CategoryName = "Categoria Teste",
-            SalePrice = createDto.SalePrice,
-            CostPrice = createDto.CostPrice,
+            SalePrice = createDto.SalePrice ?? 0,
+            CostPrice = createDto.CostPrice ?? 0,
             CurrentStock = 0,
-            MinimumStock = createDto.MinimumStock,
-            MaximumStock = createDto.MaximumStock,
+            MinimumStock = createDto.MinimumStock ?? 0,
+            MaximumStock = createDto.MaximumStock ?? 0,
             IsActive = true,
             CreatedAt = DateTime.UtcNow
         };
@@ -368,7 +368,7 @@ public class ProductsControllerTests
             Sku = updateDto.Sku,
             Name = updateDto.Name,
             Description = updateDto.Description,
-            SalePrice = updateDto.SalePrice,
+            SalePrice = updateDto.SalePrice ?? 0,
             IsActive = updateDto.IsActive
         };
 

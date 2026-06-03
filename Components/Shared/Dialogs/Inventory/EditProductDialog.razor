@@ -1,6 +1,7 @@
 @using erp.DTOs.Inventory
 @using erp.Models.Inventory
 @using erp.Services
+@using erp.Services.Inventory
 @using Color = MudBlazor.Color
 @using Size = MudBlazor.Size
 @inject ISnackbar Snackbar
@@ -200,13 +201,24 @@
                                     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
                                         <MudIcon Icon="@Icons.Material.Filled.Info" Size="MudBlazor.Size.Small"/>
                                         <MudText Typo="Typo.body2">
-                                            Estoque atual: <strong>@Product?.CurrentStock.ToString("N0") @Product?.Unit</strong>. 
-                                            Para ajustar o estoque, utilize <MudLink Href="/inventory/movements">Movimentações de Estoque</MudLink>.
+                                            O ajuste do estoque atual será salvo como movimentação para manter o histórico.
                                         </MudText>
                                     </MudStack>
                                 </MudAlert>
                             </MudItem>
-                            
+
+                            <MudItem xs="12" md="6">
+                                <MudNumericField T="decimal?"
+                                                Label="Estoque Atual"
+                                                @bind-Value="_newCurrentStock"
+                                                Min="@(Product?.AllowNegativeStock == true ? null : 0m)"
+                                                Step="1"
+                                                Variant="Variant.Outlined"
+                                                Adornment="Adornment.Start"
+                                                AdornmentIcon="@Icons.Material.Filled.Inventory"
+                                                HelperText="@GetCurrentStockHelperText()" />
+                            </MudItem>
+                             
                             <MudItem xs="12" md="6">
                                 <MudNumericField T="decimal?"
                                                 Label="Estoque Mínimo"
@@ -523,6 +535,7 @@
     private List<ProductCategoryDto> _categories = new();
     private UpdateProductDto _updateProduct = new();
     private List<VariantOptionViewModel> _variantOptions = new();
+    private decimal? _newCurrentStock;
     
     // ViewModel para a UI de opções
     private class VariantOptionViewModel
@@ -610,6 +623,7 @@
         _updateProduct.AllowNegativeStock = product.AllowNegativeStock;
         _updateProduct.IsKit = product.IsKit;
         _updateProduct.MainImageUrl = product.MainImageUrl;
+        _newCurrentStock = product.CurrentStock;
     }
 
     private void LoadExistingOptions()
@@ -637,6 +651,11 @@
         }
 
         return (_updateProduct.SalePrice.Value - _updateProduct.CostPrice!.Value) / _updateProduct.SalePrice.Value;
+    }
+
+    private string GetCurrentStockHelperText()
+    {
+        return Product == null ? string.Empty : $"Atual: {Product.CurrentStock:N2} {Product.Unit}";
     }
 
     private void Cancel()
@@ -682,6 +701,17 @@
 
             if (result != null)
             {
+                try
+                {
+                    result = await ApplyStockAdjustmentIfNeeded(result);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex, "Erro ao ajustar estoque do produto {ProductId}", result.Id);
+                    Snackbar.Add($"Produto atualizado, mas o ajuste de estoque falhou: {ex.Message}", Severity.Error);
+                    return;
+                }
+
                 // Salvar as novas opções de variação
                 var newOptions = _variantOptions.Where(o => o.Id == 0 && !string.IsNullOrWhiteSpace(o.Name) && o.Values.Any()).ToList();
                 if (newOptions.Any())
@@ -729,6 +759,24 @@
         {
             _saving = false;
         }
+    }
+
+    private async Task<ProductDto> ApplyStockAdjustmentIfNeeded(ProductDto product)
+    {
+        if (!_newCurrentStock.HasValue || Product == null || _newCurrentStock.Value == product.CurrentStock)
+        {
+            return product;
+        }
+
+        var movement = StockAdjustmentCalculator.CreateAdjustmentMovement(
+            product.Id,
+            product.CurrentStock,
+            _newCurrentStock.Value,
+            _updateProduct.CostPrice ?? product.CostPrice,
+            $"Ajuste de estoque pela edição do produto: {product.CurrentStock:N2} para {_newCurrentStock.Value:N2}");
+
+        await ApiService.PostAsync<StockMovementDto>("/api/estoque/movements", movement);
+        return await ApiService.GetAsync<ProductDto>($"/api/produtos/{product.Id}") ?? product;
     }
 
     private void AddOption()

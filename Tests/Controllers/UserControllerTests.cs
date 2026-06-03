@@ -131,6 +131,55 @@ public class UserControllerTests : IDisposable
         result.Result.Should().BeOfType<NotFoundObjectResult>();
     }
 
+    [Fact]
+    public async Task GetVendorLookups_ReturnsOnlyActiveVendorsWithoutSensitiveUserDto()
+    {
+        var vendorRole = new ApplicationRole { Id = 1, Name = "Vendedor", NormalizedName = "VENDEDOR" };
+        var adminRole = new ApplicationRole { Id = 2, Name = "Admin", NormalizedName = "ADMIN" };
+        _context.Roles.AddRange(vendorRole, adminRole);
+        _context.Users.AddRange(
+            new ApplicationUser
+            {
+                Id = 10,
+                UserName = "vendor.fullname",
+                FullName = "Vendor Fullname",
+                Email = "vendor@erp.local",
+                Cpf = "12345678900",
+                BankAccount = "0001",
+                IsActive = true
+            },
+            new ApplicationUser
+            {
+                Id = 20,
+                UserName = "inactive.vendor",
+                FullName = "Inactive Vendor",
+                IsActive = false
+            },
+            new ApplicationUser
+            {
+                Id = 30,
+                UserName = "admin.only",
+                FullName = "Admin Only",
+                IsActive = true
+            });
+        _context.UserRoles.AddRange(
+            new IdentityUserRole<int> { UserId = 10, RoleId = vendorRole.Id },
+            new IdentityUserRole<int> { UserId = 20, RoleId = vendorRole.Id },
+            new IdentityUserRole<int> { UserId = 30, RoleId = adminRole.Id });
+        await _context.SaveChangesAsync();
+
+        var result = await _controller.GetVendorLookups();
+
+        var ok = result.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var vendors = ok.Value.Should().BeAssignableTo<IEnumerable<UserLookupDto>>().Subject.ToList();
+        vendors.Should().ContainSingle().Which.Should().BeEquivalentTo(new UserLookupDto
+        {
+            Id = 10,
+            Name = "Vendor Fullname"
+        });
+        ok.Value.Should().NotBeAssignableTo<IEnumerable<UserDto>>();
+    }
+
     public void Dispose()
     {
         _context.Dispose();
